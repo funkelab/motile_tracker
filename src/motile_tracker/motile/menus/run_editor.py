@@ -7,6 +7,8 @@ from warnings import warn
 
 import napari.layers
 import networkx as nx
+import numpy as np
+from motile_toolbox.utils.relabel_segmentation import ensure_unique_labels
 from motile_tracker.motile.backend import MotileRun
 from qtpy.QtCore import Signal
 from qtpy.QtWidgets import (
@@ -147,6 +149,29 @@ class RunEditor(QGroupBox):
         run_widget.setLayout(run_layout)
         return run_widget
 
+    @staticmethod
+    def _has_duplicate_ids(segmentation: np.ndarray) -> bool:
+        """Checks if the segmentation has duplicate label ids across time. For efficiency,
+        only checks between the first and second time frames.
+
+        Args:
+            segmentation (np.ndarray): (t, [z], y, x)
+
+        Returns:
+            bool: True if there are duplicate labels between the first two frames, and
+                False otherwise.
+        """
+        if segmentation.shape[0] >= 2:
+            first_frame_ids = set(np.unique(segmentation[0]).tolist())
+            first_frame_ids.remove(0)
+            print(first_frame_ids)
+            second_frame_ids = set(np.unique(segmentation[1]).tolist())
+            second_frame_ids.remove(0)
+            print(second_frame_ids)
+            return not first_frame_ids.isdisjoint(second_frame_ids)
+        else:
+            return False
+
     def get_run(self) -> MotileRun | None:
         """Construct a motile run from the current state of the run editor
         widget.
@@ -171,6 +196,9 @@ class RunEditor(QGroupBox):
                 raise ValueError(
                     "Expected segmentation to be at least 3D, found %d", ndim
                 )
+            if self._has_duplicate_ids(input_seg):
+                input_seg = ensure_unique_labels(input_seg)
+
             input_points = None
         elif isinstance(input_layer, napari.layers.Points):
             input_seg = None
