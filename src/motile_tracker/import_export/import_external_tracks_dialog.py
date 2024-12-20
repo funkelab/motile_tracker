@@ -176,7 +176,7 @@ class CSVFieldMapWidget(QWidget):
 class DataWidget(QWidget):
     """QWidget for selecting CSV file and optional segmentation image"""
 
-    csv_loaded = Signal()
+    update_buttons = Signal()
 
     def __init__(self, add_segmentation: bool = False, incl_z: bool = False):
         super().__init__()
@@ -210,6 +210,7 @@ class DataWidget(QWidget):
         # Optional QlineEdit for segmentation image path and browse button
         if self.add_segmentation:
             self.image_path_line = QLineEdit(self)
+            self.image_path_line.editingFinished.connect(self.update_buttons.emit)
             self.image_browse_button = QPushButton("Browse Segmentation", self)
             self.image_browse_button.setAutoDefault(0)
             self.image_browse_button.clicked.connect(self._browse_segmentation)
@@ -256,7 +257,7 @@ class DataWidget(QWidget):
                 list(self.df.columns), seg=self.add_segmentation, incl_z=self.incl_z
             )
             self.layout.addWidget(self.csv_field_widget)
-            self.csv_loaded.emit()
+            self.update_buttons.emit()
 
         except pd.errors.EmptyDataError:
             QMessageBox.critical(self, "Error", "The file is empty or has no data.")
@@ -409,7 +410,7 @@ class ImportTracksDialog(QDialog):
         self.data_widget = DataWidget(
             add_segmentation=self.menu_widget.segmentation_checkbox.isChecked()
         )
-        self.data_widget.csv_loaded.connect(self._update_buttons)
+        self.data_widget.update_buttons.connect(self._update_buttons)
         self.stacked_widget.addWidget(self.data_widget)
 
         # Optional Page 3 with scaling is None until specified otherwise
@@ -428,7 +429,7 @@ class ImportTracksDialog(QDialog):
             add_segmentation=self.menu_widget.segmentation_checkbox.isChecked(),
             incl_z=self.menu_widget.radio_3D.isChecked(),
         )
-        self.data_widget.csv_loaded.connect(self._update_buttons)
+        self.data_widget.update_buttons.connect(self._update_buttons)
 
         self.stacked_widget.addWidget(self.data_widget)
 
