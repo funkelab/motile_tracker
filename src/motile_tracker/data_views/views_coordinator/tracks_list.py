@@ -21,7 +21,7 @@ from qtpy.QtWidgets import (
 )
 from superqt.fonticon import icon as qticon
 
-from motile_tracker.data_model import Tracks
+from motile_tracker.data_model import SolutionTracks, Tracks
 from motile_tracker.import_export.import_external_tracks_dialog import (
     ImportTracksDialog,
 )
@@ -192,7 +192,7 @@ class TracksList(QGroupBox):
                 self.add_tracks(tracks, name, select=True)
             except (ValueError, FileNotFoundError):
                 try:
-                    tracks = Tracks.load(directory)
+                    tracks = SolutionTracks.load(directory)
                     self.add_tracks(tracks, name, select=True)
                 except (ValueError, FileNotFoundError) as e:
                     warn(f"Could not load tracks from {directory}: {e}", stacklevel=2)
