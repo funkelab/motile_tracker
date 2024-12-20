@@ -783,6 +783,7 @@ class TreeWidget(QWidget):
                 self.selected_nodes,
                 self.tracks_viewer.filtered_nodes,
                 self.tracks_viewer.filter_color,
+                reset_view=True,
             )
         elif self.mode == "group":
             self._update_group_df()
@@ -954,6 +955,7 @@ class TreeWidget(QWidget):
             self.selected_nodes,
             self.tracks_viewer.filtered_nodes,
             self.tracks_viewer.filter_color,
+            reset_view=True,
         )
 
     def _update_lineage_df(self) -> None:
