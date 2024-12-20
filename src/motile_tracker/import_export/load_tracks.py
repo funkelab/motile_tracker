@@ -70,6 +70,9 @@ def tracks_from_df(
             "Segmentation ids in dataframe do not match values in segmentation. Is it possible that you loaded the wrong combination of csv file and segmentation, or that the scaling information you provided is incorrect?"
         )
 
+    # Convert NaN values to None
+    df = df.applymap(lambda x: None if pd.isna(x) else x)
+
     # Convert custom attributes stored as strings back to lists
     for col in df.columns:
         if col not in [
