@@ -5,9 +5,6 @@ import logging
 import networkx as nx
 import numpy as np
 from motile_toolbox.candidate_graph import NodeAttr
-from motile_tracker.data_model import SolutionTracks
-from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
-from motile_tracker.motile.backend import MotileRun, solve
 from napari import Viewer
 from napari.utils.notifications import show_warning
 from psygnal import Signal
@@ -17,6 +14,10 @@ from qtpy.QtWidgets import (
     QWidget,
 )
 from superqt.utils import thread_worker
+
+from motile_tracker.data_model import SolutionTracks
+from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
+from motile_tracker.motile.backend import MotileRun, solve
 
 from .run_editor import RunEditor
 from .run_viewer import RunViewer

@@ -2,6 +2,7 @@ import networkx as nx
 import numpy as np
 import pytest
 from motile_toolbox.candidate_graph import NodeAttr
+
 from motile_tracker.data_model import Tracks
 
 

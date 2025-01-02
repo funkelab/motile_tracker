@@ -2,6 +2,7 @@ from csv import DictReader
 
 import networkx as nx
 import numpy as np
+
 from motile_tracker.data_model import SolutionTracks
 
 

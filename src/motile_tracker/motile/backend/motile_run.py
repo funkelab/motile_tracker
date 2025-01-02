@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 from motile_toolbox.candidate_graph.graph_attributes import NodeAttr
+
 from motile_tracker.data_model import SolutionTracks
 
 from .solver_params import SolverParams

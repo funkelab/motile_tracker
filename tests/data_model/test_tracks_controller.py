@@ -1,5 +1,6 @@
 import numpy as np
 from motile_toolbox.candidate_graph.graph_attributes import NodeAttr
+
 from motile_tracker.data_model.solution_tracks import SolutionTracks
 from motile_tracker.data_model.tracks_controller import TracksController
 

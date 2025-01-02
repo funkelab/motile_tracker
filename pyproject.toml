@@ -45,6 +45,8 @@ dependencies =[
 [project.optional-dependencies]
 testing =["napari", "pyqt5", "pytest", "pytest-cov", "pytest-qt"]
 docs = ["myst-parser", "sphinx", "sphinx-autoapi", "sphinx_rtd_theme", "sphinxcontrib-video"]
+dev = ["ruff", "pre-commit"]
+all = ["motile-tracker[testing,docs,dev]"]
 
 [project.entry-points."napari.manifest"]
 motile-tracker = "motile_tracker:napari.yaml"
@@ -59,6 +61,7 @@ motile-tracker = "motile_tracker:napari.yaml"
 line-length = 88
 target-version = "py310"
 fix = true
+src = ["src"]
 
 [tool.ruff.lint]
 select = [
@@ -74,7 +77,6 @@ select = [
     "PIE", # flake8-pie
     "SIM", # flake8-simplify
 ]
-
 ignore = [
     "UP006", "UP007", # type annotation. As using magicgui require runtime type annotation then we disable this.
     "ISC001", # implicit string concatenation
@@ -84,6 +86,7 @@ ignore = [
 unfixable = [
   "B905", # currently adds strict=False to zips. Should add strict=True (manually)
 ]
+
 
 [tool.ruff.lint.per-file-ignores]
 "scripts/*.py" = ["F"]

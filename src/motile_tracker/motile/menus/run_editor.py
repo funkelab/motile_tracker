@@ -9,7 +9,6 @@ import napari.layers
 import networkx as nx
 import numpy as np
 from motile_toolbox.utils.relabel_segmentation import ensure_unique_labels
-from motile_tracker.motile.backend import MotileRun
 from qtpy.QtCore import Signal
 from qtpy.QtWidgets import (
     QComboBox,
@@ -22,6 +21,8 @@ from qtpy.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from motile_tracker.motile.backend import MotileRun
 
 from .params_editor import SolverParamsEditor
 

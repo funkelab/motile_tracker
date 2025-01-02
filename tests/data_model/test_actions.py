@@ -2,13 +2,14 @@ import networkx as nx
 import numpy as np
 import pytest
 from motile_toolbox.candidate_graph.graph_attributes import EdgeAttr, NodeAttr
+from numpy.testing import assert_array_almost_equal
+
 from motile_tracker.data_model import Tracks
 from motile_tracker.data_model.actions import (
     AddEdges,
     AddNodes,
     UpdateNodeSegs,
 )
-from numpy.testing import assert_array_almost_equal
 
 
 def test_add_delete_nodes(segmentation_2d, graph_2d):
