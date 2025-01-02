@@ -2,6 +2,7 @@ from csv import DictReader
 
 import networkx as nx
 import numpy as np
+
 from motile_tracker.data_model import SolutionTracks
 
 
@@ -44,7 +45,7 @@ def tracks_from_csv(
                     graph.add_edge(parent_id, _id)
     tracks = SolutionTracks(
         graph=graph,
-        segmentation=np.expand_dims(segmentation, axis=1),
+        segmentation=segmentation,
         pos_attr="pos",
         time_attr="time",
     )

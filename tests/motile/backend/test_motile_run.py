@@ -1,12 +1,13 @@
 import networkx as nx
 import numpy as np
+
 from motile_tracker.motile.backend import MotileRun, SolverParams
 
 
 def test_save_load(tmp_path, graph_2d):
-    segmentation = np.zeros((10, 1, 10, 10))
+    segmentation = np.zeros((10, 10, 10))
     for i in range(10):
-        segmentation[i][:, 0:5, 0:5] = i
+        segmentation[i][0:5, 0:5] = i
 
     run_name = "test"
     scale = [1.0, 2.0, 3.0]
