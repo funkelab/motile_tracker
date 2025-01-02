@@ -230,7 +230,6 @@ class Tracks:
         if seg_ids is not None and self.segmentation is not None:
             self.set_seg_ids(nodes, seg_ids)
             computed_attrs = self._compute_node_attrs(seg_ids, times)
-            print(computed_attrs)
             if positions is None:
                 final_pos = np.array(computed_attrs[NodeAttr.POS.value])
             else:

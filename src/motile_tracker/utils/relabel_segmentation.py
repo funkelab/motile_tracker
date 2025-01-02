@@ -21,7 +21,7 @@ def relabel_segmentation(
         np.ndarray: Relabeled segmentation array where nodes in same track share same
             id with shape (t,[z],y,x)
     """
-    tracked_masks = np.zeros_like(segmentation, shape=segmentation.shape)
+    tracked_masks = np.zeros_like(segmentation)
     for node, _data in solution_nx_graph.nodes(data=True):
         time_frame = solution_nx_graph.nodes[node][NodeAttr.TIME.value]
         previous_seg_id = solution_nx_graph.nodes[node][NodeAttr.SEG_ID.value]
