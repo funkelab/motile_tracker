@@ -263,7 +263,10 @@ class CollectionWidget(QGroupBox):
                 self.selected_collection.collection | set(nodes)
             )
             for node_id in nodes:
-                if "group" not in self.tracks_viewer.tracks.graph.nodes[node_id]:
+                if (
+                    "group" not in self.tracks_viewer.tracks.graph.nodes[node_id]
+                    or self.tracks_viewer.tracks.graph.nodes[node_id]["group"] is None
+                ):
                     self.tracks_viewer.tracks.graph.nodes[node_id]["group"] = []
                 if (
                     self.selected_collection.name.text()
