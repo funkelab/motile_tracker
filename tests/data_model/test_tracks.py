@@ -26,7 +26,6 @@ def test_create_tracks(graph_3d, segmentation_3d):
     assert tracks.get_positions([1], incl_time=True).tolist() == [[0, 50, 50, 50]]
     tracks.set_time(1, 1)
     assert tracks.get_positions([1], incl_time=True).tolist() == [[1, 50, 50, 50]]
-    assert tracks.get_seg_id(1) == 1
 
     # with pytest.raises(KeyError):  # raises error at construction if time is wrong
     #     tracks_wrong_attr = Tracks(
@@ -85,8 +84,8 @@ def test_add_remove_nodes(graph_2d, segmentation_2d):
 
     with pytest.raises(KeyError):
         tracks.get_positions([node])
-    # adding a node with a given seg_id infers position from segmentation
-    tracks.add_node(node, time=1, seg_id=3)
+    # adding a node without position infers position from segmentation
+    tracks.add_node(node, time=1)
     assert tracks.get_area(node) == 697 * 2
 
 
@@ -148,7 +147,6 @@ def test_pixels_and_seg_id(graph_3d, segmentation_3d):
     pix = tracks.get_pixels([1])
     new_seg_id = 10
     tracks.set_pixels(pix, [new_seg_id])
-    tracks.set_seg_id(1, new_seg_id)
 
     with pytest.raises(KeyError):
         tracks.get_positions(["0"])

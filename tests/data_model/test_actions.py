@@ -27,14 +27,9 @@ def test_add_delete_nodes(segmentation_2d, graph_2d):
     attrs[NodeAttr.TRACK_ID.value] = [
         graph_2d.nodes[node][NodeAttr.TRACK_ID.value] for node in nodes
     ]
-    attrs[NodeAttr.SEG_ID.value] = [
-        graph_2d.nodes[node][NodeAttr.SEG_ID.value] for node in nodes
-    ]
     pixels = [
-        np.nonzero(segmentation_2d[time] == track_id)
-        for time, track_id in zip(
-            attrs[NodeAttr.TIME.value], attrs[NodeAttr.SEG_ID.value], strict=True
-        )
+        np.nonzero(segmentation_2d[time] == node_id)
+        for time, node_id in zip(attrs[NodeAttr.TIME.value], nodes, strict=True)
     ]
     pixels = [
         (np.ones_like(pix[0]) * time, *pix)

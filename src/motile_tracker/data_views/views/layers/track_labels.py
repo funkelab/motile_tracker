@@ -106,10 +106,16 @@ class TrackLabels(napari.layers.Labels):
 
     def _get_node_properties(self):
         tracks = self.tracks_viewer.tracks
-        nodes = list(tracks.graph.nodes())
-        track_ids = tracks.get_seg_ids(nodes)
-        times = tracks.get_times(nodes)
-        colors = [self.tracks_viewer.colormap.map(tid) for tid in track_ids]
+        if tracks is not None:
+            nodes = list(tracks.graph.nodes())
+            track_ids = tracks.get_track_ids(nodes)
+            times = tracks.get_times(nodes)
+            colors = [self.tracks_viewer.colormap.map(tid) for tid in track_ids]
+        else:
+            nodes = []
+            track_ids = []
+            times = []
+            colors = []
         return {"node_id": nodes, "track_id": track_ids, "t": times, "color": colors}
 
     def redo(self):

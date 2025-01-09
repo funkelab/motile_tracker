@@ -79,7 +79,7 @@ class ActionGroup(TracksAction):
 class AddNodes(TracksAction):
     """Action for adding new nodes. If a segmentation should also be added, the
     pixels for each node should be provided. The label to set the pixels will
-    be taken from the seg_id attribute. The existing pixel values are assumed to be
+    be taken from the node id. The existing pixel values are assumed to be
     zero - you must explicitly update any other segmentations that were overwritten
     using an UpdateNodes action if you want to be able to undo the action.
 
@@ -97,7 +97,7 @@ class AddNodes(TracksAction):
         Args:
             tracks (Tracks): The Tracks to add the n
             nodes (Node): _description_
-            attributes (dict[str, list[Any]]): Includes times, positions, and seg_ids
+            attributes (dict[str, list[Any]]): Includes times, positions
             pixels (list | None, optional): _description_. Defaults to None.
         """
         super().__init__(tracks)
@@ -109,9 +109,6 @@ class AddNodes(TracksAction):
         self.positions = attributes.get(tracks.pos_attr, None)
         if tracks.pos_attr in attributes:
             del user_attrs[tracks.pos_attr]
-        self.seg_ids = attributes.get(NodeAttr.SEG_ID.value, None)
-        if NodeAttr.SEG_ID.value in attributes:
-            del user_attrs[NodeAttr.SEG_ID.value]
         self.pixels = pixels
         self.attributes = user_attrs
         self._apply()
@@ -123,9 +120,9 @@ class AddNodes(TracksAction):
     def _apply(self):
         """Apply the action, and set segmentation if provided in self.pixels"""
         if self.pixels is not None:
-            self.tracks.set_pixels(self.pixels, self.seg_ids)
+            self.tracks.set_pixels(self.pixels, self.nodes)
         self.tracks.add_nodes(
-            self.nodes, self.times, self.positions, self.seg_ids, attrs=self.attributes
+            self.nodes, self.times, self.positions, attrs=self.attributes
         )
 
 
@@ -143,7 +140,6 @@ class DeleteNodes(TracksAction):
         self.attributes = {
             self.tracks.time_attr: self.tracks.get_times(nodes),
             self.tracks.pos_attr: self.tracks.get_positions(nodes),
-            NodeAttr.SEG_ID.value: self.tracks.get_seg_ids(nodes),
             NodeAttr.TRACK_ID.value: self.tracks._get_nodes_attr(
                 nodes, NodeAttr.TRACK_ID.value
             ),
@@ -303,21 +299,12 @@ class UpdateTrackID(TracksAction):
         return UpdateTrackID(self.tracks, self.start_node, self.old_track_id)
 
     def _apply(self):
-        """Assign a new track id to the track starting with start_node.
-        Will also update the self.tracks.segmentation array and seg_id on the
-        self.tracks.graph if a segmentation exists.
-        """
+        """Assign a new track id to the track starting with start_node."""
         old_track_id = self.tracks.get_track_id(self.start_node)
         curr_node = self.start_node
         while self.tracks.get_track_id(curr_node) == old_track_id:
             # update the track id
             self.tracks.set_track_id(curr_node, self.new_track_id)
-            if self.tracks.segmentation is not None:
-                # update the segmentation to match the new track id
-                pix = self.tracks.get_pixels([curr_node])
-                self.tracks.set_pixels(pix, [self.new_track_id])
-                # update the graph seg_id attr to match the new seg id
-                self.tracks.set_seg_id(curr_node, self.new_track_id)
             # getting the next node (picks one if there are two)
             successors = list(self.tracks.graph.successors(curr_node))
             if len(successors) == 0:

@@ -7,7 +7,7 @@ import numpy as np
 from motile_toolbox.candidate_graph.graph_attributes import NodeAttr
 from psygnal import Signal
 
-from motile_tracker.data_model import NodeType, Tracks
+from motile_tracker.data_model import NodeType, SolutionTracks
 from motile_tracker.data_model.tracks_controller import TracksController
 from motile_tracker.data_views.views.layers.tracks_layer_group import TracksLayerGroup
 from motile_tracker.data_views.views.tree_view.tree_widget_utils import (
@@ -101,7 +101,7 @@ class TracksViewer:
         # restore selection and/or highlighting in all napari Views (napari Views do not know about their selection ('all' vs 'lineage'), but TracksViewer does)
         self.update_selection()
 
-    def update_tracks(self, tracks: Tracks, name: str) -> None:
+    def update_tracks(self, tracks: SolutionTracks, name: str) -> None:
         """Stop viewing a previous set of tracks and replace it with a new one.
         Will create new segmentation and tracks layers and add them to the viewer.
 

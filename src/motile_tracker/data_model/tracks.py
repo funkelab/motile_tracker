@@ -39,8 +39,8 @@ class Tracks:
             but the structure is not verified.
         segmentation (Optional(np.ndarray)): An optional segmentation that
             accompanies the tracking graph. If a segmentation is provided,
-            it is assumed that the graph has an attribute (default
-            "seg_id") holding the segmentation id. Defaults to None.
+            it is assumed that the node ids in the graph match the segmentation labels.
+            Defaults to None.
         time_attr (str): The attribute in the graph that specifies the time
             frame each node is in.
         pos_attr (str | tuple[str] | list[str]): The attribute in the graph
@@ -176,45 +176,11 @@ class Tracks:
         """
         self.set_times([node], [int(time)])
 
-    def get_seg_ids(
-        self, nodes: Iterable[Node], required=False
-    ) -> Sequence[int | None]:
-        return self._get_nodes_attr(nodes, NodeAttr.SEG_ID.value, required=required)
-
-    def get_seg_id(self, node: Any) -> int | None:
-        """Get the segmentation id of a given node. Raises a KeyError if the node
-        is not in the graph. Returns None if the node does not have an associated
-        segmentation.
-
-        Args:
-            node (Any): The node id to get the seg id of
-
-        Returns:
-            int | None: The seg id of the node, or None if the node does not have a
-            segmentation
-        """
-        return self.get_seg_ids([node])[0]
-
-    def set_seg_ids(self, nodes: Iterable[Node], seg_ids: Iterable[int]):
-        """Get the segmentation id of a given node. Raises a KeyError if the node
-        is not in the graph.
-
-        Args:
-            node (Any): The node id to set the seg id of
-            seg_id (int): The segmentation id to set for the node
-        """
-        seg_ids = [int(seg_id) for seg_id in seg_ids]
-        self._set_nodes_attr(nodes, NodeAttr.SEG_ID.value, seg_ids)
-
-    def set_seg_id(self, node: Node, seg_id: int):
-        self.set_seg_ids([node], [int(seg_id)])
-
     def add_nodes(
         self,
         nodes: Iterable[Node],
         times: Iterable[int],
         positions: np.ndarray | None = None,
-        seg_ids: Iterable[int] | None = None,
         attrs: Attrs | None = None,
     ):
         if attrs is None:
@@ -222,9 +188,9 @@ class Tracks:
         self.graph.add_nodes_from(nodes)
         self.set_times(nodes, times)
         final_pos: np.ndarray
-        if seg_ids is not None and self.segmentation is not None:
-            self.set_seg_ids(nodes, seg_ids)
-            computed_attrs = self._compute_node_attrs(seg_ids, times)
+        if self.segmentation is not None:
+            computed_attrs = self._compute_node_attrs(nodes, times)
+            print(computed_attrs)
             if positions is None:
                 final_pos = np.array(computed_attrs[NodeAttr.POS.value])
             else:
@@ -245,7 +211,6 @@ class Tracks:
         node: Node,
         time: int,
         position: Sequence | None = None,
-        seg_id: int | None = None,
         attrs: Attrs | None = None,
     ):
         """Add a node to the graph. Will update the internal mappings and generate the
@@ -256,20 +221,15 @@ class Tracks:
         Args:
             node (Node): The node id to add
             time (int): the time frame of the node to add
-            position (Seqeunce | None): The spatial position of the node (excluding time).
+            position (Sequence | None): The spatial position of the node (excluding time).
                 Can be None if it should be automatically detected from the segmentation.
-                Either seg_id or position must be provided. Defaults to None.
-            seg_id (int | None): The segmentation id of the node, used to match the node
-                to the segmentation at the given time, or None if the node does not have
-                a matching segmentation. Either seg_id or position must be provided.
-                Defaults to None.
+                Either segmentation or position must be provided. Defaults to None.
         """
         pos = np.expand_dims(position, axis=0) if position is not None else None
-        seg_ids = [seg_id] if seg_id is not None else None
         attributes: dict[str, Sequence[Any]] | None = (
             {key: [val] for key, val in attrs.items()} if attrs is not None else None
         )
-        self.add_nodes([node], [time], positions=pos, seg_ids=seg_ids, attrs=attributes)
+        self.add_nodes([node], [time], positions=pos, attrs=attributes)
 
     def remove_nodes(self, nodes: Iterable[Node]):
         self.graph.remove_nodes_from(nodes)
@@ -358,14 +318,10 @@ class Tracks:
             return None
         pix_list = []
         for node in nodes:
-            seg_id = self.get_seg_id(node)
-            if seg_id is None:
-                pix_list.append((np.array([], dtype=np.uint64),) * self.ndim)
-            else:
-                time = self.get_time(node)
-                loc_pixels = np.nonzero(self.segmentation[time] == seg_id)
-                time_array = np.ones_like(loc_pixels[0]) * time
-                pix_list.append((time_array, *loc_pixels))
+            time = self.get_time(node)
+            loc_pixels = np.nonzero(self.segmentation[time] == node)
+            time_array = np.ones_like(loc_pixels[0]) * time
+            pix_list.append((time_array, *loc_pixels))
         return pix_list
 
     def set_pixels(
@@ -394,17 +350,16 @@ class Tracks:
         auto-computed attributes of the nodes and incident edges.
         """
         times = self.get_times(nodes)
-        seg_ids = self.get_seg_ids(nodes, required=True)
         values = (
-            seg_ids
+            nodes
             if added
             else [
                 0,
             ]
-            * len(seg_ids)
+            * len(nodes)
         )
         self.set_pixels(pixels, values)
-        computed_attrs = self._compute_node_attrs(seg_ids, times)
+        computed_attrs = self._compute_node_attrs(nodes, times)
         positions = np.array(computed_attrs[NodeAttr.POS.value])
         self.set_positions(nodes, positions)
         self._set_nodes_attr(
@@ -662,22 +617,20 @@ class Tracks:
     def _get_edges_attr(self, edges: Iterable[Edge], attr: str, required: bool = False):
         return [self._get_edge_attr(edge, attr, required=required) for edge in edges]
 
-    def _compute_node_attrs(
-        self, seg_ids: Iterable[int | None], times: Iterable[int]
-    ) -> Attrs:
+    def _compute_node_attrs(self, nodes: Iterable[Node], times: Iterable[int]) -> Attrs:
         """Get the segmentation controlled node attributes (area and position)
-        from the segmentation with label seg_id in the given time point.
+        from the segmentation with label based on the node id in the given time point.
 
         Args:
-            seg_id (int): The label id to query the current segmentation for
-            time (int): The time frame of the current segmentation to query
+            nodes (Iterable[int]): The node ids to query the current segmentation for
+            time (int): The time frames of the current segmentation to query
 
         Returns:
             dict[str, int]: A dictionary containing the attributes that could be
                 determined from the segmentation. It will be empty if self.segmentation
-                is None. If self.segmentation exists but seg_id is not present in time,
+                is None. If self.segmentation exists but node id is not present in time,
                 area will be 0 and position will be None. If self.segmentation
-                exists and seg_id is present in time, area and position will be included.
+                exists and node id is present in time, area and position will be included.
         """
         if self.segmentation is None:
             return {}
@@ -686,27 +639,24 @@ class Tracks:
             NodeAttr.POS.value: [],
             NodeAttr.AREA.value: [],
         }
-        for seg_id, time in zip(seg_ids, times, strict=False):
-            if seg_id is None:
-                area = None
-                pos = None
-            else:
-                seg = self.segmentation[time] == seg_id
-                pos_scale = self.scale[1:] if self.scale is not None else None
-                area = np.sum(seg)
-                if pos_scale is not None:
-                    area *= np.prod(pos_scale)
-                # only include the position if the segmentation was actually there
-                pos = (
-                    measure.centroid(seg, spacing=pos_scale)
-                    if area > 0
-                    else np.array(
-                        [
-                            None,
-                        ]
-                        * (self.ndim - 1)
-                    )
+        for node, time in zip(nodes, times, strict=False):
+            seg = self.segmentation[time] == node
+            print(np.sum(seg))
+            pos_scale = self.scale[1:] if self.scale is not None else None
+            area = np.sum(seg)
+            if pos_scale is not None:
+                area *= np.prod(pos_scale)
+            # only include the position if the segmentation was actually there
+            pos = (
+                measure.centroid(seg, spacing=pos_scale)
+                if area > 0
+                else np.array(
+                    [
+                        None,
+                    ]
+                    * (self.ndim - 1)
                 )
+            )
             attrs[NodeAttr.AREA.value].append(area)
             attrs[NodeAttr.POS.value].append(pos)
         attrs[NodeAttr.POS.value] = np.array(attrs[NodeAttr.POS.value])
@@ -732,21 +682,14 @@ class Tracks:
         attrs: dict[str, list[Any]] = {EdgeAttr.IOU.value: []}
         for edge in edges:
             source, target = edge
-            source_seg = self.get_seg_id(source)
-            target_seg = self.get_seg_id(target)
-            if source_seg is None or target_seg is None:
-                iou = 0
-            else:
-                source_time = self.get_time(source)
-                target_time = self.get_time(target)
+            source_time = self.get_time(source)
+            target_time = self.get_time(target)
 
-                source_arr = self.segmentation[source_time] == source_seg
-                target_arr = self.segmentation[target_time] == target_seg
+            source_arr = self.segmentation[source_time] == source
+            target_arr = self.segmentation[target_time] == target
 
-                iou_list = _compute_ious(
-                    source_arr, target_arr
-                )  # list of (id1, id2, iou)
-                iou = 0 if len(iou_list) == 0 else iou_list[0][2]
+            iou_list = _compute_ious(source_arr, target_arr)  # list of (id1, id2, iou)
+            iou = 0 if len(iou_list) == 0 else iou_list[0][2]
 
             attrs[EdgeAttr.IOU.value].append(iou)
         return attrs

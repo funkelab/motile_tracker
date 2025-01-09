@@ -41,7 +41,6 @@ def graph_2d():
             {
                 NodeAttr.POS.value: [50, 50],
                 NodeAttr.TIME.value: 0,
-                NodeAttr.SEG_ID.value: 1,
                 NodeAttr.AREA.value: 1245,
                 NodeAttr.TRACK_ID.value: 1,
             },
@@ -51,7 +50,6 @@ def graph_2d():
             {
                 NodeAttr.POS.value: [20, 80],
                 NodeAttr.TIME.value: 1,
-                NodeAttr.SEG_ID.value: 2,
                 NodeAttr.TRACK_ID.value: 2,
                 # NodeAttr.AREA.value: 305,
             },
@@ -61,7 +59,6 @@ def graph_2d():
             {
                 NodeAttr.POS.value: [60, 45],
                 NodeAttr.TIME.value: 1,
-                NodeAttr.SEG_ID.value: 3,
                 NodeAttr.AREA.value: 697,
                 NodeAttr.TRACK_ID.value: 3,
             },
@@ -71,7 +68,6 @@ def graph_2d():
             {
                 NodeAttr.POS.value: [1.5, 1.5],
                 NodeAttr.TIME.value: 2,
-                NodeAttr.SEG_ID.value: 4,
                 NodeAttr.AREA.value: 16,
                 NodeAttr.TRACK_ID.value: 3,
             },
@@ -81,7 +77,6 @@ def graph_2d():
             {
                 NodeAttr.POS.value: [1.5, 1.5],
                 NodeAttr.TIME.value: 4,
-                NodeAttr.SEG_ID.value: 5,
                 NodeAttr.AREA.value: 16,
                 NodeAttr.TRACK_ID.value: 3,
             },
@@ -92,7 +87,6 @@ def graph_2d():
             {
                 NodeAttr.POS.value: [97.5, 97.5],
                 NodeAttr.TIME.value: 4,
-                NodeAttr.SEG_ID.value: 6,
                 NodeAttr.AREA.value: 16,
                 NodeAttr.TRACK_ID.value: 5,
             },
@@ -154,7 +148,6 @@ def graph_3d():
             {
                 NodeAttr.POS.value: [50, 50, 50],
                 NodeAttr.TIME.value: 0,
-                NodeAttr.SEG_ID.value: 1,
             },
         ),
         (
@@ -162,7 +155,6 @@ def graph_3d():
             {
                 NodeAttr.POS.value: [20, 50, 80],
                 NodeAttr.TIME.value: 1,
-                NodeAttr.SEG_ID.value: 2,
             },
         ),
         (
@@ -170,7 +162,6 @@ def graph_3d():
             {
                 NodeAttr.POS.value: [60, 50, 45],
                 NodeAttr.TIME.value: 1,
-                NodeAttr.SEG_ID.value: 3,
             },
         ),
     ]

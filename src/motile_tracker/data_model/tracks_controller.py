@@ -94,7 +94,7 @@ class TracksController:
         new nodes.
         If there is a segmentation, the attributes must include:
         - time
-        - seg_id
+        - node_id
         - track_id
         If there is not a segmentation, the attributes must include:
         - time
@@ -111,10 +111,10 @@ class TracksController:
         Args:
             nodes (list[Node]): a list of node ids
             attributes (Attributes): dictionary containing at least time and track id,
-                and either seg_id (if pixels are provided) or position (if not)
+                and either node_id (if pixels are provided) or position (if not)
             pixels (list[SegMask] | None): A list of pixels associated with the node,
                 or None if there is no segmentation. These pixels will be updated
-                in the tracks.segmentation, set to the provided seg_id
+                in the tracks.segmentation, set to the new node id
         """
         if NodeAttr.TIME.value not in attributes:
             raise ValueError(
@@ -541,7 +541,7 @@ class TracksController:
         self.node_id_counter += n
         for idx, _id in enumerate(ids):
             while self.tracks.graph.has_node(_id):
-                self.node_id_counter += 1
                 _id = self.node_id_counter
+                self.node_id_counter += 1
             ids[idx] = _id
         return ids

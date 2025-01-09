@@ -20,13 +20,11 @@ def test__add_nodes_no_seg(graph_2d):
     }
 
     action, node_ids = controller._add_nodes(attrs)
-    print(node_ids)
 
     node = node_ids[0]
     assert tracks.graph.has_node(node)
     assert tracks.get_position(node) == [1, 3]
     assert tracks.get_track_id(node) == 6
-    assert tracks.get_seg_id(node) is None
 
     assert tracks.graph.number_of_edges() == num_edges + 1  # one edge added
 
@@ -43,8 +41,6 @@ def test__add_nodes_no_seg(graph_2d):
     node2 = node_ids[1]
     assert tracks.get_position(node1) == [1, 3]
     assert tracks.get_track_id(node1) == 2
-    assert tracks.get_seg_id(node1) is None
-    print(tracks.graph.nodes[2])
     assert tracks.graph.has_edge(2, node1)
     assert tracks.graph.has_edge(node1, node2)
 
@@ -60,7 +56,6 @@ def test__add_nodes_no_seg(graph_2d):
     node = node_ids[0]
     assert tracks.get_position(node) == [1, 3]
     assert tracks.get_track_id(node) == 3
-    assert tracks.get_seg_id(node) is None
 
     assert tracks.graph.has_edge(4, node)
     assert tracks.graph.has_edge(node, 5)
@@ -76,17 +71,19 @@ def test__add_nodes_with_seg(graph_2d, segmentation_2d):
 
     new_seg = segmentation_2d.copy()
     time = 0
-    seg_id = 6
-    new_seg[time : time + 2, 90:100, 0:4] = seg_id
+    track_id = 6
+    node1 = 7
+    node2 = 8
+    new_seg[time : time + 1, 90:100, 0:4] = node1
+    new_seg[time + 1 : time + 2, 90:100, 0:4] = node2
     expected_center = [94.5, 1.5]
     # start a new track
     attrs = {
         NodeAttr.TIME.value: [time, time + 1],
-        NodeAttr.TRACK_ID.value: [seg_id, seg_id],
-        NodeAttr.SEG_ID.value: [seg_id, seg_id],
+        NodeAttr.TRACK_ID.value: [track_id, track_id],
     }
 
-    loc_pix = np.where(new_seg[time] == seg_id)
+    loc_pix = np.where(new_seg[time] == node1)
     time_pix = np.ones_like(loc_pix[0]) * time
     time_pix2 = np.ones_like(loc_pix[0]) * (time + 1)
     pixels = [
@@ -100,38 +97,38 @@ def test__add_nodes_with_seg(graph_2d, segmentation_2d):
     assert tracks.get_time(node1) == 0
     assert tracks.get_position(node1) == expected_center
     assert tracks.get_track_id(node1) == 6
-    assert tracks.get_seg_id(node1) == 6
     assert tracks.get_time(node2) == 1
     assert tracks.get_position(node2) == expected_center
     assert tracks.get_track_id(node2) == 6
-    assert tracks.get_seg_id(node2) == 6
     assert np.sum(tracks.segmentation != new_seg) == 0
 
     assert tracks.graph.number_of_edges() == num_edges + 1  # one edge added
 
     # add nodes to end of existing track
     time = 2
-    seg_id = 2
-    new_seg[time : time + 2, 0:10, 0:4] = seg_id
+    track_id = 2
+    node1 = 9
+    node2 = 10
+    new_seg[time : time + 1, 0:10, 0:4] = node1
+    new_seg[time + 1 : time + 2, 0:10, 0:4] = node2
     expected_center = [4.5, 1.5]
     # start a new track
     attrs = {
         NodeAttr.TIME.value: [time, time + 1],
-        NodeAttr.TRACK_ID.value: [seg_id, seg_id],
-        NodeAttr.SEG_ID.value: [seg_id, seg_id],
+        NodeAttr.TRACK_ID.value: [track_id, track_id],
     }
 
-    loc_pix = np.where(new_seg[time] == seg_id)
+    loc_pix = np.where(new_seg[time] == node1)
     time_pix = np.ones_like(loc_pix[0]) * time
     time_pix2 = np.ones_like(loc_pix[0]) * (time + 1)
     pixels = [(time_pix, *loc_pix), (time_pix2, *loc_pix)]
 
     action, node_ids = controller._add_nodes(attrs, pixels)
+    print(node_ids, pixels)
 
     node = node_ids[0]
     assert tracks.get_position(node) == expected_center
     assert tracks.get_track_id(node) == 2
-    assert tracks.get_seg_id(node) == 2
     assert np.sum(tracks.segmentation != new_seg) == 0
 
     assert tracks.graph.has_edge(2, node)
@@ -139,23 +136,22 @@ def test__add_nodes_with_seg(graph_2d, segmentation_2d):
 
     # add node to middle of existing track
     time = 3
-    seg_id = 3
-    new_seg[time, 0:10, 0:4] = seg_id
+    track_id = 3
+    node1 = 11
+    new_seg[time, 0:10, 0:4] = node1
     expected_center = [4.5, 1.5]
     attrs = {
         NodeAttr.TIME.value: [time],
-        NodeAttr.TRACK_ID.value: [seg_id],
-        NodeAttr.SEG_ID.value: [seg_id],
+        NodeAttr.TRACK_ID.value: [track_id],
     }
 
-    loc_pix = np.where(new_seg[time] == seg_id)
+    loc_pix = np.where(new_seg[time] == node1)
     time_pix = np.ones_like(loc_pix[0]) * time
     pixels = [(time_pix, *loc_pix)]
 
     action, node_ids = controller._add_nodes(attrs, pixels=pixels)
 
     node = node_ids[0]
-    assert tracks.get_seg_id(node) == 3
     assert tracks.get_position(node) == expected_center
     assert tracks.get_track_id(node) == 3
     assert np.sum(tracks.segmentation != new_seg) == 0
