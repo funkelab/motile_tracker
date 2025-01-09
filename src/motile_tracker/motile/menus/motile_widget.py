@@ -165,7 +165,6 @@ class MotileWidget(QWidget):
             run.segmentation = self.relabel_segmentation(
                 run.graph, run.input_segmentation
             )
-        run._create_seg_time_to_node()
 
         if run.graph.number_of_nodes() == 0:
             show_warning(

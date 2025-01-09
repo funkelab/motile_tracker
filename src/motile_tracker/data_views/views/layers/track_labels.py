@@ -167,7 +167,6 @@ class TrackLabels(napari.layers.Labels):
         ]  # also pass on the current time point to know which node to select later
         new_value, updated_pixels = self._parse_paint_event(event.value)
         # updated_pixels is a list of tuples. Each tuple is (indices, old_value)
-        tracks = self.tracks_viewer.tracks
         to_delete = []  # (node_ids, pixels)
         to_update_smaller = []  # (node_id, pixels)
         to_update_bigger = []  # (node_id, pixels)
@@ -177,7 +176,7 @@ class TrackLabels(napari.layers.Labels):
             if old_value == 0:
                 continue
             time = pixels[0][0]
-            removed_node = tracks.get_node(old_value, time)
+            removed_node = old_value
             assert (
                 removed_node is not None
             ), f"Node with label {old_value} in time {time} was not found"
@@ -191,8 +190,8 @@ class TrackLabels(napari.layers.Labels):
                 np.concatenate([pixels[dim] for pixels, _ in updated_pixels])
                 for dim in range(ndim)
             )
-            for time in np.unique(all_pixels[0]):
-                added_node = tracks.get_node(new_value, time)
+            for _ in np.unique(all_pixels[0]):
+                added_node = new_value
                 if added_node is not None:
                     to_update_bigger.append((added_node, all_pixels))
                 else:

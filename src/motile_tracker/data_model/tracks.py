@@ -73,7 +73,6 @@ class Tracks:
         self.pos_attr = pos_attr
         self.scale = scale
         self.ndim = self._compute_ndim(segmentation, scale, ndim)
-        self._create_seg_time_to_node()
 
     def get_positions(
         self, nodes: Iterable[Node], incl_time: bool = False
@@ -164,9 +163,7 @@ class Tracks:
 
     def set_times(self, nodes: Iterable[Node], times: Iterable[int]):
         times = [int(t) for t in times]
-        self._remove_from_seg_time_to_node(nodes)
         self._set_nodes_attr(nodes, self.time_attr, times)
-        self._add_to_seg_time_to_node(nodes)
 
     def set_time(self, node: Any, time: int):
         """Set the time frame of a given node. Raises an error if the node
@@ -207,9 +204,7 @@ class Tracks:
             seg_id (int): The segmentation id to set for the node
         """
         seg_ids = [int(seg_id) for seg_id in seg_ids]
-        self._remove_from_seg_time_to_node(nodes)
         self._set_nodes_attr(nodes, NodeAttr.SEG_ID.value, seg_ids)
-        self._add_to_seg_time_to_node(nodes)
 
     def set_seg_id(self, node: Node, seg_id: int):
         self.set_seg_ids([node], [int(seg_id)])
@@ -245,8 +240,6 @@ class Tracks:
         for attr, values in attrs.items():
             self._set_nodes_attr(nodes, attr, values)
 
-        self._add_to_seg_time_to_node(nodes)
-
     def add_node(
         self,
         node: Node,
@@ -279,7 +272,6 @@ class Tracks:
         self.add_nodes([node], [time], positions=pos, seg_ids=seg_ids, attrs=attributes)
 
     def remove_nodes(self, nodes: Iterable[Node]):
-        self._remove_from_seg_time_to_node(nodes)
         self.graph.remove_nodes_from(nodes)
 
     def remove_node(self, node: Node):
@@ -317,20 +309,6 @@ class Tracks:
             self.graph.remove_edge(*edge)
         else:
             raise KeyError(f"Edge {edge} not in the graph, and cannot be removed")
-
-    def get_node(self, seg_id: int, time: int) -> Node | None:
-        """Get the node with the given segmentation ID in the given time point.
-        Useful for going from segmentation labels to graph nodes.
-
-        Args:
-            seg_id (int): The segmentation id of the node
-            time (int): the time point of the node
-
-        Returns:
-            Node | None: the node id with the given seg_id in the given time, or None
-                if no such node exists.
-        """
-        return self.seg_time_to_node.get(seg_id, {}).get(time, None)
 
     def get_areas(self, nodes: Iterable[Node]) -> Sequence[int | None]:
         """Get the area/volume of a given node. Raises a KeyError if the node
@@ -648,21 +626,6 @@ class Tracks:
             )
         return ndim
 
-    def _create_seg_time_to_node(self) -> dict[int, dict[int, Node]]:
-        """Create a dictionary mapping seg_id -> dict(time_point -> node_id)"""
-        self.seg_time_to_node: dict[int, dict[int, Node]] = {}
-        if self.segmentation is None:
-            return
-
-        for node in self.graph.nodes():
-            seg_id = self.get_seg_id(node)
-            time = self.get_time(node)
-            if seg_id is None or time is None:
-                continue
-            if seg_id not in self.seg_time_to_node:
-                self.seg_time_to_node[seg_id] = {}
-            self.seg_time_to_node[seg_id][time] = node
-
     def _set_node_attr(self, node: Node, attr: NodeAttr, value: Any):
         if isinstance(value, np.ndarray):
             value = list(value)
@@ -698,28 +661,6 @@ class Tracks:
 
     def _get_edges_attr(self, edges: Iterable[Edge], attr: str, required: bool = False):
         return [self._get_edge_attr(edge, attr, required=required) for edge in edges]
-
-    def _remove_from_seg_time_to_node(self, nodes: Iterable[Node]):
-        for node in nodes:
-            seg_id = self.get_seg_id(node)
-            time = self._get_node_attr(node, self.time_attr, required=False)
-            if (
-                seg_id is not None
-                and time is not None
-                and seg_id in self.seg_time_to_node
-                and time in self.seg_time_to_node[seg_id]
-            ):
-                del self.seg_time_to_node[seg_id][time]
-
-    def _add_to_seg_time_to_node(self, nodes: Iterable[Node]):
-        for node in nodes:
-            seg_id = self.get_seg_id(node)
-            if seg_id is None:
-                continue
-            time = self.get_time(node)
-            if seg_id not in self.seg_time_to_node:
-                self.seg_time_to_node[seg_id] = {}
-            self.seg_time_to_node[seg_id][time] = node
 
     def _compute_node_attrs(
         self, seg_ids: Iterable[int | None], times: Iterable[int]
