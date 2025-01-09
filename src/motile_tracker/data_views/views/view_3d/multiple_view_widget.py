@@ -2,7 +2,7 @@ import napari
 import numpy as np
 from napari.components.layerlist import Extent
 from napari.components.viewer_model import ViewerModel
-from napari.layers import Labels, Layer, Points, Vectors
+from napari.layers import Labels, Layer, Points, Shapes, Vectors
 from napari.qt import QtViewer
 from napari.utils.action_manager import action_manager
 from napari.utils.events.event import WarningEmitter
@@ -20,7 +20,14 @@ from motile_tracker.data_views.views.layers.track_points import TrackPoints
 
 
 def copy_layer(layer: Layer, name: str = ""):
-    if isinstance(layer, TrackLabels):
+    if isinstance(
+        layer, TrackGraph
+    ):  # instead of showing the tracks (not very useful on 3D data because they are collapsed to a single frame), use an empty shapes layer as substitute to ensure that the layer indices in the orthogonal viewer models match with those in the main viewer
+        res_layer = Shapes(
+            data=[],
+        )
+
+    elif isinstance(layer, TrackLabels):
         res_layer = Labels(
             data=layer.data,
             name=layer.name,
@@ -295,16 +302,13 @@ class MultipleViewerWidget(QSplitter):
             event.value.name not in self.viewer_model1.layers
             and event.value.name not in self.viewer_model2.layers
         ):
-            # do not include TrackGraphs in the orthogonal views
-            if isinstance(event.value, TrackGraph):
-                return
-
             self.viewer_model1.layers.insert(
                 event.index, copy_layer(event.value, "model1")
             )
             self.viewer_model2.layers.insert(
                 event.index, copy_layer(event.value, "model2")
             )
+
             for name in get_property_names(event.value):
                 getattr(event.value.events, name).connect(
                     own_partial(self._property_sync, name)
@@ -323,7 +327,7 @@ class MultipleViewerWidget(QSplitter):
                 event.value.events.border_color.connect(self._sync_shown_points)
 
             # connect data and paint events
-            if event.value.name != ".cross":
+            if event.value.name != ".cross" and not isinstance(event.value, TrackGraph):
                 self.viewer_model1.layers[event.value.name].events.data.connect(
                     self._sync_data
                 )
