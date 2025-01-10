@@ -89,16 +89,8 @@ class TrackLabels(napari.layers.Labels):
                     and label != 0
                     and self.colormap.map(label)[-1] != 0
                 ):  # check opacity (=visibility) in the colormap
-                    t_values = self.node_properties["t"]
-                    track_ids = self.node_properties["track_id"]
-                    index = np.where(
-                        (t_values == event.position[0]) & (track_ids == label)
-                    )[0]  # np.where returns a tuple with an array per dimension,
-                    # here we apply it to a single dimension so take the first element
-                    # (an array of indices fulfilling condition)
-                    node_id = self.node_properties["node_id"][index[0]]
                     append = "Shift" in event.modifiers
-                    self.tracks_viewer.selected_nodes.add(node_id, append)
+                    self.tracks_viewer.selected_nodes.add(label, append)
 
         # Listen to paint events and changing the selected label
         self.events.paint.connect(self._on_paint)
@@ -267,12 +259,12 @@ class TrackLabels(napari.layers.Labels):
             color_dict=self.colormap.color_dict
         )  # create a new colormap from the updated colors (otherwise it does not refresh)
 
-    def new_colormap(self):
-        """Extended version of existing function, to emit refresh signal to also update colors in other layers/widgets"""
+    # def new_colormap(self):
+    #     """Extended version of existing function, to emit refresh signal to also update colors in other layers/widgets"""
 
-        super().new_colormap()
-        self.tracks_viewer.colormap = self.colormap
-        self.tracks_viewer._refresh()
+    #     super().new_colormap()
+    #     self.tracks_viewer.colormap = self.colormap
+    #     self.tracks_viewer._refresh()
 
     def _check_selected_label(self):
         """Check whether the selected label is larger than the current max_track_id
