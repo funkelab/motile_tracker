@@ -34,9 +34,9 @@ class TrackLabels(napari.layers.Labels):
             color_dict={
                 **dict(
                     zip(
-                        self.node_properties["track_id"],
+                        self.node_properties["node_id"],
                         self.node_properties["color"],
-                        strict=False,
+                        strict=True,
                     )
                 ),
                 None: [0, 0, 0, 0],
@@ -102,7 +102,7 @@ class TrackLabels(napari.layers.Labels):
 
         # Listen to paint events and changing the selected label
         self.events.paint.connect(self._on_paint)
-        self.events.selected_label.connect(self._check_selected_label)
+        # self.events.selected_label.connect(self._check_selected_label)
 
     def _get_node_properties(self):
         tracks = self.tracks_viewer.tracks
@@ -217,9 +217,9 @@ class TrackLabels(napari.layers.Labels):
             color_dict={
                 **dict(
                     zip(
-                        self.node_properties["track_id"],
+                        self.node_properties["node_id"],
                         self.node_properties["color"],
-                        strict=False,
+                        strict=True,
                     )
                 ),
                 None: [0, 0, 0, 0],
@@ -230,19 +230,16 @@ class TrackLabels(napari.layers.Labels):
 
     def update_label_colormap(self, visible: list[int] | str) -> None:
         """Updates the opacity of the label colormap to highlight the selected label
-        and optionally hide cells not belonging to the current lineage"""
+        and optionally hide cells not belonging to the current lineage
 
-        highlighted = [
-            self.tracks_viewer.tracks.get_track_id(node)
-            for node in self.tracks_viewer.selected_nodes
-            if self.tracks_viewer.tracks.get_time(node)
-            == self.viewer.dims.current_step[0]
-        ]
+        Visible is a list of visible node ids"""
+
+        highlighted = self.tracks_viewer.selected_nodes
 
         if len(highlighted) > 0:
             self.selected_label = highlighted[
                 0
-            ]  # set the first track_id to be the selected label color
+            ]  # set the first node_id to be the selected label color
 
         # update the opacity of the cyclic label colormap values according to whether nodes are visible/invisible/highlighted
         if visible == "all":
@@ -259,12 +256,12 @@ class TrackLabels(napari.layers.Labels):
                 key: np.array([*value[:-1], 0], dtype=np.float32)
                 for key, value in self.colormap.color_dict.items()
             }
-            for label in visible:
-                # find the index in the cyclic label colormap
-                self.colormap.color_dict[label][-1] = 0.6
+            for node in visible:
+                # find the index in the colormap
+                self.colormap.color_dict[node][-1] = 0.6
 
-        for label in highlighted:
-            self.colormap.color_dict[label][-1] = 1  # full opacity
+        for node in highlighted:
+            self.colormap.color_dict[node][-1] = 1  # full opacity
 
         self.colormap = DirectLabelColormap(
             color_dict=self.colormap.color_dict
@@ -278,7 +275,8 @@ class TrackLabels(napari.layers.Labels):
         self.tracks_viewer._refresh()
 
     def _check_selected_label(self):
-        """Check whether the selected label is larger than the current max_track_id and if so add it to the colormap (otherwise it draws in transparent color until the refresh event)"""
+        """Check whether the selected label is larger than the current max_track_id
+        and if so add it to the colormap (otherwise it draws in transparent color until the refresh event)"""
 
         if self.selected_label > self.tracks_viewer.tracks.max_track_id:
             self.events.selected_label.disconnect(
