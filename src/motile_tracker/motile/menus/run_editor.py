@@ -207,10 +207,9 @@ class RunEditor(QGroupBox):
         params = self.solver_params_widget.solver_params.copy()
         return MotileRun(
             graph=nx.DiGraph(),
-            segmentation=None,
+            segmentation=input_seg,
             run_name=run_name,
             solver_params=params,
-            input_segmentation=input_seg,
             input_points=input_points,
             time=datetime.now(),
             scale=input_layer.scale,
