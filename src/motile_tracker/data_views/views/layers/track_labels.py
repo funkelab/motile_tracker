@@ -255,9 +255,9 @@ class TrackLabels(napari.layers.Labels):
         for node in highlighted:
             self.colormap.color_dict[node][-1] = 1  # full opacity
 
-        self.colormap = DirectLabelColormap(
-            color_dict=self.colormap.color_dict
-        )  # create a new colormap from the updated colors (otherwise it does not refresh)
+        # This is the minimal set of things necessary to get the updates to display
+        self.colormap._clear_cache()
+        self.events.colormap()
 
     # def new_colormap(self):
     #     """Extended version of existing function, to emit refresh signal to also update colors in other layers/widgets"""
