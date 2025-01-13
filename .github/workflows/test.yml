@@ -28,11 +28,6 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      # these libraries enable testing on Qt on linux and OpenGL on Windows
-      - uses: pyvista/setup-headless-display-action@v2
-        with:
-          qt: true
-
       # note: if you need dependencies from conda, considering using
       # setup-miniconda: https://github.com/conda-incubator/setup-miniconda
       - name: Install conda dependencies
