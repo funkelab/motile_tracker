@@ -57,8 +57,6 @@ class TracksViewer:
         self.tracks = None
         self.visible = None
         self.tracking_layers = TracksLayerGroup(self.viewer, self.tracks, "", self)
-
-        self.viewer.dims.events.current_step.connect(self.update_highlights)
         self.selected_nodes = NodeSelectionList()
         self.selected_nodes.list_updated.connect(self.update_selection)
 
@@ -183,16 +181,6 @@ class TracksViewer:
         else:
             self.visible = "all"
             return "all"
-
-    def update_highlights(self) -> None:
-        """If the time dimension is changed, update the highlighting in the seg layer"""
-
-        if (
-            self.viewer.dims.last_used == 0
-            and self.tracking_layers.seg_layer is not None
-        ):
-            visible = self.filter_visible_nodes()
-            self.tracking_layers.seg_layer.update_label_colormap(visible)
 
     def update_selection(self) -> None:
         """Sets the view and triggers visualization updates in other components"""
