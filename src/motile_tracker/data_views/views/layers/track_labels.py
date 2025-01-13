@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import random
 from typing import TYPE_CHECKING
 
 import napari
 import numpy as np
 from napari.utils import DirectLabelColormap
+
+from ..tree_view.tree_widget_utils import extract_lineage_tree
 
 if TYPE_CHECKING:
     from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
@@ -94,7 +97,8 @@ class TrackLabels(napari.layers.Labels):
 
         # Listen to paint events and changing the selected label
         self.events.paint.connect(self._on_paint)
-        # self.events.selected_label.connect(self._check_selected_label)
+        self.events.selected_label.connect(self._ensure_valid_label)
+        self.viewer.dims.events.current_step.connect(self._ensure_valid_label)
 
     def _get_node_properties(self):
         tracks = self.tracks_viewer.tracks
@@ -231,7 +235,7 @@ class TrackLabels(napari.layers.Labels):
         if len(highlighted) > 0:
             self.selected_label = highlighted[
                 0
-            ]  # set the first node_id to be the selected label color
+            ]  # set the first node_id to be the selected label color (pipet)
 
         # update the opacity of the cyclic label colormap values according to whether nodes are visible/invisible/highlighted
         if visible == "all":
@@ -255,29 +259,68 @@ class TrackLabels(napari.layers.Labels):
         for node in highlighted:
             self.colormap.color_dict[node][-1] = 1  # full opacity
 
-        # This is the minimal set of things necessary to get the updates to display
-        self.colormap._clear_cache()
-        self.events.colormap()
+        # This is the minimal set of things necessary to get the updates to display ## For me this does not work, the highlighting is out of sync or not displayed at all
+        # self.colormap._clear_cache()
+        # self.events.colormap()
 
-    # def new_colormap(self):
-    #     """Extended version of existing function, to emit refresh signal to also update colors in other layers/widgets"""
+        self.colormap = DirectLabelColormap(
+            color_dict=self.colormap.color_dict
+        )  # create a new colormap from the updated colors (otherwise it does not refresh)
 
-    #     super().new_colormap()
-    #     self.tracks_viewer.colormap = self.colormap
-    #     self.tracks_viewer._refresh()
+    def new_colormap(self):
+        """Replace existing function, to generate new colormap and emit refresh signal to also update colors in other layers/widgets"""
 
-    def _check_selected_label(self):
-        """Check whether the selected label is larger than the current max_track_id
-        and if so add it to the colormap (otherwise it draws in transparent color until the refresh event)"""
+        self.tracks_viewer.colormap = napari.utils.colormaps.label_colormap(
+            49,
+            seed=random.uniform(0, 1),
+            background_value=0,
+        )
 
-        if self.selected_label > self.tracks_viewer.tracks.max_track_id:
-            self.events.selected_label.disconnect(
-                self._check_selected_label
-            )  # disconnect to prevent infinite loop, since setting the colormap emits a selected_label event
-            self.colormap.color_dict[self.selected_label] = (
-                self.tracks_viewer.colormap.map(self.selected_label)
-            )
-            self.colormap = DirectLabelColormap(color_dict=self.colormap.color_dict)
-            self.events.selected_label.connect(
-                self._check_selected_label
-            )  # connect again
+        track_ids = [
+            self.tracks_viewer.tracks.get_track_id(node)
+            for node in self.tracks_viewer.tracks.graph.nodes
+        ]
+        self.node_properties["colors"] = [
+            self.tracks_viewer.colormap.map(tid) for tid in track_ids
+        ]
+        self.tracks_viewer._refresh()
+
+    def _ensure_valid_label(self, event):
+        """Check if the selected label is valid: a node with that node id exists at this time point
+        1. If a node with the selected value exists at a different time point, check if there is any related node at the current time point and select that label instead
+        2. If no node with this label exists yet, it is valid and can be used to start a new track id
+        3. If a node with the label exists at the current time point, it is valid and can be used to update the existing node in a paint event"""
+
+        self.events.selected_label.disconnect(self._ensure_valid_label)
+        if self.tracks_viewer.tracks is not None:
+            current_timepoint = self.viewer.dims.current_step[0]
+            t_values = np.array(self.node_properties["t"])
+            node_ids = np.array(self.node_properties["node_id"])
+            index = np.where(
+                (t_values == current_timepoint) & (node_ids == self.selected_label)
+            )[0]
+            if len(index) == 0:
+                # check if a node with this node id exists anywhere:
+                if self.tracks_viewer.tracks.graph.has_node(self.selected_label):
+                    # selected label is not valid, select the neares available one
+                    lineage_nodes = extract_lineage_tree(
+                        self.tracks_viewer.tracks.graph, self.selected_label
+                    )
+                    for node in lineage_nodes:
+                        index = np.where(
+                            (t_values == current_timepoint) & (node_ids == node)
+                        )[0]
+                        if len(index) > 0:
+                            self.selected_label = node
+                            break
+                else:
+                    # this node should belong to a new track, add it to the colormap
+                    new_track_id = self.tracks_viewer.tracks.get_next_track_id()
+                    self.colormap.color_dict[self.selected_label] = (
+                        self.tracks_viewer.colormap.map(new_track_id)
+                    )
+                    self.colormap = DirectLabelColormap(
+                        color_dict=self.colormap.color_dict
+                    )
+
+        self.events.selected_label.connect(self._ensure_valid_label)
