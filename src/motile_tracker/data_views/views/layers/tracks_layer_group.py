@@ -97,7 +97,7 @@ class TracksLayerGroup:
 
     def update_visible(self, visible_tracks: list[int], visible_nodes: list[int]):
         if self.seg_layer is not None:
-            self.seg_layer.update_label_colormap(visible_nodes)
+            self.seg_layer.update_visible(visible_tracks, visible_nodes)
         if self.points_layer is not None:
             self.points_layer.update_point_outline(visible_tracks)
         if self.tracks_layer is not None:
