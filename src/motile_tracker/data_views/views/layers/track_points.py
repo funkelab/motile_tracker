@@ -156,7 +156,6 @@ class TrackPoints(napari.layers.Points):
         if event.action == "added":
             new_point = event.value[-1]
             attributes = self._create_node_attrs(new_point)
-            print(f"{attributes=}")
             self.tracks_viewer.tracks_controller.add_nodes(attributes)
 
         if event.action == "removed":

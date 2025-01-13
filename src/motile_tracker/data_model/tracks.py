@@ -190,7 +190,6 @@ class Tracks:
         final_pos: np.ndarray
         if self.segmentation is not None:
             computed_attrs = self._compute_node_attrs(nodes, times)
-            print(computed_attrs)
             if positions is None:
                 final_pos = np.array(computed_attrs[NodeAttr.POS.value])
             else:
@@ -641,7 +640,6 @@ class Tracks:
         }
         for node, time in zip(nodes, times, strict=False):
             seg = self.segmentation[time] == node
-            print(np.sum(seg))
             pos_scale = self.scale[1:] if self.scale is not None else None
             area = np.sum(seg)
             if pos_scale is not None:

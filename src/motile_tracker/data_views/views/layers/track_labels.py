@@ -17,7 +17,6 @@ from motile_toolbox.candidate_graph.graph_attributes import NodeAttr
 
 def new_label(layer: TrackLabels):
     """Set the currently selected label to the largest used label plus one."""
-    print("overriding new label")
     _new_label(layer, new_track_id=True)
 
 
@@ -356,9 +355,6 @@ class TrackLabels(napari.layers.Labels):
                 else:
                     # if there is already a node in that track in this frame, edit that instead
                     edit = False
-                    print(
-                        self.tracks_viewer.tracks.track_id_to_node, self.selected_track
-                    )
                     if (
                         self.selected_track
                         in self.tracks_viewer.tracks.track_id_to_node
