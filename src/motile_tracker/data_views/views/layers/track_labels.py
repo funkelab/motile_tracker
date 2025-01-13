@@ -6,10 +6,43 @@ from typing import TYPE_CHECKING
 import napari
 import numpy as np
 from napari.utils import DirectLabelColormap
+from napari.utils.action_manager import action_manager
+from napari.utils.notifications import show_info
+from napari.utils.translations import trans
 
 if TYPE_CHECKING:
     from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 from motile_toolbox.candidate_graph.graph_attributes import NodeAttr
+
+
+def new_label(layer: TrackLabels):
+    """Set the currently selected label to the largest used label plus one."""
+    print("overriding new label")
+    _new_label(layer, new_track_id=True)
+
+
+def _new_label(layer: TrackLabels, new_track_id=True):
+    if isinstance(layer.data, np.ndarray):
+        new_selected_label = np.max(layer.data) + 1
+        if layer.selected_label == new_selected_label:
+            show_info(
+                trans._(
+                    "Current selected label is not being used. You will need to use it first "
+                    "to be able to set the current select label to the next one available",
+                )
+            )
+        else:
+            layer.selected_label = new_selected_label
+            if new_track_id:
+                new_selected_track = layer.tracks_viewer.tracks.get_next_track_id()
+                layer.selected_track = new_selected_track
+            layer.colormap.color_dict[new_selected_label] = (
+                layer.tracks_viewer.colormap.map(layer.selected_track)
+            )
+    else:
+        show_info(
+            trans._("Calculating empty label on non-numpy array is not supported")
+        )
 
 
 class TrackLabels(napari.layers.Labels):
@@ -31,7 +64,7 @@ class TrackLabels(napari.layers.Labels):
     ):
         self.tracks_viewer = tracks_viewer
         self.node_properties = self._get_node_properties()
-        self.current_track_id = None
+        self.selected_track = None
 
         colormap = DirectLabelColormap(
             color_dict={
@@ -200,7 +233,7 @@ class TrackLabels(napari.layers.Labels):
                 if existing_node:
                     to_update_bigger.append((new_value, all_pixels))
                 else:
-                    to_add.append((new_value, self.current_track_id, all_pixels))
+                    to_add.append((new_value, self.selected_track, all_pixels))
 
         self.tracks_viewer.tracks_controller.update_segmentations(
             to_delete, to_update_smaller, to_update_bigger, to_add, current_timepoint
@@ -290,95 +323,93 @@ class TrackLabels(napari.layers.Labels):
             self.selected_label = self.tracks_viewer.selected_nodes[0]
 
     def _ensure_valid_label(self, event):
-        """Make sure a valid label is selected, because it is not allowed to paint with a label that already exists at a different timepoint.
+        """Make sure a valid label is selected, because it is not allowed to paint with a
+        label that already exists at a different timepoint.
         Scenarios:
-        1. If a node with the selected label value (node id) exists at a different time point, check if there is any node with the same track_id at the current time point
+        1. If a node with the selected label value (node id) exists at a different time point,
+        check if there is any node with the same track_id at the current time point
             1.a if there is a node with the same track id, select that one, so that it can be used to update an existing node
-            1.b if there is no node with the same track id, and the node_id value does not yet exist in the colormap dict, create a new node id and paint with the track_id of the selected label. Make sure to add it to the colormap dict. This can be used to add a new node with the same track id at a time point where it does not (yet) exist (anymore).
-        2. if there is no existing node with this value in the graph, but the node id is in the colormap dict, it means that the node was created but has not been used to paint with. Retrieve the track_id from self.current_track_id and use it to find if there are any nodes of this track id at current time point
-        3. If no node with this label exists yet, it is valid and can be used to start a new track id. Therefore, create a new node id and map a new color. Add it to the dictionary.
+            1.b if there is no node with the same track id, create a new node id and paint with the track_id of the selected label.
+              This can be used to add a new node with the same track id at a time point where it does not (yet) exist (anymore).
+        2. if there is no existing node with this value in the graph, it is assume that you want to add a node with the current track id
+        Retrieve the track_id from self.current_track_id and use it to find if there are any nodes of this track id
+        at current time point
+        3. If no node with this label exists yet, it is valid and can be used to start a new track id.
+        Therefore, create a new node id and map a new color. Add it to the dictionary.
         4. If a node with the label exists at the current time point, it is valid and can be used to update the existing node in a paint event. No action is needed"""
 
         self.events.selected_label.disconnect(self._ensure_valid_label)
         if self.tracks_viewer.tracks is not None:
             current_timepoint = self.viewer.dims.current_step[0]
-            t_values = np.array(self.node_properties["t"])
-            node_ids = np.array(self.node_properties["node_id"])
-
-            # check if a node with this node id exists anywhere
-            index = np.where(
-                (t_values == current_timepoint) & (node_ids == self.selected_label)
-            )[0]
-
-            if len(index) == 0:
-                if self.tracks_viewer.tracks.graph.has_node(
-                    self.selected_label
-                ):  # selected label is not valid, select the nearest available one
-                    self.current_track_id = self.tracks_viewer.tracks._get_node_attr(
-                        self.selected_label, NodeAttr.TRACK_ID.value
+            # if a node with the given label is already in the graph
+            if self.tracks_viewer.tracks.graph.has_node(self.selected_label):
+                # Update the track id
+                self.selected_track = self.tracks_viewer.tracks._get_node_attr(
+                    self.selected_label, NodeAttr.TRACK_ID.value
+                )
+                existing_time = self.tracks_viewer.tracks._get_node_attr(
+                    self.selected_label, NodeAttr.TIME.value
+                )
+                if existing_time == current_timepoint:
+                    # we are changing the existing node. This is fine
+                    pass
+                else:
+                    # if there is already a node in that track in this frame, edit that instead
+                    edit = False
+                    print(
+                        self.tracks_viewer.tracks.track_id_to_node, self.selected_track
                     )
+                    if (
+                        self.selected_track
+                        in self.tracks_viewer.tracks.track_id_to_node
+                    ):
+                        for node in self.tracks_viewer.tracks.track_id_to_node[
+                            self.selected_track
+                        ]:
+                            if (
+                                self.tracks_viewer.tracks._get_node_attr(
+                                    node, NodeAttr.TIME.value
+                                )
+                                == current_timepoint
+                            ):
+                                # raise ValueError("Can't add new node with track id {self.selected_track} in time {current_timepoint}")
 
-                    # is there any node with this track id at the current timepoint?
-                    time_point_nodes = [
-                        node
-                        for node in self.tracks_viewer.tracks.graph.nodes()
-                        if self.tracks_viewer.tracks.get_time(node) == current_timepoint
-                    ]
-                    track_id_nodes = [
-                        node
-                        for node in time_point_nodes
-                        if self.tracks_viewer.tracks._get_node_attr(
-                            node, NodeAttr.TRACK_ID.value
-                        )
-                        == self.current_track_id
-                    ]
+                                self.selected_label = node
+                                edit = True
+                                break
 
-                    if len(track_id_nodes) > 0:
-                        self.selected_label = track_id_nodes[
-                            0
-                        ]  # select the node with the same track id at the current time point
-                    else:
-                        color = self.colormap.color_dict[self.selected_label]
-                        self.selected_label = (
-                            np.max(self.data) + 1
-                        )  # pick an entirely new label, but use the same track id (color) by adding it to the colordict
-                        self.colormap.color_dict[self.selected_label] = color
+                    if not edit:
+                        # use a new label, but the same track id
+                        _new_label(self, new_track_id=False)
                         self.colormap = DirectLabelColormap(
                             color_dict=self.colormap.color_dict
                         )
 
-                # the current node does not exist in the graph. Find out if it should belong to a new track or if it belongs to an existing track id but has not been painted yet
-                elif self.selected_label in self.colormap.color_dict:
-                    # is there a node with the associated track id at the current time point?
-                    time_point_nodes = [
-                        node
-                        for node in self.tracks_viewer.tracks.graph.nodes()
-                        if self.tracks_viewer.tracks.get_time(node) == current_timepoint
-                    ]
-                    track_id_nodes = [
-                        node
-                        for node in time_point_nodes
-                        if self.tracks_viewer.tracks._get_node_attr(
-                            node, NodeAttr.TRACK_ID.value
-                        )
-                        == self.current_track_id
-                    ]
-
-                    if len(track_id_nodes) > 0:
-                        del self.colormap.color_dict[
-                            self.selected_label
-                        ]  # remove the unused label from the color_dict
-                        self.selected_label = track_id_nodes[0]
-
-                # The currently selected_label does not exist in the graph nor in the colordict, it should be a new track
-                else:
-                    # this node should belong to a new track, add it to the colormap
-                    new_track_id = self.tracks_viewer.tracks.get_next_track_id()
-                    self.colormap.color_dict[self.selected_label] = (
-                        self.tracks_viewer.colormap.map(new_track_id)
-                    )
-                    self.colormap = DirectLabelColormap(
-                        color_dict=self.colormap.color_dict
-                    )
-                    self.current_track_id = new_track_id
+            # the current node does not exist in the graph.
+            # Use the current selected_track as the track id (will be a new track if a new label was found with "m")
+            #  Check that the track id is not already in this frame.
+            else:
+                # if there is already a node in that track in this frame, edit that instead
+                edit = False
+                if self.selected_track in self.tracks_viewer.tracks.track_id_to_node:
+                    for node in self.tracks_viewer.tracks.track_id_to_node[
+                        self.selected_track
+                    ]:
+                        if (
+                            self.tracks_viewer.tracks._get_node_attr(
+                                node, NodeAttr.TIME.value
+                            )
+                            == current_timepoint
+                        ):
+                            self.selected_label = node
+                            edit = True
+                            break
         self.events.selected_label.connect(self._ensure_valid_label)
+
+
+action_manager.register_action(
+    name="napari:new_label",
+    command=new_label,
+    keymapprovider=TrackLabels,
+    description="",
+)

@@ -106,6 +106,7 @@ class SolutionTracks(Tracks):
                 self.graph,
                 {node: {NodeAttr.TRACK_ID.value: track_id} for node in tracklet},
             )
+            self.track_id_to_node[track_id] = list(tracklet)
             track_id += 1
         self.max_track_id = track_id - 1
 
