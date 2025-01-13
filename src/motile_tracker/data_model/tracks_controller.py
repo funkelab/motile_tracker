@@ -127,7 +127,8 @@ class TracksController:
 
         times = attributes[NodeAttr.TIME.value]
         track_ids = attributes[NodeAttr.TRACK_ID.value]
-        nodes = self._get_new_node_ids(len(times))
+        nodes = attributes[NodeAttr.SEG_ID.value]
+        # nodes = self._get_new_node_ids(len(times))
         actions = []
 
         # remove skip edges that will be replaced by new edges after adding nodes
@@ -464,7 +465,7 @@ class TracksController:
         to_remove: list[Node],  # (node_ids, pixels)
         to_update_smaller: list[tuple],  # (node_id, pixels)
         to_update_bigger: list[tuple],  # (node_id, pixels)
-        to_add: list[tuple],  # (track_id, pixels)
+        to_add: list[tuple],  # (seg_id, track_id, pixels)
         current_timepoint: int,
     ) -> None:
         """Handle a change in the segmentation mask, checking for node addition, deletion, and attribute updates.
@@ -479,6 +480,7 @@ class TracksController:
         """
         actions = []
         node_to_select = None
+
         if len(to_remove) > 0:
             nodes = [node_id for node_id, _ in to_remove]
             pixels = [pixels for _, pixels in to_remove]
@@ -492,13 +494,17 @@ class TracksController:
             pixels = [pixels for _, pixels in to_update_bigger]
             actions.append(self._update_node_segs(nodes, pixels, added=True))
         if len(to_add) > 0:
-            nodes = [node for node, _ in to_add]
-            pixels = [pix for _, pix in to_add]
-            seg_ids = [val for val, _ in to_add]
+            nodes = [node for node, _, _ in to_add]
+            pixels = [pix for _, _, pix in to_add]
+            seg_ids = [val for val, _, _ in to_add]
+            track_ids = [
+                val if val is not None else self.tracks.get_next_track_id()
+                for _, val, _ in to_add
+            ]
             times = [pix[0][0] for pix in pixels]
             attributes = {
                 NodeAttr.SEG_ID.value: seg_ids,
-                NodeAttr.TRACK_ID.value: seg_ids,
+                NodeAttr.TRACK_ID.value: track_ids,
                 self.tracks.time_attr: times,
             }
             action, nodes = self._add_nodes(attributes=attributes, pixels=pixels)

@@ -196,11 +196,11 @@ class TrackLabels(napari.layers.Labels):
                 for dim in range(ndim)
             )
             for _ in np.unique(all_pixels[0]):
-                added_node = new_value
-                if added_node is not None:
-                    to_update_bigger.append((added_node, all_pixels))
+                existing_node = self.tracks_viewer.tracks.graph.has_node(new_value)
+                if existing_node:
+                    to_update_bigger.append((new_value, all_pixels))
                 else:
-                    to_add.append((new_value, all_pixels))
+                    to_add.append((new_value, self.current_track_id, all_pixels))
 
         self.tracks_viewer.tracks_controller.update_segmentations(
             to_delete, to_update_smaller, to_update_bigger, to_add, current_timepoint
