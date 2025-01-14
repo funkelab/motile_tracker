@@ -332,7 +332,7 @@ class TrackLabels(napari.layers.Labels):
         """Update the selected label in the labels layer"""
 
         if len(self.tracks_viewer.selected_nodes) > 0:
-            self.selected_label = self.tracks_viewer.selected_nodes[0]
+            self.selected_label = int(self.tracks_viewer.selected_nodes[0])
 
     def _ensure_valid_label(self, event):
         """Make sure a valid label is selected, because it is not allowed to paint with a
@@ -383,7 +383,7 @@ class TrackLabels(napari.layers.Labels):
                             ):
                                 # raise ValueError("Can't add new node with track id {self.selected_track} in time {current_timepoint}")
 
-                                self.selected_label = node
+                                self.selected_label = int(node)
                                 edit = True
                                 break
 
@@ -410,7 +410,7 @@ class TrackLabels(napari.layers.Labels):
                             )
                             == current_timepoint
                         ):
-                            self.selected_label = node
+                            self.selected_label = int(node)
                             edit = True
                             break
 
