@@ -38,6 +38,9 @@ def _new_label(layer: TrackLabels, new_track_id=True):
             layer.colormap.color_dict[new_selected_label] = (
                 layer.tracks_viewer.colormap.map(layer.selected_track)
             )
+            layer.colormap = DirectLabelColormap(
+                color_dict=layer.colormap.color_dict
+            )  # to refresh, otherwise you paint with a transparent label until you release the mouse
     else:
         show_info(
             trans._("Calculating empty label on non-numpy array is not supported")
