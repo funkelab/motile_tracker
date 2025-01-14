@@ -66,7 +66,12 @@ class SolutionTracks(Tracks):
         return track_id
 
     def set_track_id(self, node: Node, value: int):
+        old_track_id = self.get_track_id(node)
+        self.track_id_to_node[old_track_id].remove(node)
         self._set_node_attr(node, NodeAttr.TRACK_ID.value, value)
+        if value not in self.track_id_to_node:
+            self.track_id_to_node[value] = []
+        self.track_id_to_node[value].append(node)
 
     def _initialize_track_ids(self):
         self.max_track_id = 0
