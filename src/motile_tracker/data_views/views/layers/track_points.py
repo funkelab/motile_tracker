@@ -138,7 +138,7 @@ class TrackPoints(napari.layers.Points):
 
         t = int(new_point[0])
         track_id = self.tracks_viewer.tracks.get_next_track_id()
-        seg_id = track_id
+        seg_id = np.max(self.tracks_viewer.tracks.graph.nodes()) + 1
         area = 0
 
         attributes = {
