@@ -134,7 +134,6 @@ class TrackPoints(napari.layers.Points):
 
         t = int(new_point[0])
         track_id = self.tracks_viewer.tracks.get_next_track_id()
-        seg_id = np.max(self.tracks_viewer.tracks.graph.nodes()) + 1
         area = 0
 
         attributes = {
@@ -142,7 +141,6 @@ class TrackPoints(napari.layers.Points):
             NodeAttr.TIME.value: np.array([t]),
             NodeAttr.TRACK_ID.value: np.array([track_id]),
             NodeAttr.AREA.value: np.array([area]),
-            NodeAttr.SEG_ID.value: np.array([seg_id]),
         }
         return attributes
 

@@ -81,6 +81,7 @@ def test__add_nodes_with_seg(graph_2d, segmentation_2d):
     attrs = {
         NodeAttr.TIME.value: [time, time + 1],
         NodeAttr.TRACK_ID.value: [track_id, track_id],
+        "node_id": [node1, node2],
     }
 
     loc_pix = np.where(new_seg[time] == node1)
@@ -116,6 +117,7 @@ def test__add_nodes_with_seg(graph_2d, segmentation_2d):
     attrs = {
         NodeAttr.TIME.value: [time, time + 1],
         NodeAttr.TRACK_ID.value: [track_id, track_id],
+        "node_id": [node1, node2],
     }
 
     loc_pix = np.where(new_seg[time] == node1)
@@ -143,6 +145,7 @@ def test__add_nodes_with_seg(graph_2d, segmentation_2d):
     attrs = {
         NodeAttr.TIME.value: [time],
         NodeAttr.TRACK_ID.value: [track_id],
+        "node_id": [node1],
     }
 
     loc_pix = np.where(new_seg[time] == node1)
