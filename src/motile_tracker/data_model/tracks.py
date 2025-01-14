@@ -357,22 +357,10 @@ class Tracks:
             ]
             * len(nodes)
         )
-
         self.set_pixels(pixels, values)
         computed_attrs = self._compute_node_attrs(nodes, times)
         positions = np.array(computed_attrs[NodeAttr.POS.value])
-
-        # Filter nodes and positions to exclude those with None values
-        filtered_nodes_positions = [
-            (node, pos)
-            for node, pos in zip(nodes, positions, strict=True)
-            if None not in pos
-        ]
-
-        if filtered_nodes_positions:
-            nodes, positions = zip(*filtered_nodes_positions, strict=True)
-            self.set_positions(nodes, positions)
-
+        self.set_positions(nodes, positions)
         self._set_nodes_attr(
             nodes, NodeAttr.AREA.value, computed_attrs[NodeAttr.AREA.value]
         )
