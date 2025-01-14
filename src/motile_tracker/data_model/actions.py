@@ -122,14 +122,6 @@ class AddNodes(TracksAction):
         self.tracks.add_nodes(
             self.nodes, self.times, self.positions, attrs=self.attributes
         )
-        # add nodes from track_id_to_node
-        if isinstance(self.tracks, SolutionTracks):
-            for node, track_id in zip(
-                self.nodes, self.attributes[NodeAttr.TRACK_ID.value], strict=True
-            ):
-                if track_id not in self.tracks.track_id_to_node:
-                    self.tracks.track_id_to_node[track_id] = []
-                self.tracks.track_id_to_node[track_id].append(node)
 
 
 class DeleteNodes(TracksAction):
@@ -174,13 +166,6 @@ class DeleteNodes(TracksAction):
                 ]
                 * len(self.pixels),
             )
-
-        # remove node from track_id_to_node
-        if isinstance(self.tracks, SolutionTracks):
-            for node, track_id in zip(
-                self.nodes, self.attributes[NodeAttr.TRACK_ID.value], strict=True
-            ):
-                self.tracks.track_id_to_node[track_id].remove(node)
 
         self.tracks.remove_nodes(self.nodes)
 
