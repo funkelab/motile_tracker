@@ -137,6 +137,17 @@ class TracksController:
             pred, succ = self._get_pred_and_succ(track_id, time)
             if pred is not None and succ is not None:
                 edges_to_remove.append((pred, succ))
+
+            # Find and remove edges to nodes with different track_ids (upstream division events)
+            track_id_nodes = self.tracks.track_id_to_node[track_id]
+            for node in track_id_nodes:
+                if (
+                    self.tracks._get_node_attr(node, NodeAttr.TIME.value) <= time
+                    and self.tracks.graph.out_degree(node) == 2
+                ):  # there is an upstream division event here
+                    for succ in self.tracks.graph.successors(node):
+                        edges_to_remove.append((node, succ))
+
         if len(edges_to_remove) > 0:
             actions.append(DeleteEdges(self.tracks, edges_to_remove))
 
@@ -507,6 +518,7 @@ class TracksController:
                 NodeAttr.TRACK_ID.value: track_ids,
                 self.tracks.time_attr: times,
             }
+
             action, nodes = self._add_nodes(attributes=attributes, pixels=pixels)
             actions.append(action)
 
