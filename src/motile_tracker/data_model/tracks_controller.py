@@ -139,14 +139,15 @@ class TracksController:
                 edges_to_remove.append((pred, succ))
 
             # Find and remove edges to nodes with different track_ids (upstream division events)
-            track_id_nodes = self.tracks.track_id_to_node[track_id]
-            for node in track_id_nodes:
-                if (
-                    self.tracks._get_node_attr(node, NodeAttr.TIME.value) <= time
-                    and self.tracks.graph.out_degree(node) == 2
-                ):  # there is an upstream division event here
-                    for succ in self.tracks.graph.successors(node):
-                        edges_to_remove.append((node, succ))
+            if track_id in self.tracks.track_id_to_node:
+                track_id_nodes = self.tracks.track_id_to_node[track_id]
+                for node in track_id_nodes:
+                    if (
+                        self.tracks._get_node_attr(node, NodeAttr.TIME.value) <= time
+                        and self.tracks.graph.out_degree(node) == 2
+                    ):  # there is an upstream division event here
+                        for succ in self.tracks.graph.successors(node):
+                            edges_to_remove.append((node, succ))
 
         if len(edges_to_remove) > 0:
             actions.append(DeleteEdges(self.tracks, edges_to_remove))
