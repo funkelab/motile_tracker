@@ -17,7 +17,9 @@ from motile_toolbox.candidate_graph.graph_attributes import NodeAttr
 
 def new_label(layer: TrackLabels):
     """Set the currently selected label to the largest used label plus one."""
+    layer.events.selected_label.disconnect(layer._ensure_valid_label)
     _new_label(layer, new_track_id=True)
+    layer.events.selected_label.connect(layer._ensure_valid_label)
 
 
 def _new_label(layer: TrackLabels, new_track_id=True):
@@ -31,10 +33,10 @@ def _new_label(layer: TrackLabels, new_track_id=True):
                 )
             )
         else:
-            layer.selected_label = new_selected_label
             if new_track_id:
                 new_selected_track = layer.tracks_viewer.tracks.get_next_track_id()
                 layer.selected_track = new_selected_track
+            layer.selected_label = new_selected_label
             layer.colormap.color_dict[new_selected_label] = (
                 layer.tracks_viewer.colormap.map(layer.selected_track)
             )
@@ -180,6 +182,7 @@ class TrackLabels(napari.layers.Labels):
                 changed (a tuple with len ndims)
                 - the value before the change
         """
+
         new_value = event_val[-1][-1]
         ndim = len(event_val[-1][0])
         concatenated_indices = tuple(
@@ -201,6 +204,8 @@ class TrackLabels(napari.layers.Labels):
 
     def _on_paint(self, event):
         """Listen to the paint event and check which track_ids have changed"""
+
+        self.events.selected_label.disconnect(self._ensure_valid_label)
 
         current_timepoint = self.viewer.dims.current_step[
             0
@@ -261,12 +266,15 @@ class TrackLabels(napari.layers.Labels):
         )
 
         self.refresh()
+        self.events.selected_label.connect(self._ensure_valid_label)
 
     def update_label_colormap(self, visible: list[int] | str) -> None:
         """Updates the opacity of the label colormap to highlight the selected label
         and optionally hide cells not belonging to the current lineage
 
         Visible is a list of visible node ids"""
+
+        self.events.selected_label.disconnect(self._ensure_valid_label)
 
         highlighted = self.tracks_viewer.selected_nodes
 
@@ -299,6 +307,8 @@ class TrackLabels(napari.layers.Labels):
         self.colormap = DirectLabelColormap(
             color_dict=self.colormap.color_dict
         )  # create a new colormap from the updated colors (otherwise it does not refresh)
+
+        self.events.selected_label.connect(self._ensure_valid_label)
 
     def new_colormap(self):
         """Replace existing function, to generate new colormap and emit refresh signal to also update colors in other layers/widgets"""
@@ -403,6 +413,7 @@ class TrackLabels(napari.layers.Labels):
                             self.selected_label = node
                             edit = True
                             break
+
         self.events.selected_label.connect(self._ensure_valid_label)
 
 
