@@ -19,13 +19,27 @@ from motile_toolbox.candidate_graph.graph_attributes import NodeAttr
 
 
 def new_label(layer: TrackLabels):
-    """Set the currently selected label to the largest used label plus one."""
+    """A function to override the default napari labels new_label function.
+    Must be registered (see end of this file)"""
     layer.events.selected_label.disconnect(layer._ensure_valid_label)
     _new_label(layer, new_track_id=True)
     layer.events.selected_label.connect(layer._ensure_valid_label)
 
 
 def _new_label(layer: TrackLabels, new_track_id=True):
+    """A function to get a new label for a given TrackLabels layer. Should properly
+    go on the class, but needs to be registered to override the default napari function
+    in the action manager. This helper is abstracted out because we want to do the same
+    thing without making a new track id in the layer, and with the new track id in the
+    overriden action.
+
+    Args:
+        layer (TrackLabels): A TrackLabels layer from which get a new label for drawing a
+            new segmentation. Updates the selected_label attribute.
+        new_track_id (bool, optional): If you should also generate a new track id and set
+            it to the selected_track attribute. Defaults to True.
+    """
+
     if isinstance(layer.data, np.ndarray):
         new_selected_label = np.max(layer.data) + 1
         if layer.selected_label == new_selected_label:
@@ -136,7 +150,7 @@ class TrackLabels(napari.layers.Labels):
         uses the tracks_viewer.colormap to map from track_id to color.
 
         Returns:
-            _type_: _description_
+            DirectLabelColormap: A map from node ids to colors based on track id
         """
         tracks = self.tracks_viewer.tracks
         if tracks is not None:
@@ -275,8 +289,8 @@ class TrackLabels(napari.layers.Labels):
         """Updates the opacity of the label colormap to highlight the selected label
         and optionally hide cells not belonging to the current lineage
 
-        Visible is a list of visible node ids"""
-
+        Visible is a list of visible node id
+        """
         with self.events.selected_label.blocker():
             highlighted = self.tracks_viewer.selected_nodes
 
@@ -381,8 +395,6 @@ class TrackLabels(napari.layers.Labels):
                                 )
                                 == current_timepoint
                             ):
-                                # raise ValueError("Can't add new node with track id {self.selected_track} in time {current_timepoint}")
-
                                 self.selected_label = int(node)
                                 edit = True
                                 break
@@ -396,7 +408,7 @@ class TrackLabels(napari.layers.Labels):
 
             # the current node does not exist in the graph.
             # Use the current selected_track as the track id (will be a new track if a new label was found with "m")
-            #  Check that the track id is not already in this frame.
+            # Check that the track id is not already in this frame.
             else:
                 # if there is already a node in that track in this frame, edit that instead
                 edit = False
@@ -418,13 +430,14 @@ class TrackLabels(napari.layers.Labels):
 
     @napari.layers.Labels.n_edit_dimensions.setter
     def n_edit_dimensions(self, n_edit_dimensions):
+        # Overriding the setter to disable editing in time dimension
         if n_edit_dimensions > self.tracks_viewer.tracks.ndim - 1:
-            # can't edit in time dimension
             n_edit_dimensions = self.tracks_viewer.tracks.ndim - 1
         self._n_edit_dimensions = n_edit_dimensions
         self.events.n_edit_dimensions()
 
 
+# This is to override the default napari function to get a new label for the labels layer
 action_manager.register_action(
     name="napari:new_label",
     command=new_label,
