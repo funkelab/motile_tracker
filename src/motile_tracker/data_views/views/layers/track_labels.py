@@ -245,6 +245,7 @@ class TrackLabels(napari.layers.Labels):
         self.tracks_viewer.tracks_controller.update_segmentations(
             to_delete, to_update_smaller, to_update_bigger, to_add, current_timepoint
         )
+        self.events.selected_label.connect(self._ensure_valid_label)
 
     def _refresh(self):
         """Refresh the data in the labels layer"""
@@ -266,7 +267,6 @@ class TrackLabels(napari.layers.Labels):
         )
 
         self.refresh()
-        self.events.selected_label.connect(self._ensure_valid_label)
 
     def update_label_colormap(self, visible: list[int] | str) -> None:
         """Updates the opacity of the label colormap to highlight the selected label

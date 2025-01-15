@@ -109,7 +109,6 @@ class TracksController:
             predecessor and successor with the same track_id, if any)
 
         Args:
-            nodes (list[Node]): a list of node ids
             attributes (Attributes): dictionary containing at least time and track id,
                 and either node_id (if pixels are provided) or position (if not)
             pixels (list[SegMask] | None): A list of pixels associated with the node,
@@ -127,8 +126,10 @@ class TracksController:
 
         times = attributes[NodeAttr.TIME.value]
         track_ids = attributes[NodeAttr.TRACK_ID.value]
-        nodes = attributes[NodeAttr.SEG_ID.value]
-        # nodes = self._get_new_node_ids(len(times))
+        if pixels is not None:
+            nodes = attributes["node_id"]
+        else:
+            nodes = self._get_new_node_ids(len(times))
         actions = []
 
         # remove skip edges that will be replaced by new edges after adding nodes
@@ -518,6 +519,7 @@ class TracksController:
                 NodeAttr.SEG_ID.value: seg_ids,
                 NodeAttr.TRACK_ID.value: track_ids,
                 self.tracks.time_attr: times,
+                "node_id": nodes,
             }
 
             action, nodes = self._add_nodes(attributes=attributes, pixels=pixels)
