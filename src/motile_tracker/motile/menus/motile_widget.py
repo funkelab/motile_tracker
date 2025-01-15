@@ -7,6 +7,7 @@ from napari.utils.notifications import show_warning
 from psygnal import Signal
 from qtpy.QtWidgets import (
     QLabel,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -16,6 +17,7 @@ from motile_tracker.data_model import SolutionTracks
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 from motile_tracker.motile.backend import MotileRun, solve
 
+from .measurement_features import MeasurementSetupWidget
 from .run_editor import RunEditor
 from .run_viewer import RunViewer
 
@@ -49,11 +51,22 @@ class MotileWidget(QWidget):
         self.view_run_widget.hide()
         self.solver_update.connect(self.view_run_widget.solver_event_update)
 
+        self.measurements_widget = MeasurementSetupWidget(self.viewer)
+        self.edit_run_widget.input_layer_updated.connect(
+            self.measurements_widget.update_input_layer
+        )
+
+        self.edit_measurement_tabwidget = QTabWidget(self)
+        self.edit_measurement_tabwidget.addTab(self.edit_run_widget, "Run Editor")
+        self.edit_measurement_tabwidget.addTab(
+            self.measurements_widget, "Feature Measurements"
+        )
+
         # Create main layout
         main_layout = QVBoxLayout()
         main_layout.addWidget(self._title_widget())
         main_layout.addWidget(self.view_run_widget)
-        main_layout.addWidget(self.edit_run_widget)
+        main_layout.addWidget(self.edit_measurement_tabwidget)
         main_layout.addStretch()
         self.setLayout(main_layout)
 
@@ -66,7 +79,7 @@ class MotileWidget(QWidget):
         """
         if isinstance(tracks, MotileRun):
             self.view_run_widget.update_run(tracks)
-            self.edit_run_widget.hide()
+            self.edit_measurement_tabwidget.hide()
             self.view_run_widget.show()
         else:
             show_warning("Tried to view a Tracks that is not a MotileRun")
@@ -80,7 +93,7 @@ class MotileWidget(QWidget):
                 from this run. If not provided, uses the SolverParams default values.
         """
         self.view_run_widget.hide()
-        self.edit_run_widget.show()
+        self.edit_measurement_tabwidget.show()
         if run:
             self.edit_run_widget.new_run(run)
 

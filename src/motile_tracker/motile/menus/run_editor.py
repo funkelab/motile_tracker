@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 
 class RunEditor(QGroupBox):
     start_run = Signal(MotileRun)
+    input_layer_updated = Signal(str)
 
     def __init__(self, viewer: napari.Viewer):
         """A widget for editing run parameters and starting solving.
@@ -84,6 +85,7 @@ class RunEditor(QGroupBox):
         elif isinstance(layer, napari.layers.Points):
             enable_iou = False
         self.solver_params_widget.iou_row.toggle_visible(enable_iou)
+        self.input_layer_updated.emit(layer.name)
 
     def _labels_layer_widget(self) -> QWidget:
         """Create the widget to select the input layer. Uses magicgui,
