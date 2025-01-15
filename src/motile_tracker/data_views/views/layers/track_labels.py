@@ -70,21 +70,8 @@ class TrackLabels(napari.layers.Labels):
         tracks_viewer: TracksViewer,
     ):
         self.tracks_viewer = tracks_viewer
-        self.node_properties = self._get_node_properties()
         self.selected_track = None
-
-        colormap = DirectLabelColormap(
-            color_dict={
-                **dict(
-                    zip(
-                        self.node_properties["node_id"],
-                        self.node_properties["color"],
-                        strict=True,
-                    )
-                ),
-                None: [0, 0, 0, 0],
-            }
-        )
+        colormap = self._get_colormap()
 
         super().__init__(
             data=data,
@@ -144,19 +131,27 @@ class TrackLabels(napari.layers.Labels):
         self.events.mode.connect(self._check_mode)
         self.viewer.dims.events.current_step.connect(self._ensure_valid_label)
 
-    def _get_node_properties(self):
+    def _get_colormap(self) -> DirectLabelColormap:
+        """Get a DirectLabelColormap that maps node ids to their track ids, and then
+        uses the tracks_viewer.colormap to map from track_id to color.
+
+        Returns:
+            _type_: _description_
+        """
         tracks = self.tracks_viewer.tracks
         if tracks is not None:
             nodes = list(tracks.graph.nodes())
             track_ids = [tracks.get_track_id(node) for node in nodes]
-            times = tracks.get_times(nodes)
             colors = [self.tracks_viewer.colormap.map(tid) for tid in track_ids]
         else:
             nodes = []
-            track_ids = []
-            times = []
             colors = []
-        return {"node_id": nodes, "track_id": track_ids, "t": times, "color": colors}
+        return DirectLabelColormap(
+            color_dict={
+                **dict(zip(nodes, colors, strict=True)),
+                None: [0, 0, 0, 0],
+            }
+        )
 
     def _check_mode(self):
         """Check if the mode is valid and call the ensure_valid_label function"""
@@ -272,23 +267,8 @@ class TrackLabels(napari.layers.Labels):
 
     def _refresh(self):
         """Refresh the data in the labels layer"""
-
         self.data = self.tracks_viewer.tracks.segmentation
-        self.node_properties = self._get_node_properties()
-
-        self.colormap = DirectLabelColormap(
-            color_dict={
-                **dict(
-                    zip(
-                        self.node_properties["node_id"],
-                        self.node_properties["color"],
-                        strict=True,
-                    )
-                ),
-                None: [0, 0, 0, 0],
-            }
-        )
-
+        self.colormap = self._get_colormap()
         self.refresh()
 
     def update_label_colormap(self, visible: list[int] | str) -> None:
@@ -325,30 +305,19 @@ class TrackLabels(napari.layers.Labels):
             for node in highlighted:
                 self.colormap.color_dict[node][-1] = 1  # full opacity
 
-            # This is the minimal set of things necessary to get the updates to display ## For me this does not work, the highlighting is out of sync or not displayed at all
-            # self.colormap._clear_cache()
-            # self.events.colormap()
-
             self.colormap = DirectLabelColormap(
                 color_dict=self.colormap.color_dict
             )  # create a new colormap from the updated colors (otherwise it does not refresh)
 
     def new_colormap(self):
-        """Replace existing function, to generate new colormap and emit refresh signal to also update colors in other layers/widgets"""
+        """Override existing function to generate new colormap on tracks_viewer and
+        emit refresh signal to update colors in all layers/widgets"""
 
         self.tracks_viewer.colormap = napari.utils.colormaps.label_colormap(
             49,
             seed=random.uniform(0, 1),
             background_value=0,
         )
-
-        track_ids = [
-            self.tracks_viewer.tracks.get_track_id(node)
-            for node in self.tracks_viewer.tracks.graph.nodes
-        ]
-        self.node_properties["colors"] = [
-            self.tracks_viewer.colormap.map(tid) for tid in track_ids
-        ]
         self.tracks_viewer._refresh()
 
     def update_selected_label(self):
