@@ -1,10 +1,8 @@
 """This module contains all the low level actions used to control a Tracks object.
 Low level actions should control these aspects of Tracks:
-    - synchronizing segmentation and nodes (including bi-directional access). Currently,
-    this means updating the seg_id and time attributes on the node, and updating the
-    seg_time_to_node dictionary.
-    - Updating attributes that are controlled by the segmentation. Currently, position
-    and area for nodes, and IOU for edges.
+    - adding/removing nodes and edges to/from the segmentation and graph
+    - Updating the segmentation and graph attributes that are controlled by the segmentation.
+    Currently, position and area for nodes, and IOU for edges.
     - Keeping track of information needed to undo the given action. For removing a node,
     this means keeping track of the incident edges that were removed, along with their
     attributes.
@@ -18,8 +16,6 @@ from many low-level actions.
 
 from __future__ import annotations
 
-from typing import Any
-
 from motile_toolbox.candidate_graph.graph_attributes import NodeAttr
 
 from .solution_tracks import SolutionTracks
@@ -31,7 +27,7 @@ class TracksAction:
         """An modular change that can be applied to the given Tracks. The tracks must
         be passed in at construction time so that metadata needed to invert the action
         can be extracted.
-        The change should be actually applied in the init function.
+        The change should be applied in the init function.
 
         Args:
             tracks (Tracks): The tracks that this action will edit
@@ -39,7 +35,8 @@ class TracksAction:
         self.tracks = tracks
 
     def inverse(self) -> TracksAction:
-        """Get the inverse action of this action. Can be used to undo and redo an action.
+        """Get the inverse of this action. Calling this function does undo the action,
+        since the change is applied in the action constructor.
 
         Raises:
             NotImplementedError: if the inverse is not implemented in the subclass
@@ -80,23 +77,23 @@ class AddNodes(TracksAction):
     be taken from the node id. The existing pixel values are assumed to be
     zero - you must explicitly update any other segmentations that were overwritten
     using an UpdateNodes action if you want to be able to undo the action.
-
     """
 
     def __init__(
         self,
         tracks: Tracks,
         nodes: list[Node],
-        attributes: dict[str, list[Any]],
+        attributes: Attrs,
         pixels: list[SegMask] | None = None,
     ):
         """Create an action to add new nodes, with optional segmentation
 
         Args:
-            tracks (Tracks): The Tracks to add the n
-            nodes (Node): _description_
-            attributes (dict[str, list[Any]]): Includes times, positions
-            pixels (list | None, optional): _description_. Defaults to None.
+            tracks (Tracks): The Tracks to add the nodes to
+            nodes (Node): A list of node ids
+            attributes (Attrs): Includes times and optionally positions
+            pixels (list[SegMask] | None, optional): The segmentations associated with each node.
+                Defaults to None.
         """
         super().__init__(tracks)
         self.nodes = nodes
@@ -161,17 +158,15 @@ class DeleteNodes(TracksAction):
         if self.pixels is not None:
             self.tracks.set_pixels(
                 self.pixels,
-                [
-                    0,
-                ]
-                * len(self.pixels),
+                [0] * len(self.pixels),
             )
 
         self.tracks.remove_nodes(self.nodes)
 
 
 class UpdateNodeSegs(TracksAction):
-    """Action for updating the segmentation associated with nodes"""
+    """Action for updating the segmentation associated with nodes. Cannot mix adding
+    and removing pixels from segmentation: the added flag applies to all nodes"""
 
     def __init__(
         self,
@@ -180,6 +175,15 @@ class UpdateNodeSegs(TracksAction):
         pixels: list[SegMask],
         added: bool = True,
     ):
+        """
+        Args:
+            tracks (Tracks): The tracks to update the segmenatations for
+            nodes (list[Node]): The nodes with updated segmenatations
+            pixels (list[SegMask]): The pixels that were updated for each node
+            added (bool, optional): If the provided pixels were added (True) or deleted
+                (False) from all nodes. Defaults to True. Cannot mix adding and deleting
+                pixels in one action.
+        """
         super().__init__(tracks)
         self.nodes = nodes
         self.pixels = pixels
@@ -201,7 +205,9 @@ class UpdateNodeSegs(TracksAction):
 
 
 class UpdateNodeAttrs(TracksAction):
-    """Action for updating the segmentation associated with nodes"""
+    """Action for user updates to node attributes. Cannot update protected
+    attributes (time, area, track id), as these are controlled by internal application
+    logic."""
 
     def __init__(
         self,
@@ -209,11 +215,20 @@ class UpdateNodeAttrs(TracksAction):
         nodes: list[Node],
         attrs: Attrs,
     ):
+        """
+        Args:
+            tracks (Tracks): The tracks to update the node attributes for
+            nodes (list[Node]): The nodes to update the attributes for
+            attrs (Attrs): A mapping from attribute name to list of new attribute values
+                for the given nodes.
+
+        Raises:
+            ValueError: If a protected attribute is in the given attribute mapping.
+        """
         super().__init__(tracks)
         protected_attrs = [
             NodeAttr.TIME.value,
             NodeAttr.AREA.value,
-            NodeAttr.SEG_ID.value,
             NodeAttr.TRACK_ID.value,
         ]
         for attr in attrs:
@@ -281,11 +296,12 @@ class DeleteEdges(TracksAction):
 
 class UpdateTrackID(TracksAction):
     def __init__(self, tracks: SolutionTracks, start_node: Node, track_id: int):
-        """Args:
-        tracks (Tracks): The tracks to update
-        start_node (Any): The node ID of the first node in the track. All successors
-            with the same track id as this node will be updated.
-        track_id (int): The new track id to assign.
+        """
+        Args:
+            tracks (Tracks): The tracks to update
+            start_node (Node): The node ID of the first node in the track. All successors
+                with the same track id as this node will be updated.
+            track_id (int): The new track id to assign.
         """
         super().__init__(tracks)
         self.start_node = start_node
