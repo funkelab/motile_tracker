@@ -416,6 +416,14 @@ class TrackLabels(napari.layers.Labels):
 
         self.events.selected_label.connect(self._ensure_valid_label)
 
+    @napari.layers.Labels.n_edit_dimensions.setter
+    def n_edit_dimensions(self, n_edit_dimensions):
+        if n_edit_dimensions > self.tracks_viewer.tracks.ndim - 1:
+            # can't edit in time dimension
+            n_edit_dimensions = self.tracks_viewer.tracks.ndim - 1
+        self._n_edit_dimensions = n_edit_dimensions
+        self.events.n_edit_dimensions()
+
 
 action_manager.register_action(
     name="napari:new_label",
