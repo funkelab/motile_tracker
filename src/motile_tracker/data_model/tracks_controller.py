@@ -147,8 +147,27 @@ class TracksController:
                         self.tracks._get_node_attr(node, NodeAttr.TIME.value) <= time
                         and self.tracks.graph.out_degree(node) == 2
                     ):  # there is an upstream division event here
-                        for succ in self.tracks.graph.successors(node):
-                            edges_to_remove.append((node, succ))
+                        msg = QMessageBox()
+                        msg.setWindowTitle("Delete existing division?")
+                        msg.setText(
+                            "Painting a label with this track id involves breaking an upstream division event. Proceed?"
+                        )
+                        msg.setIcon(QMessageBox.Information)
+
+                        # Set both OK and Cancel buttons
+                        msg.setStandardButtons(QMessageBox.Ok | QMessageBox.Cancel)
+
+                        # Execute the message box and catch the result
+                        result = msg.exec_()
+
+                        # Check which button was clicked
+                        if result == QMessageBox.Ok:
+                            for succ in self.tracks.graph.successors(node):
+                                edges_to_remove.append((node, succ))
+
+                        elif result == QMessageBox.Cancel:
+                            show_warning("Action canceled by user")
+                            return
 
         if len(edges_to_remove) > 0:
             actions.append(DeleteEdges(self.tracks, edges_to_remove))
@@ -522,7 +541,12 @@ class TracksController:
                 "node_id": nodes,
             }
 
-            action, nodes = self._add_nodes(attributes=attributes, pixels=pixels)
+            result = self._add_nodes(attributes=attributes, pixels=pixels)
+            if result is None:
+                return
+            else:
+                action, nodes = result
+
             actions.append(action)
 
             # if this is the time point where the user added a node, select the new node
