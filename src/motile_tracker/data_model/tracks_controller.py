@@ -164,7 +164,7 @@ class TracksController:
                                 edges_to_remove.append((node, succ))
 
                         elif result == QMessageBox.Cancel:
-                            show_warning("Action canceled by user")
+                            show_info("Action canceled by user")
                             return
 
         if len(edges_to_remove) > 0:
