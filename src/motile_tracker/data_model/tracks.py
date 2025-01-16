@@ -34,12 +34,10 @@ class Tracks:
 
     Attributes:
         graph (nx.DiGraph): A graph with nodes representing detections and
-            and edges representing links across time. Assumed to be "valid"
-            tracks (e.g., this is not supposed to be a candidate graph),
-            but the structure is not verified.
+            and edges representing links across time.
         segmentation (Optional(np.ndarray)): An optional segmentation that
             accompanies the tracking graph. If a segmentation is provided,
-            it is assumed that the node ids in the graph match the segmentation labels.
+            the node ids in the graph must match the segmentation labels.
             Defaults to None.
         time_attr (str): The attribute in the graph that specifies the time
             frame each node is in.
@@ -50,7 +48,6 @@ class Tracks:
     For bulk operations on attributes, a KeyError will be raised if a node or edge
     in the input set is not in the graph. All operations before the error node will
     be performed, and those after will not.
-
     """
 
     refresh = Signal(Optional[str])
@@ -115,19 +112,19 @@ class Tracks:
     def set_positions(
         self,
         nodes: Iterable[Node],
-        positions: np.ndarray | Iterable[Edge],
+        positions: np.ndarray,
         incl_time: bool = False,
     ):
-        """Set the location of a node in the graph. Optionally include the
-        time frame as the first dimension. Raises an error if the node
-        is not in the graph.
+        """Set the location of nodes in the graph. Optionally include the
+        time frame as the first dimension. Raises an error if any of the nodes
+        are not in the graph.
 
         Args:
-            node (Any): The node id in the graph to set the location of.
-            location (np.ndarray): The location to set. If incl_time is true, time
-                is the first element.
+            nodes (Iterable[node]): The node ids in the graph to set the location of.
+            positions (np.ndarray): An (ndim, num_nodes) shape array of positions to set.
+            f incl_time is true, time is the first column and is included in ndim.
             incl_time (bool, optional): If true, include the time as the
-                first element of the location array. Defaults to False.
+                first column of the position array. Defaults to False.
         """
         if not isinstance(positions, np.ndarray):
             positions = np.array(positions)
@@ -183,6 +180,22 @@ class Tracks:
         positions: np.ndarray | None = None,
         attrs: Attrs | None = None,
     ):
+        """Add a set of nodes to the tracks object. Includes computing node attributes
+        (position, area) from the segmentation if there is one. Does not include setting
+        the segmentation pixels - assumes this is already done.
+
+        Args:
+            nodes (Iterable[Node]): node ids to add
+            times (Iterable[int]): times of nodes to add
+            positions (np.ndarray | None, optional): The positions to set for each node,
+                if no segmentation is present. If segmentation is present, these provided
+                values will take precedence over the computed centroids. Defaults to None.
+            attrs (Attrs | None, optional): The additional attributes to add to each node.
+                Defaults to None.
+
+        Raises:
+            ValueError: If neither positions nor segmentations are provided
+        """
         if attrs is None:
             attrs = {}
         self.graph.add_nodes_from(nodes)
@@ -194,8 +207,7 @@ class Tracks:
                 final_pos = np.array(computed_attrs[NodeAttr.POS.value])
             else:
                 final_pos = positions
-            areas = computed_attrs[NodeAttr.AREA.value]
-            attrs[NodeAttr.AREA.value] = areas
+            attrs[NodeAttr.AREA.value] = computed_attrs[NodeAttr.AREA.value]
         elif positions is None:
             raise ValueError("Must provide positions or segmentation and ids")
         else:
@@ -223,6 +235,8 @@ class Tracks:
             position (Sequence | None): The spatial position of the node (excluding time).
                 Can be None if it should be automatically detected from the segmentation.
                 Either segmentation or position must be provided. Defaults to None.
+            attrs (Attrs | None, optional): The additional attributes to add to node.
+                Defaults to None.
         """
         pos = np.expand_dims(position, axis=0) if position is not None else None
         attributes: dict[str, Sequence[Any]] | None = (
@@ -234,13 +248,12 @@ class Tracks:
         self.graph.remove_nodes_from(nodes)
 
     def remove_node(self, node: Node):
-        """Remove the node from the graph and update the internal mappings.
+        """Remove the node from the graph.
         Does not update the segmentation if present.
 
         Args:
             node (Node): The node to remove from the graph
         """
-
         self.remove_nodes([node])
 
     def add_edges(self, edges: Iterable[Edge]):

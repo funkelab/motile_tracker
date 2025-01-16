@@ -27,13 +27,14 @@ def test_create_tracks(graph_3d, segmentation_3d):
     tracks.set_time(1, 1)
     assert tracks.get_positions([1], incl_time=True).tolist() == [[1, 50, 50, 50]]
 
-    # with pytest.raises(KeyError):  # raises error at construction if time is wrong
-    #     tracks_wrong_attr = Tracks(
-    #         graph=graph_3d, segmentation=segmentation_3d, time_attr="test"
-    #     )
+    tracks_wrong_attr = Tracks(
+        graph=graph_3d, segmentation=segmentation_3d, time_attr="test"
+    )
+    with pytest.raises(KeyError):  # raises error at access if time is wrong
+        tracks_wrong_attr.get_times([1])
 
     tracks_wrong_attr = Tracks(graph=graph_3d, pos_attr="test", ndim=3)
-    with pytest.raises(KeyError):
+    with pytest.raises(KeyError):  # raises error at access if pos is wrong
         tracks_wrong_attr.get_positions([1])
 
     # test multiple position attrs
