@@ -233,15 +233,10 @@ class TrackLabels(napari.layers.Labels):
         return new_value, actions
 
     def _revert_paint(self, event):
-        """Each atom in event.value is a 3-tuple of arrays containing:
-        - a numpy multi-index, pointing to the array elements that were
-        changed (a tuple with len ndims)
-        - the values corresponding to those elements before the change
-        - the value after the change
+        """Revert a paint event after it fails validation (no motile tracker Actions have
+        been created). This keeps the view synced with the backend data.
         """
-        for atom in event.value:
-            multiindex, old_values, _ = atom
-            self.data[multiindex] = old_values
+        super().undo()
 
     def _on_paint(self, event):
         """Listen to the paint event and check which track_ids have changed"""
