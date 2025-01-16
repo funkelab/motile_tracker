@@ -56,6 +56,7 @@ class TracksViewer:
         self.mode = "all"
         self.tracks = None
         self.visible = None
+        self.track_mode = "new track"
         self.tracking_layers = TracksLayerGroup(self.viewer, self.tracks, "", self)
         self.selected_nodes = NodeSelectionList()
         self.selected_nodes.list_updated.connect(self.update_selection)
@@ -135,6 +136,13 @@ class TracksViewer:
             self.set_display_mode("all")
         else:
             self.set_display_mode("lineage")
+
+    def toggle_track_mode(self) -> None:
+        """Set the track mode that is used when new points are added. If the track_mode == continue, the point will continue with the current track if possible. Else, it will start a new track"""
+        if self.track_mode == "continue":
+            self.track_mode = "new track"
+        else:
+            self.track_mode = "continue"
 
     def set_display_mode(self, mode: str) -> None:
         """Update the display mode and call to update colormaps for points, labels, and tracks"""
