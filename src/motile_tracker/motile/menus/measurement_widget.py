@@ -27,9 +27,12 @@ class MeasurementSetupWidget(QWidget):
         self.intensity_box = QGroupBox("Intensity image")
         self.image_dropdown = LayerDropdown(self.viewer, (Image))
         self.image_dropdown.layer_changed.connect(self._update_intensity_image)
-        self.image_layer = self.viewer.layers.get(
-            self.image_dropdown.get_current_layer(), None
-        )
+        if self.image_dropdown.get_current_layer() in self.viewer.layers:
+            self.intensity_image = self.viewer.layers[
+                self.image_dropdown.get_current_layer()
+            ]
+        else:
+            self.intensity_image = None
         self.intensity_box_layout = QVBoxLayout()
         self.intensity_box_layout.addWidget(self.image_dropdown)
         self.intensity_box.setLayout(self.intensity_box_layout)
@@ -72,10 +75,10 @@ class MeasurementSetupWidget(QWidget):
         """Update the intensity image layer"""
 
         if selected_layer == "":
-            self.image_layer = None
+            self.intensity_image = None
             self.feature_widget.update_checkbox_availability(False)
         else:
-            self.image_layer = self.viewer.layers[selected_layer]
+            self.intensity_image = self.viewer.layers[selected_layer]
             self.image_dropdown.setCurrentText(selected_layer)
             self.feature_widget.update_checkbox_availability(True)
 
@@ -88,3 +91,8 @@ class MeasurementSetupWidget(QWidget):
         """Return the features to be measured from the feature_widget"""
 
         return self.feature_widget.get_selected_features()
+
+    def get_intensity_image(self):
+        """Return the selected intensity image as np.ndarray, if available"""
+
+        return self.intensity_image.data if self.intensity_image is not None else None

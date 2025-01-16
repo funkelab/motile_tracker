@@ -193,11 +193,13 @@ class RunEditor(QTabWidget):
         """
         run_name = self.run_name.text()
         input_layer = self.get_input_layer()
+        intensity_image = self.measurements_widget.get_intensity_image()
         if input_layer is None:
             warn("No input layer selected", stacklevel=2)
             return None
         if isinstance(input_layer, napari.layers.Labels):
             input_seg = input_layer.data
+            input_layer.scale = self.measurements_widget.get_scaling()
             ndim = input_seg.ndim
             if ndim > 4:
                 raise ValueError(
@@ -222,7 +224,9 @@ class RunEditor(QTabWidget):
             solver_params=params,
             input_points=input_points,
             time=datetime.now(),
+            intensity_image=intensity_image,
             scale=input_layer.scale,
+            features=self.measurements_widget.get_features(),
         )
 
     def emit_run(self) -> None:

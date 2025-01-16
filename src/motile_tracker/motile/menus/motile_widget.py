@@ -122,7 +122,9 @@ class MotileWidget(QWidget):
             run.solver_params,
             input_data,
             lambda event_data: self._on_solver_event(run, event_data),
+            intensity_image=run.intensity_image,
             scale=run.scale,
+            features=run.features,
         )
 
         run._initialize_track_ids()

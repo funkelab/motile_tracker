@@ -8,6 +8,19 @@ from motile_toolbox.candidate_graph.graph_attributes import NodeAttr
 
 from motile_tracker.data_model import NodeType, Tracks
 
+feature_node_attrs = [
+    NodeAttr.AREA.value,
+    NodeAttr.INTENSITY_MEAN.value,
+    NodeAttr.AXIS_MINOR.value,
+    NodeAttr.AXIS_MAJOR.value,
+    NodeAttr.AXIS_SEMI_MINOR.value,
+    NodeAttr.PERIMETER.value,
+    NodeAttr.CIRCULARITY.value,
+    NodeAttr.VOLUME.value,
+    NodeAttr.SURFACE_AREA.value,
+    NodeAttr.SPHERICITY.value,
+]
+
 
 def extract_sorted_tracks(
     tracks: Tracks,
@@ -87,8 +100,11 @@ def extract_sorted_tracks(
                 "symbol": symbol,
             }
 
-            if tracks.get_area(node) is not None:
-                track_dict["area"] = tracks.get_area(node)
+            for feature in feature_node_attrs:
+                if tracks._get_node_attr(node, feature) is not None:
+                    track_dict[feature] = tracks._get_node_attr(node, feature)
+            # if tracks.get_area(node) is not None:
+            #     track_dict["area"] = tracks.get_area(node)
 
             if len(pos) == 3:
                 track_dict["z"] = pos[0]
