@@ -27,15 +27,15 @@ If one of the two children of a dividing node is deleted, the nodes of the remai
 
 Adding nodes
 -------------
-New nodes can be added in two ways:
-    - by adding a new point in the Points layer. A new, non-connected endpoint node will be created at the clicked position. This node does not have a segmentation (yet), but this can be added by the user if needed.
-    - by painting with a (new) label in the Segmentation layer. A new node will be created based on the painted pixels. If the label already exists in the Segmentation layer, it will automatically be connected to its predecessor and/or successor via (skip) edges. If the label does not yet exist, a new endpoint node is created.
+New nodes can be added in two ways, depending on what type of detections you used as input:
+    - By painting on the Segmentation layer, if it exists. To continue an existing track, select a node in the track and scroll to a new time frame. The label ID will automatically be updated to create a new node using the same track ID. To start a new track, press "m" to generate a new label with a new track ID.
 
+    - By adding a new point in the Points layer, if there are only point detections. A new, non-connected endpoint node will be created at the clicked position.
 .. figure:: images/add_node.png
    :width: 600px
    :align: center
 
-   Add a new node by painting. Press ``M`` on the segmentation layer to select a new label color for painting.
+   Add a new node by painting. Press ``M`` on the segmentation layer to select a new label color and track ID for painting.
 
 Updating nodes
 ---------------

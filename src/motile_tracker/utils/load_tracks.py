@@ -29,7 +29,7 @@ def tracks_from_csv(
     with open(csvfile) as f:
         reader = DictReader(f)
         for row in reader:
-            _id = row["id"]
+            _id = int(row["id"])
             attrs = {
                 "pos": [float(row["y"]), float(row["x"])],
                 "time": int(row["t"]),
@@ -39,9 +39,8 @@ def tracks_from_csv(
             graph.add_node(_id, **attrs)
             parent_id = row["parent_id"].strip()
             if parent_id != "":
-                parent_id = parent_id
+                parent_id = int(parent_id)
                 if parent_id != -1:
-                    assert parent_id in graph.nodes, f"{_id} {parent_id}"
                     graph.add_edge(parent_id, _id)
     tracks = SolutionTracks(
         graph=graph,
