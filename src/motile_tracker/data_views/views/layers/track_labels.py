@@ -7,7 +7,7 @@ import napari
 import numpy as np
 from napari.utils import DirectLabelColormap
 from napari.utils.action_manager import action_manager
-from napari.utils.notifications import show_info
+from napari.utils.notifications import show_info, show_warning
 from napari.utils.translations import trans
 
 if TYPE_CHECKING:
@@ -232,6 +232,17 @@ class TrackLabels(napari.layers.Labels):
                 )
         return new_value, actions
 
+    def _revert_paint(self, event):
+        """Each atom in event.value is a 3-tuple of arrays containing:
+        - a numpy multi-index, pointing to the array elements that were
+        changed (a tuple with len ndims)
+        - the values corresponding to those elements before the change
+        - the value after the change
+        """
+        for atom in event.value:
+            multiindex, old_values, _ = atom
+            self.data[multiindex] = old_values
+
     def _on_paint(self, event):
         """Listen to the paint event and check which track_ids have changed"""
 
@@ -244,7 +255,7 @@ class TrackLabels(napari.layers.Labels):
             to_delete = []  # (node_ids, pixels)
             to_update_smaller = []  # (node_id, pixels)
             to_update_bigger = []  # (node_id, pixels)
-            to_add = []  # (track_id, pixels)
+            to_add = []  # (node_id, track_id, pixels)
             for pixels, old_value in updated_pixels:
                 ndim = len(pixels)
                 if old_value == 0:
@@ -271,6 +282,14 @@ class TrackLabels(napari.layers.Labels):
                     else:
                         to_add.append((new_value, self.selected_track, all_pixels))
 
+            if len(to_delete) > 0 and len(to_add) > 0:
+                show_warning(
+                    "This paint or fill operation completely replaced one label with a new label. This is currently not supported."
+                    " If you want to update the track id of the node, please edit the edges directly instead."
+                )
+                self._revert_paint(event)
+                self.refresh()
+                return
             self.tracks_viewer.tracks_controller.update_segmentations(
                 to_delete,
                 to_update_smaller,

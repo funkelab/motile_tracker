@@ -174,6 +174,7 @@ class TracksController:
                                 edges_to_remove.append((node, succ))
                         else:
                             show_info("Action canceled by user")
+                            self.tracks.refresh.emit()
                             return
 
         if len(edges_to_remove) > 0:
