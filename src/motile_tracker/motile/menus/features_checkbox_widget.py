@@ -1,11 +1,17 @@
+from napari import Viewer
 from qtpy.QtWidgets import QCheckBox, QGroupBox, QVBoxLayout, QWidget
 
 
-class featuresCheckboxWidget(QWidget):
-    def __init__(self, ndims: int):
+class FeatureWidget(QWidget):
+    def __init__(self, viewer: Viewer, ndims: int):
         super().__init__()
 
+        self.viewer = viewer
         self.ndims = ndims
+        self.enable_intensity = False
+
+        main_layout = QVBoxLayout()
+
         # create a dictionary to store the checkbox state for each property
         self.properties = [
             {
@@ -47,7 +53,7 @@ class featuresCheckboxWidget(QWidget):
                 "prop_name": "intensity_mean",
                 "display_name": "Mean intensity",
                 "selected": False,
-                "enabled": True,
+                "enabled": self.enable_intensity,
                 "dims": 3,
             },
             {
@@ -89,7 +95,7 @@ class featuresCheckboxWidget(QWidget):
                 "prop_name": "intensity_mean",
                 "display_name": "Mean intensity",
                 "selected": False,
-                "enabled": True,
+                "enabled": self.enable_intensity,
                 "dims": 4,
             },
         ]
@@ -119,11 +125,25 @@ class featuresCheckboxWidget(QWidget):
                 self.checkbox_layout.addWidget(checkbox)
 
         self.group_box.setLayout(self.checkbox_layout)
-        main_layout = QVBoxLayout()
         main_layout.addWidget(self.group_box)
         self.setLayout(main_layout)
 
     def get_selected_features(self):
         """Return a list of the features that have been selected"""
 
-        return [key for key in self.checkbox_state if self.checkbox_state[key]]
+        selected_features = [
+            key for key in self.checkbox_state if self.checkbox_state[key]
+        ]
+        if self.enable_intensity is None and "intensity_mean" in selected_features:
+            selected_features.remove("intensity_mean")
+        return selected_features
+
+    def update_checkbox_availability(self, enable: bool = False):
+        self.enable_intensity = enable
+        for checkbox in self.checkboxes:
+            if checkbox["prop_name"] == "intensity_mean":
+                if self.enable_intensity:
+                    checkbox["checkbox"].setEnabled(True)
+                else:
+                    print("enabling this checkbox", checkbox)
+                    checkbox["checkbox"].setEnabled(False)

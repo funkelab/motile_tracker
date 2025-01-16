@@ -45,6 +45,7 @@ class LayerDropdown(QComboBox):
         """Update the list of options in the dropdown menu whenever the list of layers is changed"""
 
         selected_layer = self.currentText()
+        print(selected_layer)
         self.clear()
         layers = [
             layer
@@ -60,9 +61,16 @@ class LayerDropdown(QComboBox):
         # In case the currently selected layer is one of the available items, set it again to the current value of the dropdown.
         if selected_layer in items:
             self.setCurrentText(selected_layer)
+        else:
+            self.setCurrentText("")
 
     def _emit_layer_changed(self) -> None:
         """Emit a signal holding the currently selected layer"""
 
         selected_layer = self.currentText()
         self.layer_changed.emit(selected_layer)
+
+    def get_current_layer(self) -> None:
+        """Return the currently selected layer"""
+
+        return self.currentText()
