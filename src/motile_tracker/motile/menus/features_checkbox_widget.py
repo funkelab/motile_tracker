@@ -145,5 +145,4 @@ class FeatureWidget(QWidget):
                 if self.enable_intensity:
                     checkbox["checkbox"].setEnabled(True)
                 else:
-                    print("enabling this checkbox", checkbox)
                     checkbox["checkbox"].setEnabled(False)

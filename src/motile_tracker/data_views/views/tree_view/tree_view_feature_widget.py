@@ -15,11 +15,10 @@ class TreeViewFeatureWidget(QWidget):
 
     change_plot_type = Signal(str)
 
-    def __init__(self, features):
+    def __init__(self, features: list[str]):
         super().__init__()
 
         self.plot_type = "tree"
-        self.current_feature = "area"
 
         display_box = QGroupBox("Feature [W]")
         display_layout = QHBoxLayout()
@@ -38,6 +37,11 @@ class TreeViewFeatureWidget(QWidget):
         for feature in features:
             self.feature_dropdown.addItem(feature)
         self.feature_dropdown.currentIndexChanged.connect(self._update_feature)
+        if len(features) > 0:
+            self.current_feature = features[0]
+        else:
+            self.current_feature = None
+            self.show_area_radio.setEnabled(False)
         display_layout.addWidget(self.feature_dropdown)
 
         display_box.setLayout(display_layout)
@@ -83,8 +87,13 @@ class TreeViewFeatureWidget(QWidget):
         """Update the list of features in the dropdown"""
 
         self.feature_dropdown.clear()
+        self.show_area_radio.setEnabled(True)
         for feature in feature_list:
             self.feature_dropdown.addItem(feature)
 
         if self.current_feature not in feature_list:
-            self.current_feature = None
+            if len(feature_list) > 0:
+                self.current_feature = feature_list[0]
+            else:
+                self.current_feature = None
+                self.show_area_radio.setEnabled(False)

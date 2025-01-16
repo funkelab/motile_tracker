@@ -140,6 +140,10 @@ class TreePlot(pg.PlotWidget):
             feature (str): The feature to be plotted if plot_type == 'feature'
             selected_nodes (list[Any]): The currently selected nodes to be highlighted
         """
+        if plot_type == "feature" and (
+            feature is None or feature == ""
+        ):  # feature is not available
+            plot_type = "tree"
         self.set_data(track_df, plot_type, feature)
         self._update_viewed_data(view_direction)  # this can be expensive
         self.set_view(view_direction, plot_type, reset_view, allow_flip)
@@ -448,12 +452,14 @@ class TreeWidget(QWidget):
         self.feature_node_attrs = [
             NodeAttr.AREA.value,
             NodeAttr.INTENSITY_MEAN.value,
-            NodeAttr.AXIS_MINOR.value,
-            NodeAttr.AXIS_MAJOR.value,
-            NodeAttr.AXIS_SEMI_MINOR.value,
+            NodeAttr.AXIS_MINOR_LENGTH.value,
+            NodeAttr.AXIS_MAJOR_LENGTH.value,
+            NodeAttr.AXIS_SEMI_MINOR_LENGTH.value,
+            NodeAttr.PIXEL_COUNT.value,
             NodeAttr.PERIMETER.value,
             NodeAttr.CIRCULARITY.value,
             NodeAttr.VOLUME.value,
+            NodeAttr.VOXEL_COUNT.value,
             NodeAttr.SURFACE_AREA.value,
             NodeAttr.SPHERICITY.value,
         ]
@@ -634,11 +640,6 @@ class TreeWidget(QWidget):
             f for f in self.feature_node_attrs if f in self.track_df.columns
         ]
         self.plot_type_widget.update_feature_dropdown(feature_list)
-        print(self.track_df)
-
-        # check whether we have area measurements and therefore should activate the area
-        # button
-        self.plot_type_widget.show_area_radio.setEnabled(True)
 
         # if reset_view, we got new data and want to reset display and feature before calling the plot update
         if reset_view:

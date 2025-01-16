@@ -11,12 +11,14 @@ from motile_tracker.data_model import NodeType, Tracks
 feature_node_attrs = [
     NodeAttr.AREA.value,
     NodeAttr.INTENSITY_MEAN.value,
-    NodeAttr.AXIS_MINOR.value,
-    NodeAttr.AXIS_MAJOR.value,
-    NodeAttr.AXIS_SEMI_MINOR.value,
+    NodeAttr.AXIS_MINOR_LENGTH.value,
+    NodeAttr.AXIS_MAJOR_LENGTH.value,
+    NodeAttr.AXIS_SEMI_MINOR_LENGTH.value,
+    NodeAttr.PIXEL_COUNT.value,
     NodeAttr.PERIMETER.value,
     NodeAttr.CIRCULARITY.value,
     NodeAttr.VOLUME.value,
+    NodeAttr.VOXEL_COUNT.value,
     NodeAttr.SURFACE_AREA.value,
     NodeAttr.SPHERICITY.value,
 ]
