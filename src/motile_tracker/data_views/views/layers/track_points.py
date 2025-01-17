@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 import napari
 import numpy as np
 from motile_toolbox.candidate_graph import NodeAttr
+from napari.utils.notifications import show_info
 
 from motile_tracker.data_model import NodeType, Tracks
 
@@ -89,11 +90,6 @@ class TrackPoints(napari.layers.Points):
         # listen to updates of the data
         self.events.data.connect(self._update_data)
 
-        # connect to changing the point size in the UI
-        self.events.current_size.connect(
-            lambda: self.set_point_size(size=self.current_size)
-        )
-
         # listen to updates in the selected data (from the point selection tool)
         # to update the nodes in self.tracks_viewer.selected_nodes
         self.selected_data.events.items_changed.connect(self._update_selection)
@@ -138,7 +134,6 @@ class TrackPoints(napari.layers.Points):
 
         t = int(new_point[0])
         track_id = self.tracks_viewer.tracks.get_next_track_id()
-        seg_id = track_id
         area = 0
 
         attributes = {
@@ -146,7 +141,6 @@ class TrackPoints(napari.layers.Points):
             NodeAttr.TIME.value: np.array([t]),
             NodeAttr.TRACK_ID.value: np.array([track_id]),
             NodeAttr.AREA.value: np.array([area]),
-            NodeAttr.SEG_ID.value: np.array([seg_id]),
         }
         return attributes
 
@@ -154,10 +148,16 @@ class TrackPoints(napari.layers.Points):
         """Calls the tracks controller with to update the data in the Tracks object and dispatch the update"""
 
         if event.action == "added":
-            new_point = event.value[-1]
-            attributes = self._create_node_attrs(new_point)
-            print(f"{attributes=}")
-            self.tracks_viewer.tracks_controller.add_nodes(attributes)
+            # we only want to allow this update if there is no seg layer
+            if self.tracks_viewer.tracking_layers.seg_layer is None:
+                new_point = event.value[-1]
+                attributes = self._create_node_attrs(new_point)
+                self.tracks_viewer.tracks_controller.add_nodes(attributes)
+            else:
+                show_info(
+                    "Mixed point and segmentation nodes not allowed: add points by drawing on segmentation layer"
+                )
+                self._refresh()
 
         if event.action == "removed":
             self.tracks_viewer.tracks_controller.delete_nodes(

@@ -2,9 +2,6 @@
 
 import logging
 
-import networkx as nx
-import numpy as np
-from motile_toolbox.candidate_graph import NodeAttr
 from napari import Viewer
 from napari.utils.notifications import show_warning
 from psygnal import Signal
@@ -100,38 +97,6 @@ class MotileWidget(QWidget):
         worker.returned.connect(self._on_solve_complete)
         worker.start()
 
-    def relabel_segmentation(
-        self,
-        solution_nx_graph: nx.DiGraph,
-        segmentation: np.ndarray,
-    ) -> np.ndarray:
-        """Relabel a segmentation based on tracking results so that nodes in same
-        track share the same id. IDs do change at division.
-
-        Args:
-            solution_nx_graph (nx.DiGraph): Networkx graph with the solution to use
-                for relabeling. Nodes not in graph will be removed from seg. Original
-                segmentation ids have to be stored in the graph so we
-                can map them back.
-            segmentation (np.ndarray): Original segmentation with dimensions (t,[z],y,x)
-
-        Returns:
-            np.ndarray: Relabeled segmentation array where nodes in same track share same
-                id with shape (t,[z],y,x)
-        """
-        tracked_masks = np.zeros_like(segmentation, shape=segmentation.shape)
-        for node, _data in solution_nx_graph.nodes(data=True):
-            time_frame = solution_nx_graph.nodes[node][NodeAttr.TIME.value]
-            previous_seg_id = solution_nx_graph.nodes[node][NodeAttr.SEG_ID.value]
-            track_id = solution_nx_graph.nodes[node][NodeAttr.TRACK_ID.value]
-            solution_nx_graph.nodes[node][NodeAttr.SEG_ID.value] = (
-                track_id  # assign the new value for future updates
-            )
-
-            previous_seg_mask = segmentation[time_frame] == previous_seg_id
-            tracked_masks[time_frame][previous_seg_mask] = track_id
-        return tracked_masks
-
     @thread_worker
     def solve_with_motile(self, run: MotileRun) -> MotileRun:
         """Runs the solver and relabels the segmentation to match
@@ -147,8 +112,8 @@ class MotileWidget(QWidget):
         Returns:
             MotileRun: The provided run with the output graph and segmentation included.
         """
-        if run.input_segmentation is not None:
-            input_data = run.input_segmentation
+        if run.segmentation is not None:
+            input_data = run.segmentation
         elif run.input_points is not None:
             input_data = run.input_points
         else:
@@ -161,11 +126,6 @@ class MotileWidget(QWidget):
         )
 
         run._initialize_track_ids()
-        if run.input_segmentation is not None:
-            run.segmentation = self.relabel_segmentation(
-                run.graph, run.input_segmentation
-            )
-        run._create_seg_time_to_node()
 
         if run.graph.number_of_nodes() == 0:
             show_warning(

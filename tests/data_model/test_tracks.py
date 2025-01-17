@@ -26,16 +26,15 @@ def test_create_tracks(graph_3d, segmentation_3d):
     assert tracks.get_positions([1], incl_time=True).tolist() == [[0, 50, 50, 50]]
     tracks.set_time(1, 1)
     assert tracks.get_positions([1], incl_time=True).tolist() == [[1, 50, 50, 50]]
-    assert tracks.get_seg_id(1) == 1
-    assert tracks.get_node(seg_id=1, time=1) == 1
 
-    with pytest.raises(KeyError):  # raises error at construction if time is wrong
-        tracks_wrong_attr = Tracks(
-            graph=graph_3d, segmentation=segmentation_3d, time_attr="test"
-        )
+    tracks_wrong_attr = Tracks(
+        graph=graph_3d, segmentation=segmentation_3d, time_attr="test"
+    )
+    with pytest.raises(KeyError):  # raises error at access if time is wrong
+        tracks_wrong_attr.get_times([1])
 
     tracks_wrong_attr = Tracks(graph=graph_3d, pos_attr="test", ndim=3)
-    with pytest.raises(KeyError):
+    with pytest.raises(KeyError):  # raises error at access if pos is wrong
         tracks_wrong_attr.get_positions([1])
 
     # test multiple position attrs
@@ -78,19 +77,16 @@ def test_add_remove_nodes(graph_2d, segmentation_2d):
     # create tracks with segmentation
     tracks = Tracks(graph=graph_2d, segmentation=segmentation_2d, scale=[1, 2, 1])
 
-    # removing a node removes it from the seg_time mapping
+    # removing a node
     node = 3
-    assert tracks.get_node(seg_id=3, time=1) == node
     tracks.remove_node(node)
-    assert tracks.get_node(3, 1) is None
     with pytest.raises(KeyError):
         tracks.get_position(node)
 
     with pytest.raises(KeyError):
         tracks.get_positions([node])
-    # adding a node with a given seg_id infers position from segmentation
-    tracks.add_node(node, time=1, seg_id=3)
-    assert tracks.get_node(seg_id=3, time=1) == node
+    # adding a node without position infers position from segmentation
+    tracks.add_node(node, time=1)
     assert tracks.get_area(node) == 697 * 2
 
 
@@ -149,13 +145,9 @@ def test_pixels_and_seg_id(graph_3d, segmentation_3d):
     tracks = Tracks(graph=graph_3d, segmentation=segmentation_3d)
 
     # changing a segmentation id changes it in the mapping
-    assert tracks.get_node(1, 0) == 1
     pix = tracks.get_pixels([1])
     new_seg_id = 10
     tracks.set_pixels(pix, [new_seg_id])
-    tracks.set_seg_id(1, new_seg_id)
-    assert tracks.get_node(1, 0) is None
-    assert tracks.get_node(new_seg_id, 0) == 1
 
     with pytest.raises(KeyError):
         tracks.get_positions(["0"])

@@ -165,10 +165,8 @@ class RunEditor(QGroupBox):
         if segmentation.shape[0] >= 2:
             first_frame_ids = set(np.unique(segmentation[0]).tolist())
             first_frame_ids.remove(0)
-            print(first_frame_ids)
             second_frame_ids = set(np.unique(segmentation[1]).tolist())
             second_frame_ids.remove(0)
-            print(second_frame_ids)
             return not first_frame_ids.isdisjoint(second_frame_ids)
         else:
             return False
@@ -207,10 +205,9 @@ class RunEditor(QGroupBox):
         params = self.solver_params_widget.solver_params.copy()
         return MotileRun(
             graph=nx.DiGraph(),
-            segmentation=None,
+            segmentation=input_seg,
             run_name=run_name,
             solver_params=params,
-            input_segmentation=input_seg,
             input_points=input_points,
             time=datetime.now(),
             scale=input_layer.scale,

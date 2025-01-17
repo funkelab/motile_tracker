@@ -8,11 +8,12 @@ from motile_toolbox.candidate_graph.graph_attributes import NodeAttr
 from .tracks import Tracks
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
     from pathlib import Path
 
     import numpy as np
 
-    from .tracks import Node
+    from .tracks import Attrs, Node
 
 
 class SolutionTracks(Tracks):
@@ -66,7 +67,12 @@ class SolutionTracks(Tracks):
         return track_id
 
     def set_track_id(self, node: Node, value: int):
+        old_track_id = self.get_track_id(node)
+        self.track_id_to_node[old_track_id].remove(node)
         self._set_node_attr(node, NodeAttr.TRACK_ID.value, value)
+        if value not in self.track_id_to_node:
+            self.track_id_to_node[value] = []
+        self.track_id_to_node[value].append(node)
 
     def _initialize_track_ids(self):
         self.max_track_id = 0
@@ -106,6 +112,7 @@ class SolutionTracks(Tracks):
                 self.graph,
                 {node: {NodeAttr.TRACK_ID.value: track_id} for node in tracklet},
             )
+            self.track_id_to_node[track_id] = list(tracklet)
             track_id += 1
         self.max_track_id = track_id - 1
 
@@ -135,3 +142,23 @@ class SolutionTracks(Tracks):
                 ]
                 f.write("\n")
                 f.write(",".join(map(str, row)))
+
+    def add_nodes(
+        self,
+        nodes: Iterable[Node],
+        times: Iterable[int],
+        positions: np.ndarray | None = None,
+        attrs: Attrs | None = None,
+    ):
+        # overriding add_nodes to add new nodes to the track_id_to_node mapping
+        super().add_nodes(nodes, times, positions, attrs)
+        for node, track_id in zip(nodes, attrs[NodeAttr.TRACK_ID.value], strict=True):
+            if track_id not in self.track_id_to_node:
+                self.track_id_to_node[track_id] = []
+            self.track_id_to_node[track_id].append(node)
+
+    def remove_nodes(self, nodes: Iterable[Node]):
+        # overriding remove_nodes to remove nodes from the track_id_to_node mapping
+        for node in nodes:
+            self.track_id_to_node[self.get_track_id(node)].remove(node)
+        super().remove_nodes(nodes)

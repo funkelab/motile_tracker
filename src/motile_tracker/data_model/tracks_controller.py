@@ -1,9 +1,8 @@
 from collections.abc import Iterable
-from typing import Any
 
 import numpy as np
 from motile_toolbox.candidate_graph import NodeAttr
-from napari.utils.notifications import show_warning
+from napari.utils.notifications import show_info, show_warning
 from qtpy.QtWidgets import QMessageBox
 
 from .action_history import ActionHistory
@@ -40,8 +39,9 @@ class TracksController:
         """Calls the _add_nodes function to add nodes. Calls the refresh signal when finished.
 
         Args:
-            nodes (np.ndarray[int]):an array of node ids
-            attributes (dict[str, np.ndarray]): dictionary containing at least time and position attributes
+            attributes (Attrs): dictionary containing at least time and position attributes
+            pixels (list[SegMask] | None, optional): The pixels associated with each node,
+                if a segmentation is present. Defaults to None.
         """
         action, nodes = self._add_nodes(attributes, pixels)
         self.action_history.add_new_action(action)
@@ -64,14 +64,12 @@ class TracksController:
             track id, and the first node after time with the given track id,
             or Nones if there are no such nodes.
         """
-        if track_id not in list(self.tracks.node_id_to_track_id.values()):
+        if (
+            track_id not in self.tracks.track_id_to_node
+            or len(self.tracks.track_id_to_node[track_id]) == 0
+        ):
             return None, None
-
-        candidates = [
-            node
-            for node, tid in self.tracks.node_id_to_track_id.items()
-            if tid == track_id and self.tracks.get_time(node) != time
-        ]
+        candidates = self.tracks.track_id_to_node[track_id]
         candidates.sort(key=lambda n: self.tracks.get_time(n))
 
         pred = None
@@ -84,6 +82,30 @@ class TracksController:
                 break
         return pred, succ
 
+    def _confirm_remove_division_edges(self) -> bool:
+        """Spawn a dialog box to ask the user if they want to break an upstream division
+        event or not.
+
+        Returns:
+            bool: True if the upstream division edges should be removed to make room for
+                the new node in the track, False if the user wants to cancel the operation.
+        """
+        msg = QMessageBox()
+        msg.setWindowTitle("Delete existing division?")
+        msg.setText(
+            "Painting a label with this track id involves breaking an upstream division event. Proceed?"
+        )
+        msg.setIcon(QMessageBox.Information)
+
+        # Set both OK and Cancel buttons
+        msg.setStandardButtons(QMessageBox.Ok | QMessageBox.Cancel)
+
+        # Execute the message box and catch the result
+        result = msg.exec_()
+
+        # Check which button was clicked
+        return result == QMessageBox.Ok
+
     def _add_nodes(
         self,
         attributes: Attrs,
@@ -94,7 +116,7 @@ class TracksController:
         new nodes.
         If there is a segmentation, the attributes must include:
         - time
-        - seg_id
+        - node_id
         - track_id
         If there is not a segmentation, the attributes must include:
         - time
@@ -109,12 +131,11 @@ class TracksController:
             predecessor and successor with the same track_id, if any)
 
         Args:
-            nodes (list[Node]): a list of node ids
-            attributes (Attributes): dictionary containing at least time and track id,
-                and either seg_id (if pixels are provided) or position (if not)
+            attributes (Attrs): dictionary containing at least time and track id,
+                and either node_id (if pixels are provided) or position (if not)
             pixels (list[SegMask] | None): A list of pixels associated with the node,
                 or None if there is no segmentation. These pixels will be updated
-                in the tracks.segmentation, set to the provided seg_id
+                in the tracks.segmentation, set to the new node id
         """
         if NodeAttr.TIME.value not in attributes:
             raise ValueError(
@@ -127,7 +148,10 @@ class TracksController:
 
         times = attributes[NodeAttr.TIME.value]
         track_ids = attributes[NodeAttr.TRACK_ID.value]
-        nodes = self._get_new_node_ids(len(times))
+        if pixels is not None:
+            nodes = attributes["node_id"]
+        else:
+            nodes = self._get_new_node_ids(len(times))
         actions = []
 
         # remove skip edges that will be replaced by new edges after adding nodes
@@ -136,6 +160,23 @@ class TracksController:
             pred, succ = self._get_pred_and_succ(track_id, time)
             if pred is not None and succ is not None:
                 edges_to_remove.append((pred, succ))
+
+            # Find and remove edges to nodes with different track_ids (upstream division events)
+            if track_id in self.tracks.track_id_to_node:
+                track_id_nodes = self.tracks.track_id_to_node[track_id]
+                for node in track_id_nodes:
+                    if (
+                        self.tracks._get_node_attr(node, NodeAttr.TIME.value) <= time
+                        and self.tracks.graph.out_degree(node) == 2
+                    ):  # there is an upstream division event here
+                        if self._confirm_remove_division_edges():
+                            for succ in self.tracks.graph.successors(node):
+                                edges_to_remove.append((node, succ))
+                        else:
+                            show_info("Action canceled by user")
+                            self.tracks.refresh.emit()
+                            return
+
         if len(edges_to_remove) > 0:
             actions.append(DeleteEdges(self.tracks, edges_to_remove))
 
@@ -162,11 +203,11 @@ class TracksController:
 
         return ActionGroup(self.tracks, actions), nodes
 
-    def delete_nodes(self, nodes: Iterable[Any]) -> None:
+    def delete_nodes(self, nodes: Iterable[Node]) -> None:
         """Calls the _delete_nodes function and then emits the refresh signal
 
         Args:
-            nodes (np.ndarray): array of node_ids to be deleted
+            nodes (Iterable[Node]): array of node_ids to be deleted
         """
 
         action = self._delete_nodes(nodes)
@@ -174,7 +215,7 @@ class TracksController:
         self.tracks.refresh.emit()
 
     def _delete_nodes(
-        self, nodes: np.ndarray[Any], pixels: list[SegMask] | None = None
+        self, nodes: Iterable[Node], pixels: list[SegMask] | None = None
     ) -> TracksAction:
         """Delete the nodes provided by the array from the graph but maintain successor
         track_ids. Reconnect to the nearest predecessor and/or nearest successor
@@ -236,32 +277,9 @@ class TracksController:
 
         return ActionGroup(self.tracks, actions=actions)
 
-    def update_node_segs(
-        self, nodes: Iterable[Node], attributes: dict[str, np.ndarray]
-    ) -> None:
-        """Calls the _update_node_segs function to update the node attributtes in given array.
-        Then calls the refresh signal.
-
-        Args:
-        nodes (np.ndarray[int]):an array of node ids
-        attributes (dict[str, np.ndarray]): dictionary containing the attributes to be updated
-
-        """
-        action = self._update_node_segs(nodes, attributes)
-        self.action_history.add_new_action(action)
-        self.tracks.refresh.emit()
-
-    def update_node_attrs(self, nodes: Iterable[Node], attributes: Attrs):
-        action = self._update_node_attrs(nodes, attributes)
-        self.action_history.add_new_action(action)
-        self.tracks.refresh.emit()
-
-    def _update_node_attrs(self, nodes: Iterable[Node], attributes: Attrs):
-        return UpdateNodeAttrs(self.tracks, nodes, attributes)
-
     def _update_node_segs(
         self,
-        nodes: np.ndarray[Any],
+        nodes: Iterable[Node],
         pixels: list[SegMask],
         added=False,
     ) -> TracksAction:
@@ -269,13 +287,19 @@ class TracksController:
         a set of nodes.
 
         Args:
-        nodes (np.ndarray[int]):an array of node ids
-        attributes (dict[str, np.ndarray]): dictionary containing the attributes to be updated
+            nodes (Iterable[Node]): The nodes to update
+            pixels (list[SegMask]): The pixels for each node that were edited
+            added (bool, optional): If the pixels were added to the nodes (True)
+                or deleted (False). Defaults to False. Cannot mix adding and removing
+                pixels in one call.
+
+        Returns:
+            TracksAction: _description_
         """
         return UpdateNodeSegs(self.tracks, nodes, pixels, added=added)
 
     def add_edges(self, edges: np.ndarray[int]) -> None:
-        """Add edges and attributes to the graph. Also update the track ids and
+        """Add edges to the graph. Also update the track ids and
         corresponding segmentations if applicable
 
         Args:
@@ -299,19 +323,43 @@ class TracksController:
         self.action_history.add_new_action(action)
         self.tracks.refresh.emit()
 
+    def update_node_attrs(self, nodes: Iterable[Node], attributes: Attrs):
+        """Update the user provided node attributes (not the managed attributes).
+        Also adds the action to the history and emits the refresh signal.
+
+        Args:
+            nodes (Iterable[Node]): The nodes to update the attributes for
+            attributes (Attrs): A mapping from user-provided attributes to values for
+                each node.
+        """
+        action = self._update_node_attrs(nodes, attributes)
+        self.action_history.add_new_action(action)
+        self.tracks.refresh.emit()
+
+    def _update_node_attrs(
+        self, nodes: Iterable[Node], attributes: Attrs
+    ) -> TracksAction:
+        """Update the user provided node attributes (not the managed attributes).
+
+        Args:
+            nodes (Iterable[Node]): The nodes to update the attributes for
+            attributes (Attrs): A mapping from user-provided attributes to values for
+                each node.
+
+        Returns: A TracksAction object that performed the update
+        """
+        return UpdateNodeAttrs(self.tracks, nodes, attributes)
+
     def _add_edges(self, edges: np.ndarray[int]) -> TracksAction:
-        """Add edges and attributes to the graph. Also update the track ids and
-        corresponding segmentations of the target node tracks and potentially sibling
-        tracks.
+        """Add edges and attributes to the graph. Also update the track ids of the target
+        node tracks and potentially sibling tracks.
 
         Args:
             edges (np.array[int]): An Nx2 array of N edges, each with source and target
                 node ids
-            attributes (dict[str, np.ndarray]): dictionary mapping attribute names to
-                an array of values, where the index in the array matches the edge index
 
         Returns:
-            True if the edges were successfully added, False if any edge was invalid.
+            A TracksAction containing all edits performed in this call
         """
         actions = []
         for edge in edges:
@@ -430,7 +478,7 @@ class TracksController:
         """Delete edges from the graph.
 
         Args:
-            edges (np.ndarray): _description_
+            edges (np.ndarray): The Nx2 array of edges to be deleted
         """
 
         for edge in edges:
@@ -464,7 +512,7 @@ class TracksController:
         to_remove: list[Node],  # (node_ids, pixels)
         to_update_smaller: list[tuple],  # (node_id, pixels)
         to_update_bigger: list[tuple],  # (node_id, pixels)
-        to_add: list[tuple],  # (track_id, pixels)
+        to_add: list[tuple],  # (node_id, track_id, pixels)
         current_timepoint: int,
     ) -> None:
         """Handle a change in the segmentation mask, checking for node addition, deletion, and attribute updates.
@@ -479,6 +527,7 @@ class TracksController:
         """
         actions = []
         node_to_select = None
+
         if len(to_remove) > 0:
             nodes = [node_id for node_id, _ in to_remove]
             pixels = [pixels for _, pixels in to_remove]
@@ -492,16 +541,25 @@ class TracksController:
             pixels = [pixels for _, pixels in to_update_bigger]
             actions.append(self._update_node_segs(nodes, pixels, added=True))
         if len(to_add) > 0:
-            nodes = [node for node, _ in to_add]
-            pixels = [pix for _, pix in to_add]
-            seg_ids = [val for val, _ in to_add]
+            nodes = [node for node, _, _ in to_add]
+            pixels = [pix for _, _, pix in to_add]
+            track_ids = [
+                val if val is not None else self.tracks.get_next_track_id()
+                for _, val, _ in to_add
+            ]
             times = [pix[0][0] for pix in pixels]
             attributes = {
-                NodeAttr.SEG_ID.value: seg_ids,
-                NodeAttr.TRACK_ID.value: seg_ids,
+                NodeAttr.TRACK_ID.value: track_ids,
                 self.tracks.time_attr: times,
+                "node_id": nodes,
             }
-            action, nodes = self._add_nodes(attributes=attributes, pixels=pixels)
+
+            result = self._add_nodes(attributes=attributes, pixels=pixels)
+            if result is None:
+                return
+            else:
+                action, nodes = result
+
             actions.append(action)
 
             # if this is the time point where the user added a node, select the new node
@@ -518,14 +576,14 @@ class TracksController:
         if self.action_history.undo():
             self.tracks.refresh.emit()
         else:
-            show_warning("No more actions to undo")
+            show_info("No more actions to undo")
 
     def redo(self) -> None:
         """Obtain the action to redo from the history"""
         if self.action_history.redo():
             self.tracks.refresh.emit()
         else:
-            show_warning("No more actions to redo")
+            show_info("No more actions to redo")
 
     def _get_new_node_ids(self, n: int) -> list[Node]:
         """Get a list of new node ids for creating new nodes.
@@ -541,7 +599,7 @@ class TracksController:
         self.node_id_counter += n
         for idx, _id in enumerate(ids):
             while self.tracks.graph.has_node(_id):
-                self.node_id_counter += 1
                 _id = self.node_id_counter
+                self.node_id_counter += 1
             ids[idx] = _id
         return ids
