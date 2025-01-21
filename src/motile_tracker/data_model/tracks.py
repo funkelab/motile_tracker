@@ -13,8 +13,8 @@ import networkx as nx
 import numpy as np
 from motile_toolbox.candidate_graph import EdgeAttr, NodeAttr
 from motile_toolbox.candidate_graph.iou import _compute_ious
+from motile_toolbox.candidate_graph.regionprops_extended import regionprops_extended
 from psygnal import Signal
-from skimage import measure
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -44,6 +44,12 @@ class Tracks:
         pos_attr (str | tuple[str] | list[str]): The attribute in the graph
             that specifies the position of each node. Can be a single attribute
             that holds a list, or a list of attribute keys.
+        scale: list[float] | None: The spatial calibration for all dimensions.
+        ndim: int | None: The number of dimensions.
+        features: list[str] | None: The features to measure for each node.
+        intensity_image: (Optional(np.ndarray)): An optional intensity image
+            for measuring the intensity_mean feature
+
 
     For bulk operations on attributes, a KeyError will be raised if a node or edge
     in the input set is not in the graph. All operations before the error node will
@@ -63,6 +69,8 @@ class Tracks:
         pos_attr: str | tuple[str] | list[str] = NodeAttr.POS.value,
         scale: list[float] | None = None,
         ndim: int | None = None,
+        features: list[str] | None = (),
+        intensity_image: np.ndarray | None = None,
     ):
         self.graph = graph
         self.segmentation = segmentation
@@ -70,6 +78,8 @@ class Tracks:
         self.pos_attr = pos_attr
         self.scale = scale
         self.ndim = self._compute_ndim(segmentation, scale, ndim)
+        self.features = features
+        self.intensity_image = intensity_image
 
     def get_positions(
         self, nodes: Iterable[Node], incl_time: bool = False
@@ -374,9 +384,26 @@ class Tracks:
         computed_attrs = self._compute_node_attrs(nodes, times)
         positions = np.array(computed_attrs[NodeAttr.POS.value])
         self.set_positions(nodes, positions)
-        self._set_nodes_attr(
-            nodes, NodeAttr.AREA.value, computed_attrs[NodeAttr.AREA.value]
-        )
+        for feature in self.features:
+            if feature == "axes":
+                self._set_nodes_attr(
+                    nodes,
+                    NodeAttr.AXIS_MAJOR_LENGTH.value,
+                    computed_attrs[NodeAttr.AXIS_MAJOR_LENGTH.value],
+                )
+                self._set_nodes_attr(
+                    nodes,
+                    NodeAttr.AXIS_MINOR_LENGTH.value,
+                    computed_attrs[NodeAttr.AXIS_MINOR_LENGTH.value],
+                )
+                if self.ndim == 4:
+                    (
+                        nodes,
+                        NodeAttr.AXIS_SEMI_MINOR_LENGTH.value,
+                        computed_attrs[NodeAttr.AXIS_SEMI_MINOR_LENGTH.value],
+                    )
+            else:
+                self._set_nodes_attr(nodes, feature, computed_attrs[feature])
 
         incident_edges = list(self.graph.in_edges(nodes)) + list(
             self.graph.out_edges(nodes)
@@ -486,6 +513,7 @@ class Tracks:
             if not isinstance(self.scale, np.ndarray)
             else self.scale.tolist(),
             "ndim": self.ndim,
+            "features": self.features,
         }
         with open(out_path, "w") as f:
             json.dump(attrs_dict, f)
@@ -649,27 +677,53 @@ class Tracks:
 
         attrs: dict[str, list[Any]] = {
             NodeAttr.POS.value: [],
-            NodeAttr.AREA.value: [],
         }
+        for feature in self.features:
+            if feature == "axes" and self.ndim == 3:
+                attrs[NodeAttr.AXIS_MAJOR_LENGTH.value] = []
+                attrs[NodeAttr.AXIS_MINOR_LENGTH.value] = []
+            elif feature == "axes" and self.ndim == 4:
+                attrs[NodeAttr.AXIS_MAJOR_LENGTH.value] = []
+                attrs[NodeAttr.AXIS_SEMI_MINOR_LENGTH.value] = []
+                attrs[NodeAttr.AXIS_MINOR_LENGTH.value] = []
+            else:
+                attrs[feature] = []
+
         for node, time in zip(nodes, times, strict=False):
             seg = self.segmentation[time] == node
             pos_scale = self.scale[1:] if self.scale is not None else None
-            area = np.sum(seg)
-            if pos_scale is not None:
-                area *= np.prod(pos_scale)
-            # only include the position if the segmentation was actually there
-            pos = (
-                measure.centroid(seg, spacing=pos_scale)
-                if area > 0
-                else np.array(
-                    [
-                        None,
-                    ]
-                    * (self.ndim - 1)
+            if (
+                self.intensity_image is not None
+                and NodeAttr.INTENSITY_MEAN.value in self.features
+            ):
+                props = regionprops_extended(
+                    seg.astype(np.uint8),
+                    spacing=pos_scale,
+                    intensity_image=self.intensity_image[time],
                 )
-            )
-            attrs[NodeAttr.AREA.value].append(area)
+            else:
+                props = regionprops_extended(
+                    seg.astype(np.uint8), spacing=pos_scale, intensity_image=None
+                )
+            pos = props[0].centroid
             attrs[NodeAttr.POS.value].append(pos)
+            for feature in self.features:
+                if feature == "axes":
+                    if self.ndim == 3:
+                        attrs[NodeAttr.AXIS_MAJOR_LENGTH.value].append(
+                            props[0]["axis_major_length"]
+                        )
+                        attrs[NodeAttr.AXIS_MINOR_LENGTH.value].append(
+                            props[0]["axis_minor_length"]
+                        )
+                    elif self.ndim == 4:
+                        major, semi_minor, minor = props[0]["axes"]
+                        attrs[NodeAttr.AXIS_MAJOR_LENGTH.value].append(major)
+                        attrs[NodeAttr.AXIS_SEMI_MINOR_LENGTH.value].append(semi_minor)
+                        attrs[NodeAttr.AXIS_MINOR_LENGTH.value].append(minor)
+                else:
+                    attrs[feature].append(props[0][feature])
+
         attrs[NodeAttr.POS.value] = np.array(attrs[NodeAttr.POS.value])
         return attrs
 

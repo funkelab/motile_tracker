@@ -27,6 +27,8 @@ class SolutionTracks(Tracks):
         pos_attr: str | tuple[str] | list[str] = NodeAttr.POS.value,
         scale: list[float] | None = None,
         ndim: int | None = None,
+        features: list[str] | None = (),
+        intensity_image: np.ndarray | None = None,
     ):
         super().__init__(
             graph,
@@ -35,6 +37,8 @@ class SolutionTracks(Tracks):
             pos_attr=pos_attr,
             scale=scale,
             ndim=ndim,
+            features=features,
+            intensity_image=intensity_image,
         )
         self.max_track_id: int
         self._initialize_track_ids()
@@ -48,6 +52,8 @@ class SolutionTracks(Tracks):
             pos_attr=tracks.pos_attr,
             scale=tracks.scale,
             ndim=tracks.ndim,
+            features=tracks.features,
+            intensity_image=tracks.intensity_image,
         )
 
     @property
