@@ -52,7 +52,9 @@ The ``Run Viewer`` contains the following information:
   and see the results.
 - The ``Export tracks to CSV`` button, which will take you to a file dialog for saving
   a csv file containing the tracks. If your input was a Labels layer, the
-  ``node_id`` will be determined by the time and the original segmentation label id.
+  ``node_id`` will be determined by segmentation label id. If your original segmentation
+  repeated labels across time, the application will relabel them all to be unique, and
+  the new label id will be used as the node id.
   If your input was a Points layer, the ``node_id`` is simply the index of the
   node in the list of points.
     - Note: This does not save the output segmentation. If you want to save
