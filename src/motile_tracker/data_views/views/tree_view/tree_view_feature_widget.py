@@ -86,6 +86,7 @@ class TreeViewFeatureWidget(QWidget):
     def update_feature_dropdown(self, feature_list: list[str]) -> None:
         """Update the list of features in the dropdown"""
 
+        self.feature_dropdown.currentIndexChanged.disconnect(self._update_feature)
         self.feature_dropdown.clear()
         self.show_area_radio.setEnabled(True)
         for feature in feature_list:
@@ -94,6 +95,13 @@ class TreeViewFeatureWidget(QWidget):
         if self.current_feature not in feature_list:
             if len(feature_list) > 0:
                 self.current_feature = feature_list[0]
+                self.feature_dropdown.setCurrentIndex(0)
             else:
                 self.current_feature = None
                 self.show_area_radio.setEnabled(False)
+        else:
+            self.feature_dropdown.setCurrentIndex(
+                self.feature_dropdown.findText(self.current_feature)
+            )
+
+        self.feature_dropdown.currentIndexChanged.connect(self._update_feature)
