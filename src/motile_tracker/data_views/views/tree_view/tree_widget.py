@@ -379,7 +379,7 @@ class TreePlot(pg.PlotWidget):
         ):
             return
         else:
-            view_box.setRange(xRange=(min_x, max_x), yRange=(min_t, max_t))
+            self.autoRange()
 
     def _center_view(self, center_x: int, center_y: int):
         """Center the Viewbox on given coordinates"""
@@ -403,21 +403,7 @@ class TreePlot(pg.PlotWidget):
         ):
             return
 
-        # Calculate the width and height of the current view
-        current_width = x_range[1] - x_range[0]
-        current_height = y_range[1] - y_range[0]
-
-        # Calculate new ranges maintaining the current width and height
-        new_x_range = (
-            center_x - current_width / 2,
-            center_x + current_width / 2,
-        )
-        new_y_range = (
-            center_y - current_height / 2,
-            center_y + current_height / 2,
-        )
-
-        view_box.setRange(xRange=new_x_range, yRange=new_y_range, padding=0)
+        self.autoRange()
 
 
 class TreeWidget(QWidget):
