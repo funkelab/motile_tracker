@@ -128,7 +128,7 @@ class FeatureWidget(QWidget):
         main_layout.addWidget(self.group_box)
         self.setLayout(main_layout)
 
-    def get_selected_features(self):
+    def get_selected_features(self) -> list[str]:
         """Return a list of the features that have been selected"""
 
         selected_features = [
@@ -137,6 +137,12 @@ class FeatureWidget(QWidget):
         if self.enable_intensity is None and "intensity_mean" in selected_features:
             selected_features.remove("intensity_mean")
         return selected_features
+
+    def set_selected_features(self, features: list[str]) -> None:
+        """Set the selected features based on the input list"""
+
+        for checkbox in self.checkboxes:
+            checkbox["checkbox"].setChecked(checkbox["prop_name"] in features)
 
     def update_checkbox_availability(self, enable: bool = False):
         self.enable_intensity = enable

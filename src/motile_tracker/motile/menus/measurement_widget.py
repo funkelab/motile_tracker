@@ -44,6 +44,7 @@ class MeasurementSetupWidget(QWidget):
 
         # add a widget for specifying the scaling information
         self.scale_widget = ScaleWidget(scaling=(1, 1, 1))
+        self.scale_widget.scaling_updated.connect(self.apply_scaling)
         layout.addWidget(self.scale_widget)
 
         self.setLayout(layout)
@@ -67,6 +68,7 @@ class MeasurementSetupWidget(QWidget):
             if self.input_layer is not None
             else (1, 1, 1)
         )
+        self.scale_widget.scaling_updated.connect(self.apply_scaling)
 
         self.layout().addWidget(self.feature_widget)
         self.layout().addWidget(self.scale_widget)
@@ -92,7 +94,25 @@ class MeasurementSetupWidget(QWidget):
 
         return self.feature_widget.get_selected_features()
 
+    def update_features(self, features: list[str]) -> None:
+        """Update the selected features in the feature widget"""
+
+        self.feature_widget.set_selected_features(features)
+
+    def update_scaling(self, scale: tuple[float]) -> None:
+        """Update the scaling information in the scale widget"""
+
+        self.scale_widget.update_scaling(scale)
+
     def get_intensity_image(self):
         """Return the selected intensity image as np.ndarray, if available"""
 
-        return self.intensity_image.data if self.intensity_image is not None else None
+        return self.intensity_image if self.intensity_image is not None else None
+
+    def apply_scaling(self) -> None:
+        """Apply the scaling to the input layer and the intensity image, if present"""
+
+        if self.input_layer is not None:
+            self.input_layer.scale = self.get_scaling()
+        if self.intensity_image is not None:
+            self.intensity_image.scale = self.get_scaling()

@@ -66,6 +66,8 @@ class MotileWidget(QWidget):
         """
         if isinstance(tracks, MotileRun):
             self.view_run_widget.update_run(tracks)
+            self.edit_run_widget.update_features(tracks.features)
+            self.edit_run_widget.update_scaling(tracks.scale)
             self.edit_run_widget.hide()
             self.view_run_widget.show()
         else:

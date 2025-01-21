@@ -85,6 +85,16 @@ class RunEditor(QTabWidget):
                 self.layer_selection_box.addItem(layer.name)
         self.layer_selection_box.setCurrentText(prev_selection)
 
+    def update_features(self, features: list[str]) -> None:
+        """Update the features in the measurements widget"""
+
+        self.measurements_widget.update_features(features)
+
+    def update_scaling(self, scaling: tuple[float]) -> None:
+        """Update the scaling in the measurements widget"""
+
+        self.measurements_widget.update_scaling(scaling)
+
     def update_layer_selection(self) -> None:
         """Update the rest of the UI when the selected layer is updated"""
         layer = self.get_input_layer()
@@ -193,7 +203,12 @@ class RunEditor(QTabWidget):
         """
         run_name = self.run_name.text()
         input_layer = self.get_input_layer()
-        intensity_image = self.measurements_widget.get_intensity_image()
+        intensity_image_layer = self.measurements_widget.get_intensity_image()
+        if intensity_image_layer is not None:
+            intensity_image = intensity_image_layer.data
+            intensity_image_layer.scale = self.measurements_widget.get_scaling()
+        else:
+            intensity_image = None
         if input_layer is None:
             warn("No input layer selected", stacklevel=2)
             return None

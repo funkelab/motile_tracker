@@ -140,11 +140,8 @@ class MotileRun(SolutionTracks):
         time, run_name = cls._unpack_id(run_dir.stem)
         params = cls._load_params(run_dir)
         input_points = cls._load_array(run_dir, IN_POINTS_FILENAME, required=False)
-        tracks = SolutionTracks.load(run_dir, seg_required=False)
+        tracks = SolutionTracks.load(run_dir, seg_required=False, int_required=False)
         gaps = cls._load_list(run_dir=run_dir, filename=GAPS_FILENAME, required=False)
-        features = cls._load_list(
-            run_dir=run_dir, filename=FEATURES_FILENAME, required=False
-        )
         return cls(
             graph=tracks.graph,
             segmentation=tracks.segmentation,
@@ -153,10 +150,11 @@ class MotileRun(SolutionTracks):
             input_points=input_points,
             time=time,
             gaps=gaps,
-            features=features,
+            features=tracks.features,
             pos_attr=tracks.pos_attr,
             time_attr=tracks.time_attr,
             scale=tracks.scale,
+            intensity_image=tracks.intensity_image,
         )
 
     def _save_params(self, run_dir: Path):
@@ -251,6 +249,7 @@ class MotileRun(SolutionTracks):
             "scale": self.scale
             if not isinstance(self.scale, np.ndarray)
             else self.scale.tolist(),
+            "features": self.features,
         }
         with open(out_path, "w") as f:
             json.dump(attrs_dict, f)

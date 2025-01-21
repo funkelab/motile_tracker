@@ -23,12 +23,12 @@ class SolutionTracks(Tracks):
         self,
         graph: nx.DiGraph,
         segmentation: np.ndarray | None = None,
+        intensity_image: np.ndarray | None = None,
         time_attr: str = NodeAttr.TIME.value,
         pos_attr: str | tuple[str] | list[str] = NodeAttr.POS.value,
         scale: list[float] | None = None,
         ndim: int | None = None,
         features: list[str] | None = (),
-        intensity_image: np.ndarray | None = None,
     ):
         super().__init__(
             graph,

@@ -45,7 +45,6 @@ class LayerDropdown(QComboBox):
         """Update the list of options in the dropdown menu whenever the list of layers is changed"""
 
         selected_layer = self.currentText()
-        print(selected_layer)
         self.clear()
         layers = [
             layer
