@@ -9,6 +9,7 @@ from typing import (
     TypeAlias,
 )
 
+import funlib.persistence as fp
 import networkx as nx
 import numpy as np
 from motile_toolbox.candidate_graph import EdgeAttr, NodeAttr
@@ -35,7 +36,7 @@ class Tracks:
     Attributes:
         graph (nx.DiGraph): A graph with nodes representing detections and
             and edges representing links across time.
-        segmentation (Optional(np.ndarray)): An optional segmentation that
+        seg_path (Optional(Path): An optional path to a zarr group containing a segmentation that
             accompanies the tracking graph. If a segmentation is provided,
             the node ids in the graph must match the segmentation labels.
             Defaults to None.
@@ -52,24 +53,26 @@ class Tracks:
 
     refresh = Signal(Optional[str])
     GRAPH_FILE = "graph.json"
-    SEG_FILE = "seg.npy"
     ATTRS_FILE = "attrs.json"
 
     def __init__(
         self,
         graph: nx.DiGraph,
-        segmentation: np.ndarray | None = None,
+        seg_path: Path | None = None,
         time_attr: str = NodeAttr.TIME.value,
         pos_attr: str | tuple[str] | list[str] = NodeAttr.POS.value,
         scale: list[float] | None = None,
         ndim: int | None = None,
     ):
         self.graph = graph
-        self.segmentation = segmentation
+        self.seg_path = seg_path
+        self.segmentation: fp.Array = (
+            fp.open_ds(self.seg_path, mode="a") if self.seg_path is not None else None
+        )
         self.time_attr = time_attr
         self.pos_attr = pos_attr
         self.scale = scale
-        self.ndim = self._compute_ndim(segmentation, scale, ndim)
+        self.ndim = self._compute_ndim(seg_path, scale, ndim)
 
     def get_positions(
         self, nodes: Iterable[Node], incl_time: bool = False
@@ -424,8 +427,6 @@ class Tracks:
             directory (Path): The directory to save the tracks in.
         """
         self._save_graph(directory)
-        if self.segmentation is not None:
-            self._save_seg(directory)
         self._save_attrs(directory)
 
     def _save_graph(self, directory: Path):
@@ -460,16 +461,6 @@ class Tracks:
         with open(graph_file, "w") as f:
             json.dump(graph_data, f)
 
-    def _save_seg(self, directory: Path):
-        """Save a segmentation as a numpy array using np.save. In the future,
-        could be changed to use zarr or other file types.
-
-        Args:
-            directory (Path): The directory in which to save the segmentation
-        """
-        out_path = directory / self.SEG_FILE
-        np.save(out_path, self.segmentation)
-
     def _save_attrs(self, directory: Path):
         """Save the time_attr, pos_attr, and scale in a json file in the given directory.
 
@@ -486,6 +477,7 @@ class Tracks:
             if not isinstance(self.scale, np.ndarray)
             else self.scale.tolist(),
             "ndim": self.ndim,
+            "seg_path": self.seg_path,
         }
         with open(out_path, "w") as f:
             json.dump(attrs_dict, f)
@@ -506,13 +498,10 @@ class Tracks:
         graph_file = directory / cls.GRAPH_FILE
         graph = cls._load_graph(graph_file)
 
-        seg_file = directory / cls.SEG_FILE
-        seg = cls._load_seg(seg_file, seg_required=seg_required)
-
         attrs_file = directory / cls.ATTRS_FILE
         attrs = cls._load_attrs(attrs_file)
 
-        return cls(graph, seg, **attrs)
+        return cls(graph, **attrs)
 
     @staticmethod
     def _load_graph(graph_file: Path) -> nx.DiGraph:
@@ -574,11 +563,11 @@ class Tracks:
 
     def _compute_ndim(
         self,
-        seg: np.ndarray | None,
+        seg: Path | None,
         scale: list[float] | None,
         provided_ndim: int | None,
     ):
-        seg_ndim = seg.ndim if seg is not None else None
+        seg_ndim = fp.open_ds(seg).dims if seg is not None else None
         scale_ndim = len(scale) if scale is not None else None
         ndims = [seg_ndim, scale_ndim, provided_ndim]
         ndims = [d for d in ndims if d is not None]

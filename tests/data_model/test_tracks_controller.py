@@ -62,9 +62,9 @@ def test__add_nodes_no_seg(graph_2d):
     assert not tracks.graph.has_edge(4, 5)
 
 
-def test__add_nodes_with_seg(graph_2d, segmentation_2d):
+def test__add_nodes_with_seg(graph_2d, segmentation_2d, seg_2d_path):
     # add with segmentation
-    tracks = SolutionTracks(graph_2d, segmentation=segmentation_2d)
+    tracks = SolutionTracks(graph_2d, seg_path=seg_2d_path)
     controller = TracksController(tracks)
 
     num_edges = tracks.graph.number_of_edges()
@@ -101,7 +101,7 @@ def test__add_nodes_with_seg(graph_2d, segmentation_2d):
     assert tracks.get_time(node2) == 1
     assert tracks.get_position(node2) == expected_center
     assert tracks.get_track_id(node2) == 6
-    assert np.sum(tracks.segmentation != new_seg) == 0
+    assert np.sum(tracks.segmentation.data != new_seg) == 0
 
     assert tracks.graph.number_of_edges() == num_edges + 1  # one edge added
 
@@ -131,7 +131,7 @@ def test__add_nodes_with_seg(graph_2d, segmentation_2d):
     node = node_ids[0]
     assert tracks.get_position(node) == expected_center
     assert tracks.get_track_id(node) == 2
-    assert np.sum(tracks.segmentation != new_seg) == 0
+    assert np.sum(tracks.segmentation.data != new_seg) == 0
 
     assert tracks.graph.has_edge(2, node)
     assert tracks.graph.has_edge(node, node_ids[1])
@@ -157,7 +157,7 @@ def test__add_nodes_with_seg(graph_2d, segmentation_2d):
     node = node_ids[0]
     assert tracks.get_position(node) == expected_center
     assert tracks.get_track_id(node) == 3
-    assert np.sum(tracks.segmentation != new_seg) == 0
+    assert np.sum(tracks.segmentation.data != new_seg) == 0
 
     assert tracks.graph.has_edge(4, node)
     assert tracks.graph.has_edge(node, 5)
@@ -208,8 +208,8 @@ def test__delete_nodes_no_seg(graph_2d):
     assert tracks.get_track_id(2) == 1  # update track id for other child
 
 
-def test__delete_nodes_with_seg(graph_2d, segmentation_2d):
-    tracks = SolutionTracks(graph_2d, segmentation=segmentation_2d)
+def test__delete_nodes_with_seg(graph_2d, segmentation_2d, seg_2d_path):
+    tracks = SolutionTracks(graph_2d, seg_path=seg_2d_path)
     controller = TracksController(tracks)
     num_edges = tracks.graph.number_of_edges()
 

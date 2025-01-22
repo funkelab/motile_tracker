@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
+from pathlib import Path
 from typing import TYPE_CHECKING
 from warnings import warn
 
 import napari.layers
 import networkx as nx
 import numpy as np
-from motile_toolbox.utils.relabel_segmentation import ensure_unique_labels
+from appdirs import AppDirs
 from qtpy.QtCore import Signal
 from qtpy.QtWidgets import (
     QComboBox,
@@ -23,6 +24,7 @@ from qtpy.QtWidgets import (
 )
 
 from motile_tracker.motile.backend import MotileRun
+from motile_tracker.utils.convert_seg import convert_seg
 
 from .params_editor import SolverParamsEditor
 
@@ -185,19 +187,14 @@ class RunEditor(QGroupBox):
             warn("No input layer selected", stacklevel=2)
             return None
         if isinstance(input_layer, napari.layers.Labels):
+            # convert the layer to a zarr with unique labels
             input_seg = input_layer.data
-            ndim = input_seg.ndim
-            if ndim > 4:
-                raise ValueError(
-                    "Expected segmentation to be at most 4D, found %d", ndim
-                )
-            elif ndim < 3:
-                raise ValueError(
-                    "Expected segmentation to be at least 3D, found %d", ndim
-                )
-            if self._has_duplicate_ids(input_seg):
-                input_seg = ensure_unique_labels(input_seg)
-
+            base_path = self._get_data_save_path(run_name)
+            zarr_name = f"{run_name}.zarr"
+            group_name = "seg"
+            seg_path = base_path / zarr_name / group_name
+            relabel = self._has_duplicate_ids(input_seg)
+            convert_seg(input_seg, seg_path, input_layer.scale, relabel=relabel)
             input_points = None
         elif isinstance(input_layer, napari.layers.Points):
             input_seg = None
@@ -205,13 +202,24 @@ class RunEditor(QGroupBox):
         params = self.solver_params_widget.solver_params.copy()
         return MotileRun(
             graph=nx.DiGraph(),
-            segmentation=input_seg,
+            seg_path=seg_path,
             run_name=run_name,
             solver_params=params,
             input_points=input_points,
             time=datetime.now(),
             scale=input_layer.scale,
         )
+
+    def _get_data_save_path(self):
+        """Get the directory to save the data in. Does not include the name of the zarr
+        (will be set from run_name) or the group within the zarr (controlled by the app).
+
+        In the future, this can be a dialog for the user to set.
+        """
+        appdir = AppDirs("motile-tracker")
+        data_dir = Path(appdir.user_data_dir)
+        data_dir.mkdir(parents=True, exist_ok=True)
+        return data_dir
 
     def emit_run(self) -> None:
         """Construct a run and start solving by emitting the start run

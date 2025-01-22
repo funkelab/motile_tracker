@@ -22,7 +22,7 @@ class SolutionTracks(Tracks):
     def __init__(
         self,
         graph: nx.DiGraph,
-        segmentation: np.ndarray | None = None,
+        seg_path: Path | None = None,
         time_attr: str = NodeAttr.TIME.value,
         pos_attr: str | tuple[str] | list[str] = NodeAttr.POS.value,
         scale: list[float] | None = None,
@@ -30,7 +30,7 @@ class SolutionTracks(Tracks):
     ):
         super().__init__(
             graph,
-            segmentation=segmentation,
+            seg_path=seg_path,
             time_attr=time_attr,
             pos_attr=pos_attr,
             scale=scale,

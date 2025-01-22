@@ -1,3 +1,6 @@
+from pathlib import Path
+
+import funlib.persistence as fp
 import networkx as nx
 import numpy as np
 import pytest
@@ -12,10 +15,18 @@ from motile_tracker.data_model.actions import (
 )
 
 
-def test_add_delete_nodes(segmentation_2d, graph_2d):
+def _save_seg(tempdir: Path, seg: np.ndarray) -> Path:
+    seg_path = tempdir / "test.zarr/seg"
+    arr = fp.prepare_ds(seg_path, shape=seg.shape, mode="w")
+    arr[:] = seg
+    return seg_path
+
+
+def test_add_delete_nodes(tmp_path, segmentation_2d, graph_2d):
     empty_graph = nx.DiGraph()
     empty_seg = np.zeros_like(segmentation_2d)
-    tracks = Tracks(empty_graph, segmentation=empty_seg)
+    empty_seg_path = _save_seg(tmp_path, empty_seg)
+    tracks = Tracks(empty_graph, seg_path=empty_seg_path)
     nodes = list(graph_2d.nodes())
     attrs = {}
     attrs[NodeAttr.TIME.value] = [
@@ -45,11 +56,11 @@ def test_add_delete_nodes(segmentation_2d, graph_2d):
                 305  # hard coding the case Anniek took out for now
             )
         assert data == graph_2d_data
-    assert_array_almost_equal(tracks.segmentation, segmentation_2d)
+    assert_array_almost_equal(tracks.segmentation.data, segmentation_2d)
 
     del_nodes = add_nodes.inverse()
     assert set(tracks.graph.nodes()) == set(empty_graph.nodes())
-    assert_array_almost_equal(tracks.segmentation, empty_seg)
+    assert_array_almost_equal(tracks.segmentation.data, empty_seg)
 
     del_nodes.inverse()
 
@@ -59,11 +70,11 @@ def test_add_delete_nodes(segmentation_2d, graph_2d):
         if NodeAttr.AREA.value not in graph_2d_data:
             graph_2d_data[NodeAttr.AREA.value] = None
         assert data == graph_2d_data
-    assert_array_almost_equal(tracks.segmentation, segmentation_2d)
+    assert_array_almost_equal(tracks.segmentation.data, segmentation_2d)
 
 
-def test_update_node_segs(segmentation_2d, graph_2d):
-    tracks = Tracks(graph_2d.copy(), segmentation=segmentation_2d.copy())
+def test_update_node_segs(seg_2d_path, segmentation_2d, graph_2d):
+    tracks = Tracks(graph_2d.copy(), seg_path=seg_2d_path)
     nodes = list(graph_2d.nodes())
 
     # add a couple pixels to the first node
@@ -80,13 +91,13 @@ def test_update_node_segs(segmentation_2d, graph_2d):
         tracks.graph.nodes[1][NodeAttr.POS.value]
         != graph_2d.nodes[1][NodeAttr.POS.value]
     )
-    assert_array_almost_equal(tracks.segmentation, new_seg)
+    assert_array_almost_equal(tracks.segmentation.data, new_seg)
 
     inverse = action.inverse()
     assert set(tracks.graph.nodes()) == set(graph_2d.nodes())
     for node, data in tracks.graph.nodes(data=True):
         assert data == graph_2d.nodes[node]
-    assert_array_almost_equal(tracks.segmentation, segmentation_2d)
+    assert_array_almost_equal(tracks.segmentation.data, segmentation_2d)
 
     inverse.inverse()
 
@@ -96,12 +107,12 @@ def test_update_node_segs(segmentation_2d, graph_2d):
         tracks.graph.nodes[1][NodeAttr.POS.value]
         != graph_2d.nodes[1][NodeAttr.POS.value]
     )
-    assert_array_almost_equal(tracks.segmentation, new_seg)
+    assert_array_almost_equal(tracks.segmentation.data, new_seg)
 
 
-def test_add_delete_edges(graph_2d, segmentation_2d):
+def test_add_delete_edges(graph_2d, segmentation_2d, seg_2d_path):
     node_graph = nx.create_empty_copy(graph_2d, with_data=True)
-    tracks = Tracks(node_graph, segmentation_2d)
+    tracks = Tracks(node_graph, seg_path=seg_2d_path)
 
     edges = [[1, 2], [1, 3], [3, 4], [4, 5]]
 
@@ -113,11 +124,11 @@ def test_add_delete_edges(graph_2d, segmentation_2d):
         assert tracks.graph.edges[edge][EdgeAttr.IOU.value] == pytest.approx(
             graph_2d.edges[edge][EdgeAttr.IOU.value], abs=0.01
         )
-    assert_array_almost_equal(tracks.segmentation, segmentation_2d)
+    assert_array_almost_equal(tracks.segmentation.data, segmentation_2d)
 
     inverse = action.inverse()
     assert set(tracks.graph.edges()) == set()
-    assert_array_almost_equal(tracks.segmentation, segmentation_2d)
+    assert_array_almost_equal(tracks.segmentation.data, segmentation_2d)
 
     inverse.inverse()
     assert set(tracks.graph.nodes()) == set(graph_2d.nodes())
@@ -126,4 +137,4 @@ def test_add_delete_edges(graph_2d, segmentation_2d):
         assert tracks.graph.edges[edge][EdgeAttr.IOU.value] == pytest.approx(
             graph_2d.edges[edge][EdgeAttr.IOU.value], abs=0.01
         )
-    assert_array_almost_equal(tracks.segmentation, segmentation_2d)
+    assert_array_almost_equal(tracks.segmentation.data, segmentation_2d)

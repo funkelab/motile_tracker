@@ -6,7 +6,7 @@ from motile_toolbox.candidate_graph import NodeAttr
 from motile_tracker.data_model import Tracks
 
 
-def test_create_tracks(graph_3d, segmentation_3d):
+def test_create_tracks(graph_3d, segmentation_3d, seg_3d_path):
     # create empty tracks
     tracks = Tracks(graph=nx.DiGraph(), ndim=3)
     with pytest.raises(KeyError):
@@ -20,16 +20,14 @@ def test_create_tracks(graph_3d, segmentation_3d):
         tracks.get_positions(["0"])
 
     # create track with graph and seg
-    tracks = Tracks(graph=graph_3d, segmentation=segmentation_3d)
+    tracks = Tracks(graph=graph_3d, seg_path=seg_3d_path)
     assert tracks.get_positions([1]).tolist() == [[50, 50, 50]]
     assert tracks.get_time(1) == 0
     assert tracks.get_positions([1], incl_time=True).tolist() == [[0, 50, 50, 50]]
     tracks.set_time(1, 1)
     assert tracks.get_positions([1], incl_time=True).tolist() == [[1, 50, 50, 50]]
 
-    tracks_wrong_attr = Tracks(
-        graph=graph_3d, segmentation=segmentation_3d, time_attr="test"
-    )
+    tracks_wrong_attr = Tracks(graph=graph_3d, seg_path=seg_3d_path, time_attr="test")
     with pytest.raises(KeyError):  # raises error at access if time is wrong
         tracks_wrong_attr.get_times([1])
 
@@ -56,7 +54,7 @@ def test_create_tracks(graph_3d, segmentation_3d):
     assert tracks.get_time(1) == 1
 
 
-def test_add_remove_nodes(graph_2d, segmentation_2d):
+def test_add_remove_nodes(graph_2d, segmentation_2d, seg_2d_path):
     # create empty tracks
     tracks = Tracks(graph=nx.DiGraph(), ndim=3)
     with pytest.raises(KeyError):
@@ -75,7 +73,7 @@ def test_add_remove_nodes(graph_2d, segmentation_2d):
         tracks.add_node(1, time=10)
 
     # create tracks with segmentation
-    tracks = Tracks(graph=graph_2d, segmentation=segmentation_2d, scale=[1, 2, 1])
+    tracks = Tracks(graph=graph_2d, seg_path=seg_2d_path, scale=[1, 2, 1])
 
     # removing a node
     node = 3
@@ -90,7 +88,7 @@ def test_add_remove_nodes(graph_2d, segmentation_2d):
     assert tracks.get_area(node) == 697 * 2
 
 
-def test_add_remove_edges(graph_2d, segmentation_2d):
+def test_add_remove_edges(graph_2d, segmentation_2d, seg_2d_path):
     # create empty tracks
     tracks = Tracks(graph=nx.DiGraph(), ndim=3)
     with pytest.raises(KeyError):
@@ -114,7 +112,7 @@ def test_add_remove_edges(graph_2d, segmentation_2d):
     assert tracks.graph.number_of_edges() == 1
 
     # create track with graph and seg
-    tracks = Tracks(graph=graph_2d, segmentation=segmentation_2d)
+    tracks = Tracks(graph=graph_2d, seg_path=seg_2d_path)
     num_edges = tracks.graph.number_of_edges()
 
     edge = (1, 3)
@@ -140,9 +138,9 @@ def test_add_remove_edges(graph_2d, segmentation_2d):
     # tracks.add_edge(edge)
 
 
-def test_pixels_and_seg_id(graph_3d, segmentation_3d):
+def test_pixels_and_seg_id(graph_3d, seg_3d_path):
     # create track with graph and seg
-    tracks = Tracks(graph=graph_3d, segmentation=segmentation_3d)
+    tracks = Tracks(graph=graph_3d, seg_path=seg_3d_path)
 
     # changing a segmentation id changes it in the mapping
     pix = tracks.get_pixels([1])
@@ -153,14 +151,13 @@ def test_pixels_and_seg_id(graph_3d, segmentation_3d):
         tracks.get_positions(["0"])
 
 
-def test_update_segmentations(graph_2d, segmentation_2d):
-    tracks = Tracks(graph_2d.copy(), segmentation=segmentation_2d.copy())
+def test_update_segmentations(graph_2d, seg_2d_path, segmentation_2d):
+    tracks = Tracks(graph_2d.copy(), seg_path=seg_2d_path)
 
     # remove pixels from a segmentation
     nodes = [1]
     edge = (1, 3)
     current_pix = tracks.get_pixels(nodes)
-    print(current_pix, segmentation_2d.ndim)
     areas = tracks.get_areas(nodes)
     iou = tracks.get_iou(edge)
     # get the first 5 pixels of each segmentation
@@ -171,7 +168,7 @@ def test_update_segmentations(graph_2d, segmentation_2d):
     tracks.update_segmentations(nodes, pix_to_remove, added=False)
 
     # there are 5 different pixels for each node
-    assert np.sum(segmentation_2d != tracks.segmentation) == len(nodes) * 5
+    assert np.sum(segmentation_2d != tracks.segmentation.data) == len(nodes) * 5
 
     # the areas have updated
     for node, area in zip(nodes, areas, strict=False):
@@ -182,7 +179,7 @@ def test_update_segmentations(graph_2d, segmentation_2d):
 
     # add pixels back to the segmentation
     tracks.update_segmentations(nodes, pix_to_remove, added=True)
-    assert np.sum(segmentation_2d != tracks.segmentation) == 0
+    assert np.sum(segmentation_2d != tracks.segmentation.data) == 0
 
     # the areas have updated
     for node, area in zip(nodes, areas, strict=False):

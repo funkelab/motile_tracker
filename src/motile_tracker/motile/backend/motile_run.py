@@ -32,7 +32,7 @@ class MotileRun(SolutionTracks):
     def __init__(
         self,
         graph: nx.DiGraph,
-        segmentation: np.ndarray | None,
+        seg_path: Path | None,
         run_name: str,
         time_attr: str = NodeAttr.TIME.value,
         pos_attr: str | tuple[str] | list[str] = NodeAttr.POS.value,
@@ -45,7 +45,7 @@ class MotileRun(SolutionTracks):
     ):
         super().__init__(
             graph,
-            segmentation=segmentation,
+            seg_path=seg_path,
             time_attr=time_attr,
             pos_attr=pos_attr,
             scale=scale,

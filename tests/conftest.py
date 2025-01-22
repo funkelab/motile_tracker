@@ -1,8 +1,18 @@
+from pathlib import Path
+
+import funlib.persistence as fp
 import networkx as nx
 import numpy as np
 import pytest
 from motile_toolbox.candidate_graph.graph_attributes import EdgeAttr, NodeAttr
 from skimage.draw import disk
+
+
+def _save_seg(tempdir: Path, seg: np.ndarray) -> Path:
+    seg_path = tempdir / "test.zarr/seg"
+    arr = fp.prepare_ds(seg_path, shape=seg.shape, mode="w")
+    arr[:] = seg
+    return seg_path
 
 
 @pytest.fixture
@@ -30,6 +40,11 @@ def segmentation_2d():
     segmentation[4, 96:100, 96:100] = 6
 
     return segmentation
+
+
+@pytest.fixture
+def seg_2d_path(tmp_path, segmentation_2d):
+    return _save_seg(tmp_path, segmentation_2d)
 
 
 @pytest.fixture
@@ -137,6 +152,11 @@ def segmentation_3d():
     segmentation[1][mask] = 3
 
     return segmentation
+
+
+@pytest.fixture
+def seg_3d_path(tmp_path, segmentation_3d):
+    return _save_seg(tmp_path, segmentation_3d)
 
 
 @pytest.fixture

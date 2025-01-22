@@ -41,6 +41,7 @@ dependencies =[
     "fonticon-fontawesome6",
     "pyqtgraph",
     "lxml_html_clean",  # only to deal with napari dependencies being broken
+    "funlib.persistence",
 ]
 [project.optional-dependencies]
 testing =["napari", "pyqt5", "pytest", "pytest-cov", "pytest-qt"]
