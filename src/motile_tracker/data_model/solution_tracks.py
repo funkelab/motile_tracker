@@ -43,7 +43,7 @@ class SolutionTracks(Tracks):
     def from_tracks(cls, tracks: Tracks):
         return cls(
             tracks.graph,
-            segmentation=tracks.segmentation,
+            seg_path=tracks.seg_path,
             time_attr=tracks.time_attr,
             pos_attr=tracks.pos_attr,
             scale=tracks.scale,

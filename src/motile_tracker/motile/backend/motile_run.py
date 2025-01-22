@@ -136,7 +136,7 @@ class MotileRun(SolutionTracks):
         gaps = cls._load_list(run_dir=run_dir, filename=GAPS_FILENAME, required=False)
         return cls(
             graph=tracks.graph,
-            segmentation=tracks.segmentation,
+            seg_path=tracks.seg_path,
             run_name=run_name,
             solver_params=params,
             input_points=input_points,
@@ -221,27 +221,6 @@ class MotileRun(SolutionTracks):
             raise FileNotFoundError(f"No segmentation at {array_path}")
         else:
             return None
-
-    def _save_attrs(self, directory: Path):
-        """Save the time_attr, pos_attr, and scale in a json file in the given directory.
-
-        Args:
-            directory (Path):  The directory in which to save the attributes
-        """
-        out_path = directory / self.ATTRS_FILE
-        attrs_dict = {
-            "time_attr": self.time_attr
-            if not isinstance(self.time_attr, np.ndarray)
-            else self.time_attr.tolist(),
-            "pos_attr": self.pos_attr
-            if not isinstance(self.pos_attr, np.ndarray)
-            else self.pos_attr.tolist(),
-            "scale": self.scale
-            if not isinstance(self.scale, np.ndarray)
-            else self.scale.tolist(),
-        }
-        with open(out_path, "w") as f:
-            json.dump(attrs_dict, f)
 
     def _save_list(self, list_to_save: list | None, run_dir: Path, filename: str):
         if list_to_save is None:

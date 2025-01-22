@@ -420,8 +420,8 @@ class Tracks:
     def save(self, directory: Path):
         """Save the tracks to the given directory.
         Currently, saves the graph as a json file in networkx node link data format,
-        saves the segmentation as a numpy npz file, and saves the time and position
-        attributes and scale information in an attributes json file.
+        and saves the time and position
+        attributes and scale information and seg path in an attributes json file.
 
         Args:
             directory (Path): The directory to save the tracks in.
@@ -477,7 +477,7 @@ class Tracks:
             if not isinstance(self.scale, np.ndarray)
             else self.scale.tolist(),
             "ndim": self.ndim,
-            "seg_path": self.seg_path,
+            "seg_path": str(self.seg_path),
         }
         with open(out_path, "w") as f:
             json.dump(attrs_dict, f)
@@ -500,7 +500,6 @@ class Tracks:
 
         attrs_file = directory / cls.ATTRS_FILE
         attrs = cls._load_attrs(attrs_file)
-
         return cls(graph, **attrs)
 
     @staticmethod
@@ -525,27 +524,6 @@ class Tracks:
             raise FileNotFoundError(f"No graph at {graph_file}")
 
     @staticmethod
-    def _load_seg(seg_file: Path, seg_required: bool = False) -> np.ndarray | None:
-        """Load a segmentation from a file. If the file doesn't exist, either return
-        None or raise a FileNotFoundError depending on the seg_required flag.
-
-        Args:
-            seg_file (Path): The npz file to load.
-            seg_required (bool, optional): If true, raise a FileNotFoundError if the
-                segmentation is not present. Defaults to False.
-
-        Returns:
-            np.ndarray | None: The segmentation array, or None if it wasn't present and
-                seg_required was False.
-        """
-        if seg_file.is_file():
-            return np.load(seg_file)
-        elif seg_required:
-            raise FileNotFoundError(f"No segmentation at {seg_file}")
-        else:
-            return None
-
-    @staticmethod
     def _load_attrs(attrs_file: Path) -> dict:
         if attrs_file.is_file():
             with open(attrs_file) as f:
@@ -557,7 +535,6 @@ class Tracks:
     def delete(cls, directory: Path):
         # Lets be safe and remove the expected files and then the directory
         (directory / cls.GRAPH_FILE).unlink()
-        (directory / cls.SEG_FILE).unlink()
         (directory / cls.ATTRS_FILE).unlink()
         directory.rmdir()
 

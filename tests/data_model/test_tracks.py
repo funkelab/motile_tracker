@@ -6,7 +6,7 @@ from motile_toolbox.candidate_graph import NodeAttr
 from motile_tracker.data_model import Tracks
 
 
-def test_create_tracks(graph_3d, segmentation_3d, seg_3d_path):
+def test_create_tracks(graph_3d, seg_3d_path):
     # create empty tracks
     tracks = Tracks(graph=nx.DiGraph(), ndim=3)
     with pytest.raises(KeyError):
@@ -54,7 +54,7 @@ def test_create_tracks(graph_3d, segmentation_3d, seg_3d_path):
     assert tracks.get_time(1) == 1
 
 
-def test_add_remove_nodes(graph_2d, segmentation_2d, seg_2d_path):
+def test_add_remove_nodes(graph_2d, seg_2d_path):
     # create empty tracks
     tracks = Tracks(graph=nx.DiGraph(), ndim=3)
     with pytest.raises(KeyError):
@@ -88,7 +88,7 @@ def test_add_remove_nodes(graph_2d, segmentation_2d, seg_2d_path):
     assert tracks.get_area(node) == 697 * 2
 
 
-def test_add_remove_edges(graph_2d, segmentation_2d, seg_2d_path):
+def test_add_remove_edges(graph_2d, seg_2d_path):
     # create empty tracks
     tracks = Tracks(graph=nx.DiGraph(), ndim=3)
     with pytest.raises(KeyError):
