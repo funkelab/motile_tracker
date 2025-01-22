@@ -126,6 +126,10 @@ class TracksLayerGroup:
                     location[dim] + 0.5
                 )  # use the world location, since the 'step' in viewer.dims.range
                 # already in world units
+
+            # also set the displayed dimensions (usually xy) in the step, so that the cross widget from the 3D view can jump there
+            for dim in self.viewer.dims.displayed:
+                step[dim] = int(location[dim] + 0.5)
             self.viewer.dims.current_step = step
 
             if self.viewer.dims.ndisplay == 2:
