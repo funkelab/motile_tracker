@@ -328,13 +328,21 @@ class MultipleViewerWidget(QSplitter):
 
             # connect data and paint events
             if event.value.name != ".cross" and not isinstance(event.value, TrackGraph):
+                # model 1
                 self.viewer_model1.layers[event.value.name].events.data.connect(
                     self._sync_data
                 )
+                self.viewer_model1.layers[event.value.name].events.mode.connect(
+                    self._sync_mode
+                )
+
                 if isinstance(self.viewer_model1.layers[event.value.name], Labels):
                     self.viewer_model1.layers[event.value.name].events.paint.connect(
                         self._sync_paint
                     )
+                    self.viewer_model1.layers[
+                        event.value.name
+                    ].events.selected_label.connect(self._sync_selected_label)
                     self.viewer_model1.layers[
                         event.value.name
                     ].mouse_drag_callbacks.append(self._sync_click)
@@ -344,26 +352,61 @@ class MultipleViewerWidget(QSplitter):
                         event.value.name
                     ].mouse_drag_callbacks.append(self._sync_point_click)
 
+                # model 2
                 self.viewer_model2.layers[event.value.name].events.data.connect(
                     self._sync_data
                 )
+                self.viewer_model2.layers[event.value.name].events.mode.connect(
+                    self._sync_mode
+                )
+
+                if isinstance(self.viewer_model2.layers[event.value.name], Labels):
+                    self.viewer_model2.layers[event.value.name].events.paint.connect(
+                        self._sync_paint
+                    )
+                    self.viewer_model2.layers[
+                        event.value.name
+                    ].events.selected_label.connect(self._sync_selected_label)
+                    self.viewer_model2.layers[
+                        event.value.name
+                    ].mouse_drag_callbacks.append(self._sync_click)
 
                 if isinstance(self.viewer_model2.layers[event.value.name], Points):
                     self.viewer_model2.layers[
                         event.value.name
                     ].mouse_drag_callbacks.append(self._sync_point_click)
 
-                if isinstance(self.viewer_model2.layers[event.value.name], Labels):
-                    self.viewer_model2.layers[event.value.name].events.paint.connect(
-                        self._sync_paint
-                    )
-                self.viewer_model2.layers[event.value.name].mouse_drag_callbacks.append(
-                    self._sync_click
-                )
-
             event.value.events.name.connect(self._sync_name)
 
             self._order_update()
+
+    def _sync_selected_label(self, event):
+        """Sync the selected label between Label instances"""
+
+        for model in [self.viewer, self.viewer_model1, self.viewer_model2]:
+            if event.source.name in model.layers:
+                layer = model.layers[event.source.name]
+                if layer is event.source:
+                    return
+                try:
+                    self._block = True
+                    layer.selected_label = event.source.selected_label
+                finally:
+                    self._block = False
+
+    def _sync_mode(self, event):
+        """Sync the tool mode between source viewer and other viewer models"""
+
+        for model in [self.viewer, self.viewer_model1, self.viewer_model2]:
+            if event.source.name in model.layers:
+                layer = model.layers[event.source.name]
+                if layer is event.source:
+                    continue
+                try:
+                    self._block = True
+                    layer.mode = event.source.mode
+                finally:
+                    self._block = False
 
     def _sync_point_click(self, layer, event):
         """Retrieve the label that was clicked on and forward it to the TrackLabels instance if present"""
