@@ -82,6 +82,30 @@ class TracksController:
                 break
         return pred, succ
 
+    def _confirm_remove_division_edges(self) -> bool:
+        """Spawn a dialog box to ask the user if they want to break an upstream division
+        event or not.
+
+        Returns:
+            bool: True if the upstream division edges should be removed to make room for
+                the new node in the track, False if the user wants to cancel the operation.
+        """
+        msg = QMessageBox()
+        msg.setWindowTitle("Delete existing division?")
+        msg.setText(
+            "Painting a label with this track id involves breaking an upstream division event. Proceed?"
+        )
+        msg.setIcon(QMessageBox.Information)
+
+        # Set both OK and Cancel buttons
+        msg.setStandardButtons(QMessageBox.Ok | QMessageBox.Cancel)
+
+        # Execute the message box and catch the result
+        result = msg.exec_()
+
+        # Check which button was clicked
+        return result == QMessageBox.Ok
+
     def _add_nodes(
         self,
         attributes: Attrs,
@@ -145,26 +169,12 @@ class TracksController:
                         self.tracks._get_node_attr(node, NodeAttr.TIME.value) <= time
                         and self.tracks.graph.out_degree(node) == 2
                     ):  # there is an upstream division event here
-                        msg = QMessageBox()
-                        msg.setWindowTitle("Delete existing division?")
-                        msg.setText(
-                            "Painting a label with this track id involves breaking an upstream division event. Proceed?"
-                        )
-                        msg.setIcon(QMessageBox.Information)
-
-                        # Set both OK and Cancel buttons
-                        msg.setStandardButtons(QMessageBox.Ok | QMessageBox.Cancel)
-
-                        # Execute the message box and catch the result
-                        result = msg.exec_()
-
-                        # Check which button was clicked
-                        if result == QMessageBox.Ok:
+                        if self._confirm_remove_division_edges():
                             for succ in self.tracks.graph.successors(node):
                                 edges_to_remove.append((node, succ))
-
-                        elif result == QMessageBox.Cancel:
+                        else:
                             show_info("Action canceled by user")
+                            self.tracks.refresh.emit()
                             return
 
         if len(edges_to_remove) > 0:
