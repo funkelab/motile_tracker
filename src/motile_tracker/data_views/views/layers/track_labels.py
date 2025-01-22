@@ -110,33 +110,8 @@ class TrackLabels(napari.layers.Labels):
         self.bind_key("z")(self.tracks_viewer.undo)
         self.bind_key("r")(self.tracks_viewer.redo)
 
-        # Connect click events to node selection
-        @self.mouse_drag_callbacks.append
-        def click(_, event):
-            if (
-                event.type == "mouse_press"
-                and self.mode == "pan_zoom"
-                and not (
-                    self.tracks_viewer.mode == "lineage"
-                    and self.viewer.dims.ndisplay == 3
-                )
-            ):  # disable selecting in lineage mode in 3D
-                label = self.get_value(
-                    event.position,
-                    view_direction=event.view_direction,
-                    dims_displayed=event.dims_displayed,
-                    world=True,
-                )
-
-                if (
-                    label is not None
-                    and label != 0
-                    and self.colormap.map(label)[-1] != 0
-                ):  # check opacity (=visibility) in the colormap
-                    append = "Shift" in event.modifiers
-                    self.tracks_viewer.selected_nodes.add(label, append)
-
         # Listen to paint events and changing the selected label
+        self.mouse_drag_callbacks.append(self.click)
         self.events.paint.connect(self._on_paint)
         self.tracks_viewer.selected_nodes.list_updated.connect(
             self.update_selected_label
@@ -144,6 +119,30 @@ class TrackLabels(napari.layers.Labels):
         self.events.selected_label.connect(self._ensure_valid_label)
         self.events.mode.connect(self._check_mode)
         self.viewer.dims.events.current_step.connect(self._ensure_valid_label)
+
+    # Connect click events to node selection
+    def click(self, _, event):
+        if (
+            event.type == "mouse_press"
+            and self.mode == "pan_zoom"
+            and not (
+                self.tracks_viewer.mode == "lineage" and self.viewer.dims.ndisplay == 3
+            )
+        ):  # disable selecting in lineage mode in 3D
+            label = self.get_value(
+                event.position,
+                view_direction=event.view_direction,
+                dims_displayed=event.dims_displayed,
+                world=True,
+            )
+            self.process_click(event, label)
+
+    def process_click(self, event: Event, label: int):
+        if (
+            label is not None and label != 0 and self.colormap.map(label)[-1] != 0
+        ):  # check opacity (=visibility) in the colormap
+            append = "Shift" in event.modifiers
+            self.tracks_viewer.selected_nodes.add(label, append)
 
     def _get_colormap(self) -> DirectLabelColormap:
         """Get a DirectLabelColormap that maps node ids to their track ids, and then

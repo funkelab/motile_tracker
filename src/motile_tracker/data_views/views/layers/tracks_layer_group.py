@@ -96,10 +96,17 @@ class TracksLayerGroup:
             self.points_layer._refresh()
 
     def update_visible(self, visible_tracks: list[int], visible_nodes: list[int]):
+        """Update the visibility of the nodes in the viewer layers
+
+        Args:
+            visible_tracks (list[int], 'all'): List of node ids belonging to the tracks that should be visible, or 'all'. This filters the nodes based on whether the display mode is set to 'lineage' or to 'all'
+            visible_nodes (list[int], 'all'): List of node ids belonging to the nodes that should be visible because they are in within the bounds of a clipping plane, or 'all' if the clipping plane is not active.
+        """
+
         if self.seg_layer is not None:
-            self.seg_layer.update_label_colormap(visible_nodes)
+            self.seg_layer.update_label_colormap(visible_tracks)
         if self.points_layer is not None:
-            self.points_layer.update_point_outline(visible_tracks)
+            self.points_layer.update_point_outline(visible_tracks, visible_nodes)
         if self.tracks_layer is not None:
             self.tracks_layer.update_track_visibility(visible_tracks)
 
@@ -107,7 +114,9 @@ class TracksLayerGroup:
         """Adjust the current_step and camera center of the viewer to jump to the node
         location, if the node is not already in the field of view"""
 
-        if self.seg_layer is None or self.seg_layer.mode == "pan_zoom":
+        if (
+            self.seg_layer is None or self.seg_layer.mode == "pan_zoom"
+        ) and self.viewer.dims.ndisplay == 2:
             location = self.tracks.get_positions([node], incl_time=True)[0].tolist()
             assert (
                 len(location) == self.viewer.dims.ndim

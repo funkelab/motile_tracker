@@ -11,6 +11,8 @@ from napari.utils.notifications import show_info
 from motile_tracker.data_model import NodeType, Tracks
 
 if TYPE_CHECKING:
+    from napari.utils.events import Event
+
     from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
 
@@ -31,6 +33,9 @@ class TrackPoints(napari.layers.Points):
         self.tracks_viewer = tracks_viewer
         self.nodes = list(tracks_viewer.tracks.graph.nodes)
         self.node_index_dict = {node: idx for idx, node in enumerate(self.nodes)}
+
+        self.visible_nodes = "all"
+        self.plane_nodes = "all"
 
         points = self.tracks_viewer.tracks.get_positions(self.nodes, incl_time=True)
         track_ids = [
@@ -84,9 +89,7 @@ class TrackPoints(napari.layers.Points):
                     world=True,
                 )
                 if point_index is not None:
-                    node_id = self.nodes[point_index]
-                    append = "Shift" in event.modifiers
-                    self.tracks_viewer.selected_nodes.add(node_id, append)
+                    self.process_point_click(point_index, event)
 
         # listen to updates of the data
         self.events.data.connect(self._update_data)
@@ -94,6 +97,13 @@ class TrackPoints(napari.layers.Points):
         # listen to updates in the selected data (from the point selection tool)
         # to update the nodes in self.tracks_viewer.selected_nodes
         self.selected_data.events.items_changed.connect(self._update_selection)
+
+    def process_point_click(self, point_index: int, event: Event):
+        """Select the clicked point(s)"""
+
+        node_id = self.nodes[point_index]
+        append = "Shift" in event.modifiers
+        self.tracks_viewer.selected_nodes.add(node_id, append)
 
     def set_point_size(self, size: int) -> None:
         """Sets a new default point size"""
@@ -222,19 +232,39 @@ class TrackPoints(napari.layers.Points):
         symbols = [symbolmap[statemap[degree]] for _, degree in tracks.graph.out_degree]
         return symbols
 
-    def update_point_outline(self, visible: list[int] | str) -> None:
+    def update_point_outline(
+        self, visible: list[int] | str, plane_nodes: list[int] | str | None = None
+    ) -> None:
         """Update the outline color of the selected points and visibility according to display mode
 
         Args:
-            visible (list[int] | str): A list of track ids, or "all"
+            visible (list[int] | str): A list of node ids, or "all"
+            plane_nodes (list[int] | str): A list of node ids, or "all"
         """
-        # filter out the non-selected tracks if in lineage mode
-        if visible == "all":
+
+        if visible is not None:
+            self.visible_nodes = visible
+
+        if plane_nodes is not None:
+            self.plane_nodes = plane_nodes
+
+        if isinstance(self.visible_nodes, str) and isinstance(self.plane_nodes, str):
+            visible = "all"
+        elif not isinstance(self.visible_nodes, str) and isinstance(
+            self.plane_nodes, str
+        ):
+            visible = self.visible_nodes
+        elif isinstance(self.visible_nodes, str) and not isinstance(
+            self.plane_nodes, str
+        ):
+            visible = self.plane_nodes
+        else:
+            visible = list(set(self.visible_nodes).intersection(set(self.plane_nodes)))
+
+        if isinstance(visible, str):
             self.shown[:] = True
         else:
-            indices = np.where(np.isin(self.properties["track_id"], visible))[
-                0
-            ].tolist()
+            indices = np.where(np.isin(self.properties["node_id"], visible))[0].tolist()
             self.shown[:] = False
             self.shown[indices] = True
 
