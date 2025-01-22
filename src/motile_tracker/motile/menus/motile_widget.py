@@ -113,7 +113,7 @@ class MotileWidget(QWidget):
             MotileRun: The provided run with the output graph and segmentation included.
         """
         if run.segmentation is not None:
-            input_data = run.segmentation.data
+            input_data = run.segmentation[:]
         elif run.input_points is not None:
             input_data = run.input_points
         else:
