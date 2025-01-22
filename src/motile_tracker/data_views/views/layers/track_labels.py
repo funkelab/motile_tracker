@@ -143,6 +143,8 @@ class TrackLabels(napari.layers.Labels):
         ):  # check opacity (=visibility) in the colormap
             append = "Shift" in event.modifiers
             self.tracks_viewer.selected_nodes.add(label, append)
+        else:
+            self.tracks_viewer.selected_nodes.reset()
 
     def _get_colormap(self) -> DirectLabelColormap:
         """Get a DirectLabelColormap that maps node ids to their track ids, and then

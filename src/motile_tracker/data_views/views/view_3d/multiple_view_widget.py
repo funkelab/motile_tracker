@@ -380,8 +380,7 @@ class MultipleViewerWidget(QSplitter):
                 dims_displayed=event.dims_displayed,
                 world=True,
             )
-            if point_index is not None:
-                self.viewer.layers[name].process_point_click(point_index, event)
+            self.viewer.layers[name].process_point_click(point_index, event)
 
     def _sync_click(self, layer, event):
         """Retrieve the label that was clicked on and forward it to the TrackLabels instance if present"""

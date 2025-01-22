@@ -88,8 +88,7 @@ class TrackPoints(napari.layers.Points):
                     dims_displayed=event.dims_displayed,
                     world=True,
                 )
-                if point_index is not None:
-                    self.process_point_click(point_index, event)
+                self.process_point_click(point_index, event)
 
         # listen to updates of the data
         self.events.data.connect(self._update_data)
@@ -98,12 +97,15 @@ class TrackPoints(napari.layers.Points):
         # to update the nodes in self.tracks_viewer.selected_nodes
         self.selected_data.events.items_changed.connect(self._update_selection)
 
-    def process_point_click(self, point_index: int, event: Event):
+    def process_point_click(self, point_index: int | None, event: Event):
         """Select the clicked point(s)"""
 
-        node_id = self.nodes[point_index]
-        append = "Shift" in event.modifiers
-        self.tracks_viewer.selected_nodes.add(node_id, append)
+        if point_index is None:
+            self.tracks_viewer.selected_nodes.reset()
+        else:
+            node_id = self.nodes[point_index]
+            append = "Shift" in event.modifiers
+            self.tracks_viewer.selected_nodes.add(node_id, append)
 
     def set_point_size(self, size: int) -> None:
         """Sets a new default point size"""
