@@ -11,6 +11,7 @@ from napari.utils.notifications import show_info, show_warning
 from napari.utils.translations import trans
 
 if TYPE_CHECKING:
+    import dask as da
     from napari.utils.events import Event
 
     from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
@@ -77,7 +78,7 @@ class TrackLabels(napari.layers.Labels):
     def __init__(
         self,
         viewer: napari.Viewer,
-        data: np.array,
+        data: da.Array,
         name: str,
         opacity: float,
         scale: tuple,

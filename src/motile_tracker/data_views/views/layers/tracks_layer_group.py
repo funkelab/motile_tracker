@@ -38,7 +38,7 @@ class TracksLayerGroup:
         if self.tracks is not None and self.tracks.segmentation is not None:
             self.seg_layer = TrackLabels(
                 viewer=self.viewer,
-                data=self.tracks.segmentation,
+                data=self.tracks.segmentation.data,
                 name=self.name + "_seg",
                 opacity=0.9,
                 scale=self.tracks.scale,
