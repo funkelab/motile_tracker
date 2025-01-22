@@ -189,7 +189,7 @@ class RunEditor(QGroupBox):
         if isinstance(input_layer, napari.layers.Labels):
             # convert the layer to a zarr with unique labels
             input_seg = input_layer.data
-            base_path = self._get_data_save_path(run_name)
+            base_path = self._get_data_save_path()
             zarr_name = f"{run_name}.zarr"
             group_name = "seg"
             seg_path = base_path / zarr_name / group_name
