@@ -417,13 +417,22 @@ class MultipleViewerWidget(QSplitter):
             and name in self.viewer.layers
             and isinstance(self.viewer.layers[name], TrackPoints)
         ):
-            point_index = layer.get_value(
-                event.position,
-                view_direction=event.view_direction,
-                dims_displayed=event.dims_displayed,
-                world=True,
-            )
-            self.viewer.layers[name].process_point_click(point_index, event)
+            # differentiate between click and drag
+            dragged = False
+            yield
+            # on move
+            while event.type == "mouse_move":
+                dragged = True
+                yield
+            # on release
+            if not dragged:
+                point_index = layer.get_value(
+                    event.position,
+                    view_direction=event.view_direction,
+                    dims_displayed=event.dims_displayed,
+                    world=True,
+                )
+                self.viewer.layers[name].process_point_click(point_index, event)
 
     def _sync_click(self, layer, event):
         """Retrieve the label that was clicked on and forward it to the TrackLabels instance if present"""
@@ -435,15 +444,24 @@ class MultipleViewerWidget(QSplitter):
             and name in self.viewer.layers
             and isinstance(self.viewer.layers[name], TrackLabels)
         ):
-            label = layer.get_value(
-                event.position,
-                view_direction=event.view_direction,
-                dims_displayed=event.dims_displayed,
-                world=True,
-            )
+            # differentiate between click and drag
+            dragged = False
+            yield
+            # on move
+            while event.type == "mouse_move":
+                dragged = True
+                yield
+            # on release
+            if not dragged:
+                label = layer.get_value(
+                    event.position,
+                    view_direction=event.view_direction,
+                    dims_displayed=event.dims_displayed,
+                    world=True,
+                )
 
-            # Process the click event on the TrackLabels instance
-            self.viewer.layers[name].process_click(event, label)
+                # Process the click event on the TrackLabels instance
+                self.viewer.layers[name].process_click(event, label)
 
     def _sync_paint(self, event):
         """Forward the paint event to the TrackLabels, if present"""

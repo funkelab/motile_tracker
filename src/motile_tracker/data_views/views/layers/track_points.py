@@ -81,14 +81,23 @@ class TrackPoints(napari.layers.Points):
         @self.mouse_drag_callbacks.append
         def click(layer, event):
             if event.type == "mouse_press":
-                # is the value passed from the click event?
-                point_index = layer.get_value(
-                    event.position,
-                    view_direction=event.view_direction,
-                    dims_displayed=event.dims_displayed,
-                    world=True,
-                )
-                self.process_point_click(point_index, event)
+                # differentiate between click and drag
+                dragged = False
+                yield
+                # on move
+                while event.type == "mouse_move":
+                    dragged = True
+                    yield
+                # on release
+                if not dragged:
+                    # is the value passed from the click event?
+                    point_index = layer.get_value(
+                        event.position,
+                        view_direction=event.view_direction,
+                        dims_displayed=event.dims_displayed,
+                        world=True,
+                    )
+                    self.process_point_click(point_index, event)
 
         # listen to updates of the data
         self.events.data.connect(self._update_data)

@@ -129,13 +129,22 @@ class TrackLabels(napari.layers.Labels):
                 self.tracks_viewer.mode == "lineage" and self.viewer.dims.ndisplay == 3
             )
         ):  # disable selecting in lineage mode in 3D
-            label = self.get_value(
-                event.position,
-                view_direction=event.view_direction,
-                dims_displayed=event.dims_displayed,
-                world=True,
-            )
-            self.process_click(event, label)
+            # differentiate between click and drag
+            dragged = False
+            yield
+            # on move
+            while event.type == "mouse_move":
+                dragged = True
+                yield
+            # on release
+            if not dragged:
+                label = self.get_value(
+                    event.position,
+                    view_direction=event.view_direction,
+                    dims_displayed=event.dims_displayed,
+                    world=True,
+                )
+                self.process_click(event, label)
 
     def process_click(self, event: Event, label: int):
         if (
