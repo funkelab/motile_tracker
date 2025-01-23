@@ -44,7 +44,9 @@ class MotileWidget(QWidget):
         self.edit_run_widget = RunEditor(self.viewer)
         self.edit_run_widget.start_run.connect(self._generate_tracks)
 
-        self.view_run_widget = RunViewer()
+        self.view_run_widget = RunViewer(
+            tracks_viewer
+        )  # we need to pass on the tracksviewer somewhere in order to include the color in the csv export.
         self.view_run_widget.edit_run.connect(self.edit_run)
         self.view_run_widget.hide()
         self.solver_update.connect(self.view_run_widget.solver_event_update)

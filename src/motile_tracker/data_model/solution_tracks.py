@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
     from pathlib import Path
 
+    import napari
     import numpy as np
 
     from .tracks import Attrs, Node
@@ -74,6 +75,19 @@ class SolutionTracks(Tracks):
             self.track_id_to_node[value] = []
         self.track_id_to_node[value].append(node)
 
+    def get_lineage_id(self, node: Node) -> int:
+        """Return the track id value of the root node as lineage id"""
+
+        # go up the tree to identify the root node
+        root_node = node
+        while True:
+            predecessors = list(self.graph.predecessors(root_node))
+            if not predecessors:
+                break
+            root_node = predecessors[0]
+
+        return self.get_track_id(root_node)
+
     def _initialize_track_ids(self):
         self.max_track_id = 0
         self.track_id_to_node = {}
@@ -116,13 +130,30 @@ class SolutionTracks(Tracks):
             track_id += 1
         self.max_track_id = track_id - 1
 
-    def export_tracks(self, outfile: Path | str):
+    def export_tracks(
+        self,
+        outfile: Path | str,
+        colormap: napari.utils.CyclicLabelColormap,
+    ):
         """Export the tracks from this run to a csv with the following columns:
-        t,[z],y,x,id,parent_id,track_id
+        t, [z], y, x, id, parent_id, track_id, lineage_id, color
         Cells without a parent_id will have an empty string for the parent_id.
         Whether or not to include z is inferred from self.ndim
+        Args:
+            outfile (Path | str): The path to the output file
+            colormap (napari.utils.CyclicLabelColormap): The colormap from which to infer the color by track id.
         """
-        header = ["t", "z", "y", "x", "id", "parent_id", "track_id"]
+        header = [
+            "t",
+            "z",
+            "y",
+            "x",
+            "id",
+            "parent_id",
+            "track_id",
+            "lineage_id",
+            "color",
+        ]
         if self.ndim == 3:
             header = [header[0]] + header[2:]  # remove z
         with open(outfile, "w") as f:
@@ -133,12 +164,16 @@ class SolutionTracks(Tracks):
                 track_id = self.get_track_id(node_id)
                 time = self.get_time(node_id)
                 position = self.get_position(node_id)
+                lineage_id = self.get_lineage_id(node_id)
+                color = colormap.map(track_id)[:3] * 255
                 row = [
                     time,
                     *position,
                     node_id,
                     parent_id,
                     track_id,
+                    lineage_id,
+                    color,
                 ]
                 f.write("\n")
                 f.write(",".join(map(str, row)))
