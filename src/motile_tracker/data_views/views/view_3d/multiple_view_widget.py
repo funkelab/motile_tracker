@@ -2,7 +2,7 @@ import napari
 import numpy as np
 from napari.components.layerlist import Extent
 from napari.components.viewer_model import ViewerModel
-from napari.layers import Labels, Layer, Points, Shapes, Vectors
+from napari.layers import Labels, Layer, Points, Shapes, Tracks, Vectors
 from napari.qt import QtViewer
 from napari.utils.action_manager import action_manager
 from napari.utils.events.event import WarningEmitter
@@ -227,6 +227,61 @@ class MultipleViewerWidget(QSplitter):
 
         self.addWidget(viewer_splitter)
 
+        # add existing layers
+        for i, layer in enumerate(self.viewer.layers):
+            self.viewer_model1.layers.insert(i, copy_layer(layer, "model1"))
+            self.viewer_model2.layers.insert(i, copy_layer(layer, "model2"))
+            for name in get_property_names(layer):
+                getattr(layer.events, name).connect(
+                    own_partial(self._property_sync, name)
+                )
+            if isinstance(layer, Labels):
+                layer.events.set_data.connect(self._set_data_refresh)
+                self.viewer_model1.layers[layer.name].events.set_data.connect(
+                    self._set_data_refresh
+                )
+                self.viewer_model2.layers[layer.name].events.set_data.connect(
+                    self._set_data_refresh
+                )
+
+            # connect data and paint events
+            if layer.name != ".cross" and not isinstance(layer, Tracks):
+                # model 1
+                self.viewer_model1.layers[layer.name].events.data.connect(
+                    self._sync_data
+                )
+                self.viewer_model1.layers[layer.name].events.mode.connect(
+                    self._sync_mode
+                )
+                if isinstance(self.viewer_model1.layers[layer.name], Labels):
+                    self.viewer_model1.layers[layer.name].events.paint.connect(
+                        self._sync_paint
+                    )
+                    self.viewer_model1.layers[layer.name].events.selected_label.connect(
+                        self._sync_selected_label
+                    )
+                    self.viewer_model1.layers[layer.name].mouse_drag_callbacks.append(
+                        self._sync_click
+                    )
+
+                # model 2
+                self.viewer_model2.layers[layer.name].events.data.connect(
+                    self._sync_data
+                )
+                self.viewer_model2.layers[layer.name].events.mode.connect(
+                    self._sync_mode
+                )
+                if isinstance(self.viewer_model2.layers[layer.name], Labels):
+                    self.viewer_model2.layers[layer.name].events.paint.connect(
+                        self._sync_paint
+                    )
+                    self.viewer_model2.layers[layer.name].events.selected_label.connect(
+                        self._sync_selected_label
+                    )
+            layer.events.name.connect(self._sync_name)
+            self._order_update()
+
+        # connect to events
         self.viewer.layers.events.inserted.connect(self._layer_added)
         self.viewer.layers.events.removed.connect(self._layer_removed)
         self.viewer.layers.events.moved.connect(self._layer_moved)
@@ -343,11 +398,13 @@ class MultipleViewerWidget(QSplitter):
                     self.viewer_model1.layers[
                         event.value.name
                     ].events.selected_label.connect(self._sync_selected_label)
-                    self.viewer_model1.layers[
-                        event.value.name
-                    ].mouse_drag_callbacks.append(self._sync_click)
 
-                if isinstance(self.viewer_model1.layers[event.value.name], Points):
+                    if isinstance(event.value, TrackLabels):
+                        self.viewer_model1.layers[
+                            event.value.name
+                        ].mouse_drag_callbacks.append(self._sync_click)
+
+                if isinstance(event.value, TrackPoints):
                     self.viewer_model1.layers[
                         event.value.name
                     ].mouse_drag_callbacks.append(self._sync_point_click)
@@ -367,11 +424,13 @@ class MultipleViewerWidget(QSplitter):
                     self.viewer_model2.layers[
                         event.value.name
                     ].events.selected_label.connect(self._sync_selected_label)
-                    self.viewer_model2.layers[
-                        event.value.name
-                    ].mouse_drag_callbacks.append(self._sync_click)
 
-                if isinstance(self.viewer_model2.layers[event.value.name], Points):
+                    if isinstance(event.value, TrackLabels):
+                        self.viewer_model2.layers[
+                            event.value.name
+                        ].mouse_drag_callbacks.append(self._sync_click)
+
+                if isinstance(event.value, TrackPoints):
                     self.viewer_model2.layers[
                         event.value.name
                     ].mouse_drag_callbacks.append(self._sync_point_click)
