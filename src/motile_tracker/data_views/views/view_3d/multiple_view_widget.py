@@ -1,3 +1,5 @@
+import time
+
 import napari
 import numpy as np
 from napari.components.layerlist import Extent
@@ -477,13 +479,15 @@ class MultipleViewerWidget(QSplitter):
             and isinstance(self.viewer.layers[name], TrackPoints)
         ):
             # differentiate between click and drag
+            mouse_press_time = time.time()
             dragged = False
             yield
             # on move
             while event.type == "mouse_move":
                 dragged = True
                 yield
-            # on release
+            if dragged and time.time() - mouse_press_time < 0.5:
+                dragged = False  # suppress micro drag events and treat them as click
             if not dragged:
                 point_index = layer.get_value(
                     event.position,
@@ -504,12 +508,15 @@ class MultipleViewerWidget(QSplitter):
             and isinstance(self.viewer.layers[name], TrackLabels)
         ):
             # differentiate between click and drag
+            mouse_press_time = time.time()
             dragged = False
             yield
             # on move
             while event.type == "mouse_move":
                 dragged = True
                 yield
+            if dragged and time.time() - mouse_press_time < 0.5:
+                dragged = False  # suppress micro drag events and treat them as click
             # on release
             if not dragged:
                 label = layer.get_value(

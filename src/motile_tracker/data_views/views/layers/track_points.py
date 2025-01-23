@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import time
 from typing import TYPE_CHECKING
 
 import napari
@@ -82,13 +83,17 @@ class TrackPoints(napari.layers.Points):
         def click(layer, event):
             if event.type == "mouse_press":
                 # differentiate between click and drag
+                mouse_press_time = time.time()
                 dragged = False
                 yield
                 # on move
                 while event.type == "mouse_move":
                     dragged = True
                     yield
-                # on release
+                if dragged and time.time() - mouse_press_time < 0.5:
+                    dragged = (
+                        False  # suppress micro drag events and treat them as click
+                    )
                 if not dragged:
                     # is the value passed from the click event?
                     point_index = layer.get_value(

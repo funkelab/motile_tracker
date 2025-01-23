@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import random
+import time
 from typing import TYPE_CHECKING
 
 import napari
@@ -130,12 +131,15 @@ class TrackLabels(napari.layers.Labels):
             )
         ):  # disable selecting in lineage mode in 3D
             # differentiate between click and drag
+            mouse_press_time = time.time()
             dragged = False
             yield
             # on move
             while event.type == "mouse_move":
                 dragged = True
                 yield
+            if dragged and time.time() - mouse_press_time < 0.5:
+                dragged = False  # suppress micro drag events and treat them as click
             # on release
             if not dragged:
                 label = self.get_value(
@@ -235,8 +239,8 @@ class TrackLabels(napari.layers.Labels):
             mask = concatenated_values == old_value
             indices = tuple(concatenated_indices[dim][mask] for dim in range(ndim))
             time_points = np.unique(indices[0])
-            for time in time_points:
-                time_mask = indices[0] == time
+            for t in time_points:
+                time_mask = indices[0] == t
                 actions.append(
                     (tuple(indices[dim][time_mask] for dim in range(ndim)), old_value)
                 )
