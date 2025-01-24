@@ -19,6 +19,7 @@ from superqt.utils import qthrottled
 from motile_tracker.data_views.views.layers.track_graph import TrackGraph
 from motile_tracker.data_views.views.layers.track_labels import TrackLabels
 from motile_tracker.data_views.views.layers.track_points import TrackPoints
+from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
 
 def copy_layer(layer: Layer, name: str = ""):
@@ -216,6 +217,7 @@ class MultipleViewerWidget(QSplitter):
     def __init__(self, viewer: napari.Viewer):
         super().__init__()
         self.viewer = viewer
+        self.tracks_viewer = TracksViewer.get_instance(self.viewer)
         self.viewer_model1 = ViewerModel(title="model1")
         self.viewer_model2 = ViewerModel(title="model2")
         self._block = False
@@ -406,10 +408,35 @@ class MultipleViewerWidget(QSplitter):
                             event.value.name
                         ].mouse_drag_callbacks.append(self._sync_click)
 
+                        self.viewer_model1.layers[event.value.name].bind_key("z")(
+                            self.tracks_viewer.undo
+                        )
+                        self.viewer_model1.layers[event.value.name].bind_key("r")(
+                            self.tracks_viewer.redo
+                        )
+                        self.viewer_model1.layers[
+                            event.value.name
+                        ].undo = self.tracks_viewer.undo
+                        self.viewer_model1.layers[
+                            event.value.name
+                        ].redo = self.tracks_viewer.redo
+
                 if isinstance(event.value, TrackPoints):
                     self.viewer_model1.layers[
                         event.value.name
                     ].mouse_drag_callbacks.append(self._sync_point_click)
+                    self.viewer_model1.layers[event.value.name].bind_key("z")(
+                        self.tracks_viewer.undo
+                    )
+                    self.viewer_model1.layers[event.value.name].bind_key("r")(
+                        self.tracks_viewer.redo
+                    )
+                    self.viewer_model1.layers[
+                        event.value.name
+                    ].undo = self.tracks_viewer.undo
+                    self.viewer_model1.layers[
+                        event.value.name
+                    ].redo = self.tracks_viewer.redo
 
                 # model 2
                 self.viewer_model2.layers[event.value.name].events.data.connect(
@@ -431,11 +458,35 @@ class MultipleViewerWidget(QSplitter):
                         self.viewer_model2.layers[
                             event.value.name
                         ].mouse_drag_callbacks.append(self._sync_click)
+                        self.viewer_model2.layers[event.value.name].bind_key("z")(
+                            self.tracks_viewer.undo
+                        )
+                        self.viewer_model2.layers[event.value.name].bind_key("r")(
+                            self.tracks_viewer.redo
+                        )
+                        self.viewer_model2.layers[
+                            event.value.name
+                        ].undo = self.tracks_viewer.undo
+                        self.viewer_model2.layers[
+                            event.value.name
+                        ].redo = self.tracks_viewer.redo
 
                 if isinstance(event.value, TrackPoints):
                     self.viewer_model2.layers[
                         event.value.name
                     ].mouse_drag_callbacks.append(self._sync_point_click)
+                    self.viewer_model2.layers[event.value.name].bind_key("z")(
+                        self.tracks_viewer.undo
+                    )
+                    self.viewer_model2.layers[event.value.name].bind_key("r")(
+                        self.tracks_viewer.redo
+                    )
+                    self.viewer_model2.layers[
+                        event.value.name
+                    ].undo = self.tracks_viewer.undo
+                    self.viewer_model2.layers[
+                        event.value.name
+                    ].redo = self.tracks_viewer.redo
 
             event.value.events.name.connect(self._sync_name)
 
