@@ -285,7 +285,10 @@ class TrackPoints(napari.layers.Points):
             self.shown[indices] = True
 
         # set border color for selected item
-        self.border_color = [1, 1, 1, 1]
+        with (
+            self.events.border_color.blocker()
+        ):  # block the event emitter here to not trigger update in orthogonal views
+            self.border_color = [1, 1, 1, 1]
         self.size = self.default_size
         for node in self.tracks_viewer.selected_nodes:
             index = self.node_index_dict[node]
@@ -296,4 +299,8 @@ class TrackPoints(napari.layers.Points):
                 1,
             )
             self.size[index] = math.ceil(self.default_size + 0.3 * self.default_size)
+
+        self.border_color = (
+            self.border_color
+        )  # emit the event to trigger update in orthogonal views
         self.refresh()

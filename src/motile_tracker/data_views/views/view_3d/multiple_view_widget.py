@@ -620,11 +620,12 @@ class MultipleViewerWidget(QSplitter):
         for model in [self.viewer_model1, self.viewer_model2]:
             if event.source.name in model.layers:
                 layer = model.layers[event.source.name]
-                if layer is event.source:
-                    continue
                 try:
                     self._block = True
                     layer.shown = event.source.shown
+                    layer.border_color = event.source.border_color
+                    layer.size = event.source.size
+                    layer.refresh()
                 finally:
                     self._block = False
 
