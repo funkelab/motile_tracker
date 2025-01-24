@@ -1,4 +1,4 @@
-import napari
+import finn
 from qtpy.QtWidgets import (
     QVBoxLayout,
     QWidget,
@@ -12,7 +12,7 @@ from .menu_widget import MenuWidget
 class MainApp(QWidget):
     """Combines the different tracker widgets for faster dock arrangement"""
 
-    def __init__(self, viewer: napari.Viewer):
+    def __init__(self, viewer: finn.Viewer):
         super().__init__()
 
         menu_widget = MenuWidget(viewer)

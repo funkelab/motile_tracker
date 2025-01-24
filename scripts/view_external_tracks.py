@@ -1,4 +1,5 @@
-import napari
+import finn
+
 from motile_tracker.application_menus import MainApp
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 from motile_tracker.example_data import Fluo_N2DL_HeLa
@@ -13,7 +14,7 @@ if __name__ == "__main__":
     csvfile = "hela_example_tracks.csv"
     tracks = tracks_from_csv(csvfile, segmentation_arr)
 
-    viewer = napari.Viewer()
+    viewer = finn.Viewer()
     raw_data, raw_kwargs, _ = raw_layer_info
     viewer.add_image(raw_data, **raw_kwargs)
     labels_data, labels_kwargs, _ = labels_layer_info
@@ -22,5 +23,5 @@ if __name__ == "__main__":
     viewer.window.add_dock_widget(widget)
     TracksViewer.get_instance(viewer).tracks_list.add_tracks(tracks, "example")
 
-    # Start the Napari GUI event loop
-    napari.run()
+    # Start the finn GUI event loop
+    finn.run()

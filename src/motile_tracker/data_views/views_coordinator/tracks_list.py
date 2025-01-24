@@ -2,9 +2,9 @@ from functools import partial
 from pathlib import Path
 from warnings import warn
 
-import napari
+import finn
+from finn._qt.qt_resources import QColoredSVGIcon
 from fonticon_fa6 import FA6S
-from napari._qt.qt_resources import QColoredSVGIcon
 from qtpy.QtCore import Signal
 from qtpy.QtWidgets import (
     QFileDialog,
@@ -26,7 +26,7 @@ from motile_tracker.motile.backend.motile_run import MotileRun
 class TrackListWidget(QWidget):
     """Creates or finds a TracksViewer and displays its TrackList widget. This is only used in case the user wants to open the trackslist from the plugins menu."""
 
-    def __init__(self, viewer: napari.Viewer):
+    def __init__(self, viewer: finn.Viewer):
         super().__init__()
 
         from motile_tracker.data_views.views_coordinator.tracks_viewer import (

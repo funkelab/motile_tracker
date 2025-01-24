@@ -1,4 +1,4 @@
-import napari
+import finn
 from qtpy.QtWidgets import QScrollArea, QTabWidget, QVBoxLayout
 
 from motile_tracker.application_menus.editing_menu import EditingMenu
@@ -9,7 +9,7 @@ from motile_tracker.motile.menus.motile_widget import MotileWidget
 class MenuWidget(QScrollArea):
     """Combines the different tracker menus into tabs for cleaner UI"""
 
-    def __init__(self, viewer: napari.Viewer):
+    def __init__(self, viewer: finn.Viewer):
         super().__init__()
 
         tracks_viewer = TracksViewer.get_instance(viewer)

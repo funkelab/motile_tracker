@@ -3,10 +3,10 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING
 
-import napari
+import finn
 import numpy as np
+from finn.utils.notifications import show_info
 from motile_toolbox.candidate_graph import NodeAttr
-from napari.utils.notifications import show_info
 
 from motile_tracker.data_model import NodeType, Tracks
 
@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
 
-class TrackPoints(napari.layers.Points):
+class TrackPoints(finn.layers.Points):
     """Extended points layer that holds the track information and emits and
     responds to dynamics visualization signals
     """
@@ -59,7 +59,7 @@ class TrackPoints(napari.layers.Points):
         )
 
         # Key bindings (should be specified both on the viewer (in tracks_viewer)
-        # and on the layer to overwrite napari defaults)
+        # and on the layer to overwrite finn defaults)
         self.bind_key("q")(self.tracks_viewer.toggle_display_mode)
         self.bind_key("a")(self.tracks_viewer.create_edge)
         self.bind_key("d")(self.tracks_viewer.delete_node)

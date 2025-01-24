@@ -2,7 +2,7 @@
 
 from typing import Any
 
-import napari
+import finn
 import numpy as np
 import pandas as pd
 import pyqtgraph as pg
@@ -410,7 +410,7 @@ class TreePlot(pg.PlotWidget):
 class TreeWidget(QWidget):
     """pyqtgraph-based widget for lineage tree visualization and navigation"""
 
-    def __init__(self, viewer: napari.Viewer):
+    def __init__(self, viewer: finn.Viewer):
         super().__init__()
         self.track_df = pd.DataFrame()  # all tracks
         self.lineage_df = pd.DataFrame()  # the currently viewed subset of lineages

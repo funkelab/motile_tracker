@@ -2,8 +2,8 @@
 
 import logging
 
-from napari import Viewer
-from napari.utils.notifications import show_warning
+from finn import Viewer
+from finn.utils.notifications import show_warning
 from psygnal import Signal
 from qtpy.QtWidgets import (
     QLabel,
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 class MotileWidget(QWidget):
-    """A widget that controls the backend components of the motile napari tracker.
+    """A widget that controls the backend components of the motile finn tracker.
     Recieves user input about solver parameters, runs motile, and passes
     results to the TrackingViewController.
     """
@@ -74,7 +74,7 @@ class MotileWidget(QWidget):
 
     def edit_run(self, run: MotileRun | None):
         """Create or edit a new run in the run editor. Also removes solution layers
-        from the napari viewer.
+        from the finn viewer.
         Args:
             run (MotileRun | None): Initialize the new run with the parameters and name
                 from this run. If not provided, uses the SolverParams default values.

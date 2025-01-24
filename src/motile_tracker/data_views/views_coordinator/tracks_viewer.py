@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-import napari
+import finn
 import numpy as np
 from motile_toolbox.candidate_graph.graph_attributes import NodeAttr
 from psygnal import Signal
@@ -39,10 +39,10 @@ class TracksViewer:
 
     def __init__(
         self,
-        viewer: napari.viewer,
+        viewer: finn.viewer,
     ):
         self.viewer = viewer
-        self.colormap = napari.utils.colormaps.label_colormap(
+        self.colormap = finn.utils.colormaps.label_colormap(
             49,
             seed=0.5,
             background_value=0,
@@ -79,7 +79,7 @@ class TracksViewer:
         self.viewer.bind_key("r")(self.redo)
 
     def _refresh(self, node: str | None = None, refresh_view: bool = False) -> None:
-        """Call refresh function on napari layers and the submit signal that tracks are updated
+        """Call refresh function on finn layers and the submit signal that tracks are updated
         Restore the selected_nodes, if possible
         """
 
@@ -96,7 +96,7 @@ class TracksViewer:
         if node is not None:
             self.selected_nodes.add(node)
 
-        # restore selection and/or highlighting in all napari Views (napari Views do not know about their selection ('all' vs 'lineage'), but TracksViewer does)
+        # restore selection and/or highlighting in all finn Views (finn Views do not know about their selection ('all' vs 'lineage'), but TracksViewer does)
         self.update_selection()
 
     def update_tracks(self, tracks: SolutionTracks, name: str) -> None:
@@ -104,7 +104,7 @@ class TracksViewer:
         Will create new segmentation and tracks layers and add them to the viewer.
 
         Args:
-            tracks (motile_tracker.core.Tracks): The tracks to visualize in napari.
+            tracks (motile_tracker.core.Tracks): The tracks to visualize in finn.
             name (str): The name of the tracks to display in the layer names
         """
         self.selected_nodes._list = []
@@ -120,7 +120,7 @@ class TracksViewer:
 
         # deactivate the input labels layer
         for layer in self.viewer.layers:
-            if isinstance(layer, (napari.layers.Labels | napari.layers.Points)):
+            if isinstance(layer, (finn.layers.Labels | finn.layers.Points)):
                 layer.visible = False
 
         self.set_display_mode("all")
@@ -185,11 +185,11 @@ class TracksViewer:
     def update_selection(self) -> None:
         """Sets the view and triggers visualization updates in other components"""
 
-        self.set_napari_view()
+        self.set_finn_view()
         visible_tracks = self.filter_visible_nodes()
         self.tracking_layers.update_visible(visible_tracks, self.visible)
 
-    def set_napari_view(self) -> None:
+    def set_finn_view(self) -> None:
         """Adjust the current_step of the viewer to jump to the last item of the selected_nodes list"""
         if len(self.selected_nodes) > 0:
             node = self.selected_nodes[-1]

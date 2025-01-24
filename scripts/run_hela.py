@@ -1,12 +1,13 @@
 import logging
 from pathlib import Path
 
-import napari
+import finn as napari
 import zarr
 from appdirs import AppDirs
+from finn.utils.theme import _themes
+
 from motile_tracker.application_menus import MainApp
 from motile_tracker.data_views import TreeWidget
-from napari.utils.theme import _themes
 
 logging.basicConfig(
     level=logging.INFO,

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import napari.layers
+import finn.layers
 import networkx as nx
 import numpy as np
 import pandas as pd
@@ -11,7 +11,7 @@ from motile_tracker.data_model import NodeType, Tracks
 
 def extract_sorted_tracks(
     tracks: Tracks,
-    colormap: napari.utils.CyclicLabelColormap,
+    colormap: finn.utils.CyclicLabelColormap,
     prev_df: pd.DataFrame | None = None,
 ) -> pd.DataFrame | None:
     """
@@ -21,7 +21,7 @@ def extract_sorted_tracks(
     Args:
         tracks (motile_tracker.core.Tracks): A tracks object containing a graph
             to be converted into a dataframe.
-        colormap (napari.utils.CyclicLabelColormap): The colormap to use to
+        colormap (finn.utils.CyclicLabelColormap): The colormap to use to
             extract the color of each node from the track ID
         prev_df (pd.DataFrame, Optional). Dataframe that holds the previous track_df, including the order of the tracks.
 

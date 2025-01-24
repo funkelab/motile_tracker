@@ -9,7 +9,7 @@ import numpy as np
 import tifffile
 import zarr
 from appdirs import AppDirs
-from napari.types import LayerData
+from finn.types import LayerData
 from skimage.measure import regionprops
 
 logger = logging.getLogger(__name__)
@@ -65,7 +65,7 @@ def read_zenodo_dataset(
     ds_name: str, raw_name: str, label_name: str, data_dir: Path
 ) -> list[LayerData]:
     """Read a zenodo dataset (assumes pre-downloaded)
-    and returns a list of layer data for making napari layers
+    and returns a list of layer data for making finn layers
 
     Args:
         ds_name (str): name to give to the dataset
@@ -93,7 +93,7 @@ def read_ctc_dataset(
     ds_name: str, data_dir: Path, crop_region=False
 ) -> list[LayerData]:
     """Read a CTC dataset from a zarr (assumes pre-downloaded and converted)
-    and returns a list of layer data for making napari layers
+    and returns a list of layer data for making finn layers
 
     Args:
         ds_name (str): Dataset name
@@ -146,7 +146,7 @@ def read_ctc_dataset(
         logger.info("points dataset found, loading...")
         all_centroids = zarr_store[points_name][:]
 
-    # Prepare points layer data for napari
+    # Prepare points layer data for finn
     points_layer_data = (all_centroids, {"name": "centroids"}, "points")
 
     return [raw_layer_data, seg_layer_data, points_layer_data]

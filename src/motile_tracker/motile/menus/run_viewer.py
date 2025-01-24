@@ -28,7 +28,7 @@ class RunViewer(QGroupBox):
     """A widget for viewing in progress or completed runs, including
     the progress of the solver and the parameters. Can also save the whole
     run or export the tracks to CSV.
-    Output tracks and segmentation are visualized separately in napari layers.
+    Output tracks and segmentation are visualized separately in finn layers.
     """
 
     edit_run = Signal(object)

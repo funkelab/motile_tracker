@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import napari
+import finn
 
 from motile_tracker.data_model.tracks import Tracks
 
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 class TracksLayerGroup:
     def __init__(
         self,
-        viewer: napari.Viewer,
+        viewer: finn.Viewer,
         tracks: Tracks,
         name: str,
         tracks_viewer: TracksViewer,
@@ -31,7 +31,7 @@ class TracksLayerGroup:
         self.seg_layer: TrackLabels | None = None
 
     def set_tracks(self, tracks, name):
-        self.remove_napari_layers()
+        self.remove_finn_layers()
         self.tracks = tracks
         self.name = name
         # Create new layers
@@ -64,20 +64,20 @@ class TracksLayerGroup:
         else:
             self.tracks_layer = None
             self.points_layer = None
-        self.add_napari_layers()
+        self.add_finn_layers()
 
-    def remove_napari_layer(self, layer: napari.layers.Layer | None) -> None:
-        """Remove a layer from the napari viewer, if present"""
+    def remove_finn_layer(self, layer: finn.layers.Layer | None) -> None:
+        """Remove a layer from the finn viewer, if present"""
         if layer and layer in self.viewer.layers:
             self.viewer.layers.remove(layer)
 
-    def remove_napari_layers(self) -> None:
+    def remove_finn_layers(self) -> None:
         """Remove all tracking layers from the viewer"""
-        self.remove_napari_layer(self.tracks_layer)
-        self.remove_napari_layer(self.seg_layer)
-        self.remove_napari_layer(self.points_layer)
+        self.remove_finn_layer(self.tracks_layer)
+        self.remove_finn_layer(self.seg_layer)
+        self.remove_finn_layer(self.points_layer)
 
-    def add_napari_layers(self) -> None:
+    def add_finn_layers(self) -> None:
         """Add new tracking layers to the viewer"""
         if self.tracks_layer is not None:
             self.viewer.add_layer(self.tracks_layer)

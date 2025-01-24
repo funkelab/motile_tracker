@@ -1,4 +1,4 @@
-import napari
+import finn
 from qtpy.QtWidgets import (
     QGroupBox,
     QPushButton,
@@ -10,7 +10,7 @@ from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksView
 
 
 class EditingMenu(QWidget):
-    def __init__(self, viewer: napari.Viewer):
+    def __init__(self, viewer: finn.Viewer):
         super().__init__()
 
         self.tracks_viewer = TracksViewer.get_instance(viewer)

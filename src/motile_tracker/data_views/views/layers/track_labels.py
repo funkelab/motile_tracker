@@ -3,15 +3,15 @@ from __future__ import annotations
 import random
 from typing import TYPE_CHECKING
 
-import napari
+import finn
 import numpy as np
-from napari.utils import DirectLabelColormap
-from napari.utils.action_manager import action_manager
-from napari.utils.notifications import show_info, show_warning
-from napari.utils.translations import trans
+from finn.utils import DirectLabelColormap
+from finn.utils.action_manager import action_manager
+from finn.utils.notifications import show_info, show_warning
+from finn.utils.translations import trans
 
 if TYPE_CHECKING:
-    from napari.utils.events import Event
+    from finn.utils.events import Event
 
     from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
@@ -19,7 +19,7 @@ from motile_toolbox.candidate_graph.graph_attributes import NodeAttr
 
 
 def new_label(layer: TrackLabels):
-    """A function to override the default napari labels new_label function.
+    """A function to override the default finn labels new_label function.
     Must be registered (see end of this file)"""
     layer.events.selected_label.disconnect(layer._ensure_valid_label)
     _new_label(layer, new_track_id=True)
@@ -28,7 +28,7 @@ def new_label(layer: TrackLabels):
 
 def _new_label(layer: TrackLabels, new_track_id=True):
     """A function to get a new label for a given TrackLabels layer. Should properly
-    go on the class, but needs to be registered to override the default napari function
+    go on the class, but needs to be registered to override the default finn function
     in the action manager. This helper is abstracted out because we want to do the same
     thing without making a new track id in the layer, and with the new track id in the
     overriden action.
@@ -66,7 +66,7 @@ def _new_label(layer: TrackLabels, new_track_id=True):
         )
 
 
-class TrackLabels(napari.layers.Labels):
+class TrackLabels(finn.layers.Labels):
     """Extended labels layer that holds the track information and emits
     and responds to dynamics visualization signals"""
 
@@ -76,7 +76,7 @@ class TrackLabels(napari.layers.Labels):
 
     def __init__(
         self,
-        viewer: napari.Viewer,
+        viewer: finn.Viewer,
         data: np.array,
         name: str,
         opacity: float,
@@ -98,7 +98,7 @@ class TrackLabels(napari.layers.Labels):
         self.viewer = viewer
 
         # Key bindings (should be specified both on the viewer (in tracks_viewer)
-        # and on the layer to overwrite napari defaults)
+        # and on the layer to overwrite finn defaults)
         self.bind_key("q")(self.tracks_viewer.toggle_display_mode)
         self.bind_key("a")(self.tracks_viewer.create_edge)
         self.bind_key("d")(self.tracks_viewer.delete_node)
@@ -341,7 +341,7 @@ class TrackLabels(napari.layers.Labels):
         """Override existing function to generate new colormap on tracks_viewer and
         emit refresh signal to update colors in all layers/widgets"""
 
-        self.tracks_viewer.colormap = napari.utils.colormaps.label_colormap(
+        self.tracks_viewer.colormap = finn.utils.colormaps.label_colormap(
             49,
             seed=random.uniform(0, 1),
             background_value=0,
@@ -442,7 +442,7 @@ class TrackLabels(napari.layers.Labels):
 
             self.events.selected_label.connect(self._ensure_valid_label)
 
-    @napari.layers.Labels.n_edit_dimensions.setter
+    @finn.layers.Labels.n_edit_dimensions.setter
     def n_edit_dimensions(self, n_edit_dimensions):
         # Overriding the setter to disable editing in time dimension
         if n_edit_dimensions > self.tracks_viewer.tracks.ndim - 1:
@@ -451,9 +451,9 @@ class TrackLabels(napari.layers.Labels):
         self.events.n_edit_dimensions()
 
 
-# This is to override the default napari function to get a new label for the labels layer
+# This is to override the default finn function to get a new label for the labels layer
 action_manager.register_action(
-    name="napari:new_label",
+    name="finn:new_label",
     command=new_label,
     keymapprovider=TrackLabels,
     description="",

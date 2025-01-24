@@ -1,8 +1,8 @@
 from collections.abc import Iterable
 
 import numpy as np
+from finn.utils.notifications import show_info, show_warning
 from motile_toolbox.candidate_graph import NodeAttr
-from napari.utils.notifications import show_info, show_warning
 from qtpy.QtWidgets import QMessageBox
 
 from .action_history import ActionHistory
@@ -519,7 +519,7 @@ class TracksController:
         Args:
             updated_pixels (list[(tuple(np.ndarray, np.ndarray, np.ndarray), np.ndarray, int)]):
                 list holding the operations that updated the segmentation (directly from
-                the napari labels paint event).
+                the finn labels paint event).
                 Each element in the list consists of a tuple of np.ndarrays representing
                 indices for each dimension, an array of the previous values, and an array
                 or integer representing the new value(s)

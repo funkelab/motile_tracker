@@ -3,7 +3,7 @@ from __future__ import annotations
 import copy
 from typing import TYPE_CHECKING
 
-import napari
+import finn
 import numpy as np
 
 if TYPE_CHECKING:
@@ -11,11 +11,11 @@ if TYPE_CHECKING:
     from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
 
-def update_napari_tracks(
+def update_finn_tracks(
     tracks: SolutionTracks,
 ):
     """Function to take a networkx graph with assigned track_ids and return the data needed to add to
-    a napari tracks layer.
+    a finn tracks layer.
 
     Args:
         tracks (SolutionTracks): tracks that have track_ids and have a tree structure
@@ -35,8 +35,8 @@ def update_napari_tracks(
 
     ndim = tracks.ndim - 1
     graph = tracks.graph
-    napari_data = np.zeros((graph.number_of_nodes(), ndim + 2))
-    napari_edges = {}
+    finn_data = np.zeros((graph.number_of_nodes(), ndim + 2))
+    finn_edges = {}
 
     parents = [node for node, degree in graph.out_degree() if degree >= 2]
     intertrack_edges = []
@@ -52,7 +52,7 @@ def update_napari_tracks(
     for index, node in enumerate(graph.nodes(data=True)):
         node_id, data = node
         location = tracks.get_position(node_id)
-        napari_data[index] = [
+        finn_data[index] = [
             tracks.get_track_id(node_id),
             tracks.get_time(node_id),
             *location,
@@ -61,15 +61,15 @@ def update_napari_tracks(
     for parent, child in intertrack_edges:
         parent_track_id = tracks.get_track_id(parent)
         child_track_id = tracks.get_track_id(child)
-        if child_track_id in napari_edges:
-            napari_edges[child_track_id].append(parent_track_id)
+        if child_track_id in finn_edges:
+            finn_edges[child_track_id].append(parent_track_id)
         else:
-            napari_edges[child_track_id] = [parent_track_id]
+            finn_edges[child_track_id] = [parent_track_id]
 
-    return napari_data, napari_edges
+    return finn_data, finn_edges
 
 
-class TrackGraph(napari.layers.Tracks):
+class TrackGraph(finn.layers.Tracks):
     """Extended tracks layer that holds the track information and emits and responds
     to dynamics visualization signals"""
 
@@ -79,7 +79,7 @@ class TrackGraph(napari.layers.Tracks):
         tracks_viewer: TracksViewer,
     ):
         self.tracks_viewer = tracks_viewer
-        track_data, track_edges = update_napari_tracks(
+        track_data, track_edges = update_finn_tracks(
             self.tracks_viewer.tracks,
         )
 
@@ -98,7 +98,7 @@ class TrackGraph(napari.layers.Tracks):
     def _refresh(self):
         """Refreshes the displayed tracks based on the graph in the current tracks_viewer.tracks"""
 
-        track_data, track_edges = update_napari_tracks(
+        track_data, track_edges = update_finn_tracks(
             self.tracks_viewer.tracks,
         )
 
