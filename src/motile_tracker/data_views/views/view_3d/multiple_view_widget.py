@@ -607,6 +607,7 @@ class MultipleViewerWidget(QSplitter):
             if event.source.name in model.layers:
                 layer = model.layers[event.source.name]
                 if layer is event.source:
+                    self.viewer.layers[event.source.name]._update_data(event)
                     continue
                 try:
                     self._block = True
