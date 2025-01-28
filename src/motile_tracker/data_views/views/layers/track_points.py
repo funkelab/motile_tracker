@@ -300,6 +300,11 @@ class TrackPoints(napari.layers.Points):
             )
             self.size[index] = math.ceil(self.default_size + 0.3 * self.default_size)
 
+        if len(self.tracks_viewer.selected_nodes) > 0:
+            self.selected_track = self.tracks_viewer.tracks._get_node_attr(
+                self.tracks_viewer.selected_nodes[0], NodeAttr.TRACK_ID.value
+            )
+
         self.border_color = (
             self.border_color
         )  # emit the event to trigger update in orthogonal views
