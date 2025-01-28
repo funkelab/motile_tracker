@@ -154,6 +154,7 @@ class TrackGraph(napari.layers.Tracks):
             self.track_colors[:, 3] = 1
             self.graph = self.tracks_layer_graph
         else:
+            visible = [self.tracks_viewer.tracks.get_track_id(node) for node in visible]
             track_id_mask = np.isin(
                 self.properties["track_id"],
                 visible,

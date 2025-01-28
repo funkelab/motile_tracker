@@ -108,7 +108,7 @@ class TracksLayerGroup:
         if self.points_layer is not None:
             self.points_layer.update_point_outline(visible_tracks, visible_nodes)
         if self.tracks_layer is not None:
-            self.tracks_layer.update_track_visibility(visible_tracks)
+            self.tracks_layer.update_track_visibility(visible_tracks, visible_nodes)
 
     def center_view(self, node):
         """Adjust the current_step and camera center of the viewer to jump to the node
