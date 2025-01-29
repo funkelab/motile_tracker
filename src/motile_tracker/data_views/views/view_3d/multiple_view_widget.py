@@ -181,7 +181,8 @@ class CrossWidget(QCheckBox):
         if self.layer in self.viewer.layers:
             self.viewer.layers.remove(self.layer)
         self.layer = Vectors(name=".cross", ndim=event.value)
-        self.layer.edge_width = 1
+        self.layer.vector_style = "line"
+        self.layer.edge_width = 2
         self.update_cross()
 
     def _update_cross_visibility(self, state):
@@ -190,6 +191,9 @@ class CrossWidget(QCheckBox):
         else:
             self.viewer.layers.remove(self.layer)
         self.update_cross()
+        if not np.any(self.layer.edge_color):
+            self.layer.edge_color = "red"
+            self.layer.vector_style = "line"
 
     def update_cross(self):
         if self.layer not in self.viewer.layers:
