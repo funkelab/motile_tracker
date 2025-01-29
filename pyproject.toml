@@ -28,7 +28,7 @@ classifiers = [
 ]
 
 dependencies =[
-    "finn[all]",
+    "finn[all]@git+https://github.com/funkelab/finn.git",
     "numpy",
     "magicgui",
     "qtpy",
