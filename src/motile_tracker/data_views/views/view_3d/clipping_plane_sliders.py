@@ -11,6 +11,8 @@ from qtpy.QtWidgets import (
 )
 from superqt import QLabeledRangeSlider
 
+from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
+
 from ..layers.track_labels import TrackLabels
 from .layer_dropdown import LayerDropdown
 
@@ -25,6 +27,7 @@ class PlaneSliderWidget(QWidget):
         super().__init__()
 
         self.viewer = viewer
+        self.tracks_viewer = TracksViewer.get_instance(self.viewer)
         self.viewer.dims.events.ndisplay.connect(self.on_ndisplay_changed)
         self.mode = "volume"
         self.current_layer = None
@@ -335,8 +338,8 @@ class PlaneSliderWidget(QWidget):
             clip_plane.enabled = False
 
         if isinstance(self.current_layer, TrackLabels):
-            visible = self.current_layer.tracks_viewer.filter_visible_nodes()
-            self.current_layer.tracks_viewer.tracking_layers.update_visible(
+            visible = self.tracks_viewer.filter_visible_nodes()
+            self.tracks_viewer.tracking_layers.update_visible(
                 visible_tracks=visible, visible_nodes="all"
             )
 
@@ -387,8 +390,8 @@ class PlaneSliderWidget(QWidget):
 
         self.current_layer.experimental_clipping_planes[1].position = new_position_2
 
-        # if the layer on which the clipping plane was set is an instance of TrackLabels, emit the visible labels so that the TrackPoints and TrackGraph can update too.
-        if isinstance(self.current_layer, TrackLabels):
+        # Emit the visible nodes so that the TrackPoints and TrackGraph can update too.
+        if not self.tracks_viewer.track_df.empty:
             p1, p2 = (
                 self.current_layer.experimental_clipping_planes[0].position,
                 self.current_layer.experimental_clipping_planes[1].position,
@@ -402,15 +405,15 @@ class PlaneSliderWidget(QWidget):
             )
 
             plane_nodes += [
-                self.current_layer.tracks_viewer.tracks.get_track_id(node)
-                for node in self.current_layer.tracks_viewer.selected_nodes
-                if self.current_layer.tracks_viewer.tracks.get_time(node)
+                self.tracks_viewer.tracks.get_track_id(node)
+                for node in self.tracks_viewer.selected_nodes
+                if self.tracks_viewer.tracks.get_time(node)
                 == self.viewer.dims.current_step[0]
             ]  # also include the selected nodes for clarity, even if they are out of plane.
 
-            visible = self.current_layer.tracks_viewer.filter_visible_nodes()
+            visible = self.tracks_viewer.filter_visible_nodes()
 
-            self.current_layer.tracks_viewer.tracking_layers.update_visible(
+            self.tracks_viewer.tracking_layers.update_visible(
                 visible_tracks=visible, visible_nodes=plane_nodes
             )
 
@@ -435,9 +438,7 @@ class PlaneSliderWidget(QWidget):
 
         # Calculate signed distances to both planes
 
-        df = self.current_layer.tracks_viewer.track_df[
-            self.current_layer.tracks_viewer.track_df["t"] == t
-        ]
+        df = self.tracks_viewer.track_df[self.tracks_viewer.track_df["t"] == t]
         coords = df[
             ["z", "y", "x"]
         ].to_numpy()  # Extract txyz coordinates as a NumPy array
