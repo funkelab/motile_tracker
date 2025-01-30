@@ -1,3 +1,4 @@
+import napari
 import networkx as nx
 import numpy as np
 import pytest
@@ -172,3 +173,12 @@ def graph_3d():
     graph.add_nodes_from(nodes)
     graph.add_edges_from(edges)
     return graph
+
+
+@pytest.fixture
+def colormap():
+    return napari.utils.colormaps.label_colormap(
+        49,
+        seed=0.5,
+        background_value=0,
+    )
