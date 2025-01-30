@@ -1,7 +1,10 @@
 import napari
 from qtpy.QtWidgets import (
+    QButtonGroup,
     QGroupBox,
+    QHBoxLayout,
     QPushButton,
+    QRadioButton,
     QVBoxLayout,
     QWidget,
 )
@@ -15,15 +18,33 @@ class EditingMenu(QWidget):
 
         self.tracks_viewer = TracksViewer.get_instance(viewer)
         self.tracks_viewer.selected_nodes.list_updated.connect(self.update_buttons)
+        self.tracks_viewer.tracks_updated.connect(self._update_continue_tracks_box)
         layout = QVBoxLayout()
 
-        continue_tracks_box = QGroupBox("Point layer track mode")
-        continue_tracks_box.setMaximumHeight(60)
-        continue_tracks_layout = QVBoxLayout()
-        self.continue_tracks_button = QPushButton("Continue tracks")
-        self.continue_tracks_button.clicked.connect(self.toggle_track_mode)
-        continue_tracks_layout.addWidget(self.continue_tracks_button)
-        continue_tracks_box.setLayout(continue_tracks_layout)
+        self.continue_tracks_box = QGroupBox("Point layer track mode")
+        self.continue_tracks_box.setMaximumHeight(60)
+        continue_tracks_layout = QHBoxLayout()
+        button_group = QButtonGroup()
+        self.continue_tracks_radio = QRadioButton("Continue tracks")
+        self.continue_tracks_radio.clicked.connect(
+            lambda: self.toggle_track_mode("continue")
+        )
+        self.new_track_radio = QRadioButton("Start new tracks")
+        self.new_track_radio.setChecked(True)
+        self.new_track_radio.clicked.connect(
+            lambda: self.toggle_track_mode("new track")
+        )
+        button_group.addButton(self.continue_tracks_radio)
+        button_group.addButton(self.new_track_radio)
+        continue_tracks_layout.addWidget(self.continue_tracks_radio)
+        continue_tracks_layout.addWidget(self.new_track_radio)
+
+        self.continue_tracks_box.setLayout(continue_tracks_layout)
+        if (
+            self.tracks_viewer.tracking_layers.seg_layer is not None
+            and self.tracks_viewer.tracking_layers.points_layer is not None
+        ):
+            self.continue_tracks_box.hide()
 
         node_box = QGroupBox("Edit Node(s)")
         node_box.setMaximumHeight(60)
@@ -71,7 +92,7 @@ class EditingMenu(QWidget):
         self.redo_btn = QPushButton("Redo (R)")
         self.redo_btn.clicked.connect(self.tracks_viewer.redo)
 
-        layout.addWidget(continue_tracks_box)
+        layout.addWidget(self.continue_tracks_box)
         layout.addWidget(node_box)
         layout.addWidget(edge_box)
         layout.addWidget(self.undo_btn)
@@ -80,14 +101,21 @@ class EditingMenu(QWidget):
         self.setLayout(layout)
         self.setMaximumHeight(360)
 
-    def toggle_track_mode(self):
+    def _update_continue_tracks_box(self):
+        """Show or hide the continue tracks box depending on the presence of the TracksLabels layer. If a TracksLabels layer is present, adding nodes with points is disabled and therefore the continue_tracks_button should be hidden."""
+
+        if (
+            self.tracks_viewer.tracking_layers.seg_layer is not None
+            and self.tracks_viewer.tracking_layers.points_layer is not None
+        ):
+            self.continue_tracks_box.hide()
+        else:
+            self.continue_tracks_box.show()
+
+    def toggle_track_mode(self, mode: str):
         """Toggle the track mode (continue / new track on the tracks viewer)"""
 
-        if self.tracks_viewer.track_mode == "new track":
-            self.continue_tracks_button.setText("Start new tracks")
-        else:
-            self.continue_tracks_button.setText("Continue tracks")
-        self.tracks_viewer.toggle_track_mode()
+        self.tracks_viewer.track_mode = mode
 
     def update_buttons(self):
         """Set the buttons to enabled/disabled depending on the currently selected nodes"""

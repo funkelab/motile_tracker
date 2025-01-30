@@ -136,13 +136,6 @@ class TracksViewer:
         else:
             self.set_display_mode("lineage")
 
-    def toggle_track_mode(self) -> None:
-        """Set the track mode that is used when new points are added. If the track_mode == continue, the point will continue with the current track if possible. Else, it will start a new track"""
-        if self.track_mode == "continue":
-            self.track_mode = "new track"
-        else:
-            self.track_mode = "continue"
-
     def set_display_mode(self, mode: str) -> None:
         """Update the display mode and call to update colormaps for points, labels, and tracks"""
 
