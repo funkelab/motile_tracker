@@ -55,11 +55,13 @@ class TracksLayerGroup:
             self.tracks_layer = TrackGraph(
                 name=self.name + "_tracks",
                 tracks_viewer=self.tracks_viewer,
+                scale=self.tracks.scale,
             )
 
             self.points_layer = TrackPoints(
                 name=self.name + "_points",
                 tracks_viewer=self.tracks_viewer,
+                scale=self.tracks.scale,
             )
         else:
             self.tracks_layer = None

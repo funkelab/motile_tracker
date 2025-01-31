@@ -27,6 +27,7 @@ class TrackPoints(napari.layers.Points):
         self,
         name: str,
         tracks_viewer: TracksViewer,
+        scale: tuple,
     ):
         self.tracks_viewer = tracks_viewer
         self.nodes = list(tracks_viewer.tracks.graph.nodes)
@@ -56,6 +57,7 @@ class TrackPoints(napari.layers.Points):
             },  # TODO: use features
             border_color=[1, 1, 1, 1],
             blending="translucent_no_depth",
+            scale = scale,
         )
 
         # Key bindings (should be specified both on the viewer (in tracks_viewer)

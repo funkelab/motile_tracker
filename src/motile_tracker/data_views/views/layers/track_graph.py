@@ -77,6 +77,7 @@ class TrackGraph(napari.layers.Tracks):
         self,
         name: str,
         tracks_viewer: TracksViewer,
+        scale: tuple,
     ):
         self.tracks_viewer = tracks_viewer
         track_data, track_edges = update_napari_tracks(
@@ -89,6 +90,7 @@ class TrackGraph(napari.layers.Tracks):
             name=name,
             tail_length=3,
             color_by="track_id",
+            scale = scale,
         )
 
         self.colormaps_dict["track_id"] = self.tracks_viewer.colormap
