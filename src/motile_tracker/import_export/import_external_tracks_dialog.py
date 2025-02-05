@@ -489,9 +489,13 @@ class ImportTracksDialog(QDialog):
         # Retrieve selected columns for each required field, and optional columns for additional attributes
         name_map = self.data_widget.csv_field_widget.get_name_map()
 
-        # note: this will fail if one column is used for two features
-        name_map_reversed = {value: key for key, value in name_map.items()}
-        self.data_widget.df.rename(columns=name_map_reversed, inplace=True)
+        # Create new columns for each feature based on the original column values
+        for feature, column in name_map.items():
+            self.data_widget.df[feature] = self.data_widget.df[column]
+
+        # # note: this will fail if one column is used for two features
+        # name_map_reversed = {value: key for key, value in name_map.items()}
+        # self.data_widget.df.rename(columns=name_map_reversed, inplace=True)
 
         # Read scaling information from the spinboxes
         if self.scale_page is not None:

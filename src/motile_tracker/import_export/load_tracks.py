@@ -8,6 +8,42 @@ from motile_toolbox.candidate_graph import NodeAttr
 from motile_tracker.data_model import SolutionTracks
 
 
+def ensure_integer_ids(df):
+    """Ensure that the 'id' column in the dataframe contains integer values"""
+
+    if not pd.api.types.is_integer_dtype(df["id"]):
+        unique_ids = df["id"].unique()
+        id_mapping = {
+            original_id: new_id
+            for new_id, original_id in enumerate(unique_ids, start=1)
+        }
+        df["id"] = df["id"].map(id_mapping)
+        df["parent_id"] = df["parent_id"].map(id_mapping).fillna(np.nan)
+
+    return df
+
+
+def ensure_correct_labels(df, segmentation):
+    """create a new segmentation image where the values from the column df['seg_id'] are replaced by those in df['id']"""
+
+    # Create a new segmentation image
+    new_segmentation = np.zeros_like(segmentation)
+
+    # Loop through each time point
+    for t in df["t"].unique():
+        # Filter the dataframe for the current time point
+        df_t = df[df["t"] == t]
+
+        # Create a mapping from seg_id to id for the current time point
+        seg_id_to_id = dict(zip(df_t["seg_id"], df_t["id"], strict=True))
+
+        # Apply the mapping to the segmentation image for the current time point
+        for seg_id, new_id in seg_id_to_id.items():
+            new_segmentation[t][segmentation[t] == seg_id] = new_id
+
+    return new_segmentation
+
+
 def _test_valid(df: pd.DataFrame, segmentation: np.ndarray, scale: list[float]) -> bool:
     """Test if the segmentation pixel value for the coordinates of first node corresponds
     with the provided seg_id as a basic sanity check that the csv file matches with the
@@ -26,6 +62,7 @@ def _test_valid(df: pd.DataFrame, segmentation: np.ndarray, scale: list[float]) 
     coordinates = [
         int(coord / scale_value) for coord, scale_value in zip(pos, scale, strict=True)
     ]
+
     value = segmentation[tuple(coordinates)]
     return value == seg_id
 
@@ -69,9 +106,10 @@ def tracks_from_df(
         raise ValueError(
             "Segmentation ids in dataframe do not match values in segmentation. Is it possible that you loaded the wrong combination of csv file and segmentation, or that the scaling information you provided is incorrect?"
         )
+    if not df["id"].is_unique:
+        raise ValueError("The 'id' column must contain unique values")
 
-    # Convert NaN values to None
-    df = df.applymap(lambda x: None if pd.isna(x) else x)
+    df = df.applymap(lambda x: None if pd.isna(x) else x)  # Convert NaN values to None
 
     # Convert custom attributes stored as strings back to lists
     for col in df.columns:
@@ -90,8 +128,11 @@ def tracks_from_df(
                 else x
             )
 
-    # sort the dataframe to ensure that parents get added to the graph before children
-    df = df.sort_values(NodeAttr.TIME.value)
+    df = df.sort_values(
+        NodeAttr.TIME.value
+    )  # sort the dataframe to ensure that parents get added to the graph before children
+    df = ensure_integer_ids(df)  # Ensure that the 'id' column contains integer values
+
     graph = nx.DiGraph()
     for _, row in df.iterrows():
         row_dict = row.to_dict()
@@ -115,8 +156,8 @@ def tracks_from_df(
             del row_dict[attr]
         attrs.update(row_dict)
 
-        if "seg_id" in df.columns:
-            attrs[NodeAttr.TRACK_ID.value] = row["seg_id"]
+        if "track_id" in df.columns:
+            attrs[NodeAttr.TRACK_ID.value] = row["track_id"]
 
         # add the node to the graph
         graph.add_node(_id, **attrs)
@@ -129,9 +170,10 @@ def tracks_from_df(
             ), f"Parent id {parent_id} of node {_id} not in graph yet"
             graph.add_edge(parent_id, _id)
 
-    if segmentation is not None:
-        # add dummy hypothesis dimension (for now)
-        segmentation = np.expand_dims(segmentation, axis=1)
+    if segmentation is not None and row["seg_id"] != row["id"]:
+        segmentation = ensure_correct_labels(
+            df, segmentation
+        )  # in the case a different column than the id column was used for the seg_id, we need to update the segmentation to make sure it matches the values in the id column (it should be checked by now that these are unique and integers)
 
     tracks = SolutionTracks(
         graph=graph,
