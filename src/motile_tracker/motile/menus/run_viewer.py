@@ -6,8 +6,6 @@ from warnings import warn
 
 import pyqtgraph as pg
 from fonticon_fa6 import FA6S
-from motile_tracker.import_export import export_solution_to_csv
-from motile_tracker.motile.backend import MotileRun
 from qtpy.QtCore import Signal
 from qtpy.QtWidgets import (
     QFileDialog,
@@ -20,6 +18,9 @@ from qtpy.QtWidgets import (
 )
 from superqt import QCollapsible, ensure_main_thread
 from superqt.fonticon import icon as qticon
+
+from motile_tracker.import_export import export_solution_to_csv
+from motile_tracker.motile.backend import MotileRun
 
 from .params_viewer import SolverParamsViewer
 

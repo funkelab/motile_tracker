@@ -209,6 +209,7 @@ class TreePlot(pg.PlotWidget):
         node_id = points[0].data()
         append = Qt.ShiftModifier == modifiers
         self.node_clicked.emit(node_id, append)
+        self.setFocus()
 
     def set_data(self, track_df: pd.DataFrame, feature: str) -> None:
         """Updates the stored pyqtgraph content based on the given dataframe.
@@ -511,6 +512,7 @@ class TreeWidget(QWidget):
             direction = direction_map.get(event.key())
             if direction:
                 self.navigation_widget.move(direction)
+                self.tree_widget.setFocus()
 
     def delete_node(self):
         """Delete a node."""

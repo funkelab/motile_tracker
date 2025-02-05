@@ -2,13 +2,14 @@ import networkx as nx
 import numpy as np
 import pytest
 from motile_toolbox.candidate_graph.graph_attributes import EdgeAttr, NodeAttr
+from numpy.testing import assert_array_almost_equal
+
 from motile_tracker.data_model import Tracks
 from motile_tracker.data_model.actions import (
     AddEdges,
     AddNodes,
     UpdateNodeSegs,
 )
-from numpy.testing import assert_array_almost_equal
 
 
 def test_add_delete_nodes(segmentation_2d, graph_2d):
@@ -26,18 +27,13 @@ def test_add_delete_nodes(segmentation_2d, graph_2d):
     attrs[NodeAttr.TRACK_ID.value] = [
         graph_2d.nodes[node][NodeAttr.TRACK_ID.value] for node in nodes
     ]
-    attrs[NodeAttr.SEG_ID.value] = [
-        graph_2d.nodes[node][NodeAttr.SEG_ID.value] for node in nodes
-    ]
     pixels = [
-        np.nonzero(segmentation_2d[time] == track_id)
-        for time, track_id in zip(
-            attrs[NodeAttr.TIME.value], attrs[NodeAttr.TRACK_ID.value], strict=False
-        )
+        np.nonzero(segmentation_2d[time] == node_id)
+        for time, node_id in zip(attrs[NodeAttr.TIME.value], nodes, strict=True)
     ]
     pixels = [
         (np.ones_like(pix[0]) * time, *pix)
-        for time, pix in zip(attrs[NodeAttr.TIME.value], pixels, strict=False)
+        for time, pix in zip(attrs[NodeAttr.TIME.value], pixels, strict=True)
     ]
     add_nodes = AddNodes(tracks, nodes, attributes=attrs, pixels=pixels)
 
@@ -72,17 +68,17 @@ def test_update_node_segs(segmentation_2d, graph_2d):
 
     # add a couple pixels to the first node
     new_seg = segmentation_2d.copy()
-    new_seg[0][0][0] = 1
-    nodes = ["0_1"]
+    new_seg[0][0] = 1
+    nodes = [1]
 
     pixels = [np.nonzero(segmentation_2d != new_seg)]
     action = UpdateNodeSegs(tracks, nodes, pixels=pixels, added=True)
 
     assert set(tracks.graph.nodes()) == set(graph_2d.nodes())
-    assert tracks.graph.nodes["0_1"][NodeAttr.AREA.value] == 1345
+    assert tracks.graph.nodes[1][NodeAttr.AREA.value] == 1345
     assert (
-        tracks.graph.nodes["0_1"][NodeAttr.POS.value]
-        != graph_2d.nodes["0_1"][NodeAttr.POS.value]
+        tracks.graph.nodes[1][NodeAttr.POS.value]
+        != graph_2d.nodes[1][NodeAttr.POS.value]
     )
     assert_array_almost_equal(tracks.segmentation, new_seg)
 
@@ -95,10 +91,10 @@ def test_update_node_segs(segmentation_2d, graph_2d):
     inverse.inverse()
 
     assert set(tracks.graph.nodes()) == set(graph_2d.nodes())
-    assert tracks.graph.nodes["0_1"][NodeAttr.AREA.value] == 1345
+    assert tracks.graph.nodes[1][NodeAttr.AREA.value] == 1345
     assert (
-        tracks.graph.nodes["0_1"][NodeAttr.POS.value]
-        != graph_2d.nodes["0_1"][NodeAttr.POS.value]
+        tracks.graph.nodes[1][NodeAttr.POS.value]
+        != graph_2d.nodes[1][NodeAttr.POS.value]
     )
     assert_array_almost_equal(tracks.segmentation, new_seg)
 
@@ -107,7 +103,7 @@ def test_add_delete_edges(graph_2d, segmentation_2d):
     node_graph = nx.create_empty_copy(graph_2d, with_data=True)
     tracks = Tracks(node_graph, segmentation_2d)
 
-    edges = [["0_1", "1_2"], ["0_1", "1_3"], ["1_3", 2], [2, 4]]
+    edges = [[1, 2], [1, 3], [3, 4], [4, 5]]
 
     action = AddEdges(tracks, edges)
     # TODO: What if adding an edge that already exists?

@@ -1,4 +1,3 @@
-from motile_tracker.motile.backend import SolverParams
 from qtpy.QtCore import Signal
 from qtpy.QtWidgets import (
     QGroupBox,
@@ -7,6 +6,8 @@ from qtpy.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from motile_tracker.motile.backend import SolverParams
 
 from .param_values import StaticParamValue
 

@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 from motile_toolbox.candidate_graph.graph_attributes import NodeAttr
+
 from motile_tracker.data_model import SolutionTracks
 
 from .solver_params import SolverParams
@@ -16,7 +17,6 @@ if TYPE_CHECKING:
 
 STAMP_FORMAT = "%m%d%Y_%H%M%S"
 PARAMS_FILENAME = "solver_params.json"
-IN_SEG_FILENAME = "input_segmentation.npy"
 IN_POINTS_FILENAME = "input_points.npy"
 GAPS_FILENAME = "gaps.txt"
 
@@ -38,7 +38,6 @@ class MotileRun(SolutionTracks):
         pos_attr: str | tuple[str] | list[str] = NodeAttr.POS.value,
         scale: list[float] | None = None,
         solver_params: SolverParams | None = None,
-        input_segmentation: np.ndarray | None = None,
         input_points: np.ndarray | None = None,
         time: datetime | None = None,
         gaps: list[float] | None = None,
@@ -53,7 +52,6 @@ class MotileRun(SolutionTracks):
         )
         self.run_name = run_name
         self.solver_params = solver_params
-        self.input_segmentation = input_segmentation
         self.input_points = input_points
         self.gaps = gaps
         self.status = status
@@ -109,8 +107,6 @@ class MotileRun(SolutionTracks):
         Path.mkdir(run_dir)
         super().save(run_dir)
         self._save_params(run_dir)
-        if self.input_segmentation is not None:
-            self._save_array(run_dir, IN_SEG_FILENAME, self.input_segmentation)
         if self.input_points is not None:
             self._save_array(run_dir, IN_POINTS_FILENAME, self.input_points)
         self._save_list(list_to_save=self.gaps, run_dir=run_dir, filename=GAPS_FILENAME)
@@ -135,17 +131,14 @@ class MotileRun(SolutionTracks):
             run_dir = Path(run_dir)
         time, run_name = cls._unpack_id(run_dir.stem)
         params = cls._load_params(run_dir)
-        input_segmentation = cls._load_array(run_dir, IN_SEG_FILENAME, required=False)
         input_points = cls._load_array(run_dir, IN_POINTS_FILENAME, required=False)
-        output_seg_required = output_required and input_segmentation is not None
-        tracks = SolutionTracks.load(run_dir, seg_required=output_seg_required)
+        tracks = SolutionTracks.load(run_dir, seg_required=False)
         gaps = cls._load_list(run_dir=run_dir, filename=GAPS_FILENAME, required=False)
         return cls(
             graph=tracks.graph,
             segmentation=tracks.segmentation,
             run_name=run_name,
             solver_params=params,
-            input_segmentation=input_segmentation,
             input_points=input_points,
             time=time,
             gaps=gaps,
@@ -284,6 +277,5 @@ class MotileRun(SolutionTracks):
         run_dir = base_path / self._make_id()
         # Lets be safe and remove the expected files and then the directory
         (run_dir / PARAMS_FILENAME).unlink()
-        (run_dir / IN_SEG_FILENAME).unlink()
         (run_dir / GAPS_FILENAME).unlink()
         super().delete(run_dir)

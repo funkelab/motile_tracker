@@ -2,12 +2,6 @@
 
 import logging
 
-import networkx as nx
-import numpy as np
-from motile_toolbox.candidate_graph import NodeAttr
-from motile_tracker.data_model import SolutionTracks
-from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
-from motile_tracker.motile.backend import MotileRun, solve
 from napari import Viewer
 from napari.utils.notifications import show_warning
 from psygnal import Signal
@@ -17,6 +11,10 @@ from qtpy.QtWidgets import (
     QWidget,
 )
 from superqt.utils import thread_worker
+
+from motile_tracker.data_model import SolutionTracks
+from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
+from motile_tracker.motile.backend import MotileRun, solve
 
 from .run_editor import RunEditor
 from .run_viewer import RunViewer
@@ -98,46 +96,6 @@ class MotileWidget(QWidget):
         worker.returned.connect(self._on_solve_complete)
         worker.start()
 
-    def relabel_segmentation(
-        self,
-        solution_nx_graph: nx.DiGraph,
-        segmentation: np.ndarray,
-    ) -> np.ndarray:
-        """Relabel a segmentation based on tracking results so that nodes in same
-        track share the same id. IDs do change at division.
-
-        Args:
-            solution_nx_graph (nx.DiGraph): Networkx graph with the solution to use
-                for relabeling. Nodes not in graph will be removed from seg. Original
-                segmentation ids and hypothesis ids have to be stored in the graph so we
-                can map them back.
-            segmentation (np.ndarray): Original (potentially multi-hypothesis)
-                segmentation with dimensions (t,h,[z],y,x), where h is 1 for single
-                input segmentation.
-
-        Returns:
-            np.ndarray: Relabeled segmentation array where nodes in same track share same
-                id with shape (t,1,[z],y,x)
-        """
-        output_shape = (segmentation.shape[0], 1, *segmentation.shape[2:])
-        tracked_masks = np.zeros_like(segmentation, shape=output_shape)
-        for node, _data in solution_nx_graph.nodes(data=True):
-            time_frame = solution_nx_graph.nodes[node][NodeAttr.TIME.value]
-            previous_seg_id = solution_nx_graph.nodes[node][NodeAttr.SEG_ID.value]
-            track_id = solution_nx_graph.nodes[node][NodeAttr.TRACK_ID.value]
-            solution_nx_graph.nodes[node][NodeAttr.SEG_ID.value] = (
-                track_id  # assign the new value for future updates
-            )
-            if NodeAttr.SEG_HYPO.value in solution_nx_graph.nodes[node]:
-                hypothesis_id = solution_nx_graph.nodes[node][NodeAttr.SEG_HYPO.value]
-            else:
-                hypothesis_id = 0
-            previous_seg_mask = (
-                segmentation[time_frame, hypothesis_id] == previous_seg_id
-            )
-            tracked_masks[time_frame, 0][previous_seg_mask] = track_id
-        return tracked_masks
-
     @thread_worker
     def solve_with_motile(self, run: MotileRun) -> MotileRun:
         """Runs the solver and relabels the segmentation to match
@@ -153,8 +111,8 @@ class MotileWidget(QWidget):
         Returns:
             MotileRun: The provided run with the output graph and segmentation included.
         """
-        if run.input_segmentation is not None:
-            input_data = run.input_segmentation
+        if run.segmentation is not None:
+            input_data = run.segmentation
         elif run.input_points is not None:
             input_data = run.input_points
         else:
@@ -167,11 +125,6 @@ class MotileWidget(QWidget):
         )
 
         run._initialize_track_ids()
-        if run.input_segmentation is not None:
-            run.segmentation = self.relabel_segmentation(
-                run.graph, run.input_segmentation
-            )
-        run._create_seg_time_to_node()
 
         if run.graph.number_of_nodes() == 0:
             show_warning(

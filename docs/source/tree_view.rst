@@ -35,7 +35,7 @@ The following columns have to be selected:
 
 From this, a `SolutionTracks object`_ is generated, containing a networkx graph representing the tracking result, and optionally
 a segmentation. The networkx graph is directed, with nodes representing detections and
-edges going from a detection in time t to the same object in t+1 (edges go forward in time).
+edges going from a detection in time t to the same object in t+n (edges go forward in time).
 Nodes must have an attribute representing time, by default named "time" but a different name
 can be stored in the ``Tracks.time_attr`` attribute. Nodes must also have one or more attributes
 representing position. The default way of storing positions on nodes is an attribute called
@@ -44,16 +44,18 @@ representing position. The default way of storing positions on nodes is an attri
 should be specified in ``Tracks.pos_attr``. If a segmentation is provided but no ``area`` attribute, it will be computed automatically.
 
 The segmentation is expected to be a numpy array with time as the first dimension, followed
-by the position dimensions in the same order as the ``Tracks.pos_attr``. If a segmentation
-is provided, the nodes in the graph should also store the label id of the corresponding segmentation
-in a ``seg_id`` attribute, to allow us to match nodes in the graph to their segmentations.
+by the position dimensions in the same order as the ``Tracks.pos_attr``. The segmentation
+must have unique label ids across all time points - there is a helper function in the
+motile_toolbox called ensure_unique_labels that relabels a segmentation to be unique
+across time if needed. If a segmentation is provided, the node ids in the graph should
+match label id of the corresponding segmentation.
 
 An example script that loads a tracks object from a CSV and segmentation array is provided in `scripts/view_external_tracks.py`. Once you have a Tracks object in the format described above,
 the following lines will view it in the Tree View and create synchronized napari layers
 (Points, Labels, and Tracks) to visualize the provided tracks.::
 
-    widget = TreeWidget(viewer)
-    widget.tracks_viewer.tracks_list.add_tracks(tracks, name="Example")
+    tracks_viewer = TracksViewer.get_instance(viewer)
+    tracks_viewer.tracks_list.add_tracks(tracks, "example")
 
 We plan to incorporate loaders from standard formats in the future to make this process easier,
 and incorporate the loading into the user interface.

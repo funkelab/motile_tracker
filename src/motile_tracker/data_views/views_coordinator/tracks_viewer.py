@@ -7,7 +7,7 @@ import numpy as np
 from motile_toolbox.candidate_graph.graph_attributes import NodeAttr
 from psygnal import Signal
 
-from motile_tracker.data_model import NodeType, Tracks
+from motile_tracker.data_model import NodeType, SolutionTracks
 from motile_tracker.data_model.tracks_controller import TracksController
 from motile_tracker.data_views.views.layers.tracks_layer_group import TracksLayerGroup
 from motile_tracker.data_views.views.tree_view.tree_widget_utils import (
@@ -57,8 +57,6 @@ class TracksViewer:
         self.tracks = None
         self.visible = None
         self.tracking_layers = TracksLayerGroup(self.viewer, self.tracks, "", self)
-
-        self.viewer.dims.events.current_step.connect(self.update_highlights)
         self.selected_nodes = NodeSelectionList()
         self.selected_nodes.list_updated.connect(self.update_selection)
 
@@ -101,7 +99,7 @@ class TracksViewer:
         # restore selection and/or highlighting in all napari Views (napari Views do not know about their selection ('all' vs 'lineage'), but TracksViewer does)
         self.update_selection()
 
-    def update_tracks(self, tracks: Tracks, name: str) -> None:
+    def update_tracks(self, tracks: SolutionTracks, name: str) -> None:
         """Stop viewing a previous set of tracks and replace it with a new one.
         Will create new segmentation and tracks layers and add them to the viewer.
 
@@ -150,8 +148,8 @@ class TracksViewer:
             self.viewer.text_overlay.text = "Toggle Display [Q]\n All"
 
         self.viewer.text_overlay.visible = True
-        visible = self.filter_visible_nodes()
-        self.tracking_layers.update_visible(visible)
+        visible_tracks = self.filter_visible_nodes()
+        self.tracking_layers.update_visible(visible_tracks, self.visible)
 
     def filter_visible_nodes(self) -> list[int]:
         """Construct a list of track_ids that should be displayed"""
@@ -181,24 +179,15 @@ class TracksViewer:
                 }
             )
         else:
+            self.visible = "all"
             return "all"
-
-    def update_highlights(self) -> None:
-        """If the time dimension is changed, update the highlighting in the seg layer"""
-
-        if (
-            self.viewer.dims.last_used == 0
-            and self.tracking_layers.seg_layer is not None
-        ):
-            visible = self.filter_visible_nodes()
-            self.tracking_layers.seg_layer.update_label_colormap(visible)
 
     def update_selection(self) -> None:
         """Sets the view and triggers visualization updates in other components"""
 
         self.set_napari_view()
-        visible = self.filter_visible_nodes()
-        self.tracking_layers.update_visible(visible)
+        visible_tracks = self.filter_visible_nodes()
+        self.tracking_layers.update_visible(visible_tracks, self.visible)
 
     def set_napari_view(self) -> None:
         """Adjust the current_step of the viewer to jump to the last item of the selected_nodes list"""

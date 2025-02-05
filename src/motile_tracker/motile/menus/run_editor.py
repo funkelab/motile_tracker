@@ -8,7 +8,7 @@ from warnings import warn
 import napari.layers
 import networkx as nx
 import numpy as np
-from motile_tracker.motile.backend import MotileRun
+from motile_toolbox.utils.relabel_segmentation import ensure_unique_labels
 from qtpy.QtCore import Signal
 from qtpy.QtWidgets import (
     QComboBox,
@@ -21,6 +21,8 @@ from qtpy.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from motile_tracker.motile.backend import MotileRun
 
 from .params_editor import SolverParamsEditor
 
@@ -128,25 +130,6 @@ class RunEditor(QGroupBox):
             return None
         return self.viewer.layers[layer_name]
 
-    def reshape_labels(self, segmentation: np.ndarray) -> np.ndarray:
-        """Expect napari segmentation to have shape t, [z], y, x.
-        Motile toolbox needs a channel dimension between time and space.
-        This also raises an error if the input seg is not the expected shape.
-
-        Args:
-            segmentation (np.ndarray): _description_
-
-        Raises:
-            ValueError if segmentation is not 3D or 4D.
-        """
-        ndim = segmentation.ndim
-        if ndim > 4:
-            raise ValueError("Expected segmentation to be at most 4D, found %d", ndim)
-        elif ndim < 3:
-            raise ValueError("Expected segmentation to be at least 3D, found %d", ndim)
-        reshaped = np.expand_dims(segmentation, 1)
-        return reshaped
-
     def _run_widget(self) -> QWidget:
         """Construct a widget where you set the run name and start solving.
         Initializes self.run_name and connects the generate tracks button
@@ -167,6 +150,27 @@ class RunEditor(QGroupBox):
         run_widget.setLayout(run_layout)
         return run_widget
 
+    @staticmethod
+    def _has_duplicate_ids(segmentation: np.ndarray) -> bool:
+        """Checks if the segmentation has duplicate label ids across time. For efficiency,
+        only checks between the first and second time frames.
+
+        Args:
+            segmentation (np.ndarray): (t, [z], y, x)
+
+        Returns:
+            bool: True if there are duplicate labels between the first two frames, and
+                False otherwise.
+        """
+        if segmentation.shape[0] >= 2:
+            first_frame_ids = set(np.unique(segmentation[0]).tolist())
+            first_frame_ids.remove(0)
+            second_frame_ids = set(np.unique(segmentation[1]).tolist())
+            second_frame_ids.remove(0)
+            return not first_frame_ids.isdisjoint(second_frame_ids)
+        else:
+            return False
+
     def get_run(self) -> MotileRun | None:
         """Construct a motile run from the current state of the run editor
         widget.
@@ -181,7 +185,19 @@ class RunEditor(QGroupBox):
             warn("No input layer selected", stacklevel=2)
             return None
         if isinstance(input_layer, napari.layers.Labels):
-            input_seg = self.reshape_labels(input_layer.data)
+            input_seg = input_layer.data
+            ndim = input_seg.ndim
+            if ndim > 4:
+                raise ValueError(
+                    "Expected segmentation to be at most 4D, found %d", ndim
+                )
+            elif ndim < 3:
+                raise ValueError(
+                    "Expected segmentation to be at least 3D, found %d", ndim
+                )
+            if self._has_duplicate_ids(input_seg):
+                input_seg = ensure_unique_labels(input_seg)
+
             input_points = None
         elif isinstance(input_layer, napari.layers.Points):
             input_seg = None
@@ -189,10 +205,9 @@ class RunEditor(QGroupBox):
         params = self.solver_params_widget.solver_params.copy()
         return MotileRun(
             graph=nx.DiGraph(),
-            segmentation=None,
+            segmentation=input_seg,
             run_name=run_name,
             solver_params=params,
-            input_segmentation=input_seg,
             input_points=input_points,
             time=datetime.now(),
             scale=input_layer.scale,
