@@ -45,7 +45,7 @@ jobs:
       - name: Test with pytest
         shell: bash -el {0}
         run: |
-          pytest --color=yes --cov=motile-tracker --cov-report=xml --cov-report=term-missing tests
+          pytest --color=yes --cov=motile_tracker --cov-report=xml --cov-report=term-missing tests
 
       - name: Coverage
         uses: codecov/codecov-action@v4
