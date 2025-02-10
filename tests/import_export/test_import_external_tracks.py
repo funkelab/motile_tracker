@@ -1,0 +1,188 @@
+import unittest
+
+import numpy as np
+import pandas as pd
+from motile_toolbox.candidate_graph.graph_attributes import NodeAttr
+
+from motile_tracker.import_export.load_tracks import (
+    _test_valid,
+    ensure_correct_labels,
+    ensure_integer_ids,
+    tracks_from_df,
+)
+
+
+class TestLoadTracks(unittest.TestCase):
+    def test_non_unique_ids(self):
+        """Test that a ValueError is raised if the ids are not unique"""
+
+        data = {
+            "id": [1, 1, 2],
+            "parent_id": [0, 0, 1],
+            NodeAttr.TIME.value: [0, 1, 2],
+            "y": [10, 20, 30],
+            "x": [15, 25, 35],
+        }
+        df = pd.DataFrame(data)
+        with self.assertRaises(ValueError):
+            tracks_from_df(df)
+
+    def test_string_ids(self):
+        """Test that string ids are converted to unique integers"""
+
+        data = {
+            "id": ["a", "b", "c"],
+            "parent_id": [None, "b", "c"],
+            NodeAttr.TIME.value: [0, 1, 2],
+            "y": [10, 20, 30],
+            "x": [15, 25, 35],
+        }
+        df = pd.DataFrame(data)
+        df = ensure_integer_ids(df)
+        self.assertTrue(pd.api.types.is_integer_dtype(df["id"]))
+        self.assertTrue(
+            pd.to_numeric(df["parent_id"], errors="coerce")
+            .dropna()
+            .apply(lambda x: float(x).is_integer())
+            .all()
+        )
+        assert df["id"].is_unique
+
+    def test_set_scale(self):
+        """Test that the scaling is correctly propagated to the tracks"""
+
+        data = {
+            "id": [1, 2, 3],
+            "parent_id": [None, 1, 2],
+            NodeAttr.TIME.value: [0, 1, 2],
+            "y": [10, 20, 30],
+            "x": [15, 25, 35],
+        }
+        df = pd.DataFrame(data)
+        scale = [1, 2, 1]
+        tracks = tracks_from_df(df, scale=scale)
+        self.assertEqual(tracks.scale, scale)
+
+    def test_valid_segmentation(self):
+        """Test that the segmentation value of the first node matches with its id"""
+
+        data = {
+            "id": [1, 2, 3],
+            "parent_id": [0, 1, 2],
+            NodeAttr.TIME.value: [0, 1, 2],
+            "y": [0.25, 2, 1.3333],
+            "x": [0.75, 1.5, 1.6667],
+            "seg_id": [1, 2, 3],
+        }
+        df = pd.DataFrame(data)
+        segmentation = np.array(
+            [
+                [[1, 1, 1], [1, 3, 3], [2, 2, 3]],
+                [[1, 1, 1], [1, 3, 3], [2, 2, 3]],
+                [[1, 1, 1], [1, 3, 3], [2, 2, 3]],
+            ]
+        )
+
+        self.assertTrue(_test_valid(df, segmentation, scale=[1, 1, 1]))
+
+        data = {
+            "id": [1, 2, 3],
+            "parent_id": [0, 1, 2],
+            NodeAttr.TIME.value: [0, 1, 2],
+            "y": [1, 8, 5.3333],
+            "x": [3, 6, 6.6667],
+            "seg_id": [1, 2, 3],
+        }
+        df = pd.DataFrame(data)
+
+        self.assertFalse(
+            _test_valid(df, segmentation, scale=[1, 1, 1])
+        )  # test if False when scaling is applied incorrectly
+        self.assertTrue(
+            _test_valid(df, segmentation, scale=[1, 4, 4])
+        )  # test if True when scaling is applied correctly
+        self.assertFalse(
+            _test_valid(df, segmentation, scale=[1, 4, 4, 1])
+        )  # ndim of segmentation should match with the length of provided scale
+
+        data = {
+            "id": [1, 2, 3],
+            "parent_id": [0, 1, 2],
+            NodeAttr.TIME.value: [0, 1, 2],
+            "z": [1, 1, 1],
+            "y": [1, 8, 5.3333],
+            "x": [3, 6, 6.6667],
+            "seg_id": [1, 2, 3],
+        }
+        df = pd.DataFrame(data)
+        self.assertFalse(
+            _test_valid(df, segmentation, scale=[1, 4, 4])
+        )  # ndim of segmentation should match with the dims specified in the dataframe
+
+    def test_relabel_segmentation(self):
+        """Test relabeling the segmentation if id != seg_id"""
+
+        data = {
+            NodeAttr.TIME.value: [0, 0, 0, 1],
+            "seg_id": [1, 2, 3, 3],
+            "id": [10, 20, 30, 30],
+        }
+        df = pd.DataFrame(data)
+        segmentation = np.array(
+            [[[1, 1, 2], [2, 3, 3], [1, 2, 3]], [[1, 1, 2], [2, 3, 3], [1, 2, 3]]]
+        )
+        new_segmentation = ensure_correct_labels(df, segmentation)
+        expected_segmentation = np.array(
+            [
+                [[10, 10, 20], [20, 30, 30], [10, 20, 30]],
+                [[0, 0, 0], [0, 30, 30], [0, 0, 30]],
+            ]
+        )
+
+        np.testing.assert_array_equal(new_segmentation, expected_segmentation)
+
+    def test_measurements(self):
+        """Test if the area is measured correctly, taking scaling into account"""
+
+        data = {
+            NodeAttr.TIME.value: [0, 0, 0, 1],
+            "seg_id": [1, 2, 3, 4],
+            "id": [1, 2, 3, 4],
+            "parent_id": [None, 1, 2, 3],
+            "y": [0, 1.6667, 1.333, 1.333],
+            "x": [1, 0.33333, 1.66667, 1.66667],
+        }
+        df = pd.DataFrame(data)
+        segmentation = np.array(
+            [[[1, 1, 1], [2, 3, 3], [2, 3, 3]], [[1, 1, 0], [2, 4, 4], [2, 2, 4]]]
+        )
+
+        tracks = tracks_from_df(
+            df, segmentation, scale=(1, 1, 1), measurements=["area"]
+        )
+
+        assert tracks._get_node_attr(1, NodeAttr.AREA.value) == 3
+        assert tracks._get_node_attr(2, NodeAttr.AREA.value) == 2
+        assert tracks._get_node_attr(3, NodeAttr.AREA.value) == 4
+        assert tracks._get_node_attr(4, NodeAttr.AREA.value) == 3
+
+        tracks = tracks_from_df(
+            df, segmentation, scale=(1, 2, 1), measurements=["area"]
+        )
+
+        assert tracks._get_node_attr(1, NodeAttr.AREA.value) == 6
+        assert tracks._get_node_attr(2, NodeAttr.AREA.value) == 4
+        assert tracks._get_node_attr(3, NodeAttr.AREA.value) == 8
+        assert tracks._get_node_attr(4, NodeAttr.AREA.value) == 6
+
+        tracks = tracks_from_df(
+            df, segmentation=None, scale=(1, 2, 1), measurements=["area"]
+        )  # no seg provided, should return None
+
+        assert tracks._get_node_attr(1, NodeAttr.AREA.value) is None
+
+        tracks = tracks_from_df(
+            df, segmentation, scale=(1, 2, 1), measurements=[]
+        )  # no area measurement provided, should return None.
+
+        assert tracks._get_node_attr(1, NodeAttr.AREA.value) is None

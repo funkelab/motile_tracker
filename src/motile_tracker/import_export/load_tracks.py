@@ -18,7 +18,7 @@ def ensure_integer_ids(df):
             for new_id, original_id in enumerate(unique_ids, start=1)
         }
         df["id"] = df["id"].map(id_mapping)
-        df["parent_id"] = df["parent_id"].map(id_mapping).fillna(np.nan)
+        df["parent_id"] = df["parent_id"].map(id_mapping).astype(pd.Int64Dtype())
 
     return df
 
@@ -30,9 +30,9 @@ def ensure_correct_labels(df, segmentation):
     new_segmentation = np.zeros_like(segmentation)
 
     # Loop through each time point
-    for t in df["t"].unique():
+    for t in df[NodeAttr.TIME.value].unique():
         # Filter the dataframe for the current time point
-        df_t = df[df["t"] == t]
+        df_t = df[df[NodeAttr.TIME.value] == t]
 
         # Create a mapping from seg_id to id for the current time point
         seg_id_to_id = dict(zip(df_t["seg_id"], df_t["id"], strict=True))
@@ -49,21 +49,32 @@ def _test_valid(df: pd.DataFrame, segmentation: np.ndarray, scale: list[float]) 
     with the provided seg_id as a basic sanity check that the csv file matches with the
     segmentation file
     """
-    assert (
-        NodeAttr.SEG_ID.value in df.columns
-    ), f"Missing {NodeAttr.SEG_ID.value} attribute"
+    if NodeAttr.SEG_ID.value not in df.columns:
+        return False
+
+    if segmentation.ndim != len(scale):
+        return False
+
     row = df.iloc[0]
     pos = (
         [row[NodeAttr.TIME.value], row["z"], row["y"], row["x"]]
         if "z" in df.columns
         else [row[NodeAttr.TIME.value], row["y"], row["x"]]
     )
+
+    if segmentation.ndim != len(pos):
+        return False
+
     seg_id = row[NodeAttr.SEG_ID.value]
     coordinates = [
         int(coord / scale_value) for coord, scale_value in zip(pos, scale, strict=True)
     ]
 
-    value = segmentation[tuple(coordinates)]
+    try:
+        value = segmentation[tuple(coordinates)]
+    except IndexError:
+        return False
+
     return value == seg_id
 
 
@@ -113,7 +124,7 @@ def tracks_from_df(
     if not df["id"].is_unique:
         raise ValueError("The 'id' column must contain unique values")
 
-    df = df.applymap(lambda x: None if pd.isna(x) else x)  # Convert NaN values to None
+    df = df.map(lambda x: None if pd.isna(x) else x)  # Convert NaN values to None
 
     # Convert custom attributes stored as strings back to lists
     for col in df.columns:

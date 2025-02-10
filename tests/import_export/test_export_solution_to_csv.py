@@ -13,7 +13,7 @@ def test_export_solution_to_csv(graph_2d, graph_3d, tmp_path):
 
     header = ["t", "y", "x", "id", "parent_id", "track_id", "area"]
     assert lines[0].strip().split(",") == header
-    line1 = ["0", "50", "50", "0_1", "", "1", "1245"]
+    line1 = ["0", "50", "50", "1", "", "1", "1245"]
     assert lines[1].strip().split(",") == line1
 
     tracks = SolutionTracks(graph_3d, ndim=4)

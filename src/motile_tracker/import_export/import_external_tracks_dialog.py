@@ -3,6 +3,7 @@ import os
 import pandas as pd
 import tifffile
 import zarr
+from motile_toolbox.candidate_graph import NodeAttr
 from psygnal import Signal
 from qtpy.QtCore import Qt
 from qtpy.QtWidgets import (
@@ -92,7 +93,7 @@ class CSVFieldMapWidget(QWidget):
         super().__init__()
 
         self.standard_fields = [
-            "time",
+            NodeAttr.TIME.value,
             "y",
             "x",
             "id",
