@@ -136,7 +136,7 @@ def tracks_from_df(
     graph = nx.DiGraph()
     for _, row in df.iterrows():
         row_dict = row.to_dict()
-        _id = row["id"]
+        _id = int(row["id"])
         parent_id = row["parent_id"]
         if "z" in df.columns:
             pos = [row["z"], row["y"], row["x"]]
@@ -147,7 +147,7 @@ def tracks_from_df(
             ndims = 3
 
         attrs = {
-            NodeAttr.TIME.value: row["time"],
+            NodeAttr.TIME.value: int(row["time"]),
             NodeAttr.POS.value: pos,
         }
 
@@ -188,8 +188,7 @@ def tracks_from_df(
     if tracks.segmentation is not None and NodeAttr.AREA.value not in df.columns:
         nodes = tracks.graph.nodes
         times = tracks.get_times(nodes)
-        seg_ids = tracks.get_seg_ids(nodes, required=True)
-        computed_attrs = tracks._compute_node_attrs(seg_ids, times)
+        computed_attrs = tracks._compute_node_attrs(nodes, times)
         areas = computed_attrs[NodeAttr.AREA.value]
         tracks._set_nodes_attr(nodes, NodeAttr.AREA.value, areas)
 
