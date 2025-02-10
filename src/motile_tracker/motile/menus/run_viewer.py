@@ -19,7 +19,6 @@ from qtpy.QtWidgets import (
 from superqt import QCollapsible, ensure_main_thread
 from superqt.fonticon import icon as qticon
 
-from motile_tracker.import_export import export_solution_to_csv
 from motile_tracker.motile.backend import MotileRun
 
 from .params_viewer import SolverParamsViewer
@@ -197,7 +196,7 @@ class RunViewer(QGroupBox):
         self.export_tracks_dialog.selectFile(str(base_path / default_name))
         if self.export_tracks_dialog.exec_():
             outfile = self.export_tracks_dialog.selectedFiles()[0]
-            export_solution_to_csv(self.run, outfile)
+            self.run.export_tracks(outfile)
         else:
             warn("Exporting aborted", stacklevel=2)
 
