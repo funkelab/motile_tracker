@@ -452,6 +452,9 @@ class ImportTracksDialog(QDialog):
         # Optional Page 3 with scaling is None until specified otherwise
         self.scale_page = None
 
+        # Optional Page 4 with measurement attributes that should be calculated (only if segmentation is provided)
+        self.measurement_widget = None
+
         self._update_buttons()
 
     def _update_pages(self) -> None:
