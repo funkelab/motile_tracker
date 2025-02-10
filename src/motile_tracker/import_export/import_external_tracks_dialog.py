@@ -305,6 +305,42 @@ class DataWidget(QWidget):
         self.segmentation = segmentation
 
 
+class MeasurementWidget(QWidget):
+    """QWidget to choose which measurements should be calculated"""
+
+    def __init__(self, ndim: int):
+        super().__init__()
+
+        layout = QVBoxLayout()
+
+        # Checkboxes for measurements
+        self.measurements = []
+        layout.addWidget(QLabel("Choose measurements to calculate"))
+        if ndim == 2:
+            self.measurements.append("Area")
+        elif ndim == 3:
+            self.measurements.append("Volume")
+
+        self.measurement_checkboxes = {}
+        for measurement in self.measurements:
+            checkbox = QCheckBox(measurement)
+            checkbox.setChecked(True)
+            self.measurement_checkboxes[measurement] = checkbox
+            layout.addWidget(checkbox)
+
+        layout.setAlignment(Qt.AlignTop)
+        self.setLayout(layout)
+
+    def get_measurements(self) -> list[str]:
+        """Return the selected measurements as a list of strings"""
+
+        measurements = []
+        for measurement, checkbox in self.measurement_checkboxes.items():
+            if checkbox.isChecked():
+                measurements.append(measurement)
+        return measurements
+
+
 class ScaleWidget(QWidget):
     """QWidget for specifying pixel calibration"""
 
@@ -437,6 +473,12 @@ class ImportTracksDialog(QDialog):
             self.scale_page = ScaleWidget(self.menu_widget.radio_3D.isChecked())
             self.stacked_widget.addWidget(self.scale_page)
 
+        if self.menu_widget.segmentation_checkbox.isChecked():
+            self.measurement_widget = MeasurementWidget(
+                ndim=2 if self.menu_widget.radio_2D.isChecked() else 3
+            )
+            self.stacked_widget.addWidget(self.measurement_widget)
+
         self.stacked_widget.hide()
         self.stacked_widget.show()
 
@@ -503,6 +545,11 @@ class ImportTracksDialog(QDialog):
         else:
             scale = [1, 1, 1] if self.data_widget.incl_z is False else [1, 1, 1, 1]
 
+        if self.measurement_widget is not None:
+            measurements = self.measurement_widget.get_measurements()
+        else:
+            measurements = []
+
         # Try to create a Tracks object with the provided CSV file, the attr:column dictionaries, and the scaling information
         self.name = self.menu_widget.name_widget.text()
 
@@ -513,7 +560,7 @@ class ImportTracksDialog(QDialog):
 
         try:
             self.tracks = tracks_from_df(
-                self.data_widget.df, self.data_widget.segmentation, scale
+                self.data_widget.df, self.data_widget.segmentation, scale, measurements
             )
 
         except ValueError as e:
