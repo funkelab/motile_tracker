@@ -96,12 +96,19 @@ class TracksLayerGroup:
             self.points_layer._refresh()
 
     def update_visible(self, visible_tracks: list[int], visible_nodes: list[int]):
+        """Update the visibility of the nodes in the viewer layers
+
+        Args:
+            visible_tracks (list[int], 'all'): List of node ids belonging to the tracks that should be visible, or 'all'. This filters the nodes based on whether the display mode is set to 'lineage' or to 'all'
+            visible_nodes (list[int], 'all'): List of node ids belonging to the nodes that should be visible because they are in within the bounds of a clipping plane, or 'all' if the clipping plane is not active.
+        """
+
         if self.seg_layer is not None:
-            self.seg_layer.update_label_colormap(visible_nodes)
+            self.seg_layer.update_label_colormap(visible_tracks)
         if self.points_layer is not None:
-            self.points_layer.update_point_outline(visible_tracks)
+            self.points_layer.update_point_outline(visible_tracks, visible_nodes)
         if self.tracks_layer is not None:
-            self.tracks_layer.update_track_visibility(visible_tracks)
+            self.tracks_layer.update_track_visibility(visible_tracks, visible_nodes)
 
     def center_view(self, node):
         """Adjust the current_step and camera center of the viewer to jump to the node
@@ -119,50 +126,55 @@ class TracksLayerGroup:
                     location[dim] + 0.5
                 )  # use the world location, since the 'step' in viewer.dims.range
                 # already in world units
+
+            # also set the displayed dimensions (usually xy) in the step, so that the cross widget from the 3D view can jump there
+            for dim in self.viewer.dims.displayed:
+                step[dim] = int(location[dim] + 0.5)
             self.viewer.dims.current_step = step
 
-            # check whether the new coordinates are inside or outside the field of view,
-            # then adjust the camera if needed
-            example_layer = (
-                self.points_layer
-            )  # the points layer is always in world units,
-            # because it directly reads the scaled coordinates. Therefore, no rescaling
-            # is necessary to compute the camera center
-            corner_coordinates = example_layer.corner_pixels
+            if self.viewer.dims.ndisplay == 2:
+                # check whether the new coordinates are inside or outside the field of view,
+                # then adjust the camera if needed
+                example_layer = (
+                    self.points_layer
+                )  # the points layer is always in world units,
+                # because it directly reads the scaled coordinates. Therefore, no rescaling
+                # is necessary to compute the camera center
+                corner_coordinates = example_layer.corner_pixels
 
-            # check which dimensions are shown, the first dimension is displayed on the
-            # x axis, and the second on the y_axis
-            dims_displayed = self.viewer.dims.displayed
+                # check which dimensions are shown, the first dimension is displayed on the
+                # x axis, and the second on the y_axis
+                dims_displayed = self.viewer.dims.displayed
 
-            # Note: This centering does not work in 3D. What we should do instead is take
-            # the view direction vector, start at the point, and move backward along the
-            # vector a certain amount to put the point in view.
-            # Note #2: Points already does centering when you add the first point, and it
-            # works in 3D. We can look at that to see what logic they use.
+                # Note: This centering does not work in 3D. What we should do instead is take
+                # the view direction vector, start at the point, and move backward along the
+                # vector a certain amount to put the point in view.
+                # Note #2: Points already does centering when you add the first point, and it
+                # works in 3D. We can look at that to see what logic they use.
 
-            # self.viewer.dims.displayed_order
-            x_dim = dims_displayed[-1]
-            y_dim = dims_displayed[-2]
+                # self.viewer.dims.displayed_order
+                x_dim = dims_displayed[-1]
+                y_dim = dims_displayed[-2]
 
-            # find corner pixels for the displayed axes
-            _min_x = corner_coordinates[0][x_dim]
-            _max_x = corner_coordinates[1][x_dim]
-            _min_y = corner_coordinates[0][y_dim]
-            _max_y = corner_coordinates[1][y_dim]
+                # find corner pixels for the displayed axes
+                _min_x = corner_coordinates[0][x_dim]
+                _max_x = corner_coordinates[1][x_dim]
+                _min_y = corner_coordinates[0][y_dim]
+                _max_y = corner_coordinates[1][y_dim]
 
-            # check whether the node location falls within the corner spatial range
-            if not (
-                (location[x_dim] > _min_x and location[x_dim] < _max_x)
-                and (location[y_dim] > _min_y and location[y_dim] < _max_y)
-            ):
-                camera_center = self.viewer.camera.center
+                # check whether the node location falls within the corner spatial range
+                if not (
+                    (location[x_dim] > _min_x and location[x_dim] < _max_x)
+                    and (location[y_dim] > _min_y and location[y_dim] < _max_y)
+                ):
+                    camera_center = self.viewer.camera.center
 
-                # set the center y and x to the center of the node, by using the index of the
-                # currently displayed dimensions
-                self.viewer.camera.center = (
-                    camera_center[0],
-                    location[y_dim],
-                    # camera center is calculated in scaled coordinates, and the optional
-                    # labels layer is scaled by the layer.scale attribute
-                    location[x_dim],
-                )
+                    # set the center y and x to the center of the node, by using the index of the
+                    # currently displayed dimensions
+                    self.viewer.camera.center = (
+                        camera_center[0],
+                        location[y_dim],
+                        # camera center is calculated in scaled coordinates, and the optional
+                        # labels layer is scaled by the layer.scale attribute
+                        location[x_dim],
+                    )
