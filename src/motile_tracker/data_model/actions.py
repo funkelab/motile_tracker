@@ -98,9 +98,9 @@ class AddNodes(TracksAction):
         super().__init__(tracks)
         self.nodes = nodes
         user_attrs = attributes.copy()
-        self.times = attributes.get(tracks.time_attr, None)
-        if tracks.time_attr in attributes:
-            del user_attrs[tracks.time_attr]
+        self.times = attributes.get(NodeAttr.TIME.value, None)
+        if NodeAttr.TIME.value in attributes:
+            del user_attrs[NodeAttr.TIME.value]
         self.positions = attributes.get(tracks.pos_attr, None)
         if tracks.pos_attr in attributes:
             del user_attrs[tracks.pos_attr]
@@ -133,7 +133,7 @@ class DeleteNodes(TracksAction):
         super().__init__(tracks)
         self.nodes = nodes
         self.attributes = {
-            self.tracks.time_attr: self.tracks.get_times(nodes),
+            NodeAttr.TIME.value: self.tracks.get_times(nodes),
             self.tracks.pos_attr: self.tracks.get_positions(nodes),
             NodeAttr.TRACK_ID.value: self.tracks._get_nodes_attr(
                 nodes, NodeAttr.TRACK_ID.value
@@ -227,7 +227,7 @@ class UpdateNodeAttrs(TracksAction):
         """
         super().__init__(tracks)
         protected_attrs = [
-            NodeAttr.TIME.value,
+            tracks.time_attr,
             NodeAttr.AREA.value,
             NodeAttr.TRACK_ID.value,
         ]
