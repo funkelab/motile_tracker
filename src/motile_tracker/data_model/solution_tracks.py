@@ -63,7 +63,9 @@ class SolutionTracks(Tracks):
         return self.max_track_id
 
     def get_track_id(self, node) -> int:
-        track_id = self._get_node_attr(node, NodeAttr.TRACK_ID.value, required=True)
+        track_id = int(
+            self._get_node_attr(node, NodeAttr.TRACK_ID.value, required=True)
+        )
         return track_id
 
     def set_track_id(self, node: Node, value: int):
