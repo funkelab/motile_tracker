@@ -1,7 +1,8 @@
-import unittest
+import os
 
 import numpy as np
 import pandas as pd
+import pytest
 from motile_toolbox.candidate_graph.graph_attributes import NodeAttr
 
 from motile_tracker.import_export.load_tracks import (
@@ -12,7 +13,7 @@ from motile_tracker.import_export.load_tracks import (
 )
 
 
-class TestLoadTracks(unittest.TestCase):
+class TestLoadTracks:
     def test_non_unique_ids(self):
         """Test that a ValueError is raised if the ids are not unique"""
 
@@ -24,7 +25,7 @@ class TestLoadTracks(unittest.TestCase):
             "x": [15, 25, 35],
         }
         df = pd.DataFrame(data)
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             tracks_from_df(df)
 
     def test_string_ids(self):
@@ -39,8 +40,8 @@ class TestLoadTracks(unittest.TestCase):
         }
         df = pd.DataFrame(data)
         df = ensure_integer_ids(df)
-        self.assertTrue(pd.api.types.is_integer_dtype(df["id"]))
-        self.assertTrue(
+        assert pd.api.types.is_integer_dtype(df["id"])
+        assert (
             pd.to_numeric(df["parent_id"], errors="coerce")
             .dropna()
             .apply(lambda x: float(x).is_integer())
@@ -61,7 +62,7 @@ class TestLoadTracks(unittest.TestCase):
         df = pd.DataFrame(data)
         scale = [1, 2, 1]
         tracks = tracks_from_df(df, scale=scale)
-        self.assertEqual(tracks.scale, scale)
+        assert tracks.scale == scale
 
     def test_valid_segmentation(self):
         """Test that the segmentation value of the first node matches with its id"""
@@ -83,7 +84,7 @@ class TestLoadTracks(unittest.TestCase):
             ]
         )
 
-        self.assertTrue(_test_valid(df, segmentation, scale=[1, 1, 1]))
+        assert _test_valid(df, segmentation, scale=[1, 1, 1])
 
         data = {
             "id": [1, 2, 3],
@@ -95,15 +96,12 @@ class TestLoadTracks(unittest.TestCase):
         }
         df = pd.DataFrame(data)
 
-        self.assertFalse(
-            _test_valid(df, segmentation, scale=[1, 1, 1])
-        )  # test if False when scaling is applied incorrectly
-        self.assertTrue(
-            _test_valid(df, segmentation, scale=[1, 4, 4])
-        )  # test if True when scaling is applied correctly
-        self.assertFalse(
-            _test_valid(df, segmentation, scale=[1, 4, 4, 1])
-        )  # ndim of segmentation should match with the length of provided scale
+        # test if False when scaling is applied incorrectly
+        assert not _test_valid(df, segmentation, scale=[1, 1, 1])
+        # test if True when scaling is applied correctly
+        assert _test_valid(df, segmentation, scale=[1, 4, 4])
+        # ndim of segmentation should match with the length of provided scale
+        assert not _test_valid(df, segmentation, scale=[1, 4, 4, 1])
 
         data = {
             "id": [1, 2, 3],
@@ -115,9 +113,8 @@ class TestLoadTracks(unittest.TestCase):
             "seg_id": [1, 2, 3],
         }
         df = pd.DataFrame(data)
-        self.assertFalse(
-            _test_valid(df, segmentation, scale=[1, 4, 4])
-        )  # ndim of segmentation should match with the dims specified in the dataframe
+        # ndim of segmentation should match with the dims specified in the dataframe
+        assert not _test_valid(df, segmentation, scale=[1, 4, 4])
 
     def test_relabel_segmentation(self):
         """Test relabeling the segmentation if id != seg_id"""
@@ -186,3 +183,23 @@ class TestLoadTracks(unittest.TestCase):
         )  # no area measurement provided, should return None.
 
         assert tracks._get_node_attr(1, NodeAttr.AREA.value) is None
+
+    def test_load_sample_data(self):
+        test_dir = os.path.abspath(__file__)
+        example_csv = os.path.abspath(
+            os.path.join(test_dir, "../../../scripts/hela_example_tracks.csv")
+        )
+
+        df = pd.read_csv(example_csv)
+
+        # Retrieve selected columns for each required field, and optional columns for additional attributes
+        name_map = {
+            "time": "t",
+        }
+        # Create new columns for each feature based on the original column values
+        for feature, column in name_map.items():
+            df[feature] = df[column]
+
+        tracks = tracks_from_df(df)
+        for node in tracks.graph.nodes():
+            assert isinstance(node, int)
