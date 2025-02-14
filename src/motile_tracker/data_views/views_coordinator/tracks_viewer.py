@@ -66,17 +66,18 @@ class TracksViewer:
         self.set_keybinds()
 
     def set_keybinds(self):
+        pass
         # TODO: separate and document keybinds (and maybe allow user to choose)
-        self.viewer.bind_key("q")(self.toggle_display_mode)
-        self.viewer.bind_key("a")(self.create_edge)
-        self.viewer.bind_key("d")(self.delete_node)
-        self.viewer.bind_key("Delete")(self.delete_node)
-        self.viewer.bind_key("b")(self.delete_edge)
-        # self.viewer.bind_key("s")(self.set_split_node)
-        # self.viewer.bind_key("e")(self.set_endpoint_node)
-        # self.viewer.bind_key("c")(self.set_linear_node)
-        self.viewer.bind_key("z")(self.undo)
-        self.viewer.bind_key("r")(self.redo)
+        # self.viewer.bind_key("q")(self.toggle_display_mode)
+        # self.viewer.bind_key("a")(self.create_edge)
+        # self.viewer.bind_key("d")(self.delete_node)
+        # self.viewer.bind_key("Delete")(self.delete_node)
+        # self.viewer.bind_key("b")(self.delete_edge)
+        # # self.viewer.bind_key("s")(self.set_split_node)
+        # # self.viewer.bind_key("e")(self.set_endpoint_node)
+        # # self.viewer.bind_key("c")(self.set_linear_node)
+        # self.viewer.bind_key("z")(self.undo)
+        # self.viewer.bind_key("r")(self.redo)
 
     def _refresh(self, node: str | None = None, refresh_view: bool = False) -> None:
         """Call refresh function on napari layers and the submit signal that tracks are updated
