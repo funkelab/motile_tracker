@@ -272,16 +272,13 @@ class DataWidget(QWidget):
             return
 
     def _browse_segmentation(self) -> None:
-        """File dialog to select image file (tif, tiff, or zarr)"""
+        """Open custom dialog to select either a file or a folder"""
 
-        image_file, _ = QFileDialog.getOpenFileName(
-            self,
-            "Select Segmentation File",
-            "",
-            "Segmentation Files (*.tiff *.zarr *.tif)",
-        )
-        if image_file:
-            self.image_path_line.setText(image_file)
+        dialog = FileFolderDialog(self)
+        if dialog.exec_():
+            selected_path = dialog.get_selected_path()
+            if selected_path:
+                self.image_path_line.setText(selected_path)
 
     def _load_segmentation(self) -> None:
         """Load the segmentation image file"""
@@ -304,6 +301,61 @@ class DataWidget(QWidget):
         else:
             segmentation = None
         self.segmentation = segmentation
+
+
+class FileFolderDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Select Tif File or Zarr Folder")
+
+        self.layout = QVBoxLayout(self)
+
+        self.path_line_edit = QLineEdit(self)
+        self.layout.addWidget(self.path_line_edit)
+
+        button_layout = QHBoxLayout()
+
+        self.file_button = QPushButton("Select tiff file", self)
+        self.file_button.clicked.connect(self.select_file)
+        self.file_button.setAutoDefault(False)
+        self.file_button.setDefault(False)
+
+        button_layout.addWidget(self.file_button)
+
+        self.folder_button = QPushButton("Select zarr folder", self)
+        self.folder_button.clicked.connect(self.select_folder)
+        self.folder_button.setAutoDefault(False)
+        self.folder_button.setDefault(False)
+        button_layout.addWidget(self.folder_button)
+
+        self.layout.addLayout(button_layout)
+
+        self.ok_button = QPushButton("OK", self)
+        self.ok_button.clicked.connect(self.accept)
+        self.layout.addWidget(self.ok_button)
+
+    def select_file(self):
+        file, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select Segmentation File",
+            "",
+            "Segmentation Files (*.tiff *.zarr *.tif)",
+        )
+        if file:
+            self.path_line_edit.setText(file)
+
+    def select_folder(self):
+        folder = QFileDialog.getExistingDirectory(
+            self,
+            "Select Folder",
+            "",
+            QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks,
+        )
+        if folder:
+            self.path_line_edit.setText(folder)
+
+    def get_selected_path(self):
+        return self.path_line_edit.text()
 
 
 class MeasurementWidget(QWidget):
