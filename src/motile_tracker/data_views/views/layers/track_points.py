@@ -42,7 +42,7 @@ class TrackPoints(napari.layers.Points):
             self.tracks_viewer.tracks, self.tracks_viewer.symbolmap
         )
 
-        self.default_size = 5
+        self.default_size = self.tracks_viewer.tracks.scale[-1] * 5
 
         super().__init__(
             data=points,
