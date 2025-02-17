@@ -205,10 +205,8 @@ class DataWidget(QWidget):
         csv_layout.addWidget(QLabel("CSV File Path:"))
         csv_layout.addWidget(self.csv_path_line)
         csv_layout.addWidget(self.csv_browse_button)
-        csv_widget = QWidget()
-        csv_widget.setLayout(csv_layout)
 
-        self.layout.addWidget(csv_widget)
+        self.layout.addLayout(csv_layout)
 
         # Optional QlineEdit for segmentation image path and browse button
         if self.add_segmentation:
@@ -536,6 +534,8 @@ class ImportTracksDialog(QDialog):
         self.stacked_widget.removeWidget(self.data_widget)
         if self.scale_page is not None:
             self.stacked_widget.removeWidget(self.scale_page)
+        if self.measurement_widget is not None:
+            self.stacked_widget.removeWidget(self.measurement_widget)
 
         self.data_widget = DataWidget(
             add_segmentation=self.menu_widget.segmentation_checkbox.isChecked(),
