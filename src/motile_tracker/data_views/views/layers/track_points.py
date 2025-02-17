@@ -90,6 +90,11 @@ class TrackPoints(napari.layers.Points):
         # listen to updates of the data
         self.events.data.connect(self._update_data)
 
+        # connect to changing the point size in the UI
+        self.events.current_size.connect(
+            lambda: self.set_point_size(size=self.current_size)
+        )
+
         # listen to updates in the selected data (from the point selection tool)
         # to update the nodes in self.tracks_viewer.selected_nodes
         self.selected_data.events.items_changed.connect(self._update_selection)
