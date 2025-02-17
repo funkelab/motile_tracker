@@ -42,7 +42,7 @@ class TrackPoints(napari.layers.Points):
             self.tracks_viewer.tracks, self.tracks_viewer.symbolmap
         )
 
-        self.default_size = 5
+        self.default_size = self.tracks_viewer.tracks.scale[-1] * 5
 
         super().__init__(
             data=points,
@@ -89,6 +89,11 @@ class TrackPoints(napari.layers.Points):
 
         # listen to updates of the data
         self.events.data.connect(self._update_data)
+
+        # connect to changing the point size in the UI
+        self.events.current_size.connect(
+            lambda: self.set_point_size(size=self.current_size)
+        )
 
         # listen to updates in the selected data (from the point selection tool)
         # to update the nodes in self.tracks_viewer.selected_nodes
