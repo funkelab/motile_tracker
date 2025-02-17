@@ -100,6 +100,8 @@ class CSVFieldMapWidget(QWidget):
             "parent_id",
         ]
 
+        self.columns_left = []
+
         if incl_z:
             self.standard_fields.insert(1, "z")
         if seg:
@@ -131,38 +133,35 @@ class CSVFieldMapWidget(QWidget):
         # QComboBox dictionary from feature name to csv column
         initial_mapping = self._get_initial_mapping()
         for attribute, csv_column in initial_mapping.items():
-            combo = QComboBox(self)
-            combo.addItems(self.csv_columns)
-            combo.setCurrentText(csv_column)
-            label: QLabel | QLineEdit = (
-                QLabel(attribute)
-                if attribute in self.standard_fields
-                else QLineEdit(text=attribute)
-            )
-            self.mapping_widgets[label] = combo
-            self.mapping_layout.addRow(label, combo)
+            if attribute in self.standard_fields:
+                combo = QComboBox(self)
+                combo.addItems(self.csv_columns)
+                combo.setCurrentText(csv_column)
+                label = QLabel(attribute)
+                self.mapping_widgets[label] = combo
+                self.mapping_layout.addRow(label, combo)
 
     def _get_initial_mapping(self) -> dict[str, str]:
         """Make an initial guess for mapping of csv columns to fields"""
 
         mapping = {}
-        columns_left: list = self.csv_columns.copy()
+        self.columns_left: list = self.csv_columns.copy()
 
         # find exact matches for standard fields
         for attribute in self.standard_fields:
-            if attribute in columns_left:
+            if attribute in self.columns_left:
                 mapping[attribute] = attribute
-                columns_left.remove(attribute)
+                self.columns_left.remove(attribute)
 
         # assign first remaining column as best guess for remaining standard fields
         for attribute in self.standard_fields:
             if attribute in mapping:
                 continue
-            mapping[attribute] = columns_left.pop(0)
+            mapping[attribute] = self.columns_left.pop(0)
 
-        # make new features for any remaining columns
-        for column in columns_left:
-            mapping[column] = column
+        # # make new features for any remaining columns
+        # for column in self.columns_left:
+        #     mapping[column] = column
         return mapping
 
     def get_name_map(self) -> dict[str, str]:
