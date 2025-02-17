@@ -205,8 +205,10 @@ class DataWidget(QWidget):
         csv_layout.addWidget(QLabel("CSV File Path:"))
         csv_layout.addWidget(self.csv_path_line)
         csv_layout.addWidget(self.csv_browse_button)
+        csv_widget = QWidget()
+        csv_widget.setLayout(csv_layout)
 
-        self.layout.addLayout(csv_layout)
+        self.layout.addWidget(csv_widget)
 
         # Optional QlineEdit for segmentation image path and browse button
         if self.add_segmentation:
@@ -216,11 +218,29 @@ class DataWidget(QWidget):
             self.image_browse_button.setAutoDefault(0)
             self.image_browse_button.clicked.connect(self._browse_segmentation)
 
-            image_layout = QHBoxLayout()
-            image_layout.addWidget(QLabel("Segmentation File Path:"))
-            image_layout.addWidget(self.image_path_line)
-            image_layout.addWidget(self.image_browse_button)
-            self.layout.addLayout(image_layout)
+            image_widget = QWidget()
+            image_layout = QVBoxLayout()
+            image_sublayout = QHBoxLayout()
+            image_sublayout.addWidget(QLabel("Segmentation File Path:"))
+            image_sublayout.addWidget(self.image_path_line)
+            image_sublayout.addWidget(self.image_browse_button)
+
+            label = QLabel(
+                "Segmentation files can either be a single tiff stack, or a directory inside a zarr folder."
+            )
+            font = label.font()
+            font.setItalic(True)
+            label.setFont(font)
+
+            label.setWordWrap(True)
+            image_layout.addWidget(label)
+
+            image_layout.addLayout(image_sublayout)
+            image_widget.setLayout(image_layout)
+            image_widget.setMaximumHeight(100)
+
+            self.layout.addWidget(image_widget)
+            self.layout.setAlignment(Qt.AlignTop)
 
         # Initialize the CSVFieldMapWidget as None
         self.csv_field_widget: CSVFieldMapWidget | None = None
