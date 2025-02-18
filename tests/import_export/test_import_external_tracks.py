@@ -155,7 +155,7 @@ class TestLoadTracks:
         )
 
         tracks = tracks_from_df(
-            df, segmentation, scale=(1, 1, 1), measurements=["area"]
+            df, segmentation, scale=(1, 1, 1), features={"Area": "Recompute"}
         )
 
         assert tracks._get_node_attr(1, NodeAttr.AREA.value) == 3
@@ -164,7 +164,7 @@ class TestLoadTracks:
         assert tracks._get_node_attr(4, NodeAttr.AREA.value) == 3
 
         tracks = tracks_from_df(
-            df, segmentation, scale=(1, 2, 1), measurements=["area"]
+            df, segmentation, scale=(1, 2, 1), features={"Area": "Recompute"}
         )
 
         assert tracks._get_node_attr(1, NodeAttr.AREA.value) == 6
@@ -173,16 +173,36 @@ class TestLoadTracks:
         assert tracks._get_node_attr(4, NodeAttr.AREA.value) == 6
 
         tracks = tracks_from_df(
-            df, segmentation=None, scale=(1, 2, 1), measurements=["area"]
+            df, segmentation=None, scale=(1, 2, 1), features={"Area": "Recompute"}
         )  # no seg provided, should return None
 
         assert tracks._get_node_attr(1, NodeAttr.AREA.value) is None
 
         tracks = tracks_from_df(
-            df, segmentation, scale=(1, 2, 1), measurements=[]
+            df, segmentation, scale=(1, 2, 1), features={}
         )  # no area measurement provided, should return None.
 
         assert tracks._get_node_attr(1, NodeAttr.AREA.value) is None
+
+        data = {
+            NodeAttr.TIME.value: [0, 0, 0, 1],
+            "seg_id": [1, 2, 3, 4],
+            "id": [1, 2, 3, 4],
+            "parent_id": [None, 1, 2, 3],
+            "y": [0, 1.6667, 1.333, 1.333],
+            "x": [1, 0.33333, 1.66667, 1.66667],
+            "area": [1, 2, 3, 4],
+        }
+        df = pd.DataFrame(data)
+
+        tracks = tracks_from_df(
+            df, segmentation, scale=(1, 1, 1), features={"Area": "area"}
+        )  # Area column provided by the dataframe (import_external_tracks_dialog is in charge of mapping a custom column to a column named 'area' (to be updated in future version that supports additional measured features)
+
+        assert tracks._get_node_attr(1, NodeAttr.AREA.value) == 1
+        assert tracks._get_node_attr(2, NodeAttr.AREA.value) == 2
+        assert tracks._get_node_attr(3, NodeAttr.AREA.value) == 3
+        assert tracks._get_node_attr(4, NodeAttr.AREA.value) == 4
 
     def test_load_sample_data(self):
         test_dir = os.path.abspath(__file__)
