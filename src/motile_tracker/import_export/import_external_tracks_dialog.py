@@ -381,36 +381,88 @@ class FileFolderDialog(QDialog):
 class MeasurementWidget(QWidget):
     """QWidget to choose which measurements should be calculated"""
 
-    def __init__(self, ndim: int):
+    update_features = Signal()
+
+    def __init__(self, columns_left: list[str], ndim: int):
         super().__init__()
 
-        layout = QVBoxLayout()
+        self.columns_left = columns_left
+        self.layout = QVBoxLayout()
 
         # Checkboxes for measurements
         self.measurements = []
-        layout.addWidget(QLabel("Choose measurements to calculate"))
+        self.layout.addWidget(QLabel("Choose measurements to calculate"))
+
         if ndim == 2:
             self.measurements.append("Area")
         elif ndim == 3:
             self.measurements.append("Volume")
 
         self.measurement_checkboxes = {}
-        for measurement in self.measurements:
-            checkbox = QCheckBox(measurement)
-            checkbox.setChecked(True)
-            self.measurement_checkboxes[measurement] = checkbox
-            layout.addWidget(checkbox)
+        self.radio_buttons = {}
+        self.select_column_radio_buttons = {}
+        self.column_dropdowns = {}
 
-        layout.setAlignment(Qt.AlignTop)
-        self.setLayout(layout)
+        for measurement in self.measurements:
+            row_layout = QHBoxLayout()
+
+            checkbox = QCheckBox(measurement)
+            checkbox.setChecked(False)
+            checkbox.stateChanged.connect(self.emit_update_features)
+            self.measurement_checkboxes[measurement] = checkbox
+            row_layout.addWidget(checkbox)
+
+            recompute_radio = QRadioButton("Recompute")
+            recompute_radio.setChecked(True)
+            select_column_radio = QRadioButton("Select from column")
+            button_group = QButtonGroup()
+            button_group.addButton(recompute_radio)
+            button_group.addButton(select_column_radio)
+            self.radio_buttons[measurement] = button_group
+            row_layout.addWidget(recompute_radio)
+            row_layout.addWidget(select_column_radio)
+
+            column_dropdown = QComboBox()
+            column_dropdown.addItems(self.columns_left)
+            column_dropdown.setEnabled(False)
+            column_dropdown.currentIndexChanged.connect(self.emit_update_features)
+            self.column_dropdowns[measurement] = column_dropdown
+            row_layout.addWidget(column_dropdown)
+
+            select_column_radio.toggled.connect(
+                lambda checked, dropdown=column_dropdown: dropdown.setEnabled(checked)
+            )
+            select_column_radio.toggled.connect(self.emit_update_features)
+
+            self.layout.addLayout(row_layout)
+
+        self.layout.setAlignment(Qt.AlignTop)
+        self.setLayout(self.layout)
+
+    def emit_update_features(self):
+        self.update_features.emit()
 
     def get_measurements(self) -> list[str]:
         """Return the selected measurements as a list of strings"""
 
-        measurements = []
-        for measurement, checkbox in self.measurement_checkboxes.items():
+        selected_measurements = []
+        for prop_name, checkbox in self.measurement_checkboxes.items():
             if checkbox.isChecked():
-                measurements.append(measurement)
+                selected_measurements.append(prop_name)
+
+        measurements = {}
+        for measurement in selected_measurements:
+            button_group = self.radio_buttons[measurement]
+            checked_button = button_group.checkedButton()
+            if checked_button is not None:
+                if checked_button.text() == "Recompute":
+                    measurements[measurement] = "Recompute"
+                elif checked_button.text() == "Select from column":
+                    # retrieve the column name that was chosen
+                    measurements[measurement] = self.column_dropdowns[
+                        measurement
+                    ].currentText()
+
         return measurements
 
 
@@ -520,6 +572,7 @@ class ImportTracksDialog(QDialog):
             add_segmentation=self.menu_widget.segmentation_checkbox.isChecked()
         )
         self.data_widget.update_buttons.connect(self._update_buttons)
+        self.data_widget.update_buttons.connect(self._update_measurement_widget)
         self.stacked_widget.addWidget(self.data_widget)
 
         # Optional Page 3 with scaling is None until specified otherwise
@@ -529,6 +582,20 @@ class ImportTracksDialog(QDialog):
         self.measurement_widget = None
 
         self._update_buttons()
+
+    def _update_measurement_widget(self) -> None:
+        if (
+            self.data_widget.df is not None
+            and self.menu_widget.segmentation_checkbox.isChecked()
+        ):
+            if self.measurement_widget is not None:
+                self.stacked_widget.removeWidget(self.measurement_widget)
+            self.measurement_widget = MeasurementWidget(
+                self.data_widget.csv_field_widget.columns_left,
+                ndim=2 if self.menu_widget.radio_2D.isChecked() else 3,
+            )
+            self.stacked_widget.addWidget(self.measurement_widget)
+            self._update_buttons()
 
     def _update_pages(self) -> None:
         """Recreate page2 and page3 when the user changes the options in the menu"""
@@ -544,6 +611,7 @@ class ImportTracksDialog(QDialog):
             incl_z=self.menu_widget.radio_3D.isChecked(),
         )
         self.data_widget.update_buttons.connect(self._update_buttons)
+        self.data_widget.update_buttons.connect(self._update_measurement_widget)
 
         self.stacked_widget.addWidget(self.data_widget)
 
@@ -551,9 +619,13 @@ class ImportTracksDialog(QDialog):
             self.scale_page = ScaleWidget(self.menu_widget.radio_3D.isChecked())
             self.stacked_widget.addWidget(self.scale_page)
 
-        if self.menu_widget.segmentation_checkbox.isChecked():
+        if (
+            self.data_widget.df is not None
+            and self.menu_widget.segmentation_checkbox.isChecked()
+        ):
             self.measurement_widget = MeasurementWidget(
-                ndim=2 if self.menu_widget.radio_2D.isChecked() else 3
+                self.data_widget.csv_field_widget.columns_left,
+                ndim=2 if self.menu_widget.radio_2D.isChecked() else 3,
             )
             self.stacked_widget.addWidget(self.measurement_widget)
 
@@ -579,6 +651,15 @@ class ImportTracksDialog(QDialog):
     def _update_buttons(self) -> None:
         """Enable or disable buttons based on the current page."""
 
+        # Do not allow to finish if no CSV file is loaded
+        if self.data_widget.df is None or (
+            self.menu_widget.segmentation_checkbox.isChecked()
+            and self.data_widget.image_path_line.text() == ""
+        ):
+            self.finish_button.setEnabled(False)
+        else:
+            self.finish_button.setEnabled(True)
+
         current_index = self.stacked_widget.currentIndex()
         if current_index + 1 == self.stacked_widget.count():
             self.next_button.hide()
@@ -589,15 +670,6 @@ class ImportTracksDialog(QDialog):
         self.previous_button.setEnabled(current_index > 0)
         self.next_button.setEnabled(current_index < self.stacked_widget.count() - 1)
         self.finish_button.setAutoDefault(0)
-
-        # Do not allow to finish if no CSV file is loaded
-        if self.data_widget.df is None or (
-            self.menu_widget.segmentation_checkbox.isChecked()
-            and self.data_widget.image_path_line.text() == ""
-        ):
-            self.finish_button.setEnabled(False)
-        else:
-            self.finish_button.setEnabled(True)
 
         self.next_button.setAutoDefault(0)
         self.previous_button.setAutoDefault(0)
@@ -610,12 +682,9 @@ class ImportTracksDialog(QDialog):
         name_map = self.data_widget.csv_field_widget.get_name_map()
 
         # Create new columns for each feature based on the original column values
+        df = pd.DataFrame()
         for feature, column in name_map.items():
-            self.data_widget.df[feature] = self.data_widget.df[column]
-
-        # # note: this will fail if one column is used for two features
-        # name_map_reversed = {value: key for key, value in name_map.items()}
-        # self.data_widget.df.rename(columns=name_map_reversed, inplace=True)
+            df[feature] = self.data_widget.df[column]
 
         # Read scaling information from the spinboxes
         if self.scale_page is not None:
@@ -624,9 +693,14 @@ class ImportTracksDialog(QDialog):
             scale = [1, 1, 1] if self.data_widget.incl_z is False else [1, 1, 1, 1]
 
         if self.measurement_widget is not None:
-            measurements = self.measurement_widget.get_measurements()
+            features = self.measurement_widget.get_measurements()
+            for feature in features:
+                if features[feature] != "Recompute" and (
+                    feature == "Area" or feature == "Volume"
+                ):
+                    df["area"] = self.data_widget.df[features[feature]]
         else:
-            measurements = []
+            features = []
 
         # Try to create a Tracks object with the provided CSV file, the attr:column dictionaries, and the scaling information
         self.name = self.menu_widget.name_widget.text()
@@ -638,7 +712,7 @@ class ImportTracksDialog(QDialog):
 
         try:
             self.tracks = tracks_from_df(
-                self.data_widget.df, self.data_widget.segmentation, scale, measurements
+                df, self.data_widget.segmentation, scale, features
             )
 
         except ValueError as e:

@@ -89,7 +89,7 @@ def tracks_from_df(
     df: pd.DataFrame,
     segmentation: np.ndarray | None = None,
     scale: list[float] | None = None,
-    measurements: list[str] | None = (),
+    features: dict[str:str] | None = (),
 ) -> SolutionTracks:
     """Turns a pandas data frame with columns:
         t,[z],y,x,id,parent_id,[seg_id], [optional custom attr 1], ...
@@ -107,9 +107,9 @@ def tracks_from_df(
             corresponds to the label ids in the segmentation array. Defaults to None.
         scale (list[float] | None, optional):
             The scale of the segmentation (including the time dimension). Defaults to None.
-        measurements (list[str] | None, optional)
-            The list of measurement attributes (area, volume) to compute (
-            if they were not provided by the dataframe already). Defaults to None.
+        features (dict[str: str] | None, optional)
+            Dict mapping measurement attributes (area, volume) to value that specifies a column from which to import.
+            If value equals to "Recompute", recompute these values instead of importing them from a column.
 
     Returns:
         SolutionTracks: a solution tracks object
@@ -210,7 +210,7 @@ def tracks_from_df(
     if (
         tracks.segmentation is not None
         and NodeAttr.AREA.value not in df.columns
-        and len(measurements) > 0
+        and len(features) > 0
     ):
         nodes = tracks.graph.nodes
         times = tracks.get_times(nodes)
