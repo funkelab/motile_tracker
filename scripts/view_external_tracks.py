@@ -1,8 +1,10 @@
 import napari
+import pandas as pd
+
 from motile_tracker.application_menus import MainApp
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 from motile_tracker.example_data import Fluo_N2DL_HeLa
-from motile_tracker.import_export.load_tracks import tracks_from_csv
+from motile_tracker.import_export.load_tracks import tracks_from_df
 
 if __name__ == "__main__":
     # load the example data
@@ -12,19 +14,24 @@ if __name__ == "__main__":
     # example segmentation data, loaded above
     csvfile = "scripts/hela_example_tracks.csv"
     selected_columns = {
-        "t": "t",
+        "time": "t",
         "y": "y",
         "x": "x",
         "id": "id",
         "parent_id": "parent_id",
-        "seg_id": "seg_id",
+        "seg_id": "id",
     }
-    tracks = tracks_from_csv(
-        csvfile,
-        selected_columns,
-        extra_columns={},
+
+    df = pd.read_csv(csvfile)
+
+    # Create new columns for each feature based on the original column values
+    for feature, column in selected_columns.items():
+        df[feature] = df[column]
+
+    tracks = tracks_from_df(
+        df=df,
         segmentation=segmentation_arr,
-        scale=[1, 1],
+        scale=[1, 1, 1],
     )
 
     viewer = napari.Viewer()

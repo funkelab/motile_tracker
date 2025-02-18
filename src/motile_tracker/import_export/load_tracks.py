@@ -50,9 +50,13 @@ def _test_valid(df: pd.DataFrame, segmentation: np.ndarray, scale: list[float]) 
     segmentation file
     """
     if NodeAttr.SEG_ID.value not in df.columns:
+        print("No SEG_ID was provided")
         return False
 
     if segmentation.ndim != len(scale):
+        print(
+            "Dimensions of the segmentation image do not match the number of scale values given"
+        )
         return False
 
     row = df.iloc[0]
@@ -63,6 +67,9 @@ def _test_valid(df: pd.DataFrame, segmentation: np.ndarray, scale: list[float]) 
     )
 
     if segmentation.ndim != len(pos):
+        print(
+            "Dimensions of the segmentation do not match with the number of positional dimensions"
+        )
         return False
 
     seg_id = row[NodeAttr.SEG_ID.value]
