@@ -108,44 +108,33 @@ class CSVFieldMapWidget(QWidget):
             self.standard_fields.insert(-2, "seg_id")
 
         csv_column_layout = QVBoxLayout()
-        csv_column_layout.addWidget(QLabel("Choose columns from CSV"))
+        csv_column_layout.addWidget(QLabel("Choose columns from CSV file"))
 
         # Field Mapping Layout
         self.mapping_layout = QFormLayout()
-        self.mapping_widgets: dict[QLabel | QLineEdit, QComboBox] = {}
-        self._set_view(csv_columns, seg=seg)
+        self.mapping_widgets = {}
+        layout = QVBoxLayout()
+
+        initial_mapping = self._get_initial_mapping(csv_columns)
+        for attribute, csv_column in initial_mapping.items():
+            if attribute in self.standard_fields:
+                combo = QComboBox()
+                combo.addItems(csv_columns)
+                combo.setCurrentText(csv_column)
+                label = QLabel(attribute)
+                self.mapping_widgets[attribute] = combo
+                self.mapping_layout.addRow(label, combo)
 
         # Assemble layouts
         csv_column_layout.addLayout(self.mapping_layout)
-        layout = QVBoxLayout()
         layout.addLayout(csv_column_layout)
         self.setLayout(layout)
 
-    def _set_view(self, csv_columns: list[str], seg: bool = False) -> None:
-        """Create the layout for mapping csv columns to track features"""
-
-        self.mapping_widgets = {}
-        self.mapping_layout = QFormLayout()
-
-        self.csv_columns = csv_columns
-        self.seg = seg
-
-        # QComboBox dictionary from feature name to csv column
-        initial_mapping = self._get_initial_mapping()
-        for attribute, csv_column in initial_mapping.items():
-            if attribute in self.standard_fields:
-                combo = QComboBox(self)
-                combo.addItems(self.csv_columns)
-                combo.setCurrentText(csv_column)
-                label = QLabel(attribute)
-                self.mapping_widgets[label] = combo
-                self.mapping_layout.addRow(label, combo)
-
-    def _get_initial_mapping(self) -> dict[str, str]:
+    def _get_initial_mapping(self, csv_columns) -> dict[str, str]:
         """Make an initial guess for mapping of csv columns to fields"""
 
         mapping = {}
-        self.columns_left: list = self.csv_columns.copy()
+        self.columns_left: list = csv_columns.copy()
 
         # find exact matches for standard fields
         for attribute in self.standard_fields:
@@ -159,17 +148,14 @@ class CSVFieldMapWidget(QWidget):
                 continue
             mapping[attribute] = self.columns_left.pop(0)
 
-        # # make new features for any remaining columns
-        # for column in self.columns_left:
-        #     mapping[column] = column
         return mapping
 
     def get_name_map(self) -> dict[str, str]:
         """Return a mapping from feature name to csv field name"""
 
         return {
-            label.text(): combo.currentText()
-            for label, combo in self.mapping_widgets.items()
+            attribute: combo.currentText()
+            for attribute, combo in self.mapping_widgets.items()
         }
 
 
@@ -190,12 +176,7 @@ class DataWidget(QWidget):
         # QlineEdit for CSV file path and browse button
         self.csv_path_line = QLineEdit(self)
         self.csv_path_line.setFocusPolicy(Qt.StrongFocus)
-        self.csv_path_line.editingFinished.connect(
-            lambda: self._load_csv(self.csv_path_line.text())
-        )
-        self.csv_path_line.returnPressed.connect(
-            lambda: self._load_csv(self.csv_path_line.text())
-        )
+        self.csv_path_line.returnPressed.connect(self._on_csv_editing_finished)
         self.csv_browse_button = QPushButton("Browse Tracks CSV file", self)
         self.csv_browse_button.setAutoDefault(0)
         self.csv_browse_button.clicked.connect(self._browse_csv)
@@ -204,8 +185,10 @@ class DataWidget(QWidget):
         csv_layout.addWidget(QLabel("CSV File Path:"))
         csv_layout.addWidget(self.csv_path_line)
         csv_layout.addWidget(self.csv_browse_button)
+        csv_widget = QWidget()
+        csv_widget.setLayout(csv_layout)
 
-        self.layout.addLayout(csv_layout)
+        self.layout.addWidget(csv_widget)
 
         # Optional QlineEdit for segmentation image path and browse button
         if self.add_segmentation:
@@ -240,7 +223,11 @@ class DataWidget(QWidget):
             self.layout.setAlignment(Qt.AlignTop)
 
         # Initialize the CSVFieldMapWidget as None
-        self.csv_field_widget: CSVFieldMapWidget | None = None
+        self.csv_field_widget = None
+
+    def _on_csv_editing_finished(self):
+        csv_path = self.csv_path_line.text()
+        self._load_csv(csv_path)
 
     def _browse_csv(self) -> None:
         """Open File dialog to select CSV file"""
