@@ -1,4 +1,5 @@
 import ast
+from warnings import warn
 
 import networkx as nx
 import numpy as np
@@ -8,9 +9,16 @@ from motile_toolbox.candidate_graph import NodeAttr
 from motile_tracker.data_model import SolutionTracks
 
 
-def ensure_integer_ids(df):
-    """Ensure that the 'id' column in the dataframe contains integer values"""
+def ensure_integer_ids(df: pd.DataFrame) -> pd.DataFrame:
+    """Ensure that the 'id' column in the dataframe contains integer values
 
+    Args:
+        df (pd.DataFrame): A pandas dataframe with a columns named "id" and "parent_id"
+
+    Returns:
+        pd.DataFrame: The same dataframe with the ids remapped to be unique integers.
+            Parent id column is also remapped.
+    """
     if not pd.api.types.is_integer_dtype(df["id"]):
         unique_ids = df["id"].unique()
         id_mapping = {
@@ -23,11 +31,24 @@ def ensure_integer_ids(df):
     return df
 
 
-def ensure_correct_labels(df, segmentation):
-    """create a new segmentation image where the values from the column df['seg_id'] are replaced by those in df['id']"""
+def ensure_correct_labels(df: pd.DataFrame, segmentation: np.ndarray) -> np.ndarray:
+    """Create a new segmentation where the values from the column df['seg_id'] are
+    replaced by those in df['id']
+
+    Args:
+        df (pd.DataFrame): A pandas dataframe with columns "seg_id" and "id" where
+            the "id" column contains unique integers
+        segmentation (np.ndarray): A numpy array where segmentation label values
+            are recorded in the "seg_id" column of the dataframe
+
+    Returns:
+        np.ndarray: A numpy array similar to the input segmentation of dtype uint64
+            where each segmentation now has a unique label across time that corresponds
+            to the ID of each node
+    """
 
     # Create a new segmentation image
-    new_segmentation = np.zeros_like(segmentation)
+    new_segmentation = np.zeros_like(segmentation).astype(np.uint64)
 
     # Loop through each time point
     for t in df[NodeAttr.TIME.value].unique():
@@ -44,20 +65,40 @@ def ensure_correct_labels(df, segmentation):
     return new_segmentation
 
 
-def _test_valid(df: pd.DataFrame, segmentation: np.ndarray, scale: list[float]) -> bool:
-    """Test if the segmentation pixel value for the coordinates of first node corresponds
+def _test_valid(
+    df: pd.DataFrame, segmentation: np.ndarray, scale: list[float] | None
+) -> bool:
+    """Test if the provided segmentation, dataframe, and scale values are valid together.
+    Tests the following requirements:
+      - The scale, if provided, has same dimensions as the segmentation
+      - The location coordinates have the same dimensions as the segmentation
+      - The segmentation pixel value for the coordinates of first node corresponds
     with the provided seg_id as a basic sanity check that the csv file matches with the
     segmentation file
-    """
-    if NodeAttr.SEG_ID.value not in df.columns:
-        print("No SEG_ID was provided")
-        return False
 
-    if segmentation.ndim != len(scale):
-        print(
-            "Dimensions of the segmentation image do not match the number of scale values given"
-        )
-        return False
+    Args:
+        df (pd.DataFrame): the pandas dataframe to turn into tracks, with standardized
+            column names
+        segmentation (np.ndarray): The segmentation, a 3D or 4D array of integer labels
+        scale (list[float] | None): A list of floats representing the relationship between
+            the point coordinates and the pixels in the segmentation
+
+    Returns:
+        bool: True if the combination of segmentation, dataframe, and scale
+            pass all validity tests and can likely be loaded, and False otherwise
+    """
+    if scale is not None:
+        if segmentation.ndim != len(scale):
+            warn(
+                f"Dimensions of the segmentation image ({segmentation.ndim}) "
+                f"do not match the number of scale values given ({len(scale)})",
+                stacklevel=2,
+            )
+            return False
+    else:
+        scale = [
+            1,
+        ] * segmentation.ndim
 
     row = df.iloc[0]
     pos = (
@@ -67,8 +108,10 @@ def _test_valid(df: pd.DataFrame, segmentation: np.ndarray, scale: list[float]) 
     )
 
     if segmentation.ndim != len(pos):
-        print(
-            "Dimensions of the segmentation do not match with the number of positional dimensions"
+        warn(
+            f"Dimensions of the segmentation ({segmentation.ndim}) do not match the "
+            f"number of positional dimensions ({len(pos)})",
+            stacklevel=2,
         )
         return False
 
@@ -80,6 +123,9 @@ def _test_valid(df: pd.DataFrame, segmentation: np.ndarray, scale: list[float]) 
     try:
         value = segmentation[tuple(coordinates)]
     except IndexError:
+        warn(
+            f"Could not get the segmentation value at index {coordinates}", stacklevel=2
+        )
         return False
 
     return value == seg_id
@@ -117,8 +163,14 @@ def tracks_from_df(
         ValueError: if the segmentation IDs in the dataframe do not match the provided
             segmentation
     """
-
+    # check that the required columns are present
     required_columns = ["id", NodeAttr.TIME.value, "y", "x", "parent_id"]
+    ndim = None
+    if segmentation is not None:
+        required_columns.append("seg_id")
+        ndim = segmentation.ndim
+        if ndim == 4:
+            required_columns.append("z")
     for column in required_columns:
         assert (
             column in df.columns
@@ -126,7 +178,9 @@ def tracks_from_df(
 
     if segmentation is not None and not _test_valid(df, segmentation, scale):
         raise ValueError(
-            "Segmentation ids in dataframe do not match values in segmentation. Is it possible that you loaded the wrong combination of csv file and segmentation, or that the scaling information you provided is incorrect?"
+            "Segmentation ids in dataframe do not match values in segmentation."
+            "Is it possible that you loaded the wrong combination of csv file and "
+            "segmentation, or that the scaling information you provided is incorrect?"
         )
     if not df["id"].is_unique:
         raise ValueError("The 'id' column must contain unique values")
@@ -163,7 +217,6 @@ def tracks_from_df(
         if "z" in df.columns:
             pos = [row["z"], row["y"], row["x"]]
             ndims = 4
-            del row_dict["z"]
         else:
             pos = [row["y"], row["x"]]
             ndims = 3
@@ -192,10 +245,11 @@ def tracks_from_df(
             ), f"Parent id {parent_id} of node {_id} not in graph yet"
             graph.add_edge(parent_id, _id)
 
+    # in the case a different column than the id column was used for the seg_id, we need
+    # to update the segmentation to make sure it matches the values in the id column (it
+    # should be checked by now that these are unique and integers)
     if segmentation is not None and row["seg_id"] != row["id"]:
-        segmentation = ensure_correct_labels(
-            df, segmentation
-        )  # in the case a different column than the id column was used for the seg_id, we need to update the segmentation to make sure it matches the values in the id column (it should be checked by now that these are unique and integers)
+        segmentation = ensure_correct_labels(df, segmentation)
 
     tracks = SolutionTracks(
         graph=graph,

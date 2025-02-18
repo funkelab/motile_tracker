@@ -69,7 +69,7 @@ class TestLoadTracks:
 
         data = {
             "id": [1, 2, 3],
-            "parent_id": [0, 1, 2],
+            "parent_id": [-1, 1, 2],
             NodeAttr.TIME.value: [0, 1, 2],
             "y": [0.25, 2, 1.3333],
             "x": [0.75, 1.5, 1.6667],
@@ -85,10 +85,11 @@ class TestLoadTracks:
         )
 
         assert _test_valid(df, segmentation, scale=[1, 1, 1])
+        assert _test_valid(df, segmentation, scale=None)
 
         data = {
             "id": [1, 2, 3],
-            "parent_id": [0, 1, 2],
+            "parent_id": [-1, 1, 2],
             NodeAttr.TIME.value: [0, 1, 2],
             "y": [1, 8, 5.3333],
             "x": [3, 6, 6.6667],
@@ -98,14 +99,26 @@ class TestLoadTracks:
 
         # test if False when scaling is applied incorrectly
         assert not _test_valid(df, segmentation, scale=[1, 1, 1])
+        with pytest.raises(
+            ValueError,
+            match="Segmentation ids in dataframe do not match values in segmentation."
+            "Is it possible that you loaded the wrong combination of csv file and "
+            "segmentation, or that the scaling information you provided is incorrect?",
+        ):
+            tracks_from_df(df, segmentation=segmentation, scale=[1, 1, 1])
         # test if True when scaling is applied correctly
         assert _test_valid(df, segmentation, scale=[1, 4, 4])
         # ndim of segmentation should match with the length of provided scale
-        assert not _test_valid(df, segmentation, scale=[1, 4, 4, 1])
+        with pytest.warns(
+            UserWarning,
+            match=r"Dimensions of the segmentation image \(3\) do not match the number "
+            r"of scale values given \(4\)",
+        ):
+            assert not _test_valid(df, segmentation, scale=[1, 4, 4, 1])
 
         data = {
             "id": [1, 2, 3],
-            "parent_id": [0, 1, 2],
+            "parent_id": [-1, 1, 2],
             NodeAttr.TIME.value: [0, 1, 2],
             "z": [1, 1, 1],
             "y": [1, 8, 5.3333],
@@ -114,7 +127,29 @@ class TestLoadTracks:
         }
         df = pd.DataFrame(data)
         # ndim of segmentation should match with the dims specified in the dataframe
-        assert not _test_valid(df, segmentation, scale=[1, 4, 4])
+        with pytest.warns(
+            UserWarning,
+            match=r"Dimensions of the segmentation \(3\) do not match the number "
+            r"of positional dimensions \(4\)",
+        ):
+            assert not _test_valid(df, segmentation, scale=[1, 4, 4])
+
+        # test actual 4D data
+        data = {
+            "id": [1, 2, 3],
+            "parent_id": [-1, 1, 2],
+            NodeAttr.TIME.value: [0, 1, 2],
+            "z": [0, 0, 0],
+            "y": [1, 8, 5.3333],
+            "x": [3, 6, 6.6667],
+            "seg_id": [1, 2, 3],
+        }
+        seg_4d = np.array([segmentation, segmentation, segmentation])
+        df = pd.DataFrame(data)
+        assert _test_valid(df, seg_4d, scale=[1, 1, 4, 4])
+        tracks = tracks_from_df(df, seg_4d, scale=[1, 1, 4, 4])
+        assert tracks.graph.number_of_nodes() == 3
+        assert tracks.graph.number_of_edges() == 2
 
     def test_relabel_segmentation(self):
         """Test relabeling the segmentation if id != seg_id"""
@@ -122,21 +157,31 @@ class TestLoadTracks:
         data = {
             NodeAttr.TIME.value: [0, 0, 0, 1],
             "seg_id": [1, 2, 3, 3],
-            "id": [10, 20, 30, 30],
+            "id": [10, 20, 30, 40],
+            "x": [0, 0, 1, 1],
+            "y": [0, 2, 2, 2],
+            "parent_id": [None, None, None, None],
         }
         df = pd.DataFrame(data)
         segmentation = np.array(
-            [[[1, 1, 2], [2, 3, 3], [1, 2, 3]], [[1, 1, 2], [2, 3, 3], [1, 2, 3]]]
+            [
+                [[1, 1, 2], [2, 3, 3], [1, 2, 3]],
+                [[0, 0, 0], [0, 3, 3], [0, 0, 3]],
+            ]
         )
         new_segmentation = ensure_correct_labels(df, segmentation)
         expected_segmentation = np.array(
             [
                 [[10, 10, 20], [20, 30, 30], [10, 20, 30]],
-                [[0, 0, 0], [0, 30, 30], [0, 0, 30]],
+                [[0, 0, 0], [0, 40, 40], [0, 0, 40]],
             ]
         )
 
         np.testing.assert_array_equal(new_segmentation, expected_segmentation)
+        tracks = tracks_from_df(df, segmentation)
+        np.testing.assert_array_equal(tracks.segmentation, expected_segmentation)
+        assert tracks.graph.number_of_nodes() == 4
+        assert tracks.graph.number_of_edges() == 0
 
     def test_measurements(self):
         """Test if the area is measured correctly, taking scaling into account"""
