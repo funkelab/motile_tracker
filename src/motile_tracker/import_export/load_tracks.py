@@ -135,7 +135,7 @@ def tracks_from_df(
     df: pd.DataFrame,
     segmentation: np.ndarray | None = None,
     scale: list[float] | None = None,
-    features: dict[str:str] | None = (),
+    features: dict[str, str] | None = None,
 ) -> SolutionTracks:
     """Turns a pandas data frame with columns:
         t,[z],y,x,id,parent_id,[seg_id], [optional custom attr 1], ...
@@ -152,10 +152,12 @@ def tracks_from_df(
             If provided, assumes that the seg_id column in the dataframe exists and
             corresponds to the label ids in the segmentation array. Defaults to None.
         scale (list[float] | None, optional):
-            The scale of the segmentation (including the time dimension). Defaults to None.
+            The scale of the segmentation (including the time dimension). Defaults to
+            None.
         features (dict[str: str] | None, optional)
-            Dict mapping measurement attributes (area, volume) to value that specifies a column from which to import.
-            If value equals to "Recompute", recompute these values instead of importing them from a column.
+            Dict mapping measurement attributes (area, volume) to value that specifies a
+            column from which to import. If value equals to "Recompute", recompute these
+            values instead of importing them from a column. Defaults to None.
 
     Returns:
         SolutionTracks: a solution tracks object
@@ -163,6 +165,8 @@ def tracks_from_df(
         ValueError: if the segmentation IDs in the dataframe do not match the provided
             segmentation
     """
+    if features is None:
+        features = {}
     # check that the required columns are present
     required_columns = ["id", NodeAttr.TIME.value, "y", "x", "parent_id"]
     ndim = None
@@ -189,15 +193,7 @@ def tracks_from_df(
 
     # Convert custom attributes stored as strings back to lists
     for col in df.columns:
-        if col not in [
-            NodeAttr.TIME.value,
-            "z",
-            "y",
-            "x",
-            "id",
-            "parent_id",
-            NodeAttr.SEG_ID.value,
-        ]:
+        if col not in required_columns:
             df[col] = df[col].apply(
                 lambda x: ast.literal_eval(x)
                 if isinstance(x, str) and x.startswith("[") and x.endswith("]")
