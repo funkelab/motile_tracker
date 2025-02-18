@@ -122,6 +122,7 @@ class CSVFieldMapWidget(QWidget):
                 combo.addItems(csv_columns)
                 combo.setCurrentText(csv_column)
                 label = QLabel(attribute)
+                label.setToolTip(self._get_tooltip(attribute))
                 self.mapping_widgets[attribute] = combo
                 self.mapping_layout.addRow(label, combo)
 
@@ -129,6 +130,21 @@ class CSVFieldMapWidget(QWidget):
         csv_column_layout.addLayout(self.mapping_layout)
         layout.addLayout(csv_column_layout)
         self.setLayout(layout)
+
+    def _get_tooltip(self, attribute: str) -> str:
+        """Return the tooltip for the given attribute"""
+
+        tooltips = {
+            NodeAttr.TIME.value: "The time point of the track. Must be an integer",
+            "y": "The world y-coordinate of the track.",
+            "x": "The world x-coordinate of the track.",
+            "id": "The unique identifier of the node (string or integer).",
+            "parent_id": "The unique identifier of the parent node (string or integer).",
+            "z": "The world z-coordinate of the track.",
+            "seg_id": "The integer label value in the segmentation file.",
+        }
+
+        return tooltips.get(attribute, "No additional information available.")
 
     def _get_initial_mapping(self, csv_columns) -> dict[str, str]:
         """Make an initial guess for mapping of csv columns to fields"""
