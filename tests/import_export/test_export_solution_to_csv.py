@@ -10,8 +10,30 @@ def test_export_to_csv(graph_2d, graph_3d, tmp_path, colormap):
 
     assert len(lines) == tracks.graph.number_of_nodes() + 1  # add header
 
-    header = ["t", "y", "x", "id", "parent_id", "track_id", "lineage_id", "color"]
+    header = [
+        "t",
+        "y",
+        "x",
+        "id",
+        "parent_id",
+        "track_id",
+        "lineage_id",
+        "color",
+        "area",
+    ]
     assert lines[0].strip().split(",") == header
+    line1 = [
+        "0",
+        "50",
+        "50",
+        "1",
+        "",
+        "1",
+        "1",
+        "[120.  37.   6.]",
+        "1245",
+    ]
+    assert lines[1].strip().split(",") == line1
 
     tracks = SolutionTracks(graph_3d, ndim=4)
     temp_file = tmp_path / "test_export_3d.csv"
