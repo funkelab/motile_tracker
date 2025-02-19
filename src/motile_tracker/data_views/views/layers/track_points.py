@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import time
 from typing import TYPE_CHECKING
 
 import napari
@@ -11,6 +12,8 @@ from napari.utils.notifications import show_info
 from motile_tracker.data_model import NodeType, Tracks
 
 if TYPE_CHECKING:
+    from napari.utils.events import Event
+
     from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
 
@@ -32,6 +35,9 @@ class TrackPoints(napari.layers.Points):
         self.nodes = list(tracks_viewer.tracks.graph.nodes)
         self.node_index_dict = {node: idx for idx, node in enumerate(self.nodes)}
 
+        self.visible_nodes = "all"
+        self.plane_nodes = "all"
+
         points = self.tracks_viewer.tracks.get_positions(self.nodes, incl_time=True)
         track_ids = [
             self.tracks_viewer.tracks.graph.nodes[node][NodeAttr.TRACK_ID.value]
@@ -43,6 +49,7 @@ class TrackPoints(napari.layers.Points):
         )
 
         self.default_size = 5
+        self.selected_track = None
 
         super().__init__(
             data=points,
@@ -75,17 +82,27 @@ class TrackPoints(napari.layers.Points):
         @self.mouse_drag_callbacks.append
         def click(layer, event):
             if event.type == "mouse_press":
-                # is the value passed from the click event?
-                point_index = layer.get_value(
-                    event.position,
-                    view_direction=event.view_direction,
-                    dims_displayed=event.dims_displayed,
-                    world=True,
-                )
-                if point_index is not None:
-                    node_id = self.nodes[point_index]
-                    append = "Shift" in event.modifiers
-                    self.tracks_viewer.selected_nodes.add(node_id, append)
+                # differentiate between click and drag
+                mouse_press_time = time.time()
+                dragged = False
+                yield
+                # on move
+                while event.type == "mouse_move":
+                    dragged = True
+                    yield
+                if dragged and time.time() - mouse_press_time < 0.5:
+                    dragged = (
+                        False  # suppress micro drag events and treat them as click
+                    )
+                if not dragged:
+                    # is the value passed from the click event?
+                    point_index = layer.get_value(
+                        event.position,
+                        view_direction=event.view_direction,
+                        dims_displayed=event.dims_displayed,
+                        world=True,
+                    )
+                    self.process_point_click(point_index, event)
 
         # listen to updates of the data
         self.events.data.connect(self._update_data)
@@ -98,6 +115,16 @@ class TrackPoints(napari.layers.Points):
         # listen to updates in the selected data (from the point selection tool)
         # to update the nodes in self.tracks_viewer.selected_nodes
         self.selected_data.events.items_changed.connect(self._update_selection)
+
+    def process_point_click(self, point_index: int | None, event: Event):
+        """Select the clicked point(s)"""
+
+        if point_index is None:
+            self.tracks_viewer.selected_nodes.reset()
+        else:
+            node_id = self.nodes[point_index]
+            append = "Shift" in event.modifiers
+            self.tracks_viewer.selected_nodes.add(node_id, append)
 
     def set_point_size(self, size: int) -> None:
         """Sets a new default point size"""
@@ -138,7 +165,24 @@ class TrackPoints(napari.layers.Points):
         """Create attributes for a new node at given time point"""
 
         t = int(new_point[0])
-        track_id = self.tracks_viewer.tracks.get_next_track_id()
+
+        if self.tracks_viewer.track_mode == "new track":
+            track_id = self.tracks_viewer.tracks.get_next_track_id()
+        else:
+            # make sure there is no node with this track id at this time point yet
+            track_id_nodes = self.tracks_viewer.tracks.track_id_to_node[
+                self.selected_track
+            ]
+            for node in track_id_nodes:
+                if (
+                    self.tracks_viewer.tracks._get_node_attr(node, NodeAttr.TIME.value)
+                    == t
+                ):  # there is a node with this track id already, so create a new track id in this case
+                    track_id = self.tracks_viewer.tracks.get_next_track_id()
+                    break
+            else:
+                track_id = self.selected_track
+
         area = 0
 
         attributes = {
@@ -196,6 +240,9 @@ class TrackPoints(napari.layers.Points):
         for point in selected_points:
             node_id = self.nodes[point]
             self.tracks_viewer.selected_nodes.add(node_id, True)
+            self.selected_track = self.tracks_viewer.tracks._get_node_attr(
+                node_id, NodeAttr.TRACK_ID.value
+            )
 
     def get_symbols(self, tracks: Tracks, symbolmap: dict[NodeType, str]) -> list[str]:
         statemap = {
@@ -206,24 +253,47 @@ class TrackPoints(napari.layers.Points):
         symbols = [symbolmap[statemap[degree]] for _, degree in tracks.graph.out_degree]
         return symbols
 
-    def update_point_outline(self, visible: list[int] | str) -> None:
+    def update_point_outline(
+        self, visible: list[int] | str, plane_nodes: list[int] | str | None = None
+    ) -> None:
         """Update the outline color of the selected points and visibility according to display mode
 
         Args:
-            visible (list[int] | str): A list of track ids, or "all"
+            visible (list[int] | str): A list of node ids, or "all"
+            plane_nodes (list[int] | str): A list of node ids, or "all"
         """
-        # filter out the non-selected tracks if in lineage mode
-        if visible == "all":
+
+        if visible is not None:
+            self.visible_nodes = visible
+
+        if plane_nodes is not None:
+            self.plane_nodes = plane_nodes
+
+        if isinstance(self.visible_nodes, str) and isinstance(self.plane_nodes, str):
+            visible = "all"
+        elif not isinstance(self.visible_nodes, str) and isinstance(
+            self.plane_nodes, str
+        ):
+            visible = self.visible_nodes
+        elif isinstance(self.visible_nodes, str) and not isinstance(
+            self.plane_nodes, str
+        ):
+            visible = self.plane_nodes
+        else:
+            visible = list(set(self.visible_nodes).intersection(set(self.plane_nodes)))
+
+        if isinstance(visible, str):
             self.shown[:] = True
         else:
-            indices = np.where(np.isin(self.properties["track_id"], visible))[
-                0
-            ].tolist()
+            indices = np.where(np.isin(self.properties["node_id"], visible))[0].tolist()
             self.shown[:] = False
             self.shown[indices] = True
 
         # set border color for selected item
-        self.border_color = [1, 1, 1, 1]
+        with (
+            self.events.border_color.blocker()
+        ):  # block the event emitter here to not trigger update in orthogonal views
+            self.border_color = [1, 1, 1, 1]
         self.size = self.default_size
         for node in self.tracks_viewer.selected_nodes:
             index = self.node_index_dict[node]
@@ -234,4 +304,13 @@ class TrackPoints(napari.layers.Points):
                 1,
             )
             self.size[index] = math.ceil(self.default_size + 0.3 * self.default_size)
+
+        if len(self.tracks_viewer.selected_nodes) > 0:
+            self.selected_track = self.tracks_viewer.tracks._get_node_attr(
+                self.tracks_viewer.selected_nodes[0], NodeAttr.TRACK_ID.value
+            )
+
+        self.border_color = (
+            self.border_color
+        )  # emit the event to trigger update in orthogonal views
         self.refresh()

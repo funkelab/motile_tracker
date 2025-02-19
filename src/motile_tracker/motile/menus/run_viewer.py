@@ -19,6 +19,7 @@ from qtpy.QtWidgets import (
 from superqt import QCollapsible, ensure_main_thread
 from superqt.fonticon import icon as qticon
 
+from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 from motile_tracker.motile.backend import MotileRun
 
 from .params_viewer import SolverParamsViewer
@@ -33,9 +34,10 @@ class RunViewer(QGroupBox):
 
     edit_run = Signal(object)
 
-    def __init__(self):
+    def __init__(self, tracks_viewer: TracksViewer):
         super().__init__(title="Run Viewer")
 
+        self.tracks_viewer = tracks_viewer
         # define attributes
         self.run: MotileRun | None = None
         self.params_widget = SolverParamsViewer()
@@ -196,7 +198,7 @@ class RunViewer(QGroupBox):
         self.export_tracks_dialog.selectFile(str(base_path / default_name))
         if self.export_tracks_dialog.exec_():
             outfile = self.export_tracks_dialog.selectedFiles()[0]
-            self.run.export_tracks(outfile)
+            self.run.export_tracks(outfile, self.tracks_viewer.colormap)
         else:
             warn("Exporting aborted", stacklevel=2)
 

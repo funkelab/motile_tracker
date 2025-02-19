@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import random
+import time
 from typing import TYPE_CHECKING
 
 import napari
@@ -110,33 +111,8 @@ class TrackLabels(napari.layers.Labels):
         self.bind_key("z")(self.tracks_viewer.undo)
         self.bind_key("r")(self.tracks_viewer.redo)
 
-        # Connect click events to node selection
-        @self.mouse_drag_callbacks.append
-        def click(_, event):
-            if (
-                event.type == "mouse_press"
-                and self.mode == "pan_zoom"
-                and not (
-                    self.tracks_viewer.mode == "lineage"
-                    and self.viewer.dims.ndisplay == 3
-                )
-            ):  # disable selecting in lineage mode in 3D
-                label = self.get_value(
-                    event.position,
-                    view_direction=event.view_direction,
-                    dims_displayed=event.dims_displayed,
-                    world=True,
-                )
-
-                if (
-                    label is not None
-                    and label != 0
-                    and self.colormap.map(label)[-1] != 0
-                ):  # check opacity (=visibility) in the colormap
-                    append = "Shift" in event.modifiers
-                    self.tracks_viewer.selected_nodes.add(label, append)
-
         # Listen to paint events and changing the selected label
+        self.mouse_drag_callbacks.append(self.click)
         self.events.paint.connect(self._on_paint)
         self.tracks_viewer.selected_nodes.list_updated.connect(
             self.update_selected_label
@@ -144,6 +120,44 @@ class TrackLabels(napari.layers.Labels):
         self.events.selected_label.connect(self._ensure_valid_label)
         self.events.mode.connect(self._check_mode)
         self.viewer.dims.events.current_step.connect(self._ensure_valid_label)
+
+    # Connect click events to node selection
+    def click(self, _, event):
+        if (
+            event.type == "mouse_press"
+            and self.mode == "pan_zoom"
+            and not (
+                self.tracks_viewer.mode == "lineage" and self.viewer.dims.ndisplay == 3
+            )
+        ):  # disable selecting in lineage mode in 3D
+            # differentiate between click and drag
+            mouse_press_time = time.time()
+            dragged = False
+            yield
+            # on move
+            while event.type == "mouse_move":
+                dragged = True
+                yield
+            if dragged and time.time() - mouse_press_time < 0.5:
+                dragged = False  # suppress micro drag events and treat them as click
+            # on release
+            if not dragged:
+                label = self.get_value(
+                    event.position,
+                    view_direction=event.view_direction,
+                    dims_displayed=event.dims_displayed,
+                    world=True,
+                )
+                self.process_click(event, label)
+
+    def process_click(self, event: Event, label: int):
+        if (
+            label is not None and label != 0 and self.colormap.map(label)[-1] != 0
+        ):  # check opacity (=visibility) in the colormap
+            append = "Shift" in event.modifiers
+            self.tracks_viewer.selected_nodes.add(label, append)
+        else:
+            self.tracks_viewer.selected_nodes.reset()
 
     def _get_colormap(self) -> DirectLabelColormap:
         """Get a DirectLabelColormap that maps node ids to their track ids, and then
@@ -225,8 +239,8 @@ class TrackLabels(napari.layers.Labels):
             mask = concatenated_values == old_value
             indices = tuple(concatenated_indices[dim][mask] for dim in range(ndim))
             time_points = np.unique(indices[0])
-            for time in time_points:
-                time_mask = indices[0] == time
+            for t in time_points:
+                time_mask = indices[0] == t
                 actions.append(
                     (tuple(indices[dim][time_mask] for dim in range(ndim)), old_value)
                 )

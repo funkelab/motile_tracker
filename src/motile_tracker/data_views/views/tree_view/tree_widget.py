@@ -53,8 +53,8 @@ class CustomViewBox(pg.ViewBox):
         """Modified mouseDragEvent function to check which mouse mode to use
         and to submit rectangle coordinates for selecting multiple nodes if necessary"""
 
-        #check if SHIFT is pressed
-        shift_down = (ev.modifiers() == QtCore.Qt.ShiftModifier)
+        # check if SHIFT is pressed
+        shift_down = ev.modifiers() == QtCore.Qt.ShiftModifier
 
         if shift_down:
             # if starting a shift-drag, record the scene position
@@ -72,7 +72,7 @@ class CustomViewBox(pg.ViewBox):
                 self.selected_rect.emit(rect)  # emit the rectangle
                 ev.accept()
 
-                if hasattr(self, 'rbScaleBox') and self.rbScaleBox:
+                if hasattr(self, "rbScaleBox") and self.rbScaleBox:
                     self.rbScaleBox.hide()
 
         else:
@@ -80,9 +80,10 @@ class CustomViewBox(pg.ViewBox):
             self.setMouseMode(self.PanMode)
             super().mouseDragEvent(ev, axis)
 
-            #hide the leftover box if any
-            if hasattr(self, 'rbScaleBox') and self.rbScaleBox:
+            # hide the leftover box if any
+            if hasattr(self, "rbScaleBox") and self.rbScaleBox:
                 self.rbScaleBox.hide()
+
 
 class TreePlot(pg.PlotWidget):
     node_clicked = Signal(Any, bool)  # node_id, append
@@ -424,7 +425,6 @@ class TreeWidget(QWidget):
 
     def __init__(self, viewer: napari.Viewer):
         super().__init__()
-        self.track_df = pd.DataFrame()  # all tracks
         self.lineage_df = pd.DataFrame()  # the currently viewed subset of lineages
         self.graph = None
         self.mode = "all"  # options: "all", "lineage"
@@ -432,6 +432,8 @@ class TreeWidget(QWidget):
         self.view_direction = "vertical"  # options: "horizontal", "vertical"
 
         self.tracks_viewer = TracksViewer.get_instance(viewer)
+        self.tracks_viewer.track_df = pd.DataFrame()  # all tracks
+
         self.selected_nodes = self.tracks_viewer.selected_nodes
         self.selected_nodes.list_updated.connect(self._update_selected)
         self.tracks_viewer.tracks_updated.connect(self._update_track_data)
@@ -453,7 +455,7 @@ class TreeWidget(QWidget):
 
         # Add navigation widget
         self.navigation_widget = NavigationWidget(
-            self.track_df,
+            self.tracks_viewer.track_df,
             self.lineage_df,
             self.view_direction,
             self.selected_nodes,
@@ -605,24 +607,24 @@ class TreeWidget(QWidget):
         """
 
         if self.tracks_viewer.tracks is None:
-            self.track_df = pd.DataFrame()
+            self.tracks_viewer.track_df = pd.DataFrame()
             self.graph = None
         else:
             if reset_view:
-                self.track_df = extract_sorted_tracks(
+                self.tracks_viewer.track_df = extract_sorted_tracks(
                     self.tracks_viewer.tracks, self.tracks_viewer.colormap
                 )
             else:
-                self.track_df = extract_sorted_tracks(
+                self.tracks_viewer.track_df = extract_sorted_tracks(
                     self.tracks_viewer.tracks,
                     self.tracks_viewer.colormap,
-                    self.track_df,
+                    self.tracks_viewer.track_df,
                 )
             self.graph = self.tracks_viewer.tracks.graph
 
         # check whether we have area measurements and therefore should activate the area
         # button
-        if "area" not in self.track_df.columns:
+        if "area" not in self.tracks_viewer.track_df.columns:
             if self.feature_widget.feature == "area":
                 self.feature_widget._toggle_feature_mode()
             self.feature_widget.show_area_radio.setEnabled(False)
@@ -642,7 +644,7 @@ class TreeWidget(QWidget):
             allow_flip = False
 
         # also update the navigation widget
-        self.navigation_widget.track_df = self.track_df
+        self.navigation_widget.track_df = self.tracks_viewer.track_df
         self.navigation_widget.lineage_df = self.lineage_df
 
         # check which view to set
@@ -659,7 +661,7 @@ class TreeWidget(QWidget):
 
         else:
             self.tree_widget.update(
-                self.track_df,
+                self.tracks_viewer.track_df,
                 self.view_direction,
                 self.feature,
                 self.selected_nodes,
@@ -683,7 +685,7 @@ class TreeWidget(QWidget):
                 self.view_direction = "vertical"
             else:
                 self.view_direction = "horizontal"
-            df = self.track_df
+            df = self.tracks_viewer.track_df
         elif mode == "lineage":
             self.view_direction = "horizontal"
             self._update_lineage_df()
@@ -711,7 +713,7 @@ class TreeWidget(QWidget):
         self.navigation_widget.view_direction = self.view_direction
 
         if self.mode == "all":
-            df = self.track_df
+            df = self.tracks_viewer.track_df
         if self.mode == "lineage":
             df = self.lineage_df
 
@@ -739,8 +741,8 @@ class TreeWidget(QWidget):
             visible = []
             for node_id in self.selected_nodes:
                 visible += extract_lineage_tree(self.graph, node_id)
-        self.lineage_df = self.track_df[
-            self.track_df["node_id"].isin(visible)
+        self.lineage_df = self.tracks_viewer.track_df[
+            self.tracks_viewer.track_df["node_id"].isin(visible)
         ].reset_index()
         self.lineage_df["x_axis_pos"] = (
             self.lineage_df["x_axis_pos"].rank(method="dense").astype(int) - 1
