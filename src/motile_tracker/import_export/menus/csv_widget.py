@@ -21,6 +21,8 @@ from qtpy.QtWidgets import (
 class CSVFieldMapWidget(QWidget):
     """QWidget accepting a CSV file and displaying the different column names in QComboBoxes"""
 
+    columns_updated = Signal()
+
     def __init__(self, csv_columns: list[str], seg: bool = False, incl_z: bool = False):
         super().__init__()
 
@@ -32,6 +34,7 @@ class CSVFieldMapWidget(QWidget):
             "parent_id",
         ]
 
+        self.csv_columns = csv_columns
         self.columns_left = []
 
         if incl_z:
@@ -53,6 +56,7 @@ class CSVFieldMapWidget(QWidget):
                 combo = QComboBox()
                 combo.addItems(csv_columns)
                 combo.setCurrentText(csv_column)
+                combo.currentIndexChanged.connect(self._update_columns_left)
                 label = QLabel(attribute)
                 label.setToolTip(self._get_tooltip(attribute))
                 self.mapping_widgets[attribute] = combo
@@ -62,6 +66,16 @@ class CSVFieldMapWidget(QWidget):
         csv_column_layout.addLayout(self.mapping_layout)
         layout.addLayout(csv_column_layout)
         self.setLayout(layout)
+
+    def _update_columns_left(self) -> None:
+        """Update the list of columns that have not been mapped yet"""
+
+        self.columns_left = [
+            column
+            for column in self.csv_columns
+            if column not in self.get_name_map().values()
+        ]
+        self.columns_updated.emit()
 
     def _get_tooltip(self, attribute: str) -> str:
         """Return the tooltip for the given attribute"""
@@ -76,7 +90,7 @@ class CSVFieldMapWidget(QWidget):
             "seg_id": "The integer label value in the segmentation file.",
         }
 
-        return tooltips.get(attribute, "No additional information available.")
+        return tooltips.get(attribute, "")
 
     def _get_initial_mapping(self, csv_columns: list[str]) -> dict[str, str]:
         """Make an initial guess for mapping of csv columns to fields"""
@@ -145,7 +159,9 @@ class CSVWidget(QWidget):
         # Initialize the CSVFieldMapWidget as None
         self.csv_field_widget = None
 
-    def _on_csv_editing_finished(self):
+    def _on_csv_editing_finished(self) -> None:
+        """Load the CSV file when the user presses Enter in the CSV path line"""
+
         csv_path = self.csv_path_line.text()
         self._load_csv(csv_path)
 
@@ -181,6 +197,7 @@ class CSVWidget(QWidget):
             self.csv_field_widget = CSVFieldMapWidget(
                 list(self.df.columns), seg=self.add_segmentation, incl_z=self.incl_z
             )
+            self.csv_field_widget.columns_updated.connect(self.update_buttons)
             self.layout.addWidget(self.csv_field_widget)
             self.update_buttons.emit()
 

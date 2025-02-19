@@ -75,6 +75,8 @@ class ImportTracksDialog(QDialog):
         self._update_buttons()
 
     def _update_measurement_widget(self) -> None:
+        """Update the measurement widget based on the data dimensions and on columns that have not been picked in the csv_field_widget"""
+
         if (
             self.data_widget.df is not None
             and self.menu_widget.segmentation_checkbox.isChecked()
@@ -89,7 +91,7 @@ class ImportTracksDialog(QDialog):
             self._update_buttons()
 
     def _update_pages(self) -> None:
-        """Recreate page2 and page3 when the user changes the options in the menu"""
+        """Recreate page3 and page4 when the user changes the options in the menu"""
 
         self.stacked_widget.removeWidget(self.data_widget)
         if self.segmentation_page is not None:
@@ -112,9 +114,6 @@ class ImportTracksDialog(QDialog):
             )
             self.stacked_widget.addWidget(self.segmentation_page)
             self.segmentation_page.update_buttons.connect(self._update_buttons)
-            self.segmentation_page.update_buttons.connect(
-                self._update_measurement_widget
-            )
 
         if (
             self.data_widget.df is not None
@@ -148,7 +147,7 @@ class ImportTracksDialog(QDialog):
     def _update_buttons(self) -> None:
         """Enable or disable buttons based on the current page."""
 
-        # Do not allow to finish if no CSV file is loaded
+        # Do not allow to finish if no CSV file is loaded, or if the segmentation checkbox was checked but no seg file path is given.
         if self.data_widget.df is None or (
             self.menu_widget.segmentation_checkbox.isChecked()
             and self.segmentation_page.image_path_line.text() == ""
@@ -166,12 +165,12 @@ class ImportTracksDialog(QDialog):
             self.finish_button.hide()
         self.previous_button.setEnabled(current_index > 0)
         self.next_button.setEnabled(current_index < self.stacked_widget.count() - 1)
-        self.finish_button.setAutoDefault(0)
 
+        self.finish_button.setAutoDefault(0)
         self.next_button.setAutoDefault(0)
         self.previous_button.setAutoDefault(0)
 
-    def _finish(self):
+    def _finish(self) -> None:
         """Tries to read the CSV file and optional segmentation image,
         and apply the attribute to column mapping to construct a Tracks object"""
 
