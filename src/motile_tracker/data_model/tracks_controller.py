@@ -401,8 +401,8 @@ class TracksController:
             True if the edge is valid, false if invalid"""
 
         # make sure that the node2 is downstream of node1
-        time1 = self.tracks.graph.nodes[edge[0]][NodeAttr.TIME.value]
-        time2 = self.tracks.graph.nodes[edge[1]][NodeAttr.TIME.value]
+        time1 = self.tracks.get_time(edge[0])
+        time2 = self.tracks.get_time(edge[1])
 
         if time1 > time2:
             edge = (edge[1], edge[0])
@@ -415,10 +415,7 @@ class TracksController:
             return False, action
 
         # reject if edge is horizontal
-        elif (
-            self.tracks.graph.nodes[edge[0]][NodeAttr.TIME.value]
-            == self.tracks.graph.nodes[edge[1]][NodeAttr.TIME.value]
-        ):
+        elif self.tracks.get_time(edge[0]) == self.tracks.get_time(edge[1]):
             show_warning("Edge is rejected because it is horizontal.")
             return False, action
 
@@ -464,7 +461,7 @@ class TracksController:
                 nodes = [
                     n
                     for n, attr in self.tracks.graph.nodes(data=True)
-                    if attr.get(NodeAttr.TIME.value) == t
+                    if attr.get(self.tracks.time_attr) == t
                     and attr.get(NodeAttr.TRACK_ID.value) == track_id2
                 ]
                 if len(nodes) > 0:
@@ -550,7 +547,7 @@ class TracksController:
             times = [pix[0][0] for pix in pixels]
             attributes = {
                 NodeAttr.TRACK_ID.value: track_ids,
-                self.tracks.time_attr: times,
+                NodeAttr.TIME.value: times,
                 "node_id": nodes,
             }
 

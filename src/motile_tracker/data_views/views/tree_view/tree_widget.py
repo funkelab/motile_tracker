@@ -53,24 +53,36 @@ class CustomViewBox(pg.ViewBox):
         """Modified mouseDragEvent function to check which mouse mode to use
         and to submit rectangle coordinates for selecting multiple nodes if necessary"""
 
-        super().mouseDragEvent(ev, axis)
+        # check if SHIFT is pressed
+        shift_down = ev.modifiers() == QtCore.Qt.ShiftModifier
 
-        # use RectMode when pressing shift
-        if ev.modifiers() == QtCore.Qt.ShiftModifier:
-            self.setMouseMode(self.RectMode)
-
+        if shift_down:
+            # if starting a shift-drag, record the scene position
             if ev.isStart():
                 self.mouse_start_pos = self.mapSceneToView(ev.scenePos())
-            elif ev.isFinish():
+
+            # Put the ViewBox in RectMode so it draws its usual yellow rectangle
+            self.setMouseMode(self.RectMode)
+            super().mouseDragEvent(ev, axis)
+
+            # Once the drag finishes, emit the rectangle
+            if ev.isFinish():
                 rect_end_pos = self.mapSceneToView(ev.scenePos())
                 rect = QtCore.QRectF(self.mouse_start_pos, rect_end_pos).normalized()
                 self.selected_rect.emit(rect)  # emit the rectangle
                 ev.accept()
-            else:
-                ev.ignore()
+
+                if hasattr(self, "rbScaleBox") and self.rbScaleBox:
+                    self.rbScaleBox.hide()
+
         else:
-            # Otherwise, set pan mode
+            # SHIFT not pressed - use PanMode normally
             self.setMouseMode(self.PanMode)
+            super().mouseDragEvent(ev, axis)
+
+            # hide the leftover box if any
+            if hasattr(self, "rbScaleBox") and self.rbScaleBox:
+                self.rbScaleBox.hide()
 
 
 class TreePlot(pg.PlotWidget):
