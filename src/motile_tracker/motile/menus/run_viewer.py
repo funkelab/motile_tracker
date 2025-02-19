@@ -3,10 +3,8 @@ from __future__ import annotations
 from functools import partial
 
 import pyqtgraph as pg
-from fonticon_fa6 import FA6S
 from qtpy.QtCore import Signal
 from qtpy.QtWidgets import (
-    QFileDialog,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -15,7 +13,6 @@ from qtpy.QtWidgets import (
     QWidget,
 )
 from superqt import QCollapsible, ensure_main_thread
-from superqt.fonticon import icon as qticon
 
 from motile_tracker.motile.backend import MotileRun
 
@@ -24,8 +21,7 @@ from .params_viewer import SolverParamsViewer
 
 class RunViewer(QGroupBox):
     """A widget for viewing in progress or completed runs, including
-    the progress of the solver and the parameters. Can also save the whole
-    run or export the tracks to CSV.
+    the progress of the solver and the parameters.
     Output tracks and segmentation are visualized separately in napari layers.
     """
 
@@ -40,14 +36,10 @@ class RunViewer(QGroupBox):
         self.solver_label: QLabel
         self.gap_plot: pg.PlotWidget
 
-        # Define persistent file dialogs for saving and exporting
-        self.save_run_dialog = self._save_dialog()
-
         # Create layout and add subwidgets
         main_layout = QVBoxLayout()
         main_layout.addWidget(self._progress_widget())
         main_layout.addWidget(self.params_widget)
-        main_layout.addWidget(self._save_and_export_widget())
         main_layout.addWidget(self._back_to_edit_widget())
         self.setLayout(main_layout)
 
@@ -64,26 +56,6 @@ class RunViewer(QGroupBox):
         self.setTitle("Run Viewer: " + run_name_view)
         self.solver_event_update()
         self.params_widget.new_params.emit(run.solver_params)
-
-    def _save_and_export_widget(self) -> QWidget:
-        """Create a widget for saving and exporting tracking results.
-
-        Returns:
-            QWidget: A widget containing a save button and an export tracks
-                button.
-        """
-        widget = QWidget()
-        layout = QHBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-
-        # Save button
-        icon = qticon(FA6S.floppy_disk, color="white")
-        save_run_button = QPushButton(icon=icon, text="Save run")
-        save_run_button.clicked.connect(self.save_run)
-        layout.addWidget(save_run_button)
-
-        widget.setLayout(layout)
-        return widget
 
     def _back_to_edit_widget(self) -> QWidget:
         """Create a widget for navigating back to the run editor with different
@@ -155,17 +127,6 @@ class RunViewer(QGroupBox):
         gap_plot.plotItem.setLabel("left", "Gap", **styles)
         gap_plot.plotItem.setLabel("bottom", "Solver round", **styles)
         return gap_plot
-
-    def _save_dialog(self) -> QFileDialog:
-        save_run_dialog = QFileDialog()
-        save_run_dialog.setFileMode(QFileDialog.Directory)
-        save_run_dialog.setOption(QFileDialog.ShowDirsOnly, True)
-        return save_run_dialog
-
-    def save_run(self):
-        if self.save_run_dialog.exec_():
-            directory = self.save_run_dialog.selectedFiles()[0]
-            self.run.save(directory)
 
     def _set_solver_label(self, status: str):
         message = "Solver status: " + status
