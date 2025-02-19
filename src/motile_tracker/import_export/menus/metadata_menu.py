@@ -10,7 +10,7 @@ from qtpy.QtWidgets import (
 )
 
 
-class ChoiceMenu(QWidget):
+class MetadataMenu(QWidget):
     """Menu to choose tracks name, data dimensions, scaling, and optional segmentation"""
 
     def __init__(self):

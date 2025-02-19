@@ -8,7 +8,7 @@ from qtpy.QtWidgets import (
 )
 
 
-class ScaleWidget(QWidget):
+class SegmentationWidget(QWidget):
     """QWidget for specifying pixel calibration"""
 
     def __init__(self, incl_z=True):

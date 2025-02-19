@@ -10,10 +10,10 @@ from qtpy.QtWidgets import (
 )
 
 from ..load_tracks import tracks_from_df
-from .choice_menu import ChoiceMenu
 from .data_widget import DataWidget
 from .measurement_widget import MeasurementWidget
-from .scale_widget import ScaleWidget
+from .metadata_menu import MetadataMenu
+from .segmentation_widget import SegmentationWidget
 
 
 class ImportTracksDialog(QDialog):
@@ -48,7 +48,7 @@ class ImportTracksDialog(QDialog):
         # Page 1 for user choices
         self.page1 = QWidget()
         page1_layout = QVBoxLayout()
-        self.menu_widget = ChoiceMenu()
+        self.menu_widget = MetadataMenu()
         page1_layout.addWidget(self.menu_widget)
         self.page1.setLayout(page1_layout)
         self.stacked_widget.addWidget(self.page1)
@@ -108,7 +108,7 @@ class ImportTracksDialog(QDialog):
         self.stacked_widget.addWidget(self.data_widget)
 
         if self.menu_widget.scale_checkbox.isChecked():
-            self.scale_page = ScaleWidget(self.menu_widget.radio_3D.isChecked())
+            self.scale_page = SegmentationWidget(self.menu_widget.radio_3D.isChecked())
             self.stacked_widget.addWidget(self.scale_page)
 
         if (
