@@ -127,6 +127,22 @@ class SolutionTracks(Tracks):
         header = ["t", "z", "y", "x", "id", "parent_id", "track_id"]
         if self.ndim == 3:
             header = [header[0]] + header[2:]  # remove z
+
+        # Add the extra attributes that are not part of the default ones
+        additional_attrs = {
+            k
+            for n in self.graph.nodes
+            for k in self.graph.nodes[n]
+            if k
+            not in (
+                NodeAttr.TIME.value,
+                NodeAttr.SEG_ID.value,
+                NodeAttr.TRACK_ID.value,
+                NodeAttr.POS.value,
+            )
+        }
+        header = header + list(additional_attrs)
+
         with open(outfile, "w") as f:
             f.write(",".join(header))
             for node_id in self.graph.nodes():
@@ -135,12 +151,16 @@ class SolutionTracks(Tracks):
                 track_id = self.get_track_id(node_id)
                 time = self.get_time(node_id)
                 position = self.get_position(node_id)
+                attrs = [
+                    self._get_node_attr(node_id, attr) for attr in additional_attrs
+                ]
                 row = [
                     time,
                     *position,
                     node_id,
                     parent_id,
                     track_id,
+                    *attrs,
                 ]
                 f.write("\n")
                 f.write(",".join(map(str, row)))
