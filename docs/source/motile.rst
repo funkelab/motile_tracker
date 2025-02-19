@@ -47,9 +47,6 @@ The ``Run Viewer`` contains the following information:
 - The ``Graph of solver gap``, which is mostly for debugging purposes.
   The solver gap is an optimization value that should decrease at each iteration.
 - The run settings, including ``Hyperparameters``, ``Costs``, and ``Attribute weights``.
-- The ``Save run`` button. This button will take you to a file dialog to save the
-  whole run, so that if you close napari and re-open it, you can load the run
-  and see the results.
 - The ``Back to editing`` button, which will return you to the ``Run Editor`` in its
   previous state.
 - The ``Edit this run`` button. This button will take you back to the ``Run Editor``,
