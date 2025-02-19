@@ -44,15 +44,6 @@ class MetadataMenu(QWidget):
         dimension_box.setMaximumHeight(80)
         layout.addWidget(dimension_box)
 
-        # Scale information
-        scale_layout = QVBoxLayout()
-        scale_box = QGroupBox("Spatial Calibration")
-        self.scale_checkbox = QCheckBox("My data uses scaled units")
-        scale_layout.addWidget(self.scale_checkbox)
-        scale_box.setLayout(scale_layout)
-        scale_box.setMaximumHeight(80)
-        layout.addWidget(scale_box)
-
         # Whether or not a segmentation file exists
         segmentation_layout = QVBoxLayout()
         segmentation_box = QGroupBox("Segmentation Image")

@@ -1,14 +1,11 @@
 import os
 
 import pandas as pd
-import tifffile
-import zarr
 from motile_toolbox.candidate_graph import NodeAttr
 from psygnal import Signal
 from qtpy.QtCore import Qt
 from qtpy.QtWidgets import (
     QComboBox,
-    QDialog,
     QFileDialog,
     QFormLayout,
     QHBoxLayout,
@@ -81,7 +78,7 @@ class CSVFieldMapWidget(QWidget):
 
         return tooltips.get(attribute, "No additional information available.")
 
-    def _get_initial_mapping(self, csv_columns) -> dict[str, str]:
+    def _get_initial_mapping(self, csv_columns: list[str]) -> dict[str, str]:
         """Make an initial guess for mapping of csv columns to fields"""
 
         mapping = {}
@@ -97,7 +94,11 @@ class CSVFieldMapWidget(QWidget):
         for attribute in self.standard_fields:
             if attribute in mapping:
                 continue
-            mapping[attribute] = self.columns_left.pop(0)
+            if len(self.columns_left) > 0:
+                mapping[attribute] = self.columns_left.pop(0)
+            else:
+                # no good guesses left - just put something
+                mapping[attribute] = csv_columns[-1]
 
         return mapping
 
@@ -110,7 +111,7 @@ class CSVFieldMapWidget(QWidget):
         }
 
 
-class DataWidget(QWidget):
+class CSVWidget(QWidget):
     """QWidget for selecting CSV file and optional segmentation image"""
 
     update_buttons = Signal()
@@ -140,38 +141,6 @@ class DataWidget(QWidget):
         csv_widget.setLayout(csv_layout)
 
         self.layout.addWidget(csv_widget)
-
-        # Optional QlineEdit for segmentation image path and browse button
-        if self.add_segmentation:
-            self.image_path_line = QLineEdit(self)
-            self.image_path_line.editingFinished.connect(self.update_buttons.emit)
-            self.image_browse_button = QPushButton("Browse Segmentation", self)
-            self.image_browse_button.setAutoDefault(0)
-            self.image_browse_button.clicked.connect(self._browse_segmentation)
-
-            image_widget = QWidget()
-            image_layout = QVBoxLayout()
-            image_sublayout = QHBoxLayout()
-            image_sublayout.addWidget(QLabel("Segmentation File Path:"))
-            image_sublayout.addWidget(self.image_path_line)
-            image_sublayout.addWidget(self.image_browse_button)
-
-            label = QLabel(
-                "Segmentation files can either be a single tiff stack, or a directory inside a zarr folder."
-            )
-            font = label.font()
-            font.setItalic(True)
-            label.setFont(font)
-
-            label.setWordWrap(True)
-            image_layout.addWidget(label)
-
-            image_layout.addLayout(image_sublayout)
-            image_widget.setLayout(image_layout)
-            image_widget.setMaximumHeight(100)
-
-            self.layout.addWidget(image_widget)
-            self.layout.setAlignment(Qt.AlignTop)
 
         # Initialize the CSVFieldMapWidget as None
         self.csv_field_widget = None
@@ -225,89 +194,3 @@ class DataWidget(QWidget):
                 self, "Error", "The file could not be parsed as a valid CSV."
             )
             return
-
-    def _browse_segmentation(self) -> None:
-        """Open custom dialog to select either a file or a folder"""
-
-        dialog = FileFolderDialog(self)
-        if dialog.exec_():
-            selected_path = dialog.get_selected_path()
-            if selected_path:
-                self.image_path_line.setText(selected_path)
-
-    def _load_segmentation(self) -> None:
-        """Load the segmentation image file"""
-
-        # Check if a valid path to a segmentation image file is provided and if so load it
-        if os.path.exists(self.image_path_line.text()):
-            if self.image_path_line.text().endswith(".tif"):
-                segmentation = tifffile.imread(
-                    self.image_path_line.text()
-                )  # Assuming no segmentation is needed at this step
-            elif ".zarr" in self.image_path_line.text():
-                segmentation = zarr.open(self.image_path_line.text())
-            else:
-                QMessageBox.warning(
-                    self,
-                    "Invalid file type",
-                    "Please provide a tiff or zarr file for the segmentation image stack",
-                )
-                return
-        else:
-            segmentation = None
-        self.segmentation = segmentation
-
-
-class FileFolderDialog(QDialog):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Select Tif File or Zarr Folder")
-
-        self.layout = QVBoxLayout(self)
-
-        self.path_line_edit = QLineEdit(self)
-        self.layout.addWidget(self.path_line_edit)
-
-        button_layout = QHBoxLayout()
-
-        self.file_button = QPushButton("Select tiff file", self)
-        self.file_button.clicked.connect(self.select_file)
-        self.file_button.setAutoDefault(False)
-        self.file_button.setDefault(False)
-
-        button_layout.addWidget(self.file_button)
-
-        self.folder_button = QPushButton("Select zarr folder", self)
-        self.folder_button.clicked.connect(self.select_folder)
-        self.folder_button.setAutoDefault(False)
-        self.folder_button.setDefault(False)
-        button_layout.addWidget(self.folder_button)
-
-        self.layout.addLayout(button_layout)
-
-        self.ok_button = QPushButton("OK", self)
-        self.ok_button.clicked.connect(self.accept)
-        self.layout.addWidget(self.ok_button)
-
-    def select_file(self):
-        file, _ = QFileDialog.getOpenFileName(
-            self,
-            "Select Segmentation File",
-            "",
-            "Segmentation Files (*.tiff *.zarr *.tif)",
-        )
-        if file:
-            self.path_line_edit.setText(file)
-
-    def select_folder(self):
-        folder = QFileDialog.getExistingDirectory(
-            self,
-            "Select Folder",
-            "",
-            QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks,
-        )
-        if folder:
-            self.path_line_edit.setText(folder)
-
-    def get_selected_path(self):
-        return self.path_line_edit.text()

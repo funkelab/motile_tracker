@@ -10,7 +10,7 @@ from qtpy.QtWidgets import (
 )
 
 from ..load_tracks import tracks_from_df
-from .data_widget import DataWidget
+from .csv_widget import CSVWidget
 from .measurement_widget import MeasurementWidget
 from .metadata_menu import MetadataMenu
 from .segmentation_widget import SegmentationWidget
@@ -45,7 +45,7 @@ class ImportTracksDialog(QDialog):
         self.next_button.clicked.connect(self._go_to_next_page)
         self.finish_button.clicked.connect(self._finish)
 
-        # Page 1 for user choices
+        # Page 1 for metadata choices
         self.page1 = QWidget()
         page1_layout = QVBoxLayout()
         self.menu_widget = MetadataMenu()
@@ -54,21 +54,20 @@ class ImportTracksDialog(QDialog):
         self.stacked_widget.addWidget(self.page1)
 
         # Connect signals for updating pages
-        self.menu_widget.scale_checkbox.stateChanged.connect(self._update_pages)
         self.menu_widget.segmentation_checkbox.stateChanged.connect(self._update_pages)
         self.menu_widget.radio_2D.clicked.connect(self._update_pages)
         self.menu_widget.radio_3D.clicked.connect(self._update_pages)
 
-        # Page 2 for data selection
-        self.data_widget = DataWidget(
+        # Page 2 for csv loading
+        self.data_widget = CSVWidget(
             add_segmentation=self.menu_widget.segmentation_checkbox.isChecked()
         )
         self.data_widget.update_buttons.connect(self._update_buttons)
         self.data_widget.update_buttons.connect(self._update_measurement_widget)
         self.stacked_widget.addWidget(self.data_widget)
 
-        # Optional Page 3 with scaling is None until specified otherwise
-        self.scale_page = None
+        # Optional Page 3 with segmentation information
+        self.segmentation_page = None
 
         # Optional Page 4 with measurement attributes that should be calculated (only if segmentation is provided)
         self.measurement_widget = None
@@ -93,12 +92,12 @@ class ImportTracksDialog(QDialog):
         """Recreate page2 and page3 when the user changes the options in the menu"""
 
         self.stacked_widget.removeWidget(self.data_widget)
-        if self.scale_page is not None:
-            self.stacked_widget.removeWidget(self.scale_page)
+        if self.segmentation_page is not None:
+            self.stacked_widget.removeWidget(self.segmentation_page)
         if self.measurement_widget is not None:
             self.stacked_widget.removeWidget(self.measurement_widget)
 
-        self.data_widget = DataWidget(
+        self.data_widget = CSVWidget(
             add_segmentation=self.menu_widget.segmentation_checkbox.isChecked(),
             incl_z=self.menu_widget.radio_3D.isChecked(),
         )
@@ -107,9 +106,15 @@ class ImportTracksDialog(QDialog):
 
         self.stacked_widget.addWidget(self.data_widget)
 
-        if self.menu_widget.scale_checkbox.isChecked():
-            self.scale_page = SegmentationWidget(self.menu_widget.radio_3D.isChecked())
-            self.stacked_widget.addWidget(self.scale_page)
+        if self.menu_widget.segmentation_checkbox.isChecked():
+            self.segmentation_page = SegmentationWidget(
+                self.menu_widget.radio_3D.isChecked()
+            )
+            self.stacked_widget.addWidget(self.segmentation_page)
+            self.segmentation_page.update_buttons.connect(self._update_buttons)
+            self.segmentation_page.update_buttons.connect(
+                self._update_measurement_widget
+            )
 
         if (
             self.data_widget.df is not None
@@ -146,7 +151,7 @@ class ImportTracksDialog(QDialog):
         # Do not allow to finish if no CSV file is loaded
         if self.data_widget.df is None or (
             self.menu_widget.segmentation_checkbox.isChecked()
-            and self.data_widget.image_path_line.text() == ""
+            and self.segmentation_page.image_path_line.text() == ""
         ):
             self.finish_button.setEnabled(False)
         else:
@@ -179,8 +184,8 @@ class ImportTracksDialog(QDialog):
             df[feature] = self.data_widget.df[column]
 
         # Read scaling information from the spinboxes
-        if self.scale_page is not None:
-            scale = self.scale_page.get_scale()
+        if self.segmentation_page is not None:
+            scale = self.segmentation_page.get_scale()
         else:
             scale = [1, 1, 1] if self.data_widget.incl_z is False else [1, 1, 1, 1]
 
@@ -197,14 +202,14 @@ class ImportTracksDialog(QDialog):
         # Try to create a Tracks object with the provided CSV file, the attr:column dictionaries, and the scaling information
         self.name = self.menu_widget.name_widget.text()
 
-        if self.data_widget.add_segmentation:
-            self.data_widget._load_segmentation()
+        if self.menu_widget.segmentation_checkbox.isChecked():
+            self.segmentation_page._load_segmentation()
         else:
-            self.data_widget.segmentation = None
+            self.segmentation_page.segmentation = None
 
         try:
             self.tracks = tracks_from_df(
-                df, self.data_widget.segmentation, scale, features
+                df, self.segmentation_page.segmentation, scale, features
             )
 
         except ValueError as e:
