@@ -203,13 +203,12 @@ class ImportTracksDialog(QDialog):
 
         if self.menu_widget.segmentation_checkbox.isChecked():
             self.segmentation_page._load_segmentation()
+            segmentation = self.segmentation_page.segmentation
         else:
-            self.segmentation_page.segmentation = None
+            segmentation = None
 
         try:
-            self.tracks = tracks_from_df(
-                df, self.segmentation_page.segmentation, scale, features
-            )
+            self.tracks = tracks_from_df(df, segmentation, scale, features)
 
         except ValueError as e:
             QMessageBox.critical(self, "Error", f"Failed to load tracks: {e}")
