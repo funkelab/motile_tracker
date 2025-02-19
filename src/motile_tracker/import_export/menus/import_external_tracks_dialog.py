@@ -1,0 +1,213 @@
+import pandas as pd
+from qtpy.QtWidgets import (
+    QDialog,
+    QHBoxLayout,
+    QMessageBox,
+    QPushButton,
+    QStackedWidget,
+    QVBoxLayout,
+    QWidget,
+)
+
+from ..load_tracks import tracks_from_df
+from .choice_menu import ChoiceMenu
+from .data_widget import DataWidget
+from .measurement_widget import MeasurementWidget
+from .scale_widget import ScaleWidget
+
+
+class ImportTracksDialog(QDialog):
+    """Multipage dialog for importing external tracks from a CSV file"""
+
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Import external tracks from CSV")
+
+        self.csv = None
+        self.segmentation = None
+
+        self.layout = QVBoxLayout(self)
+        self.stacked_widget = QStackedWidget()
+        self.layout.addWidget(self.stacked_widget)
+
+        # navigation buttons
+        self.button_layout = QHBoxLayout()
+        self.previous_button = QPushButton("Previous")
+        self.next_button = QPushButton("Next")
+        self.finish_button = QPushButton("Finish")
+        self.button_layout.addWidget(self.previous_button)
+        self.button_layout.addWidget(self.next_button)
+        self.button_layout.addWidget(self.finish_button)
+        self.layout.addLayout(self.button_layout)
+
+        # Connect button signals
+        self.previous_button.clicked.connect(self._go_to_previous_page)
+        self.next_button.clicked.connect(self._go_to_next_page)
+        self.finish_button.clicked.connect(self._finish)
+
+        # Page 1 for user choices
+        self.page1 = QWidget()
+        page1_layout = QVBoxLayout()
+        self.menu_widget = ChoiceMenu()
+        page1_layout.addWidget(self.menu_widget)
+        self.page1.setLayout(page1_layout)
+        self.stacked_widget.addWidget(self.page1)
+
+        # Connect signals for updating pages
+        self.menu_widget.scale_checkbox.stateChanged.connect(self._update_pages)
+        self.menu_widget.segmentation_checkbox.stateChanged.connect(self._update_pages)
+        self.menu_widget.radio_2D.clicked.connect(self._update_pages)
+        self.menu_widget.radio_3D.clicked.connect(self._update_pages)
+
+        # Page 2 for data selection
+        self.data_widget = DataWidget(
+            add_segmentation=self.menu_widget.segmentation_checkbox.isChecked()
+        )
+        self.data_widget.update_buttons.connect(self._update_buttons)
+        self.data_widget.update_buttons.connect(self._update_measurement_widget)
+        self.stacked_widget.addWidget(self.data_widget)
+
+        # Optional Page 3 with scaling is None until specified otherwise
+        self.scale_page = None
+
+        # Optional Page 4 with measurement attributes that should be calculated (only if segmentation is provided)
+        self.measurement_widget = None
+
+        self._update_buttons()
+
+    def _update_measurement_widget(self) -> None:
+        if (
+            self.data_widget.df is not None
+            and self.menu_widget.segmentation_checkbox.isChecked()
+        ):
+            if self.measurement_widget is not None:
+                self.stacked_widget.removeWidget(self.measurement_widget)
+            self.measurement_widget = MeasurementWidget(
+                self.data_widget.csv_field_widget.columns_left,
+                ndim=2 if self.menu_widget.radio_2D.isChecked() else 3,
+            )
+            self.stacked_widget.addWidget(self.measurement_widget)
+            self._update_buttons()
+
+    def _update_pages(self) -> None:
+        """Recreate page2 and page3 when the user changes the options in the menu"""
+
+        self.stacked_widget.removeWidget(self.data_widget)
+        if self.scale_page is not None:
+            self.stacked_widget.removeWidget(self.scale_page)
+        if self.measurement_widget is not None:
+            self.stacked_widget.removeWidget(self.measurement_widget)
+
+        self.data_widget = DataWidget(
+            add_segmentation=self.menu_widget.segmentation_checkbox.isChecked(),
+            incl_z=self.menu_widget.radio_3D.isChecked(),
+        )
+        self.data_widget.update_buttons.connect(self._update_buttons)
+        self.data_widget.update_buttons.connect(self._update_measurement_widget)
+
+        self.stacked_widget.addWidget(self.data_widget)
+
+        if self.menu_widget.scale_checkbox.isChecked():
+            self.scale_page = ScaleWidget(self.menu_widget.radio_3D.isChecked())
+            self.stacked_widget.addWidget(self.scale_page)
+
+        if (
+            self.data_widget.df is not None
+            and self.menu_widget.segmentation_checkbox.isChecked()
+        ):
+            self.measurement_widget = MeasurementWidget(
+                self.data_widget.csv_field_widget.columns_left,
+                ndim=2 if self.menu_widget.radio_2D.isChecked() else 3,
+            )
+            self.stacked_widget.addWidget(self.measurement_widget)
+
+        self.stacked_widget.hide()
+        self.stacked_widget.show()
+
+    def _go_to_previous_page(self) -> None:
+        """Go to the previous page."""
+
+        current_index = self.stacked_widget.currentIndex()
+        if current_index > 0:
+            self.stacked_widget.setCurrentIndex(current_index - 1)
+        self._update_buttons()
+
+    def _go_to_next_page(self) -> None:
+        """Go to the next page."""
+
+        current_index = self.stacked_widget.currentIndex()
+        if current_index < self.stacked_widget.count() - 1:
+            self.stacked_widget.setCurrentIndex(current_index + 1)
+        self._update_buttons()
+
+    def _update_buttons(self) -> None:
+        """Enable or disable buttons based on the current page."""
+
+        # Do not allow to finish if no CSV file is loaded
+        if self.data_widget.df is None or (
+            self.menu_widget.segmentation_checkbox.isChecked()
+            and self.data_widget.image_path_line.text() == ""
+        ):
+            self.finish_button.setEnabled(False)
+        else:
+            self.finish_button.setEnabled(True)
+
+        current_index = self.stacked_widget.currentIndex()
+        if current_index + 1 == self.stacked_widget.count():
+            self.next_button.hide()
+            self.finish_button.show()
+        else:
+            self.next_button.show()
+            self.finish_button.hide()
+        self.previous_button.setEnabled(current_index > 0)
+        self.next_button.setEnabled(current_index < self.stacked_widget.count() - 1)
+        self.finish_button.setAutoDefault(0)
+
+        self.next_button.setAutoDefault(0)
+        self.previous_button.setAutoDefault(0)
+
+    def _finish(self):
+        """Tries to read the CSV file and optional segmentation image,
+        and apply the attribute to column mapping to construct a Tracks object"""
+
+        # Retrieve selected columns for each required field, and optional columns for additional attributes
+        name_map = self.data_widget.csv_field_widget.get_name_map()
+
+        # Create new columns for each feature based on the original column values
+        df = pd.DataFrame()
+        for feature, column in name_map.items():
+            df[feature] = self.data_widget.df[column]
+
+        # Read scaling information from the spinboxes
+        if self.scale_page is not None:
+            scale = self.scale_page.get_scale()
+        else:
+            scale = [1, 1, 1] if self.data_widget.incl_z is False else [1, 1, 1, 1]
+
+        if self.measurement_widget is not None:
+            features = self.measurement_widget.get_measurements()
+            for feature in features:
+                if features[feature] != "Recompute" and (
+                    feature == "Area" or feature == "Volume"
+                ):
+                    df["area"] = self.data_widget.df[features[feature]]
+        else:
+            features = []
+
+        # Try to create a Tracks object with the provided CSV file, the attr:column dictionaries, and the scaling information
+        self.name = self.menu_widget.name_widget.text()
+
+        if self.data_widget.add_segmentation:
+            self.data_widget._load_segmentation()
+        else:
+            self.data_widget.segmentation = None
+
+        try:
+            self.tracks = tracks_from_df(
+                df, self.data_widget.segmentation, scale, features
+            )
+
+        except ValueError as e:
+            QMessageBox.critical(self, "Error", f"Failed to load tracks: {e}")
+            return
+        self.accept()

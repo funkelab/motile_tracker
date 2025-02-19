@@ -22,7 +22,7 @@ from qtpy.QtWidgets import (
 from superqt.fonticon import icon as qticon
 
 from motile_tracker.data_model import SolutionTracks, Tracks
-from motile_tracker.import_export.import_external_tracks_dialog import (
+from motile_tracker.import_export.menus.import_external_tracks_dialog import (
     ImportTracksDialog,
 )
 from motile_tracker.motile.backend.motile_run import MotileRun
