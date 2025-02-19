@@ -50,16 +50,6 @@ The ``Run Viewer`` contains the following information:
 - The ``Save run`` button. This button will take you to a file dialog to save the
   whole run, so that if you close napari and re-open it, you can load the run
   and see the results.
-- The ``Export tracks to CSV`` button, which will take you to a file dialog for saving
-  a csv file containing the tracks. If your input was a Labels layer, the
-  ``node_id`` will be determined by segmentation label id. If your original segmentation
-  repeated labels across time, the application will relabel them all to be unique, and
-  the new label id will be used as the node id.
-  If your input was a Points layer, the ``node_id`` is simply the index of the
-  node in the list of points.
-    - Note: This does not save the output segmentation. If you want to save
-    the relabeled segmentation, you can do so through napari by selecting the
-    layer and then selecting ``File``-> ``Save selected layers``
 - The ``Back to editing`` button, which will return you to the ``Run Editor`` in its
   previous state.
 - The ``Edit this run`` button. This button will take you back to the ``Run Editor``,

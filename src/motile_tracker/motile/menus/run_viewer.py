@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 from functools import partial
-from pathlib import Path
-from warnings import warn
 
 import pyqtgraph as pg
 from fonticon_fa6 import FA6S
@@ -44,7 +42,6 @@ class RunViewer(QGroupBox):
 
         # Define persistent file dialogs for saving and exporting
         self.save_run_dialog = self._save_dialog()
-        self.export_tracks_dialog = self._export_tracks_dialog()
 
         # Create layout and add subwidgets
         main_layout = QVBoxLayout()
@@ -84,11 +81,6 @@ class RunViewer(QGroupBox):
         save_run_button = QPushButton(icon=icon, text="Save run")
         save_run_button.clicked.connect(self.save_run)
         layout.addWidget(save_run_button)
-
-        # create button to export tracks
-        export_tracks_btn = QPushButton("Export tracks to CSV")
-        export_tracks_btn.clicked.connect(self.export_tracks)
-        layout.addWidget(export_tracks_btn)
 
         widget.setLayout(layout)
         return widget
@@ -170,35 +162,10 @@ class RunViewer(QGroupBox):
         save_run_dialog.setOption(QFileDialog.ShowDirsOnly, True)
         return save_run_dialog
 
-    def _export_tracks_dialog(self) -> QFileDialog:
-        export_tracks_dialog = QFileDialog()
-        export_tracks_dialog.setFileMode(QFileDialog.AnyFile)
-        export_tracks_dialog.setAcceptMode(QFileDialog.AcceptSave)
-        export_tracks_dialog.setDefaultSuffix("csv")
-        return export_tracks_dialog
-
     def save_run(self):
         if self.save_run_dialog.exec_():
             directory = self.save_run_dialog.selectedFiles()[0]
             self.run.save(directory)
-
-    def export_tracks(self):
-        """Export the tracks from this run to a csv with the following columns:
-        t,[z],y,x,id,parent_id,[seg_id]
-        Cells without a parent_id will have an empty string for the parent_id.
-        Whether or not to include z is inferred from the length of an
-        arbitrary node's position attribute. If the nodes have a "seg_id" attribute,
-        the "seg_id" column is included.
-        """
-        default_name = self.run._make_id()
-        default_name = f"{default_name}_tracks.csv"
-        base_path = Path(self.export_tracks_dialog.directory().path())
-        self.export_tracks_dialog.selectFile(str(base_path / default_name))
-        if self.export_tracks_dialog.exec_():
-            outfile = self.export_tracks_dialog.selectedFiles()[0]
-            self.run.export_tracks(outfile)
-        else:
-            warn("Exporting aborted", stacklevel=2)
 
     def _set_solver_label(self, status: str):
         message = "Solver status: " + status
