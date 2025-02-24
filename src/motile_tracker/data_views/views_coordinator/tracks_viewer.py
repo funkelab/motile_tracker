@@ -4,7 +4,6 @@ from typing import Optional
 
 import napari
 import numpy as np
-from motile_toolbox.candidate_graph.graph_attributes import NodeAttr
 from psygnal import Signal
 
 from motile_tracker.data_model import NodeType, SolutionTracks
@@ -12,6 +11,9 @@ from motile_tracker.data_model.tracks_controller import TracksController
 from motile_tracker.data_views.views.layers.tracks_layer_group import TracksLayerGroup
 from motile_tracker.data_views.views.tree_view.tree_widget_utils import (
     extract_lineage_tree,
+)
+from motile_tracker.data_views.views_coordinator.collection_widget import (
+    CollectionWidget,
 )
 
 from .node_selection_list import NodeSelectionList
@@ -63,6 +65,9 @@ class TracksViewer:
         self.tracks_list = TracksList()
         self.tracks_list.view_tracks.connect(self.update_tracks)
 
+        self.collection_widget = CollectionWidget(self)
+        self.collection_widget.group_changed.connect(self.update_selection)
+
         self.set_keybinds()
 
     def set_keybinds(self):
@@ -91,6 +96,8 @@ class TracksViewer:
         self.tracking_layers._refresh()
 
         self.tracks_updated.emit(refresh_view)
+
+        self.collection_widget._refresh()
 
         # if a new node was added, we would like to select this one now (call this after emitting the signal, because if the node is a new node, we have to update the table in the tree widget first, or it won't be present)
         if node is not None:
@@ -123,6 +130,9 @@ class TracksViewer:
             if isinstance(layer, (napari.layers.Labels | napari.layers.Points)):
                 layer.visible = False
 
+        # retrieve existing groups
+        self.collection_widget.retrieve_existing_groups()
+
         self.set_display_mode("all")
         self.tracking_layers.set_tracks(tracks, name)
         self.selected_nodes.reset()
@@ -132,6 +142,8 @@ class TracksViewer:
         """Toggle the display mode between available options"""
 
         if self.mode == "lineage":
+            self.set_display_mode("group")
+        elif self.mode == "group":
             self.set_display_mode("all")
         else:
             self.set_display_mode("lineage")
@@ -143,6 +155,9 @@ class TracksViewer:
         if mode == "lineage":
             self.mode = "lineage"
             self.viewer.text_overlay.text = "Toggle Display [Q]\n Lineage"
+        elif mode == "group":
+            self.mode = "group"
+            self.viewer.text_overlay.text = "Toggle Display [Q]\n Group"
         else:
             self.mode = "all"
             self.viewer.text_overlay.text = "Toggle Display [Q]\n All"
@@ -172,12 +187,13 @@ class TracksViewer:
                 for node in self.selected_nodes:
                     self.visible += extract_lineage_tree(self.tracks.graph, node)
 
-            return list(
-                {
-                    self.tracks.graph.nodes[node][NodeAttr.TRACK_ID.value]
-                    for node in self.visible
-                }
-            )
+            return self.visible
+        elif self.mode == "group":
+            if self.collection_widget.selected_collection is not None:
+                self.visible = self.collection_widget.selected_collection.collection
+            else:
+                self.visible = []
+            return self.visible
         else:
             self.visible = "all"
             return "all"
