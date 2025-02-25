@@ -29,7 +29,10 @@ from motile_tracker.motile.backend.motile_run import MotileRun
 
 
 class TrackListWidget(QWidget):
-    """Creates or finds a TracksViewer and displays its TrackList widget. This is only used in case the user wants to open the trackslist from the plugins menu."""
+    """Creates or finds a TracksViewer and displays its TrackList widget.
+    This is only used in case the user wants to open the trackslist from the plugins
+    menu.
+    """
 
     def __init__(self, viewer: napari.Viewer):
         super().__init__()
@@ -49,7 +52,7 @@ class TracksButton(QWidget):
     # https://doc.qt.io/qt-5/qlistwidget.html#setItemWidget
     # I think this means if we want static buttons we can just make the row here
     # but if we want to change the buttons we need to do something more complex
-    # Columns: Run name, Date/time, delete btn
+    # Columns: Run name, save, export, delete buttons
     def __init__(self, tracks: Tracks, name: str):
         super().__init__()
         self.tracks = tracks
@@ -61,7 +64,7 @@ class TracksButton(QWidget):
         self.delete.setToolTip("Remove track result")
         save_icon = qticon(FA6S.floppy_disk, color="white")
         self.save = QPushButton(icon=save_icon)
-        self.save.setToolTip("Save Motile Run")
+        self.save.setToolTip("Save tracks")
         self.save.setFixedSize(20, 20)
         export_icon = qticon(FA6S.file_export, color="white")
         self.export = QPushButton(icon=export_icon)
@@ -146,8 +149,10 @@ class TracksList(QGroupBox):
         the list.
 
         Args:
-            tracks (Tracks): _description_
-            select (bool, optional): _description_. Defaults to True.
+            tracks (Tracks): the tracks object to add to the results list
+            name (str): the name of the tracks to display
+            select (bool, optional): Whether or not to select the new tracks item in the
+                list (and thus display it in the tracks viewer). Defaults to True.
         """
         item = QListWidgetItem(self.tracks_list)
         tracks_row = TracksButton(tracks, name)
@@ -161,7 +166,15 @@ class TracksList(QGroupBox):
             self.tracks_list.setCurrentRow(len(self.tracks_list) - 1)
 
     def export_to_csv(self, item: QListWidgetItem):
-        """Export a tracks object from the list to a CSV file. You must pass the list item that represents the tracks, not the tracks object itself."""
+        """Export a tracks object from the list to a CSV file.
+
+        You must pass the list item that represents the tracks, not the tracks object
+        itself.
+
+        Args:
+            item (QListWidgetItem):  The list item containing the TracksButton that
+                represents a set of tracks.
+        """
 
         tracks: Tracks = self.tracks_list.itemWidget(item).tracks
         if self.export_dialog.exec_():
@@ -193,8 +206,9 @@ class TracksList(QGroupBox):
         self.tracks_list.takeItem(row)
 
     def load_tracks(self):
-        """Call the function to load tracks from disk for a Motile Run or for externally generated tracks (CSV file),
-        depending on the choice in the dropdown menu."""
+        """Call the function to load tracks from disk for a Motile Run or for externally
+        generated tracks (CSV file),  depending on the choice in the dropdown menu.
+        """
 
         if self.dropdown_menu.currentText() == "Motile Run":
             self.load_motile_run()
