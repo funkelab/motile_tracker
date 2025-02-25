@@ -175,8 +175,13 @@ class TracksList(QGroupBox):
             item (QListWidgetItem):  The list item containing the TracksButton that
                 represents a set of tracks.
         """
-
-        tracks: Tracks = self.tracks_list.itemWidget(item).tracks
+        widget: TracksButton = self.tracks_list.itemWidget(item)
+        tracks: Tracks = widget.tracks
+        default_name: str = widget.name.text()
+        default_name = f"{default_name}_tracks.csv"
+        # use the same directory as the last time you opened the dialog
+        base_path = Path(self.export_dialog.directory().path())
+        self.export_dialog.selectFile(str(base_path / default_name))
         if self.export_dialog.exec_():
             file_path = Path(self.export_dialog.selectedFiles()[0])
             tracks.export_tracks(file_path)
