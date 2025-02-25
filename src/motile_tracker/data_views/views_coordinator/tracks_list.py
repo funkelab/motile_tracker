@@ -71,7 +71,7 @@ class TracksButton(QWidget):
         self.export.setFixedSize(20, 20)
         self.export.setToolTip("Export tracks to CSV")
         layout = QHBoxLayout()
-        layout.setSpacing(1)
+        layout.setSpacing(10)
         layout.addWidget(self.name)
         layout.addWidget(self.save)
         layout.addWidget(self.export)
