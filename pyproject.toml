@@ -38,6 +38,7 @@ dependencies =[
     "motile_toolbox == 0.4.0",
     "pydantic",
     "tifffile[all]",
+    "tqdm",
     "fonticon-fontawesome6",
     "pyqtgraph",
     "lxml_html_clean",  # only to deal with napari dependencies being broken
