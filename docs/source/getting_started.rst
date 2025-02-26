@@ -74,7 +74,16 @@ is incorporating the detection and linking corrections into the optimization tas
 Each ``Tracking Run`` will be stored in the ``Results List`` widget.
 These are the runs that are stored in memory - if you run tracking multiple
 times with different inputs or parameters, you can click back and forth
-between the results here. Here you can also save any runs that you want to store for later.
+between the results here. Here you can also save any runs that you want to store for later,
+or export the tracks to a csv file. If your input was a Labels layer, the
+``node_id`` will be determined by segmentation label id. If your original segmentation
+repeated labels across time, the application will relabel them all to be unique, and
+the new label id will be used as the node id.
+If your input was a Points layer, the ``node_id`` is simply the index of the
+node in the list of points.
+Note: This does not save the output segmentation. If you want to save
+the relabeled segmentation, you can do so through napari by selecting the
+layer and then selecting ``File``-> ``Save selected layers``
 Deleting runs you do not want to keep viewing is a good idea, since these are stored in memory.
 Runs that were saved in previous sessions do not appear here until you load them from disk with the ``Load Tracks`` button.
 The tracking results can also be visualized as a lineage tree.
