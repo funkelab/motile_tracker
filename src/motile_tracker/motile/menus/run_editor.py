@@ -231,14 +231,13 @@ class RunEditor(QGroupBox):
                 numpy array
         """
 
-        stack = []
+        stack_list = []
         for i in tqdm(
             range(segmentation.shape[0]),
             desc="Converting segmentation to in-memory array",
         ):
-            current_stack = segmentation[i].compute()
-            stack.append(current_stack)
-        return np.stack(stack, axis=0)
+            stack_list.append(segmentation[i].compute())
+        return np.stack(stack_list, axis=0)
 
     def emit_run(self) -> None:
         """Construct a run and start solving by emitting the start run
