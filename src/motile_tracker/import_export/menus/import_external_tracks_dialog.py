@@ -180,7 +180,8 @@ class ImportTracksDialog(QDialog):
         # Create new columns for each feature based on the original column values
         df = pd.DataFrame()
         for feature, column in name_map.items():
-            df[feature] = self.data_widget.df[column]
+            if column != "No selection":
+                df[feature] = self.data_widget.df[column]
 
         # Read scaling information from the spinboxes
         if self.segmentation_page is not None:

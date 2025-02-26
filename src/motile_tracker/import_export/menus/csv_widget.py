@@ -32,6 +32,7 @@ class CSVFieldMapWidget(QWidget):
             "x",
             "id",
             "parent_id",
+            "group",
         ]
 
         self.csv_columns = csv_columns
@@ -55,6 +56,7 @@ class CSVFieldMapWidget(QWidget):
             if attribute in self.standard_fields:
                 combo = QComboBox()
                 combo.addItems(csv_columns)
+                combo.addItems(["No selection"])
                 combo.setCurrentText(csv_column)
                 combo.currentIndexChanged.connect(self._update_columns_left)
                 label = QLabel(attribute)
@@ -88,6 +90,7 @@ class CSVFieldMapWidget(QWidget):
             "parent_id": "The unique identifier of the parent node (string or integer).",
             "z": "The world z-coordinate of the track.",
             "seg_id": "The integer label value in the segmentation file.",
+            "group": "(Optional) A list of group labels to which this node belongs, for example ['celltype_a', 'group_b']. Choose 'No selection' if you do not have any groups.",
         }
 
         return tooltips.get(attribute, "")
