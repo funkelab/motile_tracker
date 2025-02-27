@@ -220,23 +220,22 @@ class RunEditor(QGroupBox):
             scale=input_layer.scale,
         )
 
-    def _convert_da_to_np_array(self, segmentation: da.core.Array) -> np.ndarray:
+    def _convert_da_to_np_array(self, dask_array: da.core.Array) -> np.ndarray:
         """Convert from dask array to in-memory array.
 
         Args:
-            segmentation (da.core.Array): segmentation data as a dask array
+            dask_array (da.core.Array): a dask array
 
         Returns:
-            np.ndarray: segmentation data as an in-memory
-                numpy array
+            np.ndarray: data as an in-memory numpy array
         """
 
         stack_list = []
         for i in tqdm(
-            range(segmentation.shape[0]),
-            desc="Converting segmentation to in-memory array",
+            range(dask_array.shape[0]),
+            desc="Converting dask array to in-memory array",
         ):
-            stack_list.append(segmentation[i].compute())
+            stack_list.append(dask_array[i].compute())
         return np.stack(stack_list, axis=0)
 
     def emit_run(self) -> None:
