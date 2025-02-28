@@ -210,15 +210,13 @@ class TrackPoints(napari.layers.Points):
         """Update the outline color of the selected points and visibility according to display mode
 
         Args:
-            visible (list[int] | str): A list of track ids, or "all"
+            visible (list[int] | str): A list of node ids to be displayed, or "all"
         """
         # filter out the non-selected tracks if in lineage mode
         if visible == "all":
             self.shown[:] = True
         else:
-            indices = np.where(np.isin(self.properties["track_id"], visible))[
-                0
-            ].tolist()
+            indices = np.where(np.isin(self.properties["node_id"], visible))[0].tolist()
             self.shown[:] = False
             self.shown[indices] = True
 

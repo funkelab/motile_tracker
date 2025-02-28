@@ -95,13 +95,18 @@ class TracksLayerGroup:
         if self.points_layer is not None:
             self.points_layer._refresh()
 
-    def update_visible(self, visible_tracks: list[int], visible_nodes: list[int]):
+    def update_visible(self, visible_nodes: list[int] | str) -> None:
+        """Update the visibility of nodes.
+        Args:
+            visible_nodes (list[int]): A list of node ids to be displayed, or 'all'
+        """
+
         if self.seg_layer is not None:
             self.seg_layer.update_label_colormap(visible_nodes)
         if self.points_layer is not None:
-            self.points_layer.update_point_outline(visible_tracks)
+            self.points_layer.update_point_outline(visible_nodes)
         if self.tracks_layer is not None:
-            self.tracks_layer.update_track_visibility(visible_tracks)
+            self.tracks_layer.update_track_visibility(visible_nodes)
 
     def center_view(self, node):
         """Adjust the current_step and camera center of the viewer to jump to the node

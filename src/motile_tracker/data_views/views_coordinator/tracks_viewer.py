@@ -163,11 +163,11 @@ class TracksViewer:
             self.viewer.text_overlay.text = "Toggle Display [Q]\n All"
 
         self.viewer.text_overlay.visible = True
-        visible_tracks = self.filter_visible_nodes()
-        self.tracking_layers.update_visible(visible_tracks, self.visible)
+        visible_nodes = self.filter_visible_nodes()
+        self.tracking_layers.update_visible(visible_nodes)
 
-    def filter_visible_nodes(self) -> list[int]:
-        """Construct a list of track_ids that should be displayed"""
+    def filter_visible_nodes(self) -> list[int] | str:
+        """Construct a list of track_ids that should be displayed and updates the list of visible node_ids"""
 
         if self.tracks is None or self.tracks.graph is None:
             return []
@@ -190,7 +190,9 @@ class TracksViewer:
             return self.visible
         elif self.mode == "group":
             if self.collection_widget.selected_collection is not None:
-                self.visible = self.collection_widget.selected_collection.collection
+                self.visible = list(
+                    self.collection_widget.selected_collection.collection
+                )
             else:
                 self.visible = []
             return self.visible
@@ -202,8 +204,8 @@ class TracksViewer:
         """Sets the view and triggers visualization updates in other components"""
 
         self.set_napari_view()
-        visible_tracks = self.filter_visible_nodes()
-        self.tracking_layers.update_visible(visible_tracks, self.visible)
+        visible_nodes = self.filter_visible_nodes()
+        self.tracking_layers.update_visible(visible_nodes)
 
     def set_napari_view(self) -> None:
         """Adjust the current_step of the viewer to jump to the last item of the selected_nodes list"""
