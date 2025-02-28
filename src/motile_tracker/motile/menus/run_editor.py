@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 from warnings import warn
 
+import dask.array as da
 import napari.layers
 import networkx as nx
 import numpy as np
@@ -21,6 +22,7 @@ from qtpy.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from tqdm import tqdm
 
 from motile_tracker.motile.backend import MotileRun
 
@@ -185,7 +187,12 @@ class RunEditor(QGroupBox):
             warn("No input layer selected", stacklevel=2)
             return None
         if isinstance(input_layer, napari.layers.Labels):
-            input_seg = input_layer.data
+            if isinstance(input_layer.data, da.core.Array):
+                input_seg = self._convert_da_to_np_array(
+                    input_layer.data
+                )  # silently convert to in-memory array
+            else:
+                input_seg = input_layer.data
             ndim = input_seg.ndim
             if ndim > 4:
                 raise ValueError(
@@ -212,6 +219,24 @@ class RunEditor(QGroupBox):
             time=datetime.now(),
             scale=input_layer.scale,
         )
+
+    def _convert_da_to_np_array(self, dask_array: da.core.Array) -> np.ndarray:
+        """Convert from dask array to in-memory array.
+
+        Args:
+            dask_array (da.core.Array): a dask array
+
+        Returns:
+            np.ndarray: data as an in-memory numpy array
+        """
+
+        stack_list = []
+        for i in tqdm(
+            range(dask_array.shape[0]),
+            desc="Converting dask array to in-memory array",
+        ):
+            stack_list.append(dask_array[i].compute())
+        return np.stack(stack_list, axis=0)
 
     def emit_run(self) -> None:
         """Construct a run and start solving by emitting the start run

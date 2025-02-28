@@ -63,7 +63,7 @@ class TracksViewer:
         self.selected_nodes = NodeSelectionList()
         self.selected_nodes.list_updated.connect(self.update_selection)
 
-        self.tracks_list = TracksList()
+        self.tracks_list = TracksList(self)
         self.tracks_list.view_tracks.connect(self.update_tracks)
 
         self.collection_widget = CollectionWidget(self)
