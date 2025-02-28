@@ -1,5 +1,6 @@
 from functools import partial
 from pathlib import Path
+from typing import TYPE_CHECKING
 from warnings import warn
 
 import napari
@@ -26,6 +27,9 @@ from motile_tracker.import_export.menus.import_external_tracks_dialog import (
     ImportTracksDialog,
 )
 from motile_tracker.motile.backend.motile_run import MotileRun
+
+if TYPE_CHECKING:
+    pass
 
 
 class TrackListWidget(QWidget):
@@ -92,8 +96,9 @@ class TracksList(QGroupBox):
 
     view_tracks = Signal(Tracks, str)
 
-    def __init__(self):
+    def __init__(self, tracks_viewer):
         super().__init__(title="Results List")
+        self.tracks_viewer = tracks_viewer
         self.file_dialog = QFileDialog()
         self.file_dialog.setFileMode(QFileDialog.Directory)
         self.file_dialog.setOption(QFileDialog.ShowDirsOnly, True)
@@ -176,7 +181,7 @@ class TracksList(QGroupBox):
                 represents a set of tracks.
         """
         widget: TracksButton = self.tracks_list.itemWidget(item)
-        tracks: Tracks = widget.tracks
+        tracks: SolutionTracks = widget.tracks
         default_name: str = widget.name.text()
         default_name = f"{default_name}_tracks.csv"
         # use the same directory as the last time you opened the dialog
@@ -184,7 +189,7 @@ class TracksList(QGroupBox):
         self.export_dialog.selectFile(str(base_path / default_name))
         if self.export_dialog.exec_():
             file_path = Path(self.export_dialog.selectedFiles()[0])
-            tracks.export_tracks(file_path)
+            tracks.export_tracks(file_path, self.tracks_viewer.colormap)
 
     def save_tracks(self, item: QListWidgetItem):
         """Saves a tracks object from the list. You must pass the list item that
