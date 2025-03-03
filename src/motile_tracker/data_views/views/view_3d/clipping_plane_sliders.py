@@ -338,9 +338,9 @@ class PlaneSliderWidget(QWidget):
             clip_plane.enabled = False
 
         if isinstance(self.current_layer, TrackLabels):
-            visible = self.tracks_viewer.filter_visible_nodes()
+            visible_nodes = self.tracks_viewer.filter_visible_nodes()
             self.tracks_viewer.tracking_layers.update_visible(
-                visible_tracks=visible, visible_nodes="all"
+                visible_nodes=visible_nodes, plane_nodes="all"
             )
 
     def _set_orth_views(self):
@@ -411,10 +411,10 @@ class PlaneSliderWidget(QWidget):
                 == self.viewer.dims.current_step[0]
             ]  # also include the selected nodes for clarity, even if they are out of plane.
 
-            visible = self.tracks_viewer.filter_visible_nodes()
+            visible_nodes = self.tracks_viewer.filter_visible_nodes()
 
             self.tracks_viewer.tracking_layers.update_visible(
-                visible_tracks=visible, visible_nodes=plane_nodes
+                visible_nodes=visible_nodes, plane_nodes=plane_nodes
             )
 
     def filter_labels_with_clipping_planes(

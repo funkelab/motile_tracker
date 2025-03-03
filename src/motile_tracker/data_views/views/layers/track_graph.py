@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 import napari
 import numpy as np
+from motile_toolbox.candidate_graph import NodeAttr
 
 if TYPE_CHECKING:
     from motile_tracker.data_model.solution_tracks import SolutionTracks
@@ -116,7 +117,13 @@ class TrackGraph(napari.layers.Tracks):
         visible: list[int] | str | None = None,
         plane_nodes: list[int] | str | None = None,
     ) -> None:
-        """Optionally show only the tracks of a current lineage"""
+        """Show the tracks for all nodes or for a selection of nodes
+
+        Args:
+            visible (list[int] | str): A list of node ids to be displayed or "all"
+            plane_nodes (list[int] | str): A list of node ids that should be visible because they are in within the bounds of a clipping plane, or 'all' if the clipping plane is not active.
+
+        """
 
         if (
             self.tracks_viewer.viewer.dims.ndisplay == 2
@@ -153,12 +160,27 @@ class TrackGraph(napari.layers.Tracks):
         if isinstance(visible, str):
             self.track_colors[:, 3] = 1
             self.graph = self.tracks_layer_graph
+            self.events.rebuild_tracks()  # to force update colors
         else:
-            visible = [self.tracks_viewer.tracks.get_track_id(node) for node in visible]
-            track_id_mask = np.isin(
-                self.properties["track_id"],
-                visible,
+            visible_tracks_times = {
+                (
+                    self.tracks_viewer.tracks._get_node_attr(
+                        node, NodeAttr.TRACK_ID.value
+                    ),
+                    self.tracks_viewer.tracks._get_node_attr(node, NodeAttr.TIME.value),
+                )
+                for node in visible
+            }
+
+            track_id_mask = np.array(
+                [
+                    (track_id, time) in visible_tracks_times
+                    for track_id, time in zip(
+                        self.data[:, 0], self.data[:, 1], strict=True
+                    )
+                ]
             )
+
             self.graph = {
                 key: self.tracks_layer_graph[key]
                 for key in visible
