@@ -54,7 +54,7 @@ class CollectionButton(QWidget):
         self.node_count.setText(f"{len(self.collection)} nodes")
 
 
-class CollectionWidget(QGroupBox):
+class CollectionWidget(QWidget):
     """Widget for holding in-memory Collections (groups). Emits a signal whenever
     a collection is selected in the list, to update the viewing properties
     """
@@ -62,7 +62,7 @@ class CollectionWidget(QGroupBox):
     group_changed = Signal()
 
     def __init__(self, tracks_viewer: TracksViewer):
-        super().__init__(title="Collections")
+        super().__init__()
 
         self.tracks_viewer = tracks_viewer
         self.tracks_viewer.selected_nodes.list_updated.connect(
@@ -76,20 +76,29 @@ class CollectionWidget(QGroupBox):
         self.collection_list.itemSelectionChanged.connect(self._selection_changed)
         self.selected_collection = None
 
-        # Select nodes in group
-        selection_layout = QHBoxLayout()
+        # Select widget group
+        select_widget = QGroupBox("Selection")
+        selection_layout = QVBoxLayout()
+
+        row1_layout = QHBoxLayout()
         self.select_btn = QPushButton("Select nodes in group")
         self.select_btn.clicked.connect(self._select_nodes)
         self.invert_btn = QPushButton("Invert selection")
         self.invert_btn.clicked.connect(self._invert_selection)
+        row1_layout.addWidget(self.select_btn)
+        row1_layout.addWidget(self.invert_btn)
+
+        row2_layout = QHBoxLayout()
         self.deselect_btn = QPushButton("Deselect")
         self.deselect_btn.clicked.connect(self.tracks_viewer.selected_nodes.reset)
         self.reselect_btn = QPushButton("Restore selection")
         self.reselect_btn.clicked.connect(self.tracks_viewer.selected_nodes.restore)
-        selection_layout.addWidget(self.select_btn)
-        selection_layout.addWidget(self.deselect_btn)
-        selection_layout.addWidget(self.reselect_btn)
-        selection_layout.addWidget(self.invert_btn)
+        row2_layout.addWidget(self.deselect_btn)
+        row2_layout.addWidget(self.reselect_btn)
+
+        selection_layout.addLayout(row1_layout)
+        selection_layout.addLayout(row2_layout)
+        select_widget.setLayout(selection_layout)
 
         # edit layout
         edit_widget = QGroupBox("Edit")
@@ -136,7 +145,7 @@ class CollectionWidget(QGroupBox):
         # combine widgets
         layout = QVBoxLayout()
         layout.addWidget(self.collection_list)
-        layout.addLayout(selection_layout)
+        layout.addWidget(select_widget)
         layout.addWidget(edit_widget)
         layout.addWidget(new_group_box)
         self.setLayout(layout)
