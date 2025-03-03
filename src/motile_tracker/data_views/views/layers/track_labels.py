@@ -10,6 +10,7 @@ from napari.utils import DirectLabelColormap
 from napari.utils.action_manager import action_manager
 from napari.utils.notifications import show_info, show_warning
 from napari.utils.translations import trans
+from psygnal import Signal
 
 if TYPE_CHECKING:
     from napari.utils.events import Event
@@ -72,6 +73,8 @@ def _new_label(layer: TrackLabels, new_track_id=True):
 class TrackLabels(ContourLabels):
     """Extended labels layer that holds the track information and emits
     and responds to dynamics visualization signals"""
+
+    update_group_labels = Signal()
 
     @property
     def _type_string(self) -> str:
@@ -344,6 +347,7 @@ class TrackLabels(ContourLabels):
             if visible == "all":
                 self.contour = 0
                 self.group_labels = None
+                self.update_group_labels.emit(self.group_labels)
                 self.colormap.color_dict = {
                     key: np.array(
                         [
@@ -359,6 +363,7 @@ class TrackLabels(ContourLabels):
                 if self.viewer.dims.ndisplay == 2:
                     self.contour = 1
                     self.group_labels = visible
+                    self.update_group_labels.emit(self.group_labels)
                 else:
                     self.colormap.color_dict = {
                         key: np.array([*value[:-1], 0], dtype=np.float32)

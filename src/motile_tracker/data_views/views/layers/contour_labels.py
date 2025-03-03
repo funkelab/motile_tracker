@@ -119,3 +119,6 @@ class ContourLabels(napari.layers.Labels):
             for s1, s2 in zip(data_slice, expanded_slice, strict=False)
         )
         return sliced_labels[delta_slice]
+
+    def set_group_labels(self, labels: list[int] | None = None):
+        self.group_labels = labels

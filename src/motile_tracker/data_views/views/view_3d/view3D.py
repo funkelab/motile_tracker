@@ -23,6 +23,9 @@ class OrthogonalViews(QWidget):
 
         self.setLayout(layout)
 
+    def update(self):
+        self.multiple_viewer_widget.update()
+
 
 class View3D(QWidget):
     """Widget to combine multiple views and cross widget together."""

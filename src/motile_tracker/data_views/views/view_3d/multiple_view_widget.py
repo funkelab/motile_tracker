@@ -16,6 +16,7 @@ from qtpy.QtWidgets import (
 )
 from superqt.utils import qthrottled
 
+from motile_tracker.data_views.views.layers.contour_labels import ContourLabels
 from motile_tracker.data_views.views.layers.track_graph import TrackGraph
 from motile_tracker.data_views.views.layers.track_labels import TrackLabels
 from motile_tracker.data_views.views.layers.track_points import TrackPoints
@@ -31,13 +32,15 @@ def copy_layer(layer: Layer, name: str = ""):
         )
 
     elif isinstance(layer, TrackLabels):
-        res_layer = Labels(
+        res_layer = ContourLabels(
             data=layer.data,
             name=layer.name,
             colormap=layer.colormap,
             opacity=layer.opacity,
             scale=layer.scale,
         )
+        layer.update_group_labels.connect(res_layer.set_group_labels)
+        res_layer.group_labels = layer.group_labels
     elif isinstance(layer, TrackPoints):
         res_layer = Points(
             data=layer.data,
@@ -290,6 +293,9 @@ class MultipleViewerWidget(QSplitter):
                     self.viewer_model2.layers[layer.name].events.selected_label.connect(
                         self._sync_selected_label
                     )
+                    self.viewer_model2.layers[layer.name].mouse_drag_callbacks.append(
+                        self._sync_click
+                    )
             layer.events.name.connect(self._sync_name)
             self._order_update()
 
@@ -307,6 +313,9 @@ class MultipleViewerWidget(QSplitter):
         self.viewer.events.reset_view.connect(self._reset_view)
         self.viewer_model1.events.status.connect(self._status_update)
         self.viewer_model2.events.status.connect(self._status_update)
+
+    def update(self):
+        self.tracks_viewer.update_selection()
 
     def _status_update(self, event):
         self.viewer.status = event.value
@@ -404,9 +413,6 @@ class MultipleViewerWidget(QSplitter):
                 )
 
                 if isinstance(self.viewer_model1.layers[event.value.name], Labels):
-                    self.viewer_model1.layers[event.value.name].events.paint.connect(
-                        self._sync_paint
-                    )
                     self.viewer_model1.layers[
                         event.value.name
                     ].events.selected_label.connect(self._sync_selected_label)
@@ -415,6 +421,10 @@ class MultipleViewerWidget(QSplitter):
                         self.viewer_model1.layers[
                             event.value.name
                         ].mouse_drag_callbacks.append(self._sync_click)
+
+                        self.viewer_model1.layers[
+                            event.value.name
+                        ].events.paint.connect(self._sync_paint)
 
                         self.viewer_model1.layers[event.value.name].bind_key("z")(
                             self.tracks_viewer.undo
@@ -455,9 +465,6 @@ class MultipleViewerWidget(QSplitter):
                 )
 
                 if isinstance(self.viewer_model2.layers[event.value.name], Labels):
-                    self.viewer_model2.layers[event.value.name].events.paint.connect(
-                        self._sync_paint
-                    )
                     self.viewer_model2.layers[
                         event.value.name
                     ].events.selected_label.connect(self._sync_selected_label)
@@ -466,6 +473,10 @@ class MultipleViewerWidget(QSplitter):
                         self.viewer_model2.layers[
                             event.value.name
                         ].mouse_drag_callbacks.append(self._sync_click)
+
+                        self.viewer_model2.layers[
+                            event.value.name
+                        ].events.paint.connect(self._sync_paint)
                         self.viewer_model2.layers[event.value.name].bind_key("z")(
                             self.tracks_viewer.undo
                         )
@@ -623,6 +634,7 @@ class MultipleViewerWidget(QSplitter):
                 try:
                     self._block = True
                     layer.data = event.source.data
+
                 finally:
                     self._block = False
 
