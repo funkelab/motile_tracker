@@ -84,8 +84,11 @@ class CollectionWidget(QGroupBox):
         self.invert_btn.clicked.connect(self._invert_selection)
         self.deselect_btn = QPushButton("Deselect")
         self.deselect_btn.clicked.connect(self.tracks_viewer.selected_nodes.reset)
+        self.reselect_btn = QPushButton("Restore selection")
+        self.reselect_btn.clicked.connect(self.tracks_viewer.selected_nodes.restore)
         selection_layout.addWidget(self.select_btn)
         selection_layout.addWidget(self.deselect_btn)
+        selection_layout.addWidget(self.reselect_btn)
         selection_layout.addWidget(self.invert_btn)
 
         # edit layout
