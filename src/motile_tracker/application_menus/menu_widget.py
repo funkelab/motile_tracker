@@ -13,24 +13,31 @@ class MenuWidget(QScrollArea):
     def __init__(self, viewer: napari.Viewer):
         super().__init__()
 
+        self.viewer = viewer
         tracks_viewer = TracksViewer.get_instance(viewer)
 
         motile_widget = MotileWidget(viewer)
         editing_widget = EditingMenu(viewer)
         view3D_widget = View3D(viewer)
+        view3D_widget.update_tab.connect(self.update_3D_tab)
 
-        tabwidget = QTabWidget()
+        self.tabwidget = QTabWidget()
 
-        tabwidget.addTab(view3D_widget, "3D viewing")
-        tabwidget.addTab(motile_widget, "Track with Motile")
-        tabwidget.addTab(editing_widget, "Edit Tracks")
-        tabwidget.addTab(tracks_viewer.tracks_list, "Results List")
-        tabwidget.addTab(tracks_viewer.collection_widget, "Collections")
+        self.tabwidget.addTab(view3D_widget, "3D viewing")
+        self.tabwidget.addTab(motile_widget, "Track with Motile")
+        self.tabwidget.addTab(editing_widget, "Edit Tracks")
+        self.tabwidget.addTab(tracks_viewer.tracks_list, "Results List")
+        self.tabwidget.addTab(tracks_viewer.collection_widget, "Collections")
 
         layout = QVBoxLayout()
-        layout.addWidget(tabwidget)
+        layout.addWidget(self.tabwidget)
 
-        self.setWidget(tabwidget)
+        self.setWidget(self.tabwidget)
         self.setWidgetResizable(True)
 
         self.setLayout(layout)
+
+    def update_3D_tab(self):
+        if self.tabwidget.currentIndex() == 0:
+            self.tabwidget.setCurrentIndex(1)
+            self.tabwidget.setCurrentIndex(0)

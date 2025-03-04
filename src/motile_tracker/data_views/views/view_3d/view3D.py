@@ -1,4 +1,5 @@
 import napari
+from psygnal import Signal
 from qtpy.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 from .clipping_plane_sliders import PlaneSliderWidget
@@ -30,6 +31,8 @@ class OrthogonalViews(QWidget):
 class View3D(QWidget):
     """Widget to combine multiple views and cross widget together."""
 
+    update_tab = Signal()
+
     def __init__(
         self,
         viewer: napari.Viewer,
@@ -59,7 +62,7 @@ class View3D(QWidget):
         self.plane_widget.hide()
         self.widget_2d.hide()
 
-        # Show the correct widget initially
+        # Show the correct widget
         self.display_changed()
 
     def display_changed(self, event=None):
@@ -75,5 +78,7 @@ class View3D(QWidget):
                 self.plane_widget.show()
             elif self.viewer.dims.ndisplay == 2:
                 self.orth_views.show()
+                self.orth_views.update()
+                self.update_tab.emit()
         else:
             self.widget_2d.show()
