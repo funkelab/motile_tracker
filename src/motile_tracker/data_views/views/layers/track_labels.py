@@ -362,7 +362,7 @@ class TrackLabels(ContourLabels):
             else:
                 if self.viewer.dims.ndisplay == 2:
                     self.contour = 1
-                    self.group_labels = visible
+                    self.group_labels = visible + highlighted._list
                     self.update_group_labels.emit(self.group_labels)
                 else:
                     self.colormap.color_dict = {
