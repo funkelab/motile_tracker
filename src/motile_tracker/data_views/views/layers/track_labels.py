@@ -45,7 +45,7 @@ def _new_label(layer: TrackLabels, new_track_id=True):
     """
 
     if isinstance(layer.data, np.ndarray):
-        new_selected_label = np.max(layer.data) + 1
+        new_selected_label = int(np.max(layer.data) + 1)
         if layer.selected_label == new_selected_label:
             show_info(
                 trans._(
