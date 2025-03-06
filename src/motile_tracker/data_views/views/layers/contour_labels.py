@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import functools
 from typing import Optional
 
 import napari
@@ -47,9 +46,7 @@ def get_contours(
 
     # instead of filling with background label, fill the group label with their normal color
     if group_labels is not None and len(group_labels) > 0:
-        group_mask = functools.reduce(
-            np.logical_or, (labels == val for val in group_labels)
-        )
+        group_mask = np.isin(labels, group_labels)
         combined_mask = not_boundaries & group_mask
         contours = np.where(combined_mask, labels, contours)
 
@@ -100,6 +97,7 @@ class ContourLabels(napari.layers.Labels):
             Returns None if the contour parameter is less than 1,
             or if the label array has more than 2 dimensions.
         """
+
         if self.contour < 1:
             return None
         if labels.ndim > 2:
