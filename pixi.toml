@@ -1,0 +1,61 @@
+[project]
+name = "motile-tracker"
+channels = [
+  "conda-forge",
+  "funkelab",
+  "gurobi",
+]
+
+platforms = ["win-64", "linux-64", "osx-arm64", "osx-64"]
+preview = [ "pixi-build" ]
+
+[dependencies]
+python = "3.11.*"
+ilpy = "*"
+pip = "*"
+
+[tasks.setup]
+cmd = "pixi run pip install motile-tracker"
+
+[tasks.pack-env]
+depends-on = [ "setup" ]
+cmd = "pixi exec pixi-pack pack"
+outputs = [ "environment.tar" ]
+
+[tasks.create-executable]
+depends-on = [ "pack-env" ]
+cmd = "pixi exec pyinstaller --onefile --name motile-tracker --windowed scripts/launcher.py"
+outputs = [ "dist/motile-tracker.app" ]
+
+[tasks.start]
+depends-on = [ "setup" ]
+cmd = "python scripts/launcher.py"
+
+[package]
+name = "motile-tracker"
+version = "0.1.0"
+
+[package.build]
+backend = { name = "pixi-build-python", version = "0.1.*" }
+
+[package.host-dependencies]
+pixi-pack = "*"
+pyinstaller = "*"
+
+[feature.macos]
+platforms = [ "osx-arm64" ]
+
+[feature.macos.tasks.package-executable]
+depends-on = [ "create-executable" ]
+cmd = "create-dmg --dmg-title \"Motile Tracker Installer\" \"dist/motile-tracker\" \"motile-tracker.dmg\""
+
+[feature.win]
+platforms = [ "win-64" ]
+
+[feature.linux]
+platforms = [ "linux-64" ]
+
+[environments]
+macos = [ "macos" ]
+linux = [ "linux" ]
+win = [ "win" ]
