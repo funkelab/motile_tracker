@@ -1,0 +1,11 @@
+name: motile-tracker
+channels:
+  - conda-forge
+  - funkelab
+  - gurobi
+dependencies:
+  - python=3.12
+  - pip
+  - ilpy
+  - pip:
+    - motile-tracker
