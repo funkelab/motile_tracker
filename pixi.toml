@@ -13,18 +13,24 @@ preview = [ "pixi-build" ]
 python = "3.11.*"
 ilpy = "*"
 pip = "*"
+pyinstaller = "*"
 
 [tasks.setup]
-cmd = "pixi run pip install motile-tracker"
+cmd = "pip install git+https://github.com/funkelab/motile_tracker.git"
 
 [tasks.pack-env]
 depends-on = [ "setup" ]
 cmd = "pixi exec pixi-pack pack"
 outputs = [ "environment.tar" ]
 
-[tasks.create-executable]
+[tasks.create-spec]
 depends-on = [ "pack-env" ]
-cmd = "pixi exec pyinstaller --onefile --name motile-tracker --windowed scripts/launcher.py"
+cmd = "pyi-makespec -n motile-tracker --onefile --windowed --paths .pixi/envs/default/lib/python3.11/site-packages scripts/launcher.py"
+outputs = [ "motile-tracker.spec" ]
+
+[tasks.create-executable]
+depends-on = [ "create-spec" ]
+cmd = "pyinstaller motile-tracker.spec"
 outputs = [ "dist/motile-tracker.app" ]
 
 [tasks.start]
@@ -40,7 +46,7 @@ backend = { name = "pixi-build-python", version = "0.1.*" }
 
 [package.host-dependencies]
 pixi-pack = "*"
-pyinstaller = "*"
+constructor = "*"
 
 [feature.macos]
 platforms = [ "osx-arm64" ]
