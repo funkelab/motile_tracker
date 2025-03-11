@@ -16,7 +16,7 @@ pip = "*"
 pyinstaller = "*"
 
 [tasks.setup]
-cmd = "pip install git+https://github.com/funkelab/motile_tracker.git"
+cmd = "pip install ."
 
 [tasks.pack-env]
 depends-on = [ "setup" ]
@@ -39,7 +39,7 @@ cmd = "pixi exec constructor ."
 
 [tasks.start]
 depends-on = [ "setup" ]
-cmd = "python launcher.py"
+cmd = "python -m motile_tracker.launcher"
 
 [package]
 name = "motile-tracker"
