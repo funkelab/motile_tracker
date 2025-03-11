@@ -8,4 +8,4 @@ dependencies:
   - pip
   - ilpy
   - pip:
-    - git+https://github.com/funkelab/motile_tracker.git
+    - .
