@@ -24,7 +24,7 @@ cmd = "pixi exec pixi-pack pack"
 outputs = [ "environment.tar" ]
 
 [tasks.create-spec]
-depends-on = [ "pack-env" ]
+depends-on = [ "setup" ]
 cmd = "pyi-makespec -n motile-tracker --onefile --windowed --paths .pixi/envs/default/lib/python3.11/site-packages launcher.py"
 outputs = [ "motile-tracker.spec" ]
 
@@ -32,6 +32,10 @@ outputs = [ "motile-tracker.spec" ]
 depends-on = [ "create-spec" ]
 cmd = "pyinstaller motile-tracker.spec"
 outputs = [ "dist/motile-tracker.app" ]
+
+[tasks.create-package]
+depends-on = [ "setup" ]
+cmd = "pixi exec constructor ."
 
 [tasks.start]
 depends-on = [ "setup" ]

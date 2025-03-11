@@ -1,6 +1,5 @@
 name: MotileTracker
 version: 0.1.0
 environment_file: conda-env.yml
-installer_type: pkg
-extra_envs: motile-tracker
+installer_type: all
 license_file: LICENSE
