@@ -15,7 +15,7 @@ ilpy = "*"
 pip = "*"
 
 [tasks.setup]
-cmd = "pip install ."
+cmd = "python -m pip install ."
 
 [tasks.create-package]
 depends-on = [ "setup" ]
@@ -33,5 +33,4 @@ version = "v3.1.3"
 backend = { name = "pixi-build-python", version = "0.1.*" }
 
 [package.host-dependencies]
-pixi-pack = "*"
 constructor = "*"

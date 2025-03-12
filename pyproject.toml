@@ -58,6 +58,7 @@ motile-tracker = "motile_tracker:napari.yaml"
 "Documentation" ="https://funkelab.github.io/motile_tracker/"
 
 [tool.setuptools_scm]
+write_to = "src/motile_tracker/_version.py"
 
 [tool.ruff]
 line-length = 88
