@@ -1,5 +1,7 @@
-name: MotileTracker
+name: motile-tracker
 version: 0.1.0
 environment_file: conda-env.yml
 installer_type: all
+post_install: ./install-scripts/postinstall.sh # [not win]
+post_install: ./install-scripts/postinstall.bat # [win]
 license_file: LICENSE
