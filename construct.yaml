@@ -5,6 +5,7 @@ extra_files:
 environment_file: conda-env.yml
 keep_pkgs: false
 installer_type: all
+check_path_spaces: false
 post_install: ./install-scripts/postinstall.sh # [not win]
 post_install: ./install-scripts/postinstall.bat # [win]
 license_file: LICENSE
