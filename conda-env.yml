@@ -6,6 +6,12 @@ channels:
 dependencies:
   - python=3.11.*
   - pip
-  - ilpy
+  - gcg
+  - papilo
+  - scip
+  - soplex
+  - zimpl
+  - ilpy=0.4.0
+  - numpy<2.1
   - pip:
     - git+https://github.com/funkelab/motile_tracker@installer

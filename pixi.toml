@@ -11,11 +11,16 @@ preview = [ "pixi-build" ]
 
 [dependencies]
 python = "3.11.*"
-ilpy = "*"
 pip = "*"
+gcg = "*"
+papilo = "*"
+scip = "*"
+soplex = "*"
+zimpl = "*"
+ilpy = "0.4.0"
 
 [tasks.setup]
-cmd = "python -m pip install ."
+cmd = "pip install ."
 
 [tasks.create-package]
 depends-on = [ "setup" ]
