@@ -1,7 +1,5 @@
 name: motile-tracker
 version: 0.1.0
-specs:
-  - conda
 extra_files:
   - install-scripts/README.md: README.md
 environment_file: conda-env.yml
