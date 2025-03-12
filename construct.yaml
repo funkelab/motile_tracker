@@ -1,5 +1,7 @@
 name: motile-tracker
 version: 0.1.0
+specs:
+  - conda
 environment_file: conda-env.yml
 keep_pkgs: false
 installer_type: all
