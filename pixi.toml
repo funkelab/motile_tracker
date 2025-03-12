@@ -13,25 +13,9 @@ preview = [ "pixi-build" ]
 python = "3.11.*"
 ilpy = "*"
 pip = "*"
-pyinstaller = "*"
 
 [tasks.setup]
 cmd = "pip install ."
-
-[tasks.pack-env]
-depends-on = [ "setup" ]
-cmd = "pixi exec pixi-pack pack"
-outputs = [ "environment.tar" ]
-
-[tasks.create-spec]
-depends-on = [ "setup" ]
-cmd = "pyi-makespec -n motile-tracker --onefile --windowed --paths .pixi/envs/default/lib/python3.11/site-packages launcher.py"
-outputs = [ "motile-tracker.spec" ]
-
-[tasks.create-executable]
-depends-on = [ "create-spec" ]
-cmd = "pyinstaller motile-tracker.spec"
-outputs = [ "dist/motile-tracker.app" ]
 
 [tasks.create-package]
 depends-on = [ "setup" ]
@@ -51,21 +35,3 @@ backend = { name = "pixi-build-python", version = "0.1.*" }
 [package.host-dependencies]
 pixi-pack = "*"
 constructor = "*"
-
-[feature.macos]
-platforms = [ "osx-arm64" ]
-
-[feature.macos.tasks.package-executable]
-depends-on = [ "create-executable" ]
-cmd = "create-dmg --dmg-title \"Motile Tracker Installer\" \"dist/motile-tracker\" \"motile-tracker.dmg\""
-
-[feature.win]
-platforms = [ "win-64" ]
-
-[feature.linux]
-platforms = [ "linux-64" ]
-
-[environments]
-macos = [ "macos" ]
-linux = [ "linux" ]
-win = [ "win" ]
