@@ -27,7 +27,7 @@ cmd = "python -m motile_tracker.launcher"
 
 [package]
 name = "motile-tracker"
-version = "0.1.0"
+version = "v3.1.3"
 
 [package.build]
 backend = { name = "pixi-build-python", version = "0.1.*" }
