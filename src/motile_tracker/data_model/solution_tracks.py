@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING
 
 import networkx as nx
+import pandas as pd
 from motile_toolbox.candidate_graph.graph_attributes import NodeAttr
 
 from .tracks import Tracks
@@ -177,31 +179,35 @@ class SolutionTracks(Tracks):
         }
         header = header + list(additional_attrs)
 
-        with open(outfile, "w") as f:
-            f.write(",".join(header))
-            for node_id in self.graph.nodes():
-                parents = list(self.graph.predecessors(node_id))
-                parent_id = "" if len(parents) == 0 else parents[0]
-                track_id = self.get_track_id(node_id)
-                time = self.get_time(node_id)
-                position = self.get_position(node_id)
-                lineage_id = self.get_lineage_id(node_id)
-                color = colormap.map(track_id)[:3] * 255
-                attrs = [
-                    self._get_node_attr(node_id, attr) for attr in additional_attrs
-                ]
-                row = [
-                    time,
-                    *position,
-                    node_id,
-                    parent_id,
-                    track_id,
-                    lineage_id,
-                    color,
-                    *attrs,
-                ]
-                f.write("\n")
-                f.write(",".join(map(str, row)))
+        data = []
+        for node_id in self.graph.nodes():
+            parents = list(self.graph.predecessors(node_id))
+            parent_id = "" if len(parents) == 0 else parents[0]
+            track_id = self.get_track_id(node_id)
+            time = self.get_time(node_id)
+            position = self.get_position(node_id)
+            lineage_id = self.get_lineage_id(node_id)
+            color = colormap.map(track_id)[:3] * 255
+            attrs = [
+                self._get_node_attr(node_id, attr)
+                if attr != "group"
+                else json.dumps(self._get_node_attr(node_id, attr))
+                for attr in additional_attrs
+            ]
+            row = [
+                time,
+                *position,
+                node_id,
+                parent_id,
+                track_id,
+                lineage_id,
+                color,
+                *attrs,
+            ]
+            data.append(row)
+
+        df = pd.DataFrame(data, columns=header)
+        df.to_csv(outfile, index=False)
 
     def add_nodes(
         self,
