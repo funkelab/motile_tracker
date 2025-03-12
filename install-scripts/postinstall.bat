@@ -1,3 +1,3 @@
-echo Added by post-install script > "%PREFIX%\post_install_sentinel.txt"
+"%PREFIX%\python.exe" -m pip install git+https://github.com/funkelab/motile_tracker@installer
 
-"%PREFIX%\Scripts\pip.exe" install git+https://github.com/funkelab/motile_tracker@installer
+echo Added by post-install script > "%PREFIX%\post_install_sentinel.txt"
