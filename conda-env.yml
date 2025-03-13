@@ -8,7 +8,7 @@ dependencies:
   - pip
   - gcg
   - papilo
-  - scip
+  - scip=9.0.*
   - soplex
   - zimpl
   - ilpy=0.4.0
