@@ -24,7 +24,7 @@ cmd = "pip install ."
 
 [tasks.create-package]
 depends-on = [ "setup" ]
-cmd = "pixi exec constructor ."
+cmd = "pixi exec constructor . --output-dir dist/"
 
 [tasks.start]
 depends-on = [ "setup" ]
