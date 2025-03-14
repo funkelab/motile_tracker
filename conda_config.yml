@@ -3,6 +3,14 @@ channels:
   - conda-forge
   - funkelab
   - gurobi
-  - defaults
 dependencies:
-  - ilpy
+  - python=3.11.*
+  - pip
+  - gcg
+  - papilo
+  - scip
+  - soplex
+  - zimpl
+  - ilpy=0.4.*
+  - pip:
+    - git+https://github.com/funkelab/motile_tracker@installer
