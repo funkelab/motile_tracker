@@ -25,6 +25,15 @@ conda before installing the plugin with pip.
     conda install -c conda-forge -c funkelab -c gurobi ilpy
     pip install motile-tracker
 
+All these dependencies can also be installed using the provided conda_config.yml:
+
+    conda env create -f conda_config.yml
+    conda activate motile-tracker
+
+If you already have [pixi](https://pixi.sh/) installed, you can run motile-tracker using:
+
+    pixi run start
+
 ## Issues
 
 If you encounter any problems, please
