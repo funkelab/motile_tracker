@@ -257,9 +257,9 @@ class TrackLabels(napari.layers.Labels):
                     continue
                 time = pixels[0][0]
                 removed_node = old_value
-                assert (
-                    removed_node is not None
-                ), f"Node with label {old_value} in time {time} was not found"
+                assert removed_node is not None, (
+                    f"Node with label {old_value} in time {time} was not found"
+                )
                 # check if all pixels of old_value are removed
                 if np.sum(self.data[time] == old_value) == 0:
                     to_delete.append((removed_node, pixels))

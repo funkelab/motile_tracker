@@ -109,9 +109,9 @@ class TracksLayerGroup:
 
         if self.seg_layer is None or self.seg_layer.mode == "pan_zoom":
             location = self.tracks.get_positions([node], incl_time=True)[0].tolist()
-            assert (
-                len(location) == self.viewer.dims.ndim
-            ), f"Location {location} does not match viewer number of dims {self.viewer.dims.ndim}"
+            assert len(location) == self.viewer.dims.ndim, (
+                f"Location {location} does not match viewer number of dims {self.viewer.dims.ndim}"
+            )
 
             step = list(self.viewer.dims.current_step)
             for dim in self.viewer.dims.not_displayed:

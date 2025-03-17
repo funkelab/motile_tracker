@@ -176,9 +176,9 @@ def tracks_from_df(
         if ndim == 4:
             required_columns.append("z")
     for column in required_columns:
-        assert (
-            column in df.columns
-        ), f"Required column {column} not found in dataframe columns {df.columns}"
+        assert column in df.columns, (
+            f"Required column {column} not found in dataframe columns {df.columns}"
+        )
 
     if segmentation is not None and not _test_valid(df, segmentation, scale):
         raise ValueError(
@@ -236,9 +236,9 @@ def tracks_from_df(
         # add the edge to the graph, if the node has a parent
         # note: this loading format does not support edge attributes
         if not pd.isna(parent_id) and parent_id != -1:
-            assert (
-                parent_id in graph.nodes
-            ), f"Parent id {parent_id} of node {_id} not in graph yet"
+            assert parent_id in graph.nodes, (
+                f"Parent id {parent_id} of node {_id} not in graph yet"
+            )
             graph.add_edge(parent_id, _id)
 
     # in the case a different column than the id column was used for the seg_id, we need

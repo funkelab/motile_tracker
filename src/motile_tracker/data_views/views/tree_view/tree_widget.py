@@ -53,8 +53,8 @@ class CustomViewBox(pg.ViewBox):
         """Modified mouseDragEvent function to check which mouse mode to use
         and to submit rectangle coordinates for selecting multiple nodes if necessary"""
 
-        #check if SHIFT is pressed
-        shift_down = (ev.modifiers() == QtCore.Qt.ShiftModifier)
+        # check if SHIFT is pressed
+        shift_down = ev.modifiers() == QtCore.Qt.ShiftModifier
 
         if shift_down:
             # if starting a shift-drag, record the scene position
@@ -72,7 +72,7 @@ class CustomViewBox(pg.ViewBox):
                 self.selected_rect.emit(rect)  # emit the rectangle
                 ev.accept()
 
-                if hasattr(self, 'rbScaleBox') and self.rbScaleBox:
+                if hasattr(self, "rbScaleBox") and self.rbScaleBox:
                     self.rbScaleBox.hide()
 
         else:
@@ -80,9 +80,10 @@ class CustomViewBox(pg.ViewBox):
             self.setMouseMode(self.PanMode)
             super().mouseDragEvent(ev, axis)
 
-            #hide the leftover box if any
-            if hasattr(self, 'rbScaleBox') and self.rbScaleBox:
+            # hide the leftover box if any
+            if hasattr(self, "rbScaleBox") and self.rbScaleBox:
                 self.rbScaleBox.hide()
+
 
 class TreePlot(pg.PlotWidget):
     node_clicked = Signal(Any, bool)  # node_id, append
