@@ -3,6 +3,5 @@ channels:
   - conda-forge
   - funkelab
   - gurobi
-  - defaults
 dependencies:
   - ilpy
