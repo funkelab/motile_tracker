@@ -25,6 +25,17 @@ conda before installing the plugin with pip.
     conda install -c conda-forge -c funkelab -c gurobi ilpy
     pip install motile-tracker
 
+## Running Motile Tracker
+
+To run the application:
+* activate the conda environment created in the [Installation Step](#installation)
+
+    conda activate motile-tracker
+
+* Run:
+
+    python -m motile_tracker.launcher
+
 ## Issues
 
 If you encounter any problems, please
