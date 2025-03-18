@@ -5,8 +5,8 @@ channels:
   - gurobi
 dependencies:
   - python=3.11.*
-  - ilpy
-  - scip=9.2.*
+  - ilpy=*
+  - scip=9.0.*
   - numpy=2.0.*
   - pip
   - pip:
