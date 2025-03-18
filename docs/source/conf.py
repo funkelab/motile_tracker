@@ -1,5 +1,5 @@
 project = "Motile Tracker"
-copyright = "2024, Howard Hughes Medical Institute"
+copyright = "2024, Howard Hughes Medical Institute"  # noqa: A001
 author = "Caroline Malin-Mayor"
 
 extensions = [
