@@ -6357,7 +6357,7 @@ packages:
   requires_python: '>=3.10'
 - pypi: .
   name: motile-tracker
-  version: 3.1.4.dev30+g4f7ee6e.d20250318
+  version: 3.1.4.dev39+g3829191.d20250318
   sha256: b89e7ed6ba2894997d949ecd559602940126aea6f789d1c3e9b644f7f74f1ee5
   requires_dist:
   - napari[all]
