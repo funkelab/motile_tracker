@@ -1,6 +1,4 @@
-set PATH=%PATH%;C:\ProgramData\scoop\shims
-
-"%PREFIX%\Scripts\pip.exe" install "git+https://github.com/funkelab/motile_tracker@installer"
+"%PREFIX%\Scripts\pip.exe" install motile_tracker
 
 echo "Create start script"
 

@@ -12,15 +12,21 @@ preview = [ "pixi-build" ]
 [dependencies]
 python = "3.11.*"
 pip = "*"
-ilpy = "0.4.*"
 scip = "9.*"
 numpy = "2.0.*"
 constructor = "*"
+pyinstaller = "*"
+
+[pypi-dependencies]
+ilpy = "*"
+motile_tracker = { path = "." }
+napari = { version = "*", extras = [ "all" ] }
 
 [tasks]
 setup = "pip install ."
-create-package = { depends-on = "setup", cmd = "constructor . --output-dir dist" }
-start = { depends-on = "setup", cmd = "python -m motile_tracker.launcher" }
+create-package = "constructor . --output-dir dist"
+start = "python -m motile_tracker.launcher"
+create-app = { depends-on = [ "setup" ], cmd = "pyinstaller motile-tracker.spec" }
 
 [feature.test.dependencies]
 pytest = "*"

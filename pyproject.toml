@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=70", "setuptools-scm>=8"]
+requires = ["setuptools>=70", "wheel", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -28,9 +28,9 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Image Processing",
 ]
 
-dependencies =[
+dependencies = [
     "napari[all]",
-    "numpy",
+    "numpy >= 1.26,<2.1",
     "magicgui",
     "qtpy",
     "scikit-image",
@@ -44,6 +44,7 @@ dependencies =[
     "pyqtgraph",
     "lxml_html_clean",  # only to deal with napari dependencies being broken
 ]
+
 [project.optional-dependencies]
 testing =["napari", "pyqt5", "pytest", "pytest-cov", "pytest-qt"]
 docs = ["myst-parser", "sphinx", "sphinx-autoapi", "sphinx_rtd_theme", "sphinxcontrib-video"]
@@ -56,6 +57,19 @@ motile-tracker = "motile_tracker:napari.yaml"
 [project.urls]
 "Bug Tracker" = "https://github.com/funkelab/motile_tracker/issues"
 "Documentation" ="https://funkelab.github.io/motile_tracker/"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["motile_tracker"]
+exclude = ["docs"]
+
+[tool.setuptools.package-data]
+motile_tracker = [
+  "*napari.yaml"
+]
 
 [tool.setuptools_scm]
 write_to = "src/motile_tracker/_version.py"
@@ -90,7 +104,6 @@ unfixable = [
   "B905", # currently adds strict=False to zips. Should add strict=True (manually)
 ]
 
-
 [tool.ruff.lint.per-file-ignores]
 "scripts/*.py" = ["F"]
 
@@ -99,3 +112,4 @@ unfixable = [
 
 [tool.mypy]
 ignore_missing_imports = true
+
