@@ -86,8 +86,11 @@ exe = EXE(
     exclude_binaries=True,
     name=NAME,
     debug=DEBUG,
+    bootloader_ignore_signals=False,
+    strip=False,
     upx=UPX,
     console=(not WINDOWED),
+    disable_windowed_traceback=False,
     icon=get_icon(),
     version=get_version(),
     codesign_identity=None,
@@ -100,6 +103,7 @@ coll = COLLECT(
     a.zipfiles,
     a.datas,
     upx=UPX,
+    upx_exclude=[],
     name=NAME,
 )
 
