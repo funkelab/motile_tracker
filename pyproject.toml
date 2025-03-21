@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=70", "wheel", "setuptools-scm>=8"]
+requires = ["setuptools>=70", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -60,19 +60,6 @@ fa6s = "fonticon_fa6:FA6S"
 [project.urls]
 "Bug Tracker" = "https://github.com/funkelab/motile_tracker/issues"
 "Documentation" ="https://funkelab.github.io/motile_tracker/"
-
-[tool.setuptools]
-include-package-data = true
-
-[tool.setuptools.packages.find]
-where = ["src"]
-include = ["motile_tracker"]
-exclude = ["docs"]
-
-[tool.setuptools.package-data]
-motile_tracker = [
-  "*napari.yaml"
-]
 
 [tool.setuptools_scm]
 write_to = "src/motile_tracker/_version.py"
