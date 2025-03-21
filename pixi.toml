@@ -24,7 +24,7 @@ motile_tracker = { path = "." }
 [tasks]
 setup = "pip install ."
 create-package = "constructor . --output-dir dist"
-start = "python -m motile_tracker.launcher"
+start = { cmd = "python -m motile_tracker.launcher" }
 create-app = { cmd = "pyinstaller motile-tracker.spec" }
 
 [feature.test.dependencies]
