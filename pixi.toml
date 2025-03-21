@@ -20,8 +20,6 @@ pyinstaller = "*"
 [pypi-dependencies]
 ilpy = "*"
 motile_tracker = { path = "." }
-superqt = "*"
-fonticon-fontawesome6 = "*"
 
 [tasks]
 setup = "pip install ."
