@@ -1,5 +1,4 @@
-from PyInstaller.utils.hooks import (collect_all, collect_data_files,
-                                     collect_submodules)
+from PyInstaller.utils.hooks import collect_submodules
 
 hiddenimports = collect_submodules('superqt')
 
