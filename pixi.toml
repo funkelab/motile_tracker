@@ -20,13 +20,14 @@ pyinstaller = "*"
 [pypi-dependencies]
 ilpy = "*"
 motile_tracker = { path = "." }
-napari = { version = "*", extras = [ "all" ] }
+superqt = "*"
+fonticon-fontawesome6 = "*"
 
 [tasks]
 setup = "pip install ."
 create-package = "constructor . --output-dir dist"
 start = "python -m motile_tracker.launcher"
-create-app = { depends-on = [ "setup" ], cmd = "pyinstaller motile-tracker.spec" }
+create-app = { cmd = "pyinstaller motile-tracker.spec" }
 
 [feature.test.dependencies]
 pytest = "*"

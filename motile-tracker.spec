@@ -11,7 +11,7 @@ sys.modules["FixTk"] = None
 
 NAME = "motile-tracker"
 WINDOWED = True
-DEBUG = True
+DEBUG = False
 UPX = False
 BLOCK_CIPHER = None
 
@@ -59,8 +59,10 @@ def get_version():
 a = Analysis(
     ["src/motile_tracker/launcher.py"],
     hookspath=["src/installer_hooks"],
-    hiddenimports=["motile_tracker"],
-    runtime_hooks=[],
+    hiddenimports=[
+        "motile_tracker",
+    ],
+    runtime_hooks=["src/runtime_hook.py"],
     excludes=[
         "FixTk",
         "tcl",

@@ -1,18 +1,17 @@
 from PyInstaller.utils.hooks import collect_all
 
-print("✅ Hook for motile_tracker is being loaded!")
-
 datas, binaries, hiddenimports = collect_all('motile_tracker')
 
-# datas = collect_data_files('motile_tracker')
+# datas += collect_data_files('motile_tracker.data_views.views_coordinator')
+# hiddenimports += collect_submodules('motile_tracker.data_views.views_coordinator')
 
-# hiddenimports = collect_submodules('motile_tracker')
+# datas += collect_data_files('fonticon_fa6')
+# hiddenimports += collect_submodules('fonticon_fa6')
 
-hiddenimports += [
-    'motile_tracker.launcher',
-    'motile_tracker.application_menus.main_app',
-    'motile_tracker.application_menus.menu_widget',
-    'motile_tracker.data_views.views.tree_view.tree_widget',
-    'motile_tracker.motile.backend.solve',
-    'motile_tracker.example_data',
-]
+# datas += collect_data_files('superqt.fonticon')
+# hiddenimports += collect_submodules('superqt.fonticon')
+
+# datas += collect_data_files('superqt.fonticon._plugins')
+# hiddenimports += collect_submodules('superqt.fonticon._plugins')
+
+print("✅ Loaded motile_tracker!")

@@ -54,6 +54,9 @@ all = ["motile-tracker[testing,docs,dev]"]
 [project.entry-points."napari.manifest"]
 motile-tracker = "motile_tracker:napari.yaml"
 
+[project.entry-points."superqt.fonticon"]
+fa6s = "fonticon_fa6:FA6S"
+
 [project.urls]
 "Bug Tracker" = "https://github.com/funkelab/motile_tracker/issues"
 "Documentation" ="https://funkelab.github.io/motile_tracker/"
