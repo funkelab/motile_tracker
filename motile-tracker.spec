@@ -62,7 +62,7 @@ a = Analysis(
     hiddenimports=[
         "motile_tracker",
     ],
-    runtime_hooks=["src/runtime_hook.py"],
+    runtime_hooks=[],
     excludes=[
         "FixTk",
         "tcl",
