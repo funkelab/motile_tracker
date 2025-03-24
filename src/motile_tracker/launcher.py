@@ -26,20 +26,6 @@ class TqdmToLogger:
         pass  # No-op for compatibility
 
 
-def _patched_tqdm_init(self, *args, **kwargs):
-    if 'file' not in kwargs or kwargs['file'] is None:
-        kwargs['file'] = TqdmToLogger(logger)
-    # Patch tqdm globally
-    _original_tqdm_init(self, *args, **kwargs)
-
-
-def _launch_viewer():
-    print('Open Napari Viewer with Motile Tracker plugin...')
-    # use an existing viewer if one exists, otherwise create a new one 
-    viewer = napari.Viewer()
-    viewer.window.add_plugin_dock_widget("motile-tracker")
-
-
 def _configure_logging(logfile=None, verbose=False):
     loglevel = logging.DEBUG if verbose else logging.INFO
     logformat = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -71,6 +57,20 @@ def _define_args():
     args = args_parser.parse_args()
 
     return args
+
+
+def _launch_viewer():
+    print('Open Napari Viewer with Motile Tracker plugin...')
+    # use an existing viewer if one exists, otherwise create a new one 
+    viewer = napari.Viewer()
+    viewer.window.add_plugin_dock_widget("motile-tracker")
+
+
+def _patched_tqdm_init(self, *args, **kwargs):
+    if 'file' not in kwargs or kwargs['file'] is None:
+        kwargs['file'] = TqdmToLogger(logger)
+    # Patch tqdm globally
+    _original_tqdm_init(self, *args, **kwargs)
 
 
 if __name__ == '__main__':
