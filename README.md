@@ -59,6 +59,11 @@ ELF executable on Linux.
 On Windows in order to be able to package the application the ilpy library must be
 properly installed and compiled. This will require [download](https://aka.ms/vs/17/release/vs_BuildTools.exe) and install [Visual Studio Build Tools](https://visualstudio.microsoft.com/downloads/). This comes with a script to set all required environment variables located typically at `"C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat"` so before you setup the app you need to run this bat file. For powershell run `scripts\scripts/set-vs-buildTools-env.ps1 <fullpathto vcvars64>`.
 
+Further to create an installer for the app you will need:
+* InnoSetup on Windows (`scoop install inno-setup` or `winget install "Inno Setup"`)
+* create-dmg on OSX (`brew install create-dmg`)
+* makeself on Linux (`apt install makeself`)
+
 ## Issues
 
 If you encounter any problems, please

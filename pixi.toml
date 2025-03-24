@@ -44,6 +44,9 @@ outputs = [ "dist/MotileTracker.dmg" ]
 [target.win-64.tasks.package-app]
 cmd = "iscc install-scripts/wininstaller.iss"
 
+[target.linux-64.tasks.package-app]
+cmd = "makeself --target /opt/MotileTracker dist/MotileTracker dist/MotileTrackerInstaller.run \"MotileTracker Installer\" ./MotileTracker"
+
 [environments]
 test = [ "test" ]
 
