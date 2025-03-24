@@ -1,3 +1,6 @@
+# Run this using vcvars64.bat location and architecture, e.g.
+#   .\set-vs-buildTools-env.ps1 "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat" amd64
+
 function Invoke-BatchEnvironment {
     param (
         [string[]]$BatchFileWithArgs
