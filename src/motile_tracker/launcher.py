@@ -26,12 +26,10 @@ class TqdmToLogger:
         pass  # No-op for compatibility
 
 
-# Patch tqdm globally
-
-
 def _patched_tqdm_init(self, *args, **kwargs):
     if 'file' not in kwargs or kwargs['file'] is None:
         kwargs['file'] = TqdmToLogger(logger)
+    # Patch tqdm globally
     _original_tqdm_init(self, *args, **kwargs)
 
 
@@ -69,6 +67,7 @@ def _define_args():
 
     args_parser.add_argument('--verbose', action='store_true', help='Enable verbose logging')
     args_parser.add_argument('--log-file', dest='logfile', help='Log file path')
+    args_parser.add_argument('-h', '--help', action='store_true', help='Display this help message')
 
     args = args_parser.parse_args()
 
@@ -81,6 +80,15 @@ if __name__ == '__main__':
     multiprocessing.freeze_support()
 
     args = _define_args()
+    if args.help:
+        print('Motile Tracker launcher')
+        print('Usage: python -m motile_tracker.launcher [options]')
+        print('Options:')
+        print('  --verbose        Enable verbose logging')
+        print('  --log-file FILE  Log file path')
+        print('  -h, --help       Display this help message')
+        sys.exit(0)
+
     logger = _configure_logging(args.logfile, args.verbose)
 
     tqdm.tqdm.__init__ = _patched_tqdm_init
