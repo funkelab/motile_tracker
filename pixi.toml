@@ -40,7 +40,7 @@ test = "pytest tests"
 [target.osx-arm64.tasks.package-app]
 cmd = "echo package DMG"
 
-[target.win64.tasks.package-app]
+[target.win-64.tasks.package-app]
 cmd = "echo package WinInstaller"
 
 [environments]
