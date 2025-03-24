@@ -9,7 +9,7 @@ import numpy as np
 import tifffile
 import zarr
 from appdirs import AppDirs
-from napari.types import LayerData
+from finn.types import LayerData
 from skimage.measure import regionprops
 
 logger = logging.getLogger(__name__)

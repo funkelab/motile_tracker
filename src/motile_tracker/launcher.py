@@ -1,8 +1,14 @@
-import napari
+import finn
+from finn.track_application_menus.main_app import MainApp
+
+from motile_tracker.motile.menus.motile_widget import MotileWidget
 
 # Auto-load your plugin
-viewer = napari.Viewer()
-viewer.window.add_plugin_dock_widget("motile-tracker")
+viewer = finn.Viewer()
+main_app = MainApp(viewer)
+motile_widget = MotileWidget(viewer)
+main_app.menu_widget.tabwidget.addTab(motile_widget, "Track with Motile")
+viewer.window.add_dock_widget(main_app)
 
-# Start Napari event loop
-napari.run()
+# Start finn event loop
+finn.run()

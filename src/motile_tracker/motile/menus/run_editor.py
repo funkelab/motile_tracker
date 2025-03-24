@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from warnings import warn
 
 import dask.array as da
-import napari.layers
+import finn.layers
 import networkx as nx
 import numpy as np
 from motile_toolbox.utils.relabel_segmentation import ensure_unique_labels
@@ -29,7 +29,7 @@ from motile_tracker.motile.backend import MotileRun
 from .params_editor import SolverParamsEditor
 
 if TYPE_CHECKING:
-    import napari
+    import finn
 
 logger = logging.getLogger(__name__)
 
@@ -37,13 +37,13 @@ logger = logging.getLogger(__name__)
 class RunEditor(QGroupBox):
     start_run = Signal(MotileRun)
 
-    def __init__(self, viewer: napari.Viewer):
+    def __init__(self, viewer: finn.Viewer):
         """A widget for editing run parameters and starting solving.
         Has to know about the viewer to get the input segmentation
         from the current layers.
 
         Args:
-            viewer (napari.Viewer): The napari viewer that the editor should
+            viewer (finn.Viewer): The finn viewer that the editor should
                 get the input segmentation from.
         """
         super().__init__(title="Run Editor")
@@ -72,7 +72,7 @@ class RunEditor(QGroupBox):
         prev_selection = self.layer_selection_box.currentText()
         self.layer_selection_box.clear()
         for layer in self.viewer.layers:
-            if isinstance(layer, napari.layers.Labels | napari.layers.Points):
+            if isinstance(layer, finn.layers.Labels | finn.layers.Points):
                 self.layer_selection_box.addItem(layer.name)
         self.layer_selection_box.setCurrentText(prev_selection)
 
@@ -81,9 +81,9 @@ class RunEditor(QGroupBox):
         layer = self.get_input_layer()
         if layer is None:
             return
-        if isinstance(layer, napari.layers.Labels):
+        if isinstance(layer, finn.layers.Labels):
             enable_iou = True
-        elif isinstance(layer, napari.layers.Points):
+        elif isinstance(layer, finn.layers.Points):
             enable_iou = False
         self.solver_params_widget.iou_row.toggle_visible(enable_iou)
 
@@ -93,7 +93,7 @@ class RunEditor(QGroupBox):
 
         Returns:
             QWidget: A dropdown select with all the labels layers in layers
-                and a refresh button to sync with napari.
+                and a refresh button to sync with finn.
         """
         layer_group = QWidget()
         layer_layout = QHBoxLayout()
@@ -119,12 +119,12 @@ class RunEditor(QGroupBox):
         layer_group.setLayout(layer_layout)
         return layer_group
 
-    def get_input_layer(self) -> napari.layers.Layer | None:
+    def get_input_layer(self) -> finn.layers.Layer | None:
         """Get the input segmentation or points in current selection in the
         layer dropdown.
 
         Returns:
-            napari.layers.Layer | None: The points or labels layer with the name
+            finn.layers.Layer | None: The points or labels layer with the name
                 that is selected, or None if no layer is selected.
         """
         layer_name = self.layer_selection_box.currentText()
@@ -186,7 +186,7 @@ class RunEditor(QGroupBox):
         if input_layer is None:
             warn("No input layer selected", stacklevel=2)
             return None
-        if isinstance(input_layer, napari.layers.Labels):
+        if isinstance(input_layer, finn.layers.Labels):
             if isinstance(input_layer.data, da.core.Array):
                 input_seg = self._convert_da_to_np_array(
                     input_layer.data
@@ -206,7 +206,7 @@ class RunEditor(QGroupBox):
                 input_seg = ensure_unique_labels(input_seg)
 
             input_points = None
-        elif isinstance(input_layer, napari.layers.Points):
+        elif isinstance(input_layer, finn.layers.Points):
             input_seg = None
             input_points = input_layer.data
         params = self.solver_params_widget.solver_params.copy()
