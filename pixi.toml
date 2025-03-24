@@ -19,7 +19,7 @@ pyinstaller = "*"
 
 [pypi-dependencies]
 ilpy = "==0.4.1"
-motile_tracker = { path = "." }
+motile_tracker = { path = ".", editable = true }
 
 [tasks]
 setup = "pip install ."

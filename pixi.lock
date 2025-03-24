@@ -6857,7 +6857,7 @@ packages:
   requires_python: '>=3.10'
 - pypi: .
   name: motile-tracker
-  version: 3.1.4.dev80+gb479a53.d20250324
+  version: 3.1.4.dev85+g447356a.d20250324
   sha256: 905747affe3df2ee103d1dfb2e3062504709ba4a4cbd46ec0822e6719441c0e3
   requires_dist:
   - napari[all]
@@ -6888,6 +6888,7 @@ packages:
   - pre-commit ; extra == 'dev'
   - motile-tracker[dev,docs,testing] ; extra == 'all'
   requires_python: '>=3.10'
+  editable: true
 - conda: https://conda.anaconda.org/conda-forge/linux-64/mpfr-4.2.1-h90cbb55_3.conda
   sha256: f25d2474dd557ca66c6231c8f5ace5af312efde1ba8290a6ea5e1732a4e669c0
   md5: 2eeb50cab6652538eee8fc0bc3340c81
