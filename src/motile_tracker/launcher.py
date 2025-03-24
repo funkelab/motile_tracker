@@ -1,5 +1,7 @@
+import argparse
 import logging
 import multiprocessing
+import os
 import napari
 import tqdm
 import sys
@@ -33,31 +35,57 @@ def _patched_tqdm_init(self, *args, **kwargs):
     _original_tqdm_init(self, *args, **kwargs)
 
 
-def launch_viewer():
+def _launch_viewer():
     print('Open Napari Viewer with Motile Tracker plugin...')
     # use an existing viewer if one exists, otherwise create a new one 
     viewer = napari.Viewer()
     viewer.window.add_plugin_dock_widget("motile-tracker")
 
 
-def configure_logging(verbose):
-    log_level = logging.DEBUG if verbose else logging.INFO
-    log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    logging.basicConfig(level=log_level,
-                        format=log_format,
+def _configure_logging(logfile=None, verbose=False):
+    loglevel = logging.DEBUG if verbose else logging.INFO
+    logformat = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+
+    if logfile:
+        logdir = os.path.dirname(logfile)
+        if logdir and not os.path.exists(logdir):
+            os.makedirs(logdir, exist_ok=True)  # Create parent dirs if needed
+
+        handler = logging.FileHandler(logfile)
+    else:
+        handler = logging.StreamHandler(stream=sys.stdout)
+
+    logging.basicConfig(level=loglevel,
+                        format=logformat,
                         datefmt='%Y-%m-%d %H:%M:%S',
                         handlers=[
-                            logging.StreamHandler(stream=sys.stdout)
+                            handler
                         ])
     return logging.getLogger()
 
 
+def _define_args():
+    args_parser = argparse.ArgumentParser(description='Motile Tracker launcher')
+
+    args_parser.add_argument('--verbose', action='store_true', help='Enable verbose logging')
+    args_parser.add_argument('--log-file', dest='logfile', help='Log file path')
+
+    args = args_parser.parse_args()
+
+    return args
+
+
 if __name__ == '__main__':
+    # freeze_support is required to prevent
+    # creating a viewer every time a napari action is invoked
     multiprocessing.freeze_support()
-    launch_viewer()
-    logger = configure_logging(True)
+
+    args = _define_args()
+    logger = _configure_logging(args.logfile, args.verbose)
 
     tqdm.tqdm.__init__ = _patched_tqdm_init
+
+    _launch_viewer()
 
     # Start Napari event loop
     print('Start Napari event loop...')
