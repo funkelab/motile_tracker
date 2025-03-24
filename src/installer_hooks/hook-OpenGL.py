@@ -54,7 +54,7 @@ elif is_darwin:
     hiddenimports = ['OpenGL.platform.darwin']
 # Use glx for other platforms (Linux, ...)
 else:
-    hiddenimports = ['OpenGL.platform.glx']
+    hiddenimports = ['OpenGL.platform.glx', 'OpenGL.platform.egl']
 
 
 # Arrays modules are needed too.
@@ -68,3 +68,6 @@ hiddenimports += opengl_arrays_modules()
 # files.
 if is_win:
     datas = collect_data_files('OpenGL')
+
+print("✅ Loaded OpenGL!", hiddenimports)
+
