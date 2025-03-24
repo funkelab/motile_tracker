@@ -108,6 +108,8 @@ coll = COLLECT(
 )
 
 if sys.platform == "darwin":
+    import motile_tracker
+
     app = BUNDLE(
         coll,
         name=NAME + ".app",
