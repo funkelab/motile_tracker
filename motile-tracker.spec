@@ -9,7 +9,7 @@ sys.setrecursionlimit(sys.getrecursionlimit() * 5)
 sys.modules["FixTk"] = None
 
 
-NAME = "motile-tracker"
+NAME = "MotileTracker"
 WINDOWED = True
 DEBUG = False
 UPX = False
@@ -115,7 +115,7 @@ if sys.platform == "darwin":
         bundle_identifier=f"com.{NAME}.{NAME}",
         info_plist={
             "CFBundleIdentifier": f"com.{NAME}.{NAME}",
-            "CFBundleShortVersionString": napari.__version__,
+            "CFBundleShortVersionString": motile_tracker.__version__,
             "NSHighResolutionCapable": "True",
         },
     )

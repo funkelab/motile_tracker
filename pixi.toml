@@ -25,7 +25,7 @@ motile_tracker = { path = ".", editable = true }
 setup = "pip install ."
 create-package = "constructor . --output-dir dist"
 start = { cmd = "python -m motile_tracker.launcher" }
-create-app = { cmd = "pyinstaller motile-tracker.spec" }
+create-app = "pyinstaller motile-tracker.spec"
 package-app = "echo Package app"
 
 [feature.test.dependencies]
@@ -37,8 +37,13 @@ motile_tracker = { path = ".", editable = false }
 [feature.test.tasks]
 test = "pytest tests"
 
+[target.osx-arm64.tasks.create-app]
+cmd = "pyinstaller motile-tracker.spec"
+outputs = [ "dist/MotileTracker.app" ]
+
 [target.osx-arm64.tasks.package-app]
-cmd = "echo package DMG"
+depends-on = [ "create-app" ]
+cmd = "install-scripts/create-dmg.sh"
 
 [target.win-64.tasks.package-app]
 cmd = "echo package WinInstaller"
