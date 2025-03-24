@@ -39,7 +39,7 @@ test = "pytest tests"
 
 [target.osx-arm64.tasks.package-app]
 cmd = "install-scripts/create-dmg.sh"
-outputs = [ dist/MotileTracker.dmg ]
+outputs = [ "dist/MotileTracker.dmg" ]
 
 [target.win-64.tasks.package-app]
 cmd = "echo package WinInstaller"
