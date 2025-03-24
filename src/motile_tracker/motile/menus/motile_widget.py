@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 class MotileWidget(QWidget):
-    """A widget that controls the backend components of the motile napari tracker.
+    """A widget that controls the backend components of the motile tracker.
     Recieves user input about solver parameters, runs motile, and passes
     results to the TrackingViewController.
     """

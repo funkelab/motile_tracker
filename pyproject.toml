@@ -54,6 +54,9 @@ all = ["motile-tracker[testing,docs,dev]"]
 "Bug Tracker" = "https://github.com/funkelab/motile_tracker/issues"
 "Documentation" ="https://funkelab.github.io/motile_tracker/"
 
+[project.scripts]
+motile_tracker = "motile_tracker.__main__:main"
+
 [tool.setuptools_scm]
 
 [tool.ruff]
