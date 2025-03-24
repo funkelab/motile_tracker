@@ -67,7 +67,6 @@ def _define_args():
 
     args_parser.add_argument('--verbose', action='store_true', help='Enable verbose logging')
     args_parser.add_argument('--log-file', dest='logfile', help='Log file path')
-    args_parser.add_argument('-h', '--help', action='store_true', help='Display this help message')
 
     args = args_parser.parse_args()
 
@@ -80,6 +79,7 @@ if __name__ == '__main__':
     multiprocessing.freeze_support()
 
     args = _define_args()
+
     if args.help:
         print('Motile Tracker launcher')
         print('Usage: python -m motile_tracker.launcher [options]')
