@@ -35,7 +35,6 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/fmt-11.0.2-h434a139_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/frozendict-2.4.6-py311h9ecbd09_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/gmp-6.3.0-hac33072_2.conda
-      - conda: https://conda.anaconda.org/gurobi/linux-64/gurobi-12.0.1-py311_0.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/noarch/h2-4.2.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/hpack-4.1.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/hyperframe-6.1.0-pyhd8ed1ab_0.conda
@@ -295,7 +294,6 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-64/freetype-2.13.3-h40dfd5c_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/frozendict-2.4.6-py311h1314207_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/gmp-6.3.0-hf036a51_2.conda
-      - conda: https://conda.anaconda.org/gurobi/osx-64/gurobi-12.0.1-py311_0.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/noarch/h2-4.2.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/hpack-4.1.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/hyperframe-6.1.0-pyhd8ed1ab_0.conda
@@ -552,7 +550,6 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/freetype-2.13.3-h1d14073_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/frozendict-2.4.6-py311hae2e1ce_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/gmp-6.3.0-h7bae524_2.conda
-      - conda: https://conda.anaconda.org/gurobi/osx-arm64/gurobi-12.0.1-py311_0.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/noarch/h2-4.2.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/hpack-4.1.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/hyperframe-6.1.0-pyhd8ed1ab_0.conda
@@ -809,7 +806,6 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/win-64/frozendict-2.4.6-py311he736701_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/future-1.0.0-pyhd8ed1ab_2.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/gmp-6.3.0-hfeafd45_2.conda
-      - conda: https://conda.anaconda.org/gurobi/win-64/gurobi-12.0.1-py311_0.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/noarch/h2-4.2.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/hpack-4.1.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/hyperframe-6.1.0-pyhd8ed1ab_0.conda
@@ -1078,7 +1074,6 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/fmt-11.0.2-h434a139_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/frozendict-2.4.6-py311h9ecbd09_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/gmp-6.3.0-hac33072_2.conda
-      - conda: https://conda.anaconda.org/gurobi/linux-64/gurobi-12.0.1-py311_0.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/noarch/h2-4.2.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/hpack-4.1.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/hyperframe-6.1.0-pyhd8ed1ab_0.conda
@@ -1342,7 +1337,6 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-64/freetype-2.13.3-h40dfd5c_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/frozendict-2.4.6-py311h1314207_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/gmp-6.3.0-hf036a51_2.conda
-      - conda: https://conda.anaconda.org/gurobi/osx-64/gurobi-12.0.1-py311_0.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/noarch/h2-4.2.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/hpack-4.1.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/hyperframe-6.1.0-pyhd8ed1ab_0.conda
@@ -1603,7 +1597,6 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/freetype-2.13.3-h1d14073_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/frozendict-2.4.6-py311hae2e1ce_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/gmp-6.3.0-h7bae524_2.conda
-      - conda: https://conda.anaconda.org/gurobi/osx-arm64/gurobi-12.0.1-py311_0.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/noarch/h2-4.2.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/hpack-4.1.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/hyperframe-6.1.0-pyhd8ed1ab_0.conda
@@ -1864,7 +1857,6 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/win-64/frozendict-2.4.6-py311he736701_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/future-1.0.0-pyhd8ed1ab_2.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/gmp-6.3.0-hfeafd45_2.conda
-      - conda: https://conda.anaconda.org/gurobi/win-64/gurobi-12.0.1-py311_0.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/noarch/h2-4.2.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/hpack-4.1.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/hyperframe-6.1.0-pyhd8ed1ab_0.conda
@@ -3784,38 +3776,6 @@ packages:
   purls: []
   size: 567053
   timestamp: 1718982076982
-- conda: https://conda.anaconda.org/gurobi/linux-64/gurobi-12.0.1-py311_0.tar.bz2
-  sha256: ab4bd4f6d0bf9c157b88aa5ecb2d540c25db3136a18708f76e5cfe097b14bf96
-  md5: a8b630e3deff0dfaf91e9632cb59c435
-  depends:
-  - python >=3.11,<3.12.0a0
-  license: PROPRIETARY
-  size: 41923083
-  timestamp: 1737524925488
-- conda: https://conda.anaconda.org/gurobi/osx-64/gurobi-12.0.1-py311_0.tar.bz2
-  sha256: 15e84bcb97ebe887f25db227c5aa0b1ad412cbaafbe56e4d9527996ee55f2f6d
-  md5: 3aee63ccbf6c54f99a62ef7a32a00a31
-  depends:
-  - python >=3.11,<3.12.0a0
-  license: PROPRIETARY
-  size: 37956752
-  timestamp: 1737527993664
-- conda: https://conda.anaconda.org/gurobi/osx-arm64/gurobi-12.0.1-py311_0.tar.bz2
-  sha256: 41d19dd88acf3b636e218c30ce8c83add22c731012efce5a95b4f245ab4d9de5
-  md5: e92e1f4f0f6199926082355344401ef0
-  depends:
-  - python >=3.11,<3.12.0a0
-  license: PROPRIETARY
-  size: 35321282
-  timestamp: 1737531128027
-- conda: https://conda.anaconda.org/gurobi/win-64/gurobi-12.0.1-py311_0.tar.bz2
-  sha256: 3ae0ecefd48c62289bce9627b7b6f3495d11827606977f62ce5c50f07605ebc3
-  md5: f83a0135c72e661f27269f01d437c7bc
-  depends:
-  - python >=3.11,<3.12.0a0
-  license: PROPRIETARY
-  size: 38906748
-  timestamp: 1737525712678
 - conda: https://conda.anaconda.org/conda-forge/noarch/h2-4.2.0-pyhd8ed1ab_0.conda
   sha256: 0aa1cdc67a9fe75ea95b5644b734a756200d6ec9d0dff66530aec3d1c1e9df75
   md5: b4754fb1bdcb70c8fd54f918301582c6
@@ -6897,7 +6857,7 @@ packages:
   requires_python: '>=3.10'
 - pypi: .
   name: motile-tracker
-  version: 3.1.4.dev76+g3440027.d20250321
+  version: 3.1.4.dev80+gb479a53.d20250324
   sha256: 905747affe3df2ee103d1dfb2e3062504709ba4a4cbd46ec0822e6719441c0e3
   requires_dist:
   - napari[all]

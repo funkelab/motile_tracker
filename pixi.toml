@@ -13,7 +13,6 @@ preview = [ "pixi-build" ]
 python = "3.11.*"
 pip = "*"
 scip = "9.1.*"
-gurobi = "*"
 
 constructor = "*"
 pyinstaller = "*"
