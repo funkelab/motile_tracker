@@ -1,17 +1,23 @@
-#define AppName MotileTracker
+#define AppName "MotileTracker"
 #define AppVersion GetFileVersion('dist\MotileTracker\MotileTracker.exe')
+#define AppURL "https://funkelab.github.io/motile_tracker"
 
 [Setup]
 AppName={#AppName}
-AppVersion={#AppVersion}
-DefaultDirName={pf}\{#AppName}
-OutputDir=dist
+AppVersion="1.0"
+AppPublisherURL={#AppURL}
+DefaultDirName={commonpf}\{#AppName}
+LicenseFile="..\LICENSE"
+OutputDir="..\dist\"
 OutputBaseFilename={#AppName}Installer
 Compression=lzma
 SolidCompression=yes
 
 [Files]
-Source: "dist\{#AppName}\{#AppName}.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\dist\{#AppName}\{#AppName}.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\dist\{#AppName}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppName}.exe"
+Name: "{group}\{cm:UninstallProgram,{#AppName}}"; Filename: "{uninstallexe}"
+Name: "{commondesktop}\{#AppName}"; Filename: "{app}\{#AppName}.exe"; Tasks: desktopicon

@@ -42,7 +42,7 @@ cmd = "install-scripts/create-dmg.sh"
 outputs = [ "dist/MotileTracker.dmg" ]
 
 [target.win-64.tasks.package-app]
-cmd = "iscc install-scripts\WinInstaller.iss"
+cmd = "iscc install-scripts/wininstaller.iss"
 
 [environments]
 test = [ "test" ]
