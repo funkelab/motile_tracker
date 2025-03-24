@@ -13,6 +13,9 @@ OutputBaseFilename={#AppName}Installer
 Compression=lzma
 SolidCompression=yes
 
+[Tasks]
+Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+
 [Files]
 Source: "..\dist\{#AppName}\{#AppName}.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\dist\{#AppName}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
