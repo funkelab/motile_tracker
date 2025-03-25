@@ -1,4 +1,5 @@
-# Hook required for IPython autocomplete
+from PyInstaller.utils.hooks import collect_all
 
+datas, binaries, hiddenimports = collect_all('freetype')
 
-hiddenimports = ["freetype"]
+print("Loaded freetype!", datas, binaries, hiddenimports)
