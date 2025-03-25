@@ -104,3 +104,7 @@ jobs:
       - name: Install app dependencies
         working-directory: motile-tracker
         run: pixi run setup
+
+      - name: Package native app
+        working-directory: motile-tracker
+        run: pixi run create-app
