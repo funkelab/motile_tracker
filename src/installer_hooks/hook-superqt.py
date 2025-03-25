@@ -4,4 +4,4 @@ hiddenimports = collect_submodules('superqt')
 
 hiddenimports += collect_submodules('superqt.fonticon')
 
-print("✅ Loaded superqt!", hiddenimports)
+print("Loaded superqt!", hiddenimports)

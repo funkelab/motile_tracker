@@ -69,5 +69,5 @@ hiddenimports += opengl_arrays_modules()
 if is_win:
     datas = collect_data_files('OpenGL')
 
-print("✅ Loaded OpenGL!", hiddenimports)
+print("Loaded OpenGL!", hiddenimports)
 
