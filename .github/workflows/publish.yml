@@ -127,4 +127,4 @@ jobs:
 
       - name: Package native app
         working-directory: motile-tracker
-        run: pixi run package-app
+        run: pixi run create-installer
