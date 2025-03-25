@@ -113,7 +113,8 @@ jobs:
       - name: Download installer app (Linux only)
         if: runner.os == 'Linux'
         run: |
-          apt install -y makeself
+          sudo apt-get update
+          sudo apt-get install -y makeself
 
       - name: Download installer app (macOS only)
         if: runner.os == 'macOS'
@@ -128,3 +129,18 @@ jobs:
       - name: Package native app
         working-directory: motile-tracker
         run: pixi run create-installer
+
+      - name: Upload app
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            motile-tracker/dist/MotileTracker.dmg
+            motile-tracker/dist/MotileTrackerInstaller.exe
+            motile-tracker/dist/MotileTrackerInstaller.run
+          token: ${{ secrets.GITHUB_TOKEN }}
+          draft: false
+          prerelease: false
+        if: (runner.os == 'macOS' && exists('motile-tracker/dist/MotileTracker.dmg')|| 
+             runner.os == 'Windows' && exists('motile-tracker/dist/MotileTrackerInstaller.exe') ||
+             runner.os == 'Linux' && exists('motile-tracker/dist/MotileTrackerInstaller.run'))
+        )
