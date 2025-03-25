@@ -22,8 +22,8 @@ motile_tracker = { path = ".", editable = true }
 [tasks]
 setup = { cmd = "pip install ." }
 start = { cmd = "python -m motile_tracker.launcher" }
-create-app = { cmd = "pyinstaller motile-tracker.spec", outputs = [ "dist/MotileTracker" ] }
-package-app = { cmd = "echo Package app" }
+create-app = { cmd = "echo Create native app" }
+create-installer = { depends-on = [ "create-app" ], cmd = "echo Package app installer" }
 
 [feature.test.dependencies]
 pytest = "*"
@@ -34,17 +34,29 @@ motile_tracker = { path = ".", editable = false }
 [feature.test.tasks]
 test = "pytest tests"
 
-[target.osx-arm64.tasks.package-app]
+[target.osx-arm64.tasks.create-app]
+cmd = "pyinstaller motile-tracker.spec"
+outputs = [ "dist/MotileTracker/MotileTracker" ]
+
+[target.win-64.tasks.create-app]
+cmd = "pyinstaller motile-tracker.spec"
+outputs = [ "dist/MotileTracker/MotileTracker.exe" ]
+
+[target.linux-64.tasks.create-app]
+cmd = "pyinstaller motile-tracker.spec"
+outputs = [ "dist/MotileTracker/MotileTracker" ]
+
+[target.osx-arm64.tasks.create-installer]
 cmd = "install-scripts/create-dmg.sh"
 outputs = [ "dist/MotileTracker.dmg" ]
 
-[target.win-64.tasks.package-app]
-depends-on = [ "create-app" ]
+[target.win-64.tasks.create-installer]
 cmd = "iscc install-scripts/wininstaller.iss"
+outputs = [ "dist/MotileTrackerInstaller.exe" ]
 
-[target.linux-64.tasks.package-app]
-depends-on = [ "create-app" ]
+[target.linux-64.tasks.create-installer]
 cmd = "cp install-scripts/finalize-install.sh dist/MotileTracker && makeself --target /opt/MotileTracker --license LICENSE dist/MotileTracker dist/MotileTrackerInstaller.run \"MotileTracker Installer\" ./finalize-install.sh"
+outputs = [ "dist/MotileTrackerInstaller.run" ]
 
 [environments]
 test = [ "test" ]
