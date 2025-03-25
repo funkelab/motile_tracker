@@ -134,13 +134,8 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            motile-tracker/dist/MotileTracker.dmg
-            motile-tracker/dist/MotileTrackerInstaller.exe
-            motile-tracker/dist/MotileTrackerInstaller.run
+            motile-tracker/dist/MotileTrackerInstaller.{dmg|exe|run}
           token: ${{ secrets.GITHUB_TOKEN }}
           draft: false
           prerelease: false
-        if: (runner.os == 'macOS' && exists('motile-tracker/dist/MotileTracker.dmg')|| 
-             runner.os == 'Windows' && exists('motile-tracker/dist/MotileTrackerInstaller.exe') ||
-             runner.os == 'Linux' && exists('motile-tracker/dist/MotileTrackerInstaller.run'))
-        )
+        

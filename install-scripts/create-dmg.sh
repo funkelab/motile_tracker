@@ -3,5 +3,5 @@ create-dmg \
     --volname MotileTracker \
     --volicon logo.icns \
     --eula LICENSE \
-    dist/MotileTracker.dmg \
+    dist/MotileTrackerInstaller.dmg \
     dist/MotileTracker.app
