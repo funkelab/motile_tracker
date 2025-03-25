@@ -110,6 +110,21 @@ jobs:
         working-directory: motile-tracker
         run: pixi run setup
 
+      - name: Download installer app (Linux only)
+        if: runner.os == 'Linux'
+        run: |
+          apt install -y makeself
+
+      - name: Download installer app (macOS only)
+        if: runner.os == 'macOS'
+        run: |
+          brew install create-dmg
+
+      - name: Download installer app (Windows only)
+        if: runner.os == 'Windows'
+        run: |
+          choco install -y innosetup
+
       - name: Package native app
         working-directory: motile-tracker
-        run: pixi run create-app
+        run: pixi run package-app
