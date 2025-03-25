@@ -14,63 +14,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  prepare_matrix:
-    # See this SO answer for details on conditional matrices
-    # https://stackoverflow.com/a/65434401/3407590
-    name: Prepare matrix
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
-    steps:
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - name: Prepare matrix
-        id: set-matrix
-        shell: python
-        # The Python versions chosen below will determine which
-        # Python versions the installers will bundle. The general
-        # principle is to follow the SPEC-0 recommendation:
-        # https://scientific-python.org/specs/spec-0000/
-        run: |
-          import os
-          import json
-
-          elements = [
-            {
-              "os": "ubuntu-latest",
-              "python-version": "3.11",
-              "target-platform": "linux-64",
-            },
-            {
-              "os": "macos-14",
-              "python-version": "3.11",
-              "target-platform": "osx-arm64",
-            },
-            {
-              "os": "windows-latest",
-              "python-version": "3.11",
-              "target-platform": "win-64",
-            },
-          ]
-          platforms_str = "${{ inputs.installer_platforms || 'linux-64,win-64,osx-arm64' }}"
-          platforms = {p.strip() for p in platforms_str.split(",")}
-
-          matrix = {"include": []}
-          for element in elements:
-            if element["target-platform"] in platforms:
-              matrix["include"].append(element)
-
-          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
-            f.write(f"matrix={json.dumps(matrix)}\n")
-
-  create_app:
-    name: Create ${{ matrix.targe-platform }} app bundle
+  create-app-bundle:
+    name: Create ${{ matrix.target-platform }} app bundle
     runs-on: ${{ matrix.os }}
-    needs: [ prepare_matrix ]
+    if: startsWith(github.ref, 'refs/tags/')
     strategy:
       fail-fast: false
-      matrix: ${{ fromJSON(needs.prepare_matrix.outputs.matrix) }}
+      matrix:
+        target-platform: [linux-64, osx-arm64, win-64]
+        os: [ubuntu-latest, macos-latest, windows-latest]
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
