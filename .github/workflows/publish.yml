@@ -65,7 +65,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     strategy:
       fail-fast: false
-      matrix: ${{ fromJSON(needs.prepare_matrix.outputs.matrix) }}
+      matrix: ${{ fromJSON(needs.prepare-matrix.outputs.matrix) }}
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
