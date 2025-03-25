@@ -2,7 +2,7 @@ name: publish
 
 on:
   push:
-    branches: [main]
+    branches: [deploy]
     tags: ["v*"] # Push events to matching v*, i.e. v1.0, v20.15.10
     paths:
       - '.github/workflows/publish.yml' # this file
