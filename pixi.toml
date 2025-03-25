@@ -13,8 +13,6 @@ preview = [ "pixi-build" ]
 python = "3.11.*"
 pip = "*"
 scip = "9.1.*"
-
-constructor = "*"
 pyinstaller = "*"
 
 [pypi-dependencies]
@@ -22,8 +20,7 @@ ilpy = "==0.4.1"
 motile_tracker = { path = ".", editable = true }
 
 [tasks]
-setup = "pip install ."
-create-package = "constructor . --output-dir dist"
+setup = { cmd = "pip install ." }
 start = { cmd = "python -m motile_tracker.launcher" }
 create-app = { cmd = "pyinstaller motile-tracker.spec", outputs = [ "dist/MotileTracker" ] }
 package-app = { cmd = "echo Package app" }

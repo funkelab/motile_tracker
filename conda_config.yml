@@ -5,9 +5,8 @@ channels:
   - gurobi
 dependencies:
   - python=3.11.*
-  - ilpy=*
-  - scip=9.0.*
-  - numpy=2.0.*
+  - ilpy=0.4.1
+  - scip=9.1.*
   - pip
   - pip:
-    - git+https://github.com/funkelab/motile_tracker@installer
+    - motile-tracker
