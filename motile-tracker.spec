@@ -8,9 +8,8 @@ sys.setrecursionlimit(sys.getrecursionlimit() * 5)
 
 sys.modules["FixTk"] = None
 
-
 NAME = "MotileTracker"
-WINDOWED = True
+WINDOWED = True if sys.platform == "darwin" else False
 DEBUG = False
 UPX = False
 BLOCK_CIPHER = None

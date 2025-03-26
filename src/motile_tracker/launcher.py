@@ -12,15 +12,12 @@ _original_tqdm_init = tqdm.tqdm.__init__
 
 
 class TqdmToLogger:
-    def __init__(self, logger, level=logging.INFO):
+    def __init__(self, logger):
         self.logger = logger
-        self.level = level
-        self._buffer = ""
 
     def write(self, message):
-        # tqdm outputs '\r', so we buffer lines
-        if message.strip():  # skip empty lines
-            self.logger.log(self.level, message.strip())
+        if logger:
+            self.logger.log(logger.level, message.lstrip("\r"))
 
     def flush(self):
         pass  # No-op for compatibility
@@ -67,9 +64,9 @@ def _launch_viewer():
 
 
 def _patched_tqdm_init(self, *args, **kwargs):
-    if 'file' not in kwargs or kwargs['file'] is None:
+    if (('file' not in kwargs or kwargs['file'] is None) and
+        (not sys.stdout or not sys.stdout.isatty() or not sys.stderr or not sys.stderr.isatty())):
         kwargs['file'] = TqdmToLogger(logger)
-    # Patch tqdm globally
     _original_tqdm_init(self, *args, **kwargs)
 
 
@@ -82,6 +79,7 @@ if __name__ == '__main__':
 
     logger = _configure_logging(args.logfile, args.verbose)
 
+    # Patch tqdm globally
     tqdm.tqdm.__init__ = _patched_tqdm_init
 
     _launch_viewer()
