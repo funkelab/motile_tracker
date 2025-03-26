@@ -3,24 +3,7 @@ import logging
 import multiprocessing
 import os
 import napari
-import tqdm
 import sys
-
-
-logger = None
-_original_tqdm_init = tqdm.tqdm.__init__
-
-
-class TqdmToLogger:
-    def __init__(self, logger):
-        self.logger = logger
-
-    def write(self, message):
-        if logger:
-            self.logger.log(logger.level, message.lstrip("\r"))
-
-    def flush(self):
-        pass  # No-op for compatibility
 
 
 def _configure_logging(logfile=None, verbose=False):
@@ -63,24 +46,14 @@ def _launch_viewer():
     viewer.window.add_plugin_dock_widget("motile-tracker")
 
 
-def _patched_tqdm_init(self, *args, **kwargs):
-    if (('file' not in kwargs or kwargs['file'] is None) and
-        (not sys.stdout or not sys.stdout.isatty() or not sys.stderr or not sys.stderr.isatty())):
-        kwargs['file'] = TqdmToLogger(logger)
-    _original_tqdm_init(self, *args, **kwargs)
-
-
 if __name__ == '__main__':
     # freeze_support is required to prevent
     # creating a viewer every time a napari action is invoked
     multiprocessing.freeze_support()
 
     args = _define_args()
-
+    global logger
     logger = _configure_logging(args.logfile, args.verbose)
-
-    # Patch tqdm globally
-    tqdm.tqdm.__init__ = _patched_tqdm_init
 
     _launch_viewer()
 
