@@ -2,10 +2,8 @@ name: publish
 
 on:
   push:
-    branches: [deploy]
+    branches: [deploy] # Change this to run only for push events to main branch
     tags: ["v*"] # Push events to matching v*, i.e. v1.0, v20.15.10
-    paths:
-      - '.github/workflows/publish.yml' # this file
   pull_request: {}
   workflow_dispatch:
 
@@ -62,7 +60,7 @@ jobs:
     name: Create ${{ matrix.target-platform }} app bundle
     runs-on: ${{ matrix.os }}
     needs: prepare-matrix
-    if: startsWith(github.ref, 'refs/tags/')
+    if: startsWith(github.ref, 'refs/tags/') # Only run for tags
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.prepare-matrix.outputs.matrix) }}
@@ -132,5 +130,5 @@ jobs:
           files: |
             motile-tracker/dist/MotileTrackerInstaller.*
           token: ${{ secrets.GITHUB_TOKEN }}
-          draft: false
-          prerelease: false
+          draft: ${{ contains(github.ref_name, '-dev') }}
+          prerelease: ${{ contains(github.ref_name, '-rc') }}
