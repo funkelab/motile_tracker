@@ -16,7 +16,7 @@ BLOCK_CIPHER = None
 
 
 def get_icon():
-    logo_file = "logo.ico" if sys.platform.startswith("win") else "logo.icns"
+    logo_file = "motile_logo.ico" if sys.platform.startswith("win") else "motile_logo.icns"
     return logo_file
 
 

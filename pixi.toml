@@ -48,7 +48,7 @@ outputs = [ "dist/MotileTracker/MotileTracker" ]
 
 [target.osx-arm64.tasks.create-installer]
 depends-on = [ "create-app" ]
-cmd = "install-scripts/create-dmg.sh"
+cmd = "create-dmg --volname MotileTracker --volicon motile_logo.icns --eula LICENSE dist/MotileTrackerInstaller.dmg dist/MotileTracker.app"
 outputs = [ "dist/MotileTracker.dmg" ]
 
 [target.win-64.tasks.create-installer]
