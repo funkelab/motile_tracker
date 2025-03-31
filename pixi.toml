@@ -1,13 +1,11 @@
-[project]
+[workspace]
 name = "motile-tracker"
 channels = [
   "conda-forge",
   "funkelab",
   "gurobi"
 ]
-
 platforms = ["win-64", "linux-64", "osx-arm64", "osx-64"]
-preview = [ "pixi-build" ]
 
 [dependencies]
 python = "3.11.*"
@@ -21,9 +19,10 @@ motile_tracker = { path = ".", editable = true }
 
 [tasks]
 setup = { cmd = "pip install ." }
-start = { cmd = "python -m motile_tracker.launcher" }
+build = { cmd = "python -m build --sdist --wheel --outdir dist/" }
 create-app = { cmd = "echo Create native app" }
 create-installer = { cmd = "echo Package app installer" }
+start = { cmd = "python -m motile_tracker.launcher" }
 
 [feature.test.dependencies]
 pytest = "*"
@@ -63,10 +62,3 @@ outputs = [ "dist/MotileTrackerInstaller.run" ]
 
 [environments]
 test = [ "test" ]
-
-[package]
-name = "motile-tracker"
-version = "v3.1.3"
-
-[package.build]
-backend = { name = "pixi-build-python", version = "0.1.*" }
