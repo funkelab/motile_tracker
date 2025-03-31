@@ -1,4 +1,4 @@
-name: publish
+name: Deploy
 
 on:
   push:
@@ -112,6 +112,7 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         if: runner.os == 'Linux'
         with:
+          packages-dir: motile-tracker/dist
           password: ${{ secrets.PYPI_API_TOKEN }}
 
       - name: Download installer app (Linux only)
