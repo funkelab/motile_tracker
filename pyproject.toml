@@ -28,7 +28,7 @@ classifiers = [
 ]
 
 dependencies =[
-    "finn-viewer",
+    "finn-viewer>=0.2",
     "funtracks",
     "appdirs",
     "numpy",
