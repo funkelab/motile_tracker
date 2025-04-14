@@ -2,9 +2,9 @@ import argparse
 import logging
 import multiprocessing
 import os
-import napari
 import sys
 
+from motile_tracker.__main__ import main
 
 def _configure_logging(logfile=None, verbose=False):
     loglevel = logging.DEBUG if verbose else logging.INFO
@@ -39,13 +39,6 @@ def _define_args():
     return args
 
 
-def _launch_viewer():
-    print('Open Napari Viewer with Motile Tracker plugin...')
-    # use an existing viewer if one exists, otherwise create a new one 
-    viewer = napari.Viewer()
-    viewer.window.add_plugin_dock_widget("motile-tracker")
-
-
 if __name__ == '__main__':
     # freeze_support is required to prevent
     # creating a viewer every time a napari action is invoked
@@ -55,8 +48,6 @@ if __name__ == '__main__':
     global logger
     logger = _configure_logging(args.logfile, args.verbose)
 
-    _launch_viewer()
-
     # Start Napari event loop
     print('Start Napari event loop...')
-    napari.run()
+    sys.exit(main())

@@ -1,6 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 import sys
-import napari
+import motile_tracker
+
 from PyInstaller.building.build_main import Analysis, PYZ, EXE, COLLECT, BUNDLE
 
 
@@ -26,7 +27,7 @@ def get_version():
 
     from PyInstaller.utils.win32 import versioninfo as vi
 
-    ver_str = napari.__version__
+    ver_str = motile_tracker.__version__
     version = ver_str.replace("+", ".").split(".")
     version = [int(x) for x in version if x.isnumeric()]
     version += [0] * (4 - len(version))
@@ -107,8 +108,6 @@ coll = COLLECT(
 )
 
 if sys.platform == "darwin":
-    import motile_tracker
-
     app = BUNDLE(
         coll,
         name=NAME + ".app",

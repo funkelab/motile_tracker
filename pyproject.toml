@@ -14,7 +14,6 @@ authors = [
 ]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
-    "Framework :: napari",
     "Intended Audience :: Developers",
     "Intended Audience :: End Users/Desktop",
     "Intended Audience :: Science/Research",
@@ -28,8 +27,10 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Image Processing",
 ]
 
-dependencies = [
-    "napari[all]",
+dependencies =[
+    "finn-viewer>=0.2",
+    "funtracks",
+    "appdirs",
     "numpy >= 1.26,<2.1",
     "magicgui",
     "qtpy",
@@ -42,17 +43,13 @@ dependencies = [
     "dask[array]>=2021.10.0",
     "fonticon-fontawesome6",
     "pyqtgraph",
-    "lxml_html_clean",  # only to deal with napari dependencies being broken
 ]
 
 [project.optional-dependencies]
-testing =["napari", "pyqt5", "pytest", "pytest-cov", "pytest-qt"]
+testing =["pyqt5", "pytest", "pytest-cov", "pytest-qt"]
 docs = ["myst-parser", "sphinx", "sphinx-autoapi", "sphinx_rtd_theme", "sphinxcontrib-video"]
 dev = ["ruff", "pre-commit"]
 all = ["motile-tracker[testing,docs,dev]"]
-
-[project.entry-points."napari.manifest"]
-motile-tracker = "motile_tracker:napari.yaml"
 
 [project.entry-points."superqt.fonticon"]
 fa6s = "fonticon_fa6:FA6S"
@@ -60,6 +57,9 @@ fa6s = "fonticon_fa6:FA6S"
 [project.urls]
 "Bug Tracker" = "https://github.com/funkelab/motile_tracker/issues"
 "Documentation" ="https://funkelab.github.io/motile_tracker/"
+
+[project.scripts]
+motile_tracker = "motile_tracker.__main__:main"
 
 [tool.setuptools_scm]
 write_to = "src/motile_tracker/_version.py"
