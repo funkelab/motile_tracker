@@ -48,6 +48,6 @@ if __name__ == '__main__':
     global logger
     logger = _configure_logging(args.logfile, args.verbose)
 
-    # Start Napari event loop
-    print('Start Napari event loop...')
+    # Start event loop
+    print('Start event loop...')
     sys.exit(main())

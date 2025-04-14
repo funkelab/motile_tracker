@@ -42,6 +42,7 @@ dependencies =[
     "tqdm",
     "dask[array]>=2021.10.0",
     "fonticon-fontawesome6",
+    "PyQt5",
     "pyqtgraph",
 ]
 
