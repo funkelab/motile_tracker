@@ -48,6 +48,4 @@ if __name__ == '__main__':
     global logger
     logger = _configure_logging(args.logfile, args.verbose)
 
-    # Start event loop
-    print('Start event loop...')
     sys.exit(main())
