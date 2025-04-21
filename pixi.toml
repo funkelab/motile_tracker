@@ -10,11 +10,12 @@ platforms = ["win-64", "linux-64", "osx-arm64", "osx-64"]
 [dependencies]
 python = "3.11.*"
 pip = "*"
-scip = "9.1.*"
 pyinstaller = "*"
+scip = "*"
 
 [pypi-dependencies]
-ilpy = "==0.4.1"
+ilpy = "*"
+pyscipopt = "*"
 motile_tracker = { path = ".", editable = true }
 
 [tasks]
