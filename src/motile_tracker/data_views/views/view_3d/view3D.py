@@ -3,7 +3,8 @@ from psygnal import Signal
 from qtpy.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 from .clipping_plane_sliders import PlaneSliderWidget
-from .multiple_view_widget import CrossWidget, MultipleViewerWidget
+from .cross_widget import CrossWidget
+from .multiple_view_widget import MultipleViewerWidget
 
 
 class OrthogonalViews(QWidget):

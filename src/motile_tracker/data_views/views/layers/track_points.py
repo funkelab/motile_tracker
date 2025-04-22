@@ -8,6 +8,7 @@ import napari
 import numpy as np
 from motile_toolbox.candidate_graph import NodeAttr
 from napari.utils.notifications import show_info
+from psygnal import Signal
 
 from motile_tracker.data_model import NodeType, Tracks
 
@@ -21,6 +22,8 @@ class TrackPoints(napari.layers.Points):
     """Extended points layer that holds the track information and emits and
     responds to dynamics visualization signals
     """
+
+    data_updated = Signal()
 
     @property
     def _type_string(self) -> str:
@@ -49,7 +52,6 @@ class TrackPoints(napari.layers.Points):
         )
 
         self.default_size = 5
-        self.selected_track = None
 
         super().__init__(
             data=points,
@@ -130,7 +132,8 @@ class TrackPoints(napari.layers.Points):
         """Sets a new default point size"""
 
         self.default_size = size
-        self._refresh()
+        self.size = self.default_size
+        self.border_color = self.border_color  # emits border color event which triggers updating the sizes as well (size does not have its own event)
 
     def _refresh(self):
         """Refresh the data in the points layer"""
@@ -138,15 +141,18 @@ class TrackPoints(napari.layers.Points):
         self.events.data.disconnect(
             self._update_data
         )  # do not listen to new events until updates are complete
-        self.nodes = list(self.tracks_viewer.tracks.graph.nodes)
 
+        self.nodes = list(self.tracks_viewer.tracks.graph.nodes)
         self.node_index_dict = {node: idx for idx, node in enumerate(self.nodes)}
 
         track_ids = [
             self.tracks_viewer.tracks.graph.nodes[node][NodeAttr.TRACK_ID.value]
             for node in self.nodes
         ]
+        # this submits two events one where the action is 'ongoing' and one when it is finished
         self.data = self.tracks_viewer.tracks.get_positions(self.nodes, incl_time=True)
+        self.data_updated.emit()  # emit update signal for the orthogonal views to connect to
+
         self.symbol = self.get_symbols(
             self.tracks_viewer.tracks, self.tracks_viewer.symbolmap
         )
@@ -154,8 +160,10 @@ class TrackPoints(napari.layers.Points):
             self.tracks_viewer.colormap.map(track_id) for track_id in track_ids
         ]
         self.properties = {"node_id": self.nodes, "track_id": track_ids}
-        self.size = self.default_size
-        self.border_color = [1, 1, 1, 1]
+
+        with self.events.border_color.blocker():  # no need to submit events for this
+            self.size = self.default_size
+            self.border_color = [1, 1, 1, 1]
 
         self.events.data.connect(
             self._update_data
@@ -165,24 +173,7 @@ class TrackPoints(napari.layers.Points):
         """Create attributes for a new node at given time point"""
 
         t = int(new_point[0])
-
-        if self.tracks_viewer.track_mode == "new track":
-            track_id = self.tracks_viewer.tracks.get_next_track_id()
-        else:
-            # make sure there is no node with this track id at this time point yet
-            track_id_nodes = self.tracks_viewer.tracks.track_id_to_node[
-                self.selected_track
-            ]
-            for node in track_id_nodes:
-                if (
-                    self.tracks_viewer.tracks._get_node_attr(node, NodeAttr.TIME.value)
-                    == t
-                ):  # there is a node with this track id already, so create a new track id in this case
-                    track_id = self.tracks_viewer.tracks.get_next_track_id()
-                    break
-            else:
-                track_id = self.selected_track
-
+        track_id = self.tracks_viewer.tracks.get_next_track_id()
         area = 0
 
         attributes = {
@@ -194,7 +185,9 @@ class TrackPoints(napari.layers.Points):
         return attributes
 
     def _update_data(self, event):
-        """Calls the tracks controller with to update the data in the Tracks object and dispatch the update"""
+        """Calls the tracks controller with to update the data in the Tracks object and
+        dispatch the update
+        """
 
         if event.action == "added":
             # we only want to allow this update if there is no seg layer
@@ -204,7 +197,8 @@ class TrackPoints(napari.layers.Points):
                 self.tracks_viewer.tracks_controller.add_nodes(attributes)
             else:
                 show_info(
-                    "Mixed point and segmentation nodes not allowed: add points by drawing on segmentation layer"
+                    "Mixed point and segmentation nodes not allowed: add points by "
+                    "drawing on segmentation layer"
                 )
                 self._refresh()
 
@@ -240,9 +234,6 @@ class TrackPoints(napari.layers.Points):
         for point in selected_points:
             node_id = self.nodes[point]
             self.tracks_viewer.selected_nodes.add(node_id, True)
-            self.selected_track = self.tracks_viewer.tracks._get_node_attr(
-                node_id, NodeAttr.TRACK_ID.value
-            )
 
     def get_symbols(self, tracks: Tracks, symbolmap: dict[NodeType, str]) -> list[str]:
         statemap = {
@@ -298,7 +289,8 @@ class TrackPoints(napari.layers.Points):
             self.events.border_color.blocker()
         ):  # block the event emitter here to not trigger update in orthogonal views
             self.border_color = [1, 1, 1, 1]
-        self.size = self.default_size
+        with self.events.size.blocker():
+            self.size = self.default_size
         for node in self.tracks_viewer.selected_nodes:
             index = self.node_index_dict[node]
             self.border_color[index] = (
@@ -314,7 +306,7 @@ class TrackPoints(napari.layers.Points):
                 self.tracks_viewer.selected_nodes[0], NodeAttr.TRACK_ID.value
             )
 
-        self.border_color = (
-            self.border_color
-        )  # emit the event to trigger update in orthogonal views
+        # emit the event to trigger update in orthogonal views
+        self.border_color = self.border_color
+        self.size = self.size
         self.refresh()

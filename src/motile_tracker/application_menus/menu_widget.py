@@ -19,7 +19,6 @@ class MenuWidget(QScrollArea):
         motile_widget = MotileWidget(viewer)
         editing_widget = EditingMenu(viewer)
         view3D_widget = View3D(viewer)
-        view3D_widget.update_tab.connect(self.update_3D_tab)
 
         self.tabwidget = QTabWidget()
 
@@ -36,8 +35,4 @@ class MenuWidget(QScrollArea):
         self.setWidgetResizable(True)
 
         self.setLayout(layout)
-
-    def update_3D_tab(self):
-        if self.tabwidget.currentIndex() == 0:
-            self.tabwidget.setCurrentIndex(1)
-            self.tabwidget.setCurrentIndex(0)
+        self.setMinimumWidth(300)

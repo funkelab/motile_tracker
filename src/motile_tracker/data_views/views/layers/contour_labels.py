@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
-
 import napari
 import numpy as np
 from napari.layers.labels._labels_utils import (
@@ -80,7 +78,7 @@ class ContourLabels(napari.layers.Labels):
 
     def _calculate_contour(
         self, labels: np.ndarray, data_slice: tuple[slice, ...]
-    ) -> Optional[np.ndarray]:
+    ) -> np.ndarray | None:
         """Calculate the contour of a given label array within the specified data slice.
 
         Parameters

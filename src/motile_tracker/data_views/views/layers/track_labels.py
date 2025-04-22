@@ -120,7 +120,7 @@ class TrackLabels(ContourLabels):
         self.bind_key("z")(self.tracks_viewer.undo)
         self.bind_key("r")(self.tracks_viewer.redo)
 
-        # Listen to paint events and changing the selected label
+        # Listen to click, paint events and changing the selected label
         self.mouse_drag_callbacks.append(self.click)
         self.events.paint.connect(self._on_paint)
         self.tracks_viewer.selected_nodes.list_updated.connect(
@@ -248,8 +248,8 @@ class TrackLabels(ContourLabels):
             mask = concatenated_values == old_value
             indices = tuple(concatenated_indices[dim][mask] for dim in range(ndim))
             time_points = np.unique(indices[0])
-            for t in time_points:
-                time_mask = indices[0] == t
+            for time_point in time_points:
+                time_mask = indices[0] == time_point
                 actions.append(
                     (tuple(indices[dim][time_mask] for dim in range(ndim)), old_value)
                 )
@@ -278,13 +278,13 @@ class TrackLabels(ContourLabels):
                 ndim = len(pixels)
                 if old_value == 0:
                     continue
-                time = pixels[0][0]
+                time_point = pixels[0][0]
                 removed_node = old_value
                 assert (
                     removed_node is not None
-                ), f"Node with label {old_value} in time {time} was not found"
+                ), f"Node with label {old_value} in time {time_point} was not found"
                 # check if all pixels of old_value are removed
-                if np.sum(self.data[time] == old_value) == 0:
+                if np.sum(self.data[time_point] == old_value) == 0:
                     to_delete.append((removed_node, pixels))
                 else:
                     to_update_smaller.append((removed_node, pixels))
