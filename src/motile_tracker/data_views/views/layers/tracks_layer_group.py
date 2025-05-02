@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import napari
+from napari.layers import Image
 
 from motile_tracker.data_model.tracks import Tracks
 
@@ -29,6 +30,7 @@ class TracksLayerGroup:
         self.tracks_layer: TrackGraph | None = None
         self.points_layer: TrackPoints | None = None
         self.seg_layer: TrackLabels | None = None
+        self.intensity_image_layer: Image | None = None
 
     def set_tracks(self, tracks, name):
         self.remove_napari_layers()
@@ -46,6 +48,16 @@ class TracksLayerGroup:
             )
         else:
             self.seg_layer = None
+
+        if self.tracks is not None and self.tracks.intensity_image is not None:
+            self.intensity_image_layer = Image(
+                data=self.tracks.intensity_image,
+                name=self.name + "_intensity",
+                opacity=1,
+                scale=self.tracks.scale,
+            )
+        else:
+            self.intensity_image_layer = None
 
         if (
             self.tracks is not None
@@ -73,12 +85,15 @@ class TracksLayerGroup:
 
     def remove_napari_layers(self) -> None:
         """Remove all tracking layers from the viewer"""
+        self.remove_napari_layer(self.intensity_image_layer)
         self.remove_napari_layer(self.tracks_layer)
         self.remove_napari_layer(self.seg_layer)
         self.remove_napari_layer(self.points_layer)
 
     def add_napari_layers(self) -> None:
         """Add new tracking layers to the viewer"""
+        if self.intensity_image_layer is not None:
+            self.viewer.add_layer(self.intensity_image_layer)
         if self.tracks_layer is not None:
             self.viewer.add_layer(self.tracks_layer)
         if self.seg_layer is not None:

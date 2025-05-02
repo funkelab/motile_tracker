@@ -19,6 +19,7 @@ STAMP_FORMAT = "%m%d%Y_%H%M%S"
 PARAMS_FILENAME = "solver_params.json"
 IN_POINTS_FILENAME = "input_points.npy"
 GAPS_FILENAME = "gaps.txt"
+FEATURES_FILENAME = "features.txt"
 
 
 class MotileRun(SolutionTracks):
@@ -36,7 +37,9 @@ class MotileRun(SolutionTracks):
         run_name: str,
         time_attr: str = NodeAttr.TIME.value,
         pos_attr: str | tuple[str] | list[str] = NodeAttr.POS.value,
+        intensity_image: np.ndarray | None = None,
         scale: list[float] | None = None,
+        features: list[str] | None = (),
         solver_params: SolverParams | None = None,
         input_points: np.ndarray | None = None,
         time: datetime | None = None,
@@ -56,6 +59,8 @@ class MotileRun(SolutionTracks):
         self.gaps = gaps
         self.status = status
         self.time = datetime.now() if time is None else time
+        self.intensity_image = intensity_image
+        self.features = features
 
     def _make_id(self) -> str:
         """Combine the time and run name into a unique id for the run
@@ -110,6 +115,9 @@ class MotileRun(SolutionTracks):
         if self.input_points is not None:
             self._save_array(run_dir, IN_POINTS_FILENAME, self.input_points)
         self._save_list(list_to_save=self.gaps, run_dir=run_dir, filename=GAPS_FILENAME)
+        self._save_list(
+            list_to_save=self.features, run_dir=run_dir, filename=FEATURES_FILENAME
+        )
         return run_dir
 
     @classmethod
@@ -132,7 +140,7 @@ class MotileRun(SolutionTracks):
         time, run_name = cls._unpack_id(run_dir.stem)
         params = cls._load_params(run_dir)
         input_points = cls._load_array(run_dir, IN_POINTS_FILENAME, required=False)
-        tracks = SolutionTracks.load(run_dir, seg_required=False)
+        tracks = SolutionTracks.load(run_dir, seg_required=False, int_required=False)
         gaps = cls._load_list(run_dir=run_dir, filename=GAPS_FILENAME, required=False)
         return cls(
             graph=tracks.graph,
@@ -142,9 +150,11 @@ class MotileRun(SolutionTracks):
             input_points=input_points,
             time=time,
             gaps=gaps,
+            features=tracks.features,
             pos_attr=tracks.pos_attr,
             time_attr=tracks.time_attr,
             scale=tracks.scale,
+            intensity_image=tracks.intensity_image,
         )
 
     def _save_params(self, run_dir: Path):
@@ -239,6 +249,7 @@ class MotileRun(SolutionTracks):
             "scale": self.scale
             if not isinstance(self.scale, np.ndarray)
             else self.scale.tolist(),
+            "features": self.features,
         }
         with open(out_path, "w") as f:
             json.dump(attrs_dict, f)

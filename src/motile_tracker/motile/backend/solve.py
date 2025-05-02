@@ -26,7 +26,9 @@ def solve(
     solver_params: SolverParams,
     input_data: np.ndarray,
     on_solver_update: Callable | None = None,
+    intensity_image: np.ndarray | None = None,
     scale: list | None = None,
+    features: list[str] | None = (),
 ) -> nx.DiGraph:
     """Get a tracking solution for the given segmentation and parameters.
 
@@ -45,6 +47,9 @@ def solve(
             whenever the motile solver emits an event. The function should take
             a dictionary of event data, and can be used to track progress of
             the solver. Defaults to None.
+        scale: spatial calibration for all dimensions
+        features: list of features (regionprops) to measure.
+
 
     Returns:
         nx.DiGraph: A solution graph where the ids of the nodes correspond to
@@ -60,7 +65,9 @@ def solve(
             input_data,
             solver_params.max_edge_distance,
             iou=solver_params.iou_cost is not None,
+            intensity_image=intensity_image,
             scale=scale,
+            features=features,
         )
     logger.debug("Cand graph has %d nodes", cand_graph.number_of_nodes())
     solver = construct_solver(cand_graph, solver_params)

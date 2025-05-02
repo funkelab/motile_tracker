@@ -19,6 +19,7 @@ from qtpy.QtWidgets import (
     QLineEdit,
     QPushButton,
     QSizePolicy,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -26,6 +27,7 @@ from tqdm import tqdm
 
 from motile_tracker.motile.backend import MotileRun
 
+from .measurement_widget import MeasurementSetupWidget
 from .params_editor import SolverParamsEditor
 
 if TYPE_CHECKING:
@@ -34,7 +36,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class RunEditor(QGroupBox):
+class RunEditor(QTabWidget):
     start_run = Signal(MotileRun)
 
     def __init__(self, viewer: napari.Viewer):
@@ -46,9 +48,10 @@ class RunEditor(QGroupBox):
             viewer (napari.Viewer): The napari viewer that the editor should
                 get the input segmentation from.
         """
-        super().__init__(title="Run Editor")
+        super().__init__()
         self.viewer = viewer
         self.solver_params_widget = SolverParamsEditor()
+
         self.run_name: QLineEdit
         self.layer_selection_box: QComboBox
 
@@ -59,12 +62,20 @@ class RunEditor(QGroupBox):
             "Might take minutes or longer for larger samples."
         )
 
+        self.run_edit_widget = QGroupBox(title="Run Editor")
         main_layout = QVBoxLayout()
         main_layout.addWidget(self._run_widget())
         main_layout.addWidget(self._labels_layer_widget())
         main_layout.addWidget(self.solver_params_widget)
         main_layout.addWidget(generate_tracks_btn)
-        self.setLayout(main_layout)
+        self.run_edit_widget.setLayout(main_layout)
+        self.addTab(self.run_edit_widget, "Run Editor")
+
+        self.measurements_widget = MeasurementSetupWidget(
+            self.viewer, self.get_input_layer()
+        )
+        self.addTab(self.measurements_widget, "Feature measurements")
+
         self.update_layer_selection()
 
     def update_labels_layers(self) -> None:
@@ -76,6 +87,16 @@ class RunEditor(QGroupBox):
                 self.layer_selection_box.addItem(layer.name)
         self.layer_selection_box.setCurrentText(prev_selection)
 
+    def update_features(self, features: list[str]) -> None:
+        """Update the features in the measurements widget"""
+
+        self.measurements_widget.update_features(features)
+
+    def update_scaling(self, scaling: tuple[float]) -> None:
+        """Update the scaling in the measurements widget"""
+
+        self.measurements_widget.update_scaling(scaling)
+
     def update_layer_selection(self) -> None:
         """Update the rest of the UI when the selected layer is updated"""
         layer = self.get_input_layer()
@@ -86,6 +107,7 @@ class RunEditor(QGroupBox):
         elif isinstance(layer, napari.layers.Points):
             enable_iou = False
         self.solver_params_widget.iou_row.toggle_visible(enable_iou)
+        self.measurements_widget.update_input_layer(layer)
 
     def _labels_layer_widget(self) -> QWidget:
         """Create the widget to select the input layer. Uses magicgui,
@@ -183,6 +205,12 @@ class RunEditor(QGroupBox):
         """
         run_name = self.run_name.text()
         input_layer = self.get_input_layer()
+        intensity_image_layer = self.measurements_widget.get_intensity_image()
+        if intensity_image_layer is not None:
+            intensity_image = intensity_image_layer.data
+            intensity_image_layer.scale = self.measurements_widget.get_scaling()
+        else:
+            intensity_image = None
         if input_layer is None:
             warn("No input layer selected", stacklevel=2)
             return None
@@ -217,7 +245,9 @@ class RunEditor(QGroupBox):
             solver_params=params,
             input_points=input_points,
             time=datetime.now(),
+            intensity_image=intensity_image,
             scale=input_layer.scale,
+            features=self.measurements_widget.get_features(),
         )
 
     def _convert_da_to_np_array(self, dask_array: da.core.Array) -> np.ndarray:

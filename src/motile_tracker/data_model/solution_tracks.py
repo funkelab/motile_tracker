@@ -26,10 +26,12 @@ class SolutionTracks(Tracks):
         self,
         graph: nx.DiGraph,
         segmentation: np.ndarray | None = None,
+        intensity_image: np.ndarray | None = None,
         time_attr: str = NodeAttr.TIME.value,
         pos_attr: str | tuple[str] | list[str] = NodeAttr.POS.value,
         scale: list[float] | None = None,
         ndim: int | None = None,
+        features: list[str] | None = (),
     ):
         super().__init__(
             graph,
@@ -38,6 +40,8 @@ class SolutionTracks(Tracks):
             pos_attr=pos_attr,
             scale=scale,
             ndim=ndim,
+            features=features,
+            intensity_image=intensity_image,
         )
         self.max_track_id: int
         self._initialize_track_ids()
@@ -51,6 +55,8 @@ class SolutionTracks(Tracks):
             pos_attr=tracks.pos_attr,
             scale=tracks.scale,
             ndim=tracks.ndim,
+            features=tracks.features,
+            intensity_image=tracks.intensity_image,
         )
 
     @property
@@ -66,9 +72,7 @@ class SolutionTracks(Tracks):
         return self.max_track_id
 
     def get_track_id(self, node) -> int:
-        track_id = int(
-            self._get_node_attr(node, NodeAttr.TRACK_ID.value, required=True)
-        )
+        track_id = self._get_node_attr(node, NodeAttr.TRACK_ID.value, required=True)
         return track_id
 
     def set_track_id(self, node: Node, value: int):

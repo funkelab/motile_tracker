@@ -1,4 +1,5 @@
 import pandas as pd
+from motile_toolbox.candidate_graph import NodeAttr
 from qtpy.QtWidgets import (
     QDialog,
     QHBoxLayout,
@@ -87,6 +88,7 @@ class ImportTracksDialog(QDialog):
                 self.data_widget.csv_field_widget.columns_left,
                 ndim=2 if self.menu_widget.radio_2D.isChecked() else 3,
             )
+            self.measurement_widget.update_features.connect(self._update_buttons)
             self.stacked_widget.addWidget(self.measurement_widget)
             self._update_buttons()
 
@@ -147,6 +149,17 @@ class ImportTracksDialog(QDialog):
     def _update_buttons(self) -> None:
         """Enable or disable buttons based on the current page."""
 
+        # Additional condition for intensity image
+        if self.measurement_widget is not None:
+            selected_measurements = self.measurement_widget.get_measurements()
+            if (
+                NodeAttr.INTENSITY_MEAN.value in selected_measurements
+                and self.measurement_widget.intensity_widget.image_path_line.text()
+                == ""
+            ):
+                self.finish_button.setEnabled(False)
+                return
+
         # Do not allow to finish if no CSV file is loaded, or if the segmentation checkbox was checked but no seg file path is given.
         if self.data_widget.df is None or (
             self.menu_widget.segmentation_checkbox.isChecked()
@@ -191,13 +204,13 @@ class ImportTracksDialog(QDialog):
 
         if self.measurement_widget is not None:
             features = self.measurement_widget.get_measurements()
+            intensity_img = self.measurement_widget.get_intensity_image()
             for feature in features:
-                if features[feature] != "Recompute" and (
-                    feature == "Area" or feature == "Volume"
-                ):
-                    df["area"] = self.data_widget.df[features[feature]]
+                if features[feature] != "Recompute":
+                    df[feature] = self.data_widget.df[features[feature]]
         else:
             features = []
+            intensity_img = None
 
         # Try to create a Tracks object with the provided CSV file, the attr:column dictionaries, and the scaling information
         self.name = self.menu_widget.name_widget.text()
@@ -209,7 +222,9 @@ class ImportTracksDialog(QDialog):
             segmentation = None
 
         try:
-            self.tracks = tracks_from_df(df, segmentation, scale, features)
+            self.tracks = tracks_from_df(
+                df, segmentation, scale, features, intensity_img
+            )
 
         except ValueError as e:
             QMessageBox.critical(self, "Error", f"Failed to load tracks: {e}")

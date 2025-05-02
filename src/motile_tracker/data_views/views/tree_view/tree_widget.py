@@ -6,6 +6,7 @@ import napari
 import numpy as np
 import pandas as pd
 import pyqtgraph as pg
+from motile_toolbox.candidate_graph.graph_attributes import NodeAttr
 from psygnal import Signal
 from pyqtgraph.Qt import QtCore
 from qtpy.QtCore import Qt
@@ -53,36 +54,24 @@ class CustomViewBox(pg.ViewBox):
         """Modified mouseDragEvent function to check which mouse mode to use
         and to submit rectangle coordinates for selecting multiple nodes if necessary"""
 
-        # check if SHIFT is pressed
-        shift_down = ev.modifiers() == QtCore.Qt.ShiftModifier
+        super().mouseDragEvent(ev, axis)
 
-        if shift_down:
-            # if starting a shift-drag, record the scene position
+        # use RectMode when pressing shift
+        if ev.modifiers() == QtCore.Qt.ShiftModifier:
+            self.setMouseMode(self.RectMode)
+
             if ev.isStart():
                 self.mouse_start_pos = self.mapSceneToView(ev.scenePos())
-
-            # Put the ViewBox in RectMode so it draws its usual yellow rectangle
-            self.setMouseMode(self.RectMode)
-            super().mouseDragEvent(ev, axis)
-
-            # Once the drag finishes, emit the rectangle
-            if ev.isFinish():
+            elif ev.isFinish():
                 rect_end_pos = self.mapSceneToView(ev.scenePos())
                 rect = QtCore.QRectF(self.mouse_start_pos, rect_end_pos).normalized()
                 self.selected_rect.emit(rect)  # emit the rectangle
                 ev.accept()
-
-                if hasattr(self, "rbScaleBox") and self.rbScaleBox:
-                    self.rbScaleBox.hide()
-
+            else:
+                ev.ignore()
         else:
-            # SHIFT not pressed - use PanMode normally
+            # Otherwise, set pan mode
             self.setMouseMode(self.PanMode)
-            super().mouseDragEvent(ev, axis)
-
-            # hide the leftover box if any
-            if hasattr(self, "rbScaleBox") and self.rbScaleBox:
-                self.rbScaleBox.hide()
 
 
 class TreePlot(pg.PlotWidget):
@@ -108,11 +97,12 @@ class TreePlot(pg.PlotWidget):
         self.sizes = []
 
         self.view_direction = None
+        self.plot_type = None
         self.feature = None
         self.g = pg.GraphItem()
         self.g.scatter.sigClicked.connect(self._on_click)
         self.addItem(self.g)
-        self.set_view("vertical", feature="tree")
+        self.set_view("vertical", plot_type="tree")
         self.getViewBox().selected_rect.connect(self.select_points_in_rect)
 
     def select_points_in_rect(self, rect: QtCore.QRectF):
@@ -134,6 +124,7 @@ class TreePlot(pg.PlotWidget):
         self,
         track_df: pd.DataFrame,
         view_direction: str,
+        plot_type: str,
         feature: str,
         selected_nodes: list[Any],
         reset_view: bool | None = False,
@@ -145,18 +136,23 @@ class TreePlot(pg.PlotWidget):
         Args:
             track_df (pd.DataFrame): The dataframe containing the graph data
             view_direction (str): The view direction
-            feature (str): The feature to be plotted ('tree' or 'area')
+            plot_type (str): The plot_type ('tree' or 'feature')f
+            feature (str): The feature to be plotted if plot_type == 'feature'
             selected_nodes (list[Any]): The currently selected nodes to be highlighted
         """
-        self.set_data(track_df, feature)
+        if plot_type == "feature" and (
+            feature is None or feature == ""
+        ):  # feature is not available
+            plot_type = "tree"
+        self.set_data(track_df, plot_type, feature)
         self._update_viewed_data(view_direction)  # this can be expensive
-        self.set_view(view_direction, feature, reset_view, allow_flip)
-        self.set_selection(selected_nodes, feature)
+        self.set_view(view_direction, plot_type, reset_view, allow_flip)
+        self.set_selection(selected_nodes, plot_type)
 
     def set_view(
         self,
         view_direction: str,
-        feature: str,
+        plot_type: str,
         reset_view: bool | None = False,
         allow_flip: bool | None = True,
     ):
@@ -167,17 +163,17 @@ class TreePlot(pg.PlotWidget):
 
         Args:
             view_direction (str): "horizontal" or "vertical"
-            feature (str): the feature being displayed, it can be 'tree' or 'area'
+            plot_type (str): the plot type being displayed, it can be 'tree' or 'feature'
         """
 
-        if view_direction == self.view_direction and feature == self.feature:
-            if reset_view:
-                self.autoRange()
-            return
+        # if view_direction == self.view_direction and plot_type == self.plot_type:
+        #     if reset_view:
+        #         self.autoRange()
+        #     return
 
         axis_titles = {
             "time": "Time Point",
-            "area": "Object size in calibrated units",
+            "feature": f"Object {self.feature} in calibrated units",
             "tree": "",
         }
         if allow_flip:
@@ -192,8 +188,8 @@ class TreePlot(pg.PlotWidget):
             self.setLabel(time_axis, text=axis_titles["time"])
             self.getAxis(time_axis).setStyle(showValues=True)
 
-            self.setLabel(feature_axis, text=axis_titles[feature])
-            if feature == "tree":
+            self.setLabel(feature_axis, text=axis_titles[plot_type])
+            if plot_type == "tree":
                 self.getAxis(feature_axis).setStyle(showValues=False)
             else:
                 self.getAxis(feature_axis).setStyle(showValues=True)
@@ -201,12 +197,12 @@ class TreePlot(pg.PlotWidget):
 
         if (
             self.view_direction != view_direction
-            or self.feature != feature
+            or self.plot_type != plot_type
             or reset_view
         ):
             self.autoRange()
         self.view_direction = view_direction
-        self.feature = feature
+        self.plot_type = plot_type
 
     def _on_click(self, _, points: np.ndarray, ev: QMouseEvent) -> None:
         """Adds the selected point to the selected_nodes list. Called when
@@ -223,17 +219,18 @@ class TreePlot(pg.PlotWidget):
         self.node_clicked.emit(node_id, append)
         self.setFocus()
 
-    def set_data(self, track_df: pd.DataFrame, feature: str) -> None:
+    def set_data(self, track_df: pd.DataFrame, plot_type: str, feature: str) -> None:
         """Updates the stored pyqtgraph content based on the given dataframe.
         Does not render the new information (need to call _update_viewed_data).
 
         Args:
             track_df (pd.DataFrame): The tracks df to compute the pyqtgraph
                 content for. Can be all lineages or any subset of them.
-            feature (str): The feature to be plotted. Can either be 'tree', or 'area'.
+            plot_type (str): The plot_type to be plotted. Can either be 'tree', or 'feature'.
+            feature (str): the header name of the feature to be plotted, if plot_type == "feature"
         """
         self.track_df = track_df
-        self._create_pyqtgraph_content(track_df, feature)
+        self._create_pyqtgraph_content(track_df, plot_type, feature)
 
     def _update_viewed_data(self, view_direction: str):
         """Set the data according to the view direction
@@ -260,14 +257,17 @@ class TreePlot(pg.PlotWidget):
         self.g.scatter.setPen(self.outline_pen)
         self.g.scatter.setSize(self.sizes)
 
-    def _create_pyqtgraph_content(self, track_df: pd.DataFrame, feature: str) -> None:
+    def _create_pyqtgraph_content(
+        self, track_df: pd.DataFrame, plot_type: str, feature: str | None = None
+    ) -> None:
         """Parse the given track_df into the format that pyqtgraph expects
         and save the information as attributes.
 
         Args:
             track_df (pd.DataFrame): The dataframe containing the graph to be
                 rendered in the tree view. Can be all lineages or a subset.
-            feature (str): The feature to be plotted. Can either be 'tree' or 'area'.
+            plot_type (str): The plot type to be plotted. Can either be 'tree' or 'feature'.
+            feature (str): The header name of the feature to be plotted, if plot_type == feature.
         """
         self._pos = []
         self.adj = []
@@ -276,14 +276,15 @@ class TreePlot(pg.PlotWidget):
         self.pen = []
         self.sizes = []
         self.node_ids = []
+        self.feature = feature
 
         if track_df is not None and not track_df.empty:
             self.symbols = track_df["symbol"].to_list()
             self.symbolBrush = track_df["color"].to_numpy()
-            if feature == "tree":
+            if plot_type == "tree":
                 self._pos = track_df[["x_axis_pos", "t"]].to_numpy()
-            elif feature == "area":
-                self._pos = track_df[["area", "t"]].to_numpy()
+            elif plot_type == "feature":
+                self._pos = track_df[[feature, "t"]].to_numpy()
             self.node_ids = track_df["node_id"].to_list()
             self.sizes = np.array(
                 [
@@ -305,14 +306,14 @@ class TreePlot(pg.PlotWidget):
             [pg.mkPen(QColor(150, 150, 150)) for i in range(len(self._pos))]
         )
 
-    def set_selection(self, selected_nodes: list[Any], feature: str) -> None:
+    def set_selection(self, selected_nodes: list[Any], plot_type: str) -> None:
         """Set the provided list of nodes to be selected. Increases the size
         and highlights the outline with blue. Also centers the view
         if the first selected node is not visible in the current canvas.
 
         Args:
             selected_nodes (list[Any]): A list of node ids to be selected.
-            feature (str): the feature that is being plotted, either 'tree' or 'area'
+            plot_type (str): the plot type that is being plotted, either 'tree' or 'feature'
         """
 
         # reset to default size and color to avoid problems with the array lengths
@@ -325,7 +326,7 @@ class TreePlot(pg.PlotWidget):
 
         outlines = self.outline_pen.copy()
         axis_label = (
-            "area" if feature == "area" else "x_axis_pos"
+            self.feature if plot_type == "feature" else "x_axis_pos"
         )  # check what is currently being shown, to know how to scale  the view
 
         if len(selected_nodes) > 0:
@@ -379,7 +380,7 @@ class TreePlot(pg.PlotWidget):
         ):
             return
         else:
-            view_box.setRange(xRange=(min_x, max_x), yRange=(min_t, max_t))
+            self.autoRange()
 
     def _center_view(self, center_x: int, center_y: int):
         """Center the Viewbox on given coordinates"""
@@ -403,21 +404,7 @@ class TreePlot(pg.PlotWidget):
         ):
             return
 
-        # Calculate the width and height of the current view
-        current_width = x_range[1] - x_range[0]
-        current_height = y_range[1] - y_range[0]
-
-        # Calculate new ranges maintaining the current width and height
-        new_x_range = (
-            center_x - current_width / 2,
-            center_x + current_width / 2,
-        )
-        new_y_range = (
-            center_y - current_height / 2,
-            center_y + current_height / 2,
-        )
-
-        view_box.setRange(xRange=new_x_range, yRange=new_y_range, padding=0)
+        self.autoRange()
 
 
 class TreeWidget(QWidget):
@@ -428,7 +415,7 @@ class TreeWidget(QWidget):
         self.lineage_df = pd.DataFrame()  # the currently viewed subset of lineages
         self.graph = None
         self.mode = "all"  # options: "all", "lineage"
-        self.feature = "tree"  # options: "tree", "area"
+        self.plot_type = "tree"  # options: "tree", "feature"
         self.view_direction = "vertical"  # options: "horizontal", "vertical"
 
         self.tracks_viewer = TracksViewer.get_instance(viewer)
@@ -449,9 +436,31 @@ class TreeWidget(QWidget):
         self.mode_widget = TreeViewModeWidget()
         self.mode_widget.change_mode.connect(self._set_mode)
 
-        # Add buttons to change which feature to display
-        self.feature_widget = TreeViewFeatureWidget()
-        self.feature_widget.change_feature.connect(self._set_feature)
+        # Add buttons to change which plot type to display
+        self.feature_node_attrs = [
+            NodeAttr.AREA.value,
+            NodeAttr.INTENSITY_MEAN.value,
+            NodeAttr.AXIS_MINOR_LENGTH.value,
+            NodeAttr.AXIS_MAJOR_LENGTH.value,
+            NodeAttr.AXIS_SEMI_MINOR_LENGTH.value,
+            NodeAttr.PIXEL_COUNT.value,
+            NodeAttr.PERIMETER.value,
+            NodeAttr.CIRCULARITY.value,
+            NodeAttr.VOLUME.value,
+            NodeAttr.VOXEL_COUNT.value,
+            NodeAttr.SURFACE_AREA.value,
+            NodeAttr.SPHERICITY.value,
+        ]
+
+        self.default_node_attrs = [
+            NodeAttr.POS.value,
+            NodeAttr.TIME.value,
+            NodeAttr.SEG_ID.value,
+            NodeAttr.TRACK_ID.value,
+        ]
+
+        self.plot_type_widget = TreeViewFeatureWidget(self.feature_node_attrs)
+        self.plot_type_widget.change_plot_type.connect(self._set_plot_type)
 
         # Add navigation widget
         self.navigation_widget = NavigationWidget(
@@ -459,7 +468,7 @@ class TreeWidget(QWidget):
             self.lineage_df,
             self.view_direction,
             self.selected_nodes,
-            self.feature,
+            self.plot_type,
         )
 
         # Add widget to flip the axes
@@ -469,7 +478,7 @@ class TreeWidget(QWidget):
         # Construct a toolbar and set main layout
         panel_layout = QHBoxLayout()
         panel_layout.addWidget(self.mode_widget)
-        panel_layout.addWidget(self.feature_widget)
+        panel_layout.addWidget(self.plot_type_widget)
         panel_layout.addWidget(self.navigation_widget)
         panel_layout.addWidget(self.flip_widget)
         panel_layout.setSpacing(0)
@@ -477,7 +486,7 @@ class TreeWidget(QWidget):
 
         panel = QWidget()
         panel.setLayout(panel_layout)
-        panel.setMaximumWidth(930)
+        panel.setMaximumWidth(1000)
         panel.setMaximumHeight(82)
 
         # Make a collapsible for TreeView widgets
@@ -503,7 +512,7 @@ class TreeWidget(QWidget):
             Qt.Key_Z: self.undo,
             Qt.Key_R: self.redo,
             Qt.Key_Q: self.toggle_display_mode,
-            Qt.Key_W: self.toggle_feature_mode,
+            Qt.Key_W: self.toggle_plot_type,
             Qt.Key_F: self._flip_axes,
             Qt.Key_X: lambda: self.set_mouse_enabled(x=True, y=False),
             Qt.Key_Y: lambda: self.set_mouse_enabled(x=False, y=True),
@@ -551,9 +560,9 @@ class TreeWidget(QWidget):
         """Toggle display mode."""
         self.mode_widget._toggle_display_mode()
 
-    def toggle_feature_mode(self):
-        """Toggle feature mode."""
-        self.feature_widget._toggle_feature_mode()
+    def toggle_plot_type(self):
+        """Toggle plot_type mode mode."""
+        self.plot_type_widget._toggle_plot_type()
 
     def _flip_axes(self):
         """Flip the axes of the plot"""
@@ -567,7 +576,7 @@ class TreeWidget(QWidget):
         self.tree_widget._update_viewed_data(self.view_direction)
         self.tree_widget.set_view(
             view_direction=self.view_direction,
-            feature=self.tree_widget.feature,
+            plot_type=self.tree_widget.plot_type,
             reset_view=False,
         )
 
@@ -595,11 +604,12 @@ class TreeWidget(QWidget):
             self.tree_widget.update(
                 self.lineage_df,
                 self.view_direction,
-                self.feature,
+                self.plot_type,
+                self.plot_type_widget.get_current_feature(),
                 self.selected_nodes,
             )
         else:
-            self.tree_widget.set_selection(self.selected_nodes, self.feature)
+            self.tree_widget.set_selection(self.selected_nodes, self.plot_type)
 
     def _update_track_data(self, reset_view: bool | None = None) -> None:
         """Called when the TracksViewer emits the tracks_updated signal, indicating
@@ -609,6 +619,7 @@ class TreeWidget(QWidget):
         if self.tracks_viewer.tracks is None:
             self.tracks_viewer.track_df = pd.DataFrame()
             self.graph = None
+            self.graph_attributes = []
         else:
             if reset_view:
                 self.tracks_viewer.track_df = extract_sorted_tracks(
@@ -621,15 +632,19 @@ class TreeWidget(QWidget):
                     self.tracks_viewer.track_df,
                 )
             self.graph = self.tracks_viewer.tracks.graph
+            self.graph_attributes = {
+                k for n in self.graph.nodes for k in self.graph.nodes[n]
+            }
 
-        # check whether we have area measurements and therefore should activate the area
-        # button
-        if "area" not in self.tracks_viewer.track_df.columns:
-            if self.feature_widget.feature == "area":
-                self.feature_widget._toggle_feature_mode()
-            self.feature_widget.show_area_radio.setEnabled(False)
-        else:
-            self.feature_widget.show_area_radio.setEnabled(True)
+        # update the features that can be plotted
+        feature_list = [
+            f
+            for f in self.graph_attributes
+            if f not in self.default_node_attrs
+            and f in self.tracks_viewer.track_df.columns
+            and pd.api.types.is_numeric_dtype(self.tracks_viewer.track_df[f])
+        ]
+        self.plot_type_widget.update_feature_dropdown(feature_list)
 
         # if reset_view, we got new data and want to reset display and feature before calling the plot update
         if reset_view:
@@ -637,8 +652,8 @@ class TreeWidget(QWidget):
             self.mode = "all"
             self.mode_widget.show_all_radio.setChecked(True)
             self.view_direction = "vertical"
-            self.feature = "tree"
-            self.feature_widget.show_tree_radio.setChecked(True)
+            self.plot_type = "tree"
+            self.plot_type_widget.show_tree_radio.setChecked(True)
             allow_flip = True
         else:
             allow_flip = False
@@ -653,7 +668,8 @@ class TreeWidget(QWidget):
             self.tree_widget.update(
                 self.lineage_df,
                 self.view_direction,
-                self.feature,
+                self.plot_type,
+                self.plot_type_widget.get_current_feature(),
                 self.selected_nodes,
                 reset_view=reset_view,
                 allow_flip=allow_flip,
@@ -663,7 +679,8 @@ class TreeWidget(QWidget):
             self.tree_widget.update(
                 self.tracks_viewer.track_df,
                 self.view_direction,
-                self.feature,
+                self.plot_type,
+                self.plot_type_widget.get_current_feature(),
                 self.selected_nodes,
                 reset_view=reset_view,
                 allow_flip=allow_flip,
@@ -681,7 +698,7 @@ class TreeWidget(QWidget):
 
         self.mode = mode
         if mode == "all":
-            if self.feature == "tree":
+            if self.plot_type == "tree":
                 self.view_direction = "vertical"
             else:
                 self.view_direction = "horizontal"
@@ -692,21 +709,26 @@ class TreeWidget(QWidget):
             df = self.lineage_df
         self.navigation_widget.view_direction = self.view_direction
         self.tree_widget.update(
-            df, self.view_direction, self.feature, self.selected_nodes
+            df,
+            self.view_direction,
+            self.plot_type,
+            self.plot_type_widget.get_current_feature(),
+            self.selected_nodes,
+            reset_view=True,
         )
 
-    def _set_feature(self, feature: str) -> None:
-        """Set the feature mode to 'tree' or 'area'. For this the view is always
+    def _set_plot_type(self, plot_type: str) -> None:
+        """Set the plot_type mode to 'tree' or 'area'. For this the view is always
         horizontal.
 
         Args:
-            feature (str): The feature to plot. Options are "tree" or "area"
+            plot_type (str): The plot type to display. Options are "tree" or "feature"
         """
-        if feature not in ["tree", "area"]:
-            raise ValueError(f"Feature must be 'tree' or 'area', got {feature}")
+        if plot_type not in ["tree", "feature"]:
+            raise ValueError(f"Plot type must be 'tree' or 'feature', got {plot_type}")
 
-        self.feature = feature
-        if feature == "tree" and self.mode == "all":
+        self.plot_type = plot_type
+        if plot_type == "tree" and self.mode == "all":
             self.view_direction = "vertical"
         else:
             self.view_direction = "horizontal"
@@ -717,9 +739,14 @@ class TreeWidget(QWidget):
         if self.mode == "lineage":
             df = self.lineage_df
 
-        self.navigation_widget.feature = self.feature
+        self.navigation_widget.plot_type = self.plot_type
         self.tree_widget.update(
-            df, self.view_direction, self.feature, self.selected_nodes
+            df,
+            self.view_direction,
+            self.plot_type,
+            self.plot_type_widget.get_current_feature(),
+            self.selected_nodes,
+            reset_view=True,
         )
 
     def _update_lineage_df(self) -> None:

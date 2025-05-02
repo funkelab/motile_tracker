@@ -8,6 +8,28 @@ from motile_toolbox.candidate_graph.graph_attributes import NodeAttr
 
 from motile_tracker.data_model import NodeType, Tracks
 
+default_node_attrs = [
+    NodeAttr.POS.value,
+    NodeAttr.TIME.value,
+    NodeAttr.SEG_ID.value,
+    NodeAttr.TRACK_ID.value,
+]
+
+feature_node_attrs = [
+    NodeAttr.AREA.value,
+    NodeAttr.INTENSITY_MEAN.value,
+    NodeAttr.AXIS_MINOR_LENGTH.value,
+    NodeAttr.AXIS_MAJOR_LENGTH.value,
+    NodeAttr.AXIS_SEMI_MINOR_LENGTH.value,
+    NodeAttr.PIXEL_COUNT.value,
+    NodeAttr.PERIMETER.value,
+    NodeAttr.CIRCULARITY.value,
+    NodeAttr.VOLUME.value,
+    NodeAttr.VOXEL_COUNT.value,
+    NodeAttr.SURFACE_AREA.value,
+    NodeAttr.SPHERICITY.value,
+]
+
 
 def extract_sorted_tracks(
     tracks: Tracks,
@@ -49,6 +71,9 @@ def extract_sorted_tracks(
         out_edges = solution_nx_graph.out_edges(parent_node)
         soln_copy.remove_edges_from(out_edges)
 
+    node_attrs = {
+        k for n in solution_nx_graph.nodes for k in solution_nx_graph.nodes[n]
+    }
     # Process each weakly connected component as a separate track
     for node_set in nx.weakly_connected_components(soln_copy):
         # Sort nodes in each weakly connected component by their time attribute to ensure correct order
@@ -87,8 +112,17 @@ def extract_sorted_tracks(
                 "symbol": symbol,
             }
 
-            if tracks.get_area(node) is not None:
-                track_dict["area"] = tracks.get_area(node)
+            for feature in feature_node_attrs:
+                if tracks._get_node_attr(node, feature) is not None:
+                    track_dict[feature] = tracks._get_node_attr(node, feature)
+
+            for attr in node_attrs:
+                if (
+                    attr not in feature_node_attrs
+                    and attr not in default_node_attrs
+                    and tracks._get_node_attr(node, attr) is not None
+                ):
+                    track_dict[attr] = tracks._get_node_attr(node, attr)
 
             if len(pos) == 3:
                 track_dict["z"] = pos[0]
@@ -124,8 +158,6 @@ def extract_sorted_tracks(
         node["x_axis_pos"] = x_axis_order.index(node["track_id"])
 
     df = pd.DataFrame(track_list)
-    if "area" in df.columns:
-        df["area"] = df["area"].fillna(0)
 
     return df
 

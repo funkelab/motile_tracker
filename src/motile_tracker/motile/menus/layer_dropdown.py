@@ -1,0 +1,75 @@
+import napari
+from PyQt5.QtCore import pyqtSignal
+from qtpy.QtWidgets import QComboBox
+
+
+class LayerDropdown(QComboBox):
+    """QComboBox widget with functions for updating the selected layer and to update the list of options when the list of layers is modified."""
+
+    layer_changed = pyqtSignal(str)  # signal to emit the selected layer name
+
+    def __init__(self, viewer: napari.Viewer, layer_type: tuple):
+        super().__init__()
+        self.viewer = viewer
+        self.layer_type = layer_type
+        self.viewer.layers.events.inserted.connect(self._on_insert)
+        self.viewer.layers.events.changed.connect(self._update_dropdown)
+        self.viewer.layers.events.removed.connect(self._update_dropdown)
+        self.viewer.layers.selection.events.changed.connect(self._on_selection_changed)
+        self.currentIndexChanged.connect(self._emit_layer_changed)
+        self._update_dropdown()
+
+    def _on_insert(self, event) -> None:
+        """Update dropdown and make new layer responsive to name changes"""
+
+        layer = event.value
+
+        @layer.events.name.connect
+        def _on_rename(name_event):
+            self._update_dropdown()
+
+        self._update_dropdown()
+
+    def _on_selection_changed(self) -> None:
+        """Request signal emission if the user changes the layer selection."""
+
+        if (
+            len(self.viewer.layers.selection) == 1
+        ):  # Only consider single layer selection
+            selected_layer = self.viewer.layers.selection.active
+            if isinstance(selected_layer, self.layer_type):
+                self.setCurrentText(selected_layer.name)
+                self._emit_layer_changed()
+
+    def _update_dropdown(self) -> None:
+        """Update the list of options in the dropdown menu whenever the list of layers is changed"""
+
+        selected_layer = self.currentText()
+        self.clear()
+        layers = [
+            layer
+            for layer in self.viewer.layers
+            if isinstance(layer, self.layer_type) and layer.name != "label options"
+        ]
+        items = []
+        for layer in layers:
+            self.addItem(layer.name)
+            items.append(layer.name)
+            layer.events.name.connect(self._update_dropdown)
+
+        # In case the currently selected layer is one of the available items, set it again to the current value of the dropdown.
+        if selected_layer in items:
+            self.setCurrentText(selected_layer)
+        else:
+            self.setCurrentText("")
+
+    def _emit_layer_changed(self) -> None:
+        """Emit a signal holding the currently selected layer"""
+
+        selected_layer = self.currentText()
+        self.layer_changed.emit(selected_layer)
+
+    def get_current_layer(self) -> None:
+        """Return the currently selected layer"""
+
+        return self.currentText()

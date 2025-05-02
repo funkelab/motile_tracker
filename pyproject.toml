@@ -35,7 +35,7 @@ dependencies =[
     "qtpy",
     "scikit-image",
     "motile >= 0.3",
-    "motile_toolbox == 0.4.0",
+    "motile_toolbox@git+https://github.com/funkelab/motile_toolbox@additional_node_features",
     "pydantic",
     "tifffile[all]",
     "tqdm",

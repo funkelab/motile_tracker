@@ -135,7 +135,8 @@ def tracks_from_df(
     df: pd.DataFrame,
     segmentation: np.ndarray | None = None,
     scale: list[float] | None = None,
-    features: dict[str, str] | None = None,
+    features: dict[str:str] | None = (),
+    intensity_image: np.ndarray | None = None,
 ) -> SolutionTracks:
     """Turns a pandas data frame with columns:
         t,[z],y,x,id,parent_id,[seg_id], [optional custom attr 1], ...
@@ -175,6 +176,10 @@ def tracks_from_df(
         ndim = segmentation.ndim
         if ndim == 4:
             required_columns.append("z")
+        if intensity_image is not None and segmentation.shape != intensity_image.shape:
+            raise ValueError(
+                "The shape of the segmentation and intensity image do not match"
+            )
     for column in required_columns:
         assert (
             column in df.columns
@@ -230,6 +235,12 @@ def tracks_from_df(
         if "track_id" in df.columns:
             attrs[NodeAttr.TRACK_ID.value] = row["track_id"]
 
+        # Add extra attributes from features if segmentation is provided
+        if segmentation is not None:
+            for feature, column in features.items():
+                if column != "Recompute" and column in df.columns:
+                    attrs[feature] = row[column]
+
         # add the node to the graph
         graph.add_node(_id, **attrs)
 
@@ -254,18 +265,18 @@ def tracks_from_df(
         time_attr=NodeAttr.TIME.value,
         ndim=ndims,
         scale=scale,
+        intensity_image=intensity_image,
     )
 
-    # compute the 'area' attribute if needed
-    if (
-        tracks.segmentation is not None
-        and NodeAttr.AREA.value not in df.columns
-        and len(features) > 0
-    ):
+    # compute missing attributes as requested
+    if tracks.segmentation is not None:
+        tracks.features = features.keys()
         nodes = tracks.graph.nodes
         times = tracks.get_times(nodes)
-        computed_attrs = tracks._compute_node_attrs(nodes, times)
-        areas = computed_attrs[NodeAttr.AREA.value]
-        tracks._set_nodes_attr(nodes, NodeAttr.AREA.value, areas)
+        computed_attrs = tracks._compute_node_attrs(
+            nodes, times, [f for f in features if features[f] == "Recompute"]
+        )
+        for k, v in computed_attrs.items():
+            tracks._set_nodes_attr(nodes, k, v)
 
     return tracks
