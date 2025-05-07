@@ -200,7 +200,7 @@ class TestLoadTracks:
         )
 
         tracks = tracks_from_df(
-            df, segmentation, scale=(1, 1, 1), features={"Area": "Recompute"}
+            df, segmentation, scale=(1, 1, 1), features={"area": "Recompute"}
         )
 
         assert tracks._get_node_attr(1, NodeAttr.AREA.value) == 3
@@ -209,7 +209,7 @@ class TestLoadTracks:
         assert tracks._get_node_attr(4, NodeAttr.AREA.value) == 3
 
         tracks = tracks_from_df(
-            df, segmentation, scale=(1, 2, 1), features={"Area": "Recompute"}
+            df, segmentation, scale=(1, 2, 1), features={"area": "Recompute"}
         )
 
         assert tracks._get_node_attr(1, NodeAttr.AREA.value) == 6
@@ -218,7 +218,7 @@ class TestLoadTracks:
         assert tracks._get_node_attr(4, NodeAttr.AREA.value) == 6
 
         tracks = tracks_from_df(
-            df, segmentation=None, scale=(1, 2, 1), features={"Area": "Recompute"}
+            df, segmentation=None, scale=(1, 2, 1), features={"area": "Recompute"}
         )  # no seg provided, should return None
 
         assert tracks._get_node_attr(1, NodeAttr.AREA.value) is None

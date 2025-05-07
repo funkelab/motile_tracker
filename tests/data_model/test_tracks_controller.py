@@ -126,7 +126,6 @@ def test__add_nodes_with_seg(graph_2d, segmentation_2d):
     pixels = [(time_pix, *loc_pix), (time_pix2, *loc_pix)]
 
     action, node_ids = controller._add_nodes(attrs, pixels)
-    print(node_ids, pixels)
 
     node = node_ids[0]
     assert tracks.get_position(node) == expected_center

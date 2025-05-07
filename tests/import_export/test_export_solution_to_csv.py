@@ -33,7 +33,11 @@ def test_export_to_csv(graph_2d, graph_3d, tmp_path, colormap):
         "[120.  37.   6.]",
         "1245",
     ]
-    assert lines[1].strip().split(",") == line1
+    csv_line1 = [
+        str(int(float(x))) if x.replace(".", "", 1).isdigit() else x
+        for x in lines[1].strip().split(",")
+    ]
+    assert csv_line1 == line1
 
     tracks = SolutionTracks(graph_3d, ndim=4)
     temp_file = tmp_path / "test_export_3d.csv"

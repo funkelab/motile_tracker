@@ -9,7 +9,7 @@ from motile_tracker.data_views.views.tree_view.tree_widget_utils import (
 
 
 def test_track_df(graph_2d):
-    tracks = SolutionTracks(graph=graph_2d, ndim=3)
+    tracks = SolutionTracks(graph=graph_2d, ndim=3, features=["area"])
 
     assert tracks.get_area(1) == 1245
     assert tracks.get_area(2) is None

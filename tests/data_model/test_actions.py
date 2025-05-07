@@ -15,7 +15,7 @@ from motile_tracker.data_model.actions import (
 def test_add_delete_nodes(segmentation_2d, graph_2d):
     empty_graph = nx.DiGraph()
     empty_seg = np.zeros_like(segmentation_2d)
-    tracks = Tracks(empty_graph, segmentation=empty_seg)
+    tracks = Tracks(empty_graph, segmentation=empty_seg, features=["area"])
     nodes = list(graph_2d.nodes())
     attrs = {}
     attrs[NodeAttr.TIME.value] = [
@@ -63,7 +63,9 @@ def test_add_delete_nodes(segmentation_2d, graph_2d):
 
 
 def test_update_node_segs(segmentation_2d, graph_2d):
-    tracks = Tracks(graph_2d.copy(), segmentation=segmentation_2d.copy())
+    tracks = Tracks(
+        graph_2d.copy(), segmentation=segmentation_2d.copy(), features=["area"]
+    )
     nodes = list(graph_2d.nodes())
 
     # add a couple pixels to the first node
@@ -101,7 +103,7 @@ def test_update_node_segs(segmentation_2d, graph_2d):
 
 def test_add_delete_edges(graph_2d, segmentation_2d):
     node_graph = nx.create_empty_copy(graph_2d, with_data=True)
-    tracks = Tracks(node_graph, segmentation_2d)
+    tracks = Tracks(node_graph, segmentation_2d, features=["area"])
 
     edges = [[1, 2], [1, 3], [3, 4], [4, 5]]
 

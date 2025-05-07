@@ -75,7 +75,9 @@ def test_add_remove_nodes(graph_2d, segmentation_2d):
         tracks.add_node(1, time=10)
 
     # create tracks with segmentation
-    tracks = Tracks(graph=graph_2d, segmentation=segmentation_2d, scale=[1, 2, 1])
+    tracks = Tracks(
+        graph=graph_2d, segmentation=segmentation_2d, scale=[1, 2, 1], features=["area"]
+    )
 
     # removing a node
     node = 3
@@ -154,13 +156,14 @@ def test_pixels_and_seg_id(graph_3d, segmentation_3d):
 
 
 def test_update_segmentations(graph_2d, segmentation_2d):
-    tracks = Tracks(graph_2d.copy(), segmentation=segmentation_2d.copy())
+    tracks = Tracks(
+        graph_2d.copy(), segmentation=segmentation_2d.copy(), features=["area"]
+    )
 
     # remove pixels from a segmentation
     nodes = [1]
     edge = (1, 3)
     current_pix = tracks.get_pixels(nodes)
-    print(current_pix, segmentation_2d.ndim)
     areas = tracks.get_areas(nodes)
     iou = tracks.get_iou(edge)
     # get the first 5 pixels of each segmentation
