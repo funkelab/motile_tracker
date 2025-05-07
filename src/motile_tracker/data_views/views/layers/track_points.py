@@ -52,6 +52,7 @@ class TrackPoints(napari.layers.Points):
         )
 
         self.default_size = 5
+        self.selected_track = None
 
         super().__init__(
             data=points,
@@ -143,6 +144,7 @@ class TrackPoints(napari.layers.Points):
         )  # do not listen to new events until updates are complete
 
         self.nodes = list(self.tracks_viewer.tracks.graph.nodes)
+
         self.node_index_dict = {node: idx for idx, node in enumerate(self.nodes)}
 
         track_ids = [
@@ -173,7 +175,23 @@ class TrackPoints(napari.layers.Points):
         """Create attributes for a new node at given time point"""
 
         t = int(new_point[0])
-        track_id = self.tracks_viewer.tracks.get_next_track_id()
+
+        if self.tracks_viewer.track_mode == "new track":
+            track_id = self.tracks_viewer.tracks.get_next_track_id()
+        else:
+            # make sure there is no node with this track id at this time point yet
+            track_id_nodes = self.tracks_viewer.tracks.track_id_to_node[
+                self.selected_track
+            ]
+            for node in track_id_nodes:
+                if (
+                    self.tracks_viewer.tracks._get_node_attr(node, NodeAttr.TIME.value)
+                    == t
+                ):  # there is a node with this track id already, so create a new track id in this case
+                    track_id = self.tracks_viewer.tracks.get_next_track_id()
+                    break
+            else:
+                track_id = self.selected_track
 
         attributes = {
             NodeAttr.POS.value: np.array([new_point[1:]]),
@@ -232,6 +250,9 @@ class TrackPoints(napari.layers.Points):
         for point in selected_points:
             node_id = self.nodes[point]
             self.tracks_viewer.selected_nodes.add(node_id, True)
+            self.selected_track = self.tracks_viewer.tracks._get_node_attr(
+                node_id, NodeAttr.TRACK_ID.value
+            )
 
     def get_symbols(self, tracks: Tracks, symbolmap: dict[NodeType, str]) -> list[str]:
         statemap = {
