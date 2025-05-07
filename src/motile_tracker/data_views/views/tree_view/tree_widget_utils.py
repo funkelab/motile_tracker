@@ -159,6 +159,12 @@ def extract_sorted_tracks(
 
     df = pd.DataFrame(track_list)
 
+    # Replace NaN values with 0 for the existing features
+    extra_features = [
+        feature for feature in feature_node_attrs if feature in df.columns
+    ]
+    df[extra_features] = df[extra_features].fillna(0)
+
     return df
 
 

@@ -214,18 +214,22 @@ class Tracks:
         self.set_times(nodes, times)
         final_pos: np.ndarray
         if self.segmentation is not None:
-            computed_attrs = self._compute_node_attrs(nodes, times)
+            computed_attrs = self._compute_node_attrs(nodes, times, self.features)
             if positions is None:
                 final_pos = np.array(computed_attrs[NodeAttr.POS.value])
             else:
                 final_pos = positions
-            attrs[NodeAttr.AREA.value] = computed_attrs[NodeAttr.AREA.value]
+
+            for attr, values in computed_attrs.items():
+                if attr != NodeAttr.POS.value:
+                    attrs[attr] = values
         elif positions is None:
             raise ValueError("Must provide positions or segmentation and ids")
         else:
             final_pos = positions
 
         self.set_positions(nodes, final_pos)
+
         for attr, values in attrs.items():
             self._set_nodes_attr(nodes, attr, values)
 

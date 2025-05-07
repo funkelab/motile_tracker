@@ -135,7 +135,7 @@ def tracks_from_df(
     df: pd.DataFrame,
     segmentation: np.ndarray | None = None,
     scale: list[float] | None = None,
-    features: dict[str:str] | None = (),
+    features: dict[str:str] | None = None,
     intensity_image: np.ndarray | None = None,
 ) -> SolutionTracks:
     """Turns a pandas data frame with columns:
