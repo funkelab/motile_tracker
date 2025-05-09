@@ -270,7 +270,7 @@ def tracks_from_df(
 
     # compute missing attributes as requested
     if tracks.segmentation is not None:
-        tracks.features = features.keys()
+        tracks.features = list(features.keys())
         nodes = tracks.graph.nodes
         times = tracks.get_times(nodes)
         computed_attrs = tracks._compute_node_attrs(
