@@ -4,4 +4,9 @@ channels:
   - funkelab
   - gurobi
 dependencies:
-  - ilpy
+  - python=3.11.*
+  - ilpy=0.4.1
+  - scip=9.1.*
+  - pip
+  - pip:
+    - motile-tracker
