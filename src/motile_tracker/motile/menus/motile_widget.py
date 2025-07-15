@@ -66,6 +66,8 @@ class MotileWidget(QWidget):
         """
         if isinstance(tracks, MotileRun):
             self.view_run_widget.update_run(tracks)
+            self.edit_run_widget.update_features(tracks.features)
+            self.edit_run_widget.update_scaling(tracks.scale)
             self.edit_run_widget.hide()
             self.view_run_widget.show()
         else:
@@ -120,7 +122,9 @@ class MotileWidget(QWidget):
         run.graph = solve(
             run.solver_params,
             input_data,
+            run.features,
             lambda event_data: self._on_solver_event(run, event_data),
+            intensity_image=run.intensity_image,
             scale=run.scale,
         )
 

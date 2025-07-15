@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 from funtracks.data_model import SolutionTracks
+from funtracks.features.feature_set import FeatureSet
 from motile_toolbox.candidate_graph.graph_attributes import NodeAttr
 
 from .solver_params import SolverParams
@@ -32,9 +33,11 @@ class MotileRun(SolutionTracks):
         self,
         graph: nx.DiGraph,
         segmentation: np.ndarray | None,
+        features: FeatureSet,
         run_name: str,
         time_attr: str = NodeAttr.TIME.value,
         pos_attr: str | tuple[str] | list[str] = NodeAttr.POS.value,
+        intensity_image: np.ndarray | None = None,
         scale: list[float] | None = None,
         solver_params: SolverParams | None = None,
         input_points: np.ndarray | None = None,
@@ -55,6 +58,8 @@ class MotileRun(SolutionTracks):
         self.gaps = gaps
         self.status = status
         self.time = datetime.now() if time is None else time
+        self.intensity_image = intensity_image
+        self.features = features
 
     def _make_id(self) -> str:
         """Combine the time and run name into a unique id for the run
@@ -131,16 +136,18 @@ class MotileRun(SolutionTracks):
         time, run_name = cls._unpack_id(run_dir.stem)
         params = cls._load_params(run_dir)
         input_points = cls._load_array(run_dir, IN_POINTS_FILENAME, required=False)
-        tracks = SolutionTracks.load(run_dir, seg_required=False)
+        tracks = SolutionTracks.load(run_dir, seg_required=False, int_required=False)
         gaps = cls._load_list(run_dir=run_dir, filename=GAPS_FILENAME, required=False)
         return cls(
             graph=tracks.graph,
             segmentation=tracks.segmentation,
+            intensity_image=tracks.intensity_image,
             run_name=run_name,
             solver_params=params,
             input_points=input_points,
             time=time,
             gaps=gaps,
+            features=tracks.features,
             pos_attr=tracks.pos_attr,
             time_attr=tracks.time_attr,
             scale=tracks.scale,
@@ -238,6 +245,9 @@ class MotileRun(SolutionTracks):
             "scale": self.scale
             if not isinstance(self.scale, np.ndarray)
             else self.scale.tolist(),
+            "features": self.features._features
+            if not isinstance(self.features_features, np.ndarray)
+            else self.features_features.tolist(),
         }
         with open(out_path, "w") as f:
             json.dump(attrs_dict, f)

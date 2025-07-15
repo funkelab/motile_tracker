@@ -6,16 +6,16 @@ from collections.abc import Callable
 
 import networkx as nx
 import numpy as np
-from motile import Solver, TrackGraph
-from motile.constraints import MaxChildren, MaxParents
-from motile.costs import Appear, EdgeDistance, EdgeSelection, Split
-from motile_toolbox.candidate_graph import (
-    EdgeAttr,
-    NodeAttr,
+from funtracks.data_model.graph_attributes import EdgeAttr, NodeAttr
+from funtracks.data_model.graph_utils import (
     compute_graph_from_points_list,
     compute_graph_from_seg,
     graph_to_nx,
 )
+from funtracks.features.feature_set import FeatureSet
+from motile import Solver, TrackGraph
+from motile.constraints import MaxChildren, MaxParents
+from motile.costs import Appear, EdgeDistance, EdgeSelection, Split
 
 from .solver_params import SolverParams
 
@@ -25,7 +25,9 @@ logger = logging.getLogger(__name__)
 def solve(
     solver_params: SolverParams,
     input_data: np.ndarray,
+    features: FeatureSet,
     on_solver_update: Callable | None = None,
+    intensity_image: np.ndarray | None = None,
     scale: list | None = None,
 ) -> nx.DiGraph:
     """Get a tracking solution for the given segmentation and parameters.
@@ -41,10 +43,14 @@ def solve(
         input_data (np.ndarray): The input segmentation or points list to run
             tracking on. If 2D, assumed to be a list of points, otherwise a
             segmentation.
+        features: FeatureSet, referring to regionprops features, that should be measured.
         on_solver_update (Callable, optional): A function that is called
             whenever the motile solver emits an event. The function should take
             a dictionary of event data, and can be used to track progress of
             the solver. Defaults to None.
+        intensity_image (np.ndarray): intensity data
+        scale: spatial calibration for all dimensions
+
 
     Returns:
         nx.DiGraph: A solution graph where the ids of the nodes correspond to
@@ -53,13 +59,15 @@ def solve(
     """
     if input_data.ndim == 2:
         cand_graph = compute_graph_from_points_list(
-            input_data, solver_params.max_edge_distance, scale=scale
+            input_data, features, solver_params.max_edge_distance, scale=scale
         )
     else:
         cand_graph = compute_graph_from_seg(
             input_data,
+            features,
             solver_params.max_edge_distance,
             iou=solver_params.iou_cost is not None,
+            intensity_image=intensity_image,
             scale=scale,
         )
     logger.debug("Cand graph has %d nodes", cand_graph.number_of_nodes())
