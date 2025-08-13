@@ -29,5 +29,5 @@ jobs:
       - name: Create draft release
         uses: softprops/action-gh-release@v2
         with:
-          draft: false
+          draft: true
           generate_release_notes: true
