@@ -1,0 +1,16 @@
+name: Deploy
+
+on:
+  push:
+    branches: [deploy] # Change this to run only for push events to main branch
+    tags: ["v*"] # Push events to matching v*, i.e. v1.0, v20.15.10
+  # workflow_dispatch: # go to motile_tracker_bundle_app repo to trigger manual runs
+
+jobs:
+  packaging:
+    permissions:
+      contents: write
+    uses: funkelab/motile_tracker_bundled_app/.github/workflows/bundle_app.yml@main
+    secrets: inherit
+    with:
+      event_name: ${{ github.event_name }}
