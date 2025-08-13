@@ -2,7 +2,7 @@ name: Deploy
 
 on:
   push:
-    branches: [deploy] # Change this to run only for push events to main branch
+    branches: [install] # Change this to run only for push events to main branch
     tags: ["v*"] # Push events to matching v*, i.e. v1.0, v20.15.10
   workflow_dispatch:
 
