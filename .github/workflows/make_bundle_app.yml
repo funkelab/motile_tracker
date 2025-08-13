@@ -3,7 +3,7 @@ name: bundleApp
 on:
   release:
     types:
-      - prereleased
+      - released
       - published
   # motile_tracker_bundle_app will be triggered when the release is changed from draft to published
 
