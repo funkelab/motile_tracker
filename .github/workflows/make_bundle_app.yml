@@ -5,7 +5,7 @@ on:
     types:
       - prereleased
       - published
-  workflow_dispatch: # go to motile_tracker_bundle_app repo to trigger manual runs
+  # motile_tracker_bundle_app will be triggered when the release is changed from draft to published
 
 jobs:
   packaging:
