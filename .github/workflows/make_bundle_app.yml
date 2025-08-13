@@ -4,7 +4,7 @@ on:
   release:
     types:
       - published
-  workflow_dispatch: # go to motile_tracker_bundle_app repo to trigger manual runs
+  # workflow_dispatch: # go to motile_tracker_bundle_app repo to trigger manual runs
 
 jobs:
   packaging:
