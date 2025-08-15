@@ -52,20 +52,8 @@ If [pixi](https://pixi.sh/) is available, you can run motile-tracker using:
 
 ## Package the application into an executable and create the installer
 
-To create the executab run
-
-    pixi run create-app
-
-This command will create an application (.app) on OSX, an EXE on Windows and an
-ELF executable on Linux.
-
-On Windows in order to be able to package the application the ilpy library must be
-properly installed and compiled. This will require [download](https://aka.ms/vs/17/release/vs_BuildTools.exe) and install [Visual Studio Build Tools](https://visualstudio.microsoft.com/downloads/). This comes with a script to set all required environment variables located typically at `"C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat"` so before you setup the app you need to run this bat file. For powershell run `scripts\scripts/set-vs-buildTools-env.ps1 <fullpathto vcvars64>`.
-
-Further to create an installer for the app you will need:
-* InnoSetup on Windows (`scoop install inno-setup` or `winget install "Inno Setup"`)
-* create-dmg on OSX (`brew install create-dmg`)
-* makeself on Linux (`apt install makeself`)
+Tagging any branch will automatically trigger the deploy.yml workflow,
+which pushes the tagged version to PyPi and creates a github release; draft release if the tag contains "-dev", pre-release if the tag contains "-rc' or a full release otherwise. In case of a draft or pre release, when the user updates the release notes and promotes it to a published release, github will trigger `make_bundle_app.yml` workflow which will create the Linux, Mac and Windows installer and will upload them as release artifacts to github.
 
 ## Issues
 

@@ -42,7 +42,6 @@ dependencies =[
     "tqdm",
     "dask[array]>=2021.10.0",
     "fonticon-fontawesome6",
-    "PyQt5",
     "pyqtgraph",
 ]
 
@@ -51,9 +50,6 @@ testing =["pyqt5", "pytest", "pytest-cov", "pytest-qt"]
 docs = ["myst-parser", "sphinx", "sphinx-autoapi", "sphinx_rtd_theme", "sphinxcontrib-video"]
 dev = ["ruff", "pre-commit"]
 all = ["motile-tracker[testing,docs,dev]"]
-
-[project.entry-points."superqt.fonticon"]
-fa6s = "fonticon_fa6:FA6S"
 
 [project.urls]
 "Bug Tracker" = "https://github.com/funkelab/motile_tracker/issues"
