@@ -4,6 +4,4 @@ channels:
   - funkelab
   - gurobi
 dependencies:
-  - python=3.11.*
   - ilpy
-  - scip
