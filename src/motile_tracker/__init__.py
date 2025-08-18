@@ -1,7 +1,5 @@
-from importlib.metadata import PackageNotFoundError, version
-
 try:
-    __version__ = version("motile-tracker")
-except PackageNotFoundError:
+    from ._version import version as __version__
+except ImportError:
     # package is not installed
     __version__ = "uninstalled"

@@ -31,7 +31,7 @@ dependencies =[
     "finn-viewer>=0.2",
     "funtracks",
     "appdirs",
-    "numpy",
+    "numpy >= 1.26,<2.1",
     "magicgui",
     "qtpy",
     "scikit-image",
@@ -44,6 +44,7 @@ dependencies =[
     "fonticon-fontawesome6",
     "pyqtgraph",
 ]
+
 [project.optional-dependencies]
 testing =["pyqt5", "pytest", "pytest-cov", "pytest-qt"]
 docs = ["myst-parser", "sphinx", "sphinx-autoapi", "sphinx_rtd_theme", "sphinxcontrib-video"]
@@ -58,10 +59,11 @@ all = ["motile-tracker[testing,docs,dev]"]
 motile_tracker = "motile_tracker.__main__:main"
 
 [tool.setuptools_scm]
+write_to = "src/motile_tracker/_version.py"
 
 [tool.ruff]
 line-length = 88
-target-version = "py310"
+target-version = "py311"
 fix = true
 src = ["src"]
 

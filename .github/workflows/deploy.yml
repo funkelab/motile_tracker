@@ -24,6 +24,10 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}
-      - uses: softprops/action-gh-release@v2
+          skip-existing: true
+      - name: Create release
+        uses: softprops/action-gh-release@v2
         with:
+          draft: ${{ contains(github.ref_name, '-dev') }}
+          prerelease: ${{ contains(github.ref_name, '-rc') }}
           generate_release_notes: true

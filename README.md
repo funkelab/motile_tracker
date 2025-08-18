@@ -24,6 +24,13 @@ conda before installing the plugin with pip.
     conda install -c conda-forge -c funkelab -c gurobi ilpy
     pip install motile-tracker
 
+The conda environment can also be created from the provided conda_config.yml:
+
+    conda env create -f conda_config.yml
+    conda activate motile-tracker
+
+Alternatively one can use [pixi](https://pixi.sh/).
+
 ## Running Motile Tracker
 
 To run the application:
@@ -38,6 +45,15 @@ To run the application:
 or
 
     motile_tracker
+
+If [pixi](https://pixi.sh/) is available, you can run motile-tracker using:
+
+    pixi run start
+
+## Package the application into an executable and create the installer
+
+Tagging any branch will automatically trigger the deploy.yml workflow,
+which pushes the tagged version to PyPi and creates a github release; draft release if the tag contains "-dev", pre-release if the tag contains "-rc' or a full release otherwise. In case of a draft or pre release, when the user updates the release notes and promotes it to a published release, github will trigger `make_bundle_app.yml` workflow which will create the Linux, Mac and Windows installer and will upload them as release artifacts to github.
 
 ## Issues
 

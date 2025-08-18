@@ -1,0 +1,17 @@
+name: bundleApp
+
+on:
+  release:
+    types:
+      - released
+      - published
+  # motile_tracker_bundle_app will be triggered when the release is changed from draft to published
+
+jobs:
+  packaging:
+    permissions:
+      contents: write
+    uses: funkelab/motile_tracker_bundled_app/.github/workflows/bundle_app.yml@main
+    secrets: inherit
+    with:
+      event_name: ${{ github.event_name }}
