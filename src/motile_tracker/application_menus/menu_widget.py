@@ -2,7 +2,6 @@ import napari
 from qtpy.QtWidgets import QScrollArea, QTabWidget, QVBoxLayout
 
 from motile_tracker.application_menus.editing_menu import EditingMenu
-from motile_tracker.data_views.views.view_3d import View3D
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 from motile_tracker.motile.menus.motile_widget import MotileWidget
 
@@ -18,12 +17,9 @@ class MenuWidget(QScrollArea):
 
         motile_widget = MotileWidget(viewer)
         editing_widget = EditingMenu(viewer)
-        view3D_widget = View3D(viewer)
-        view3D_widget.update_tab.connect(self.update_3D_tab)
 
         self.tabwidget = QTabWidget()
 
-        self.tabwidget.addTab(view3D_widget, "3D viewing")
         self.tabwidget.addTab(motile_widget, "Track with Motile")
         self.tabwidget.addTab(editing_widget, "Edit Tracks")
         self.tabwidget.addTab(tracks_viewer.tracks_list, "Results List")
@@ -37,8 +33,3 @@ class MenuWidget(QScrollArea):
 
         self.setLayout(layout)
         self.setMinimumWidth(300)
-
-    def update_3D_tab(self):
-        if self.tabwidget.currentIndex() == 0:
-            self.tabwidget.setCurrentIndex(1)
-            self.tabwidget.setCurrentIndex(0)

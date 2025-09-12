@@ -137,6 +137,10 @@ class TracksLayerGroup:
                     location[dim] + 0.5
                 )  # use the world location, since the 'step' in viewer.dims.range
                 # already in world units
+            # Also update the step for the dims that are displayed, in order to sync with
+            # the orthogonal views
+            for dim in self.viewer.dims.displayed:
+                step[dim] = int(location[dim] + 0.5)
             self.viewer.dims.current_step = step
 
             # check whether the new coordinates are inside or outside the field of view,

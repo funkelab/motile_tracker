@@ -43,6 +43,7 @@ dependencies =[
     "fonticon-fontawesome6",
     "pyqtgraph",
     "lxml_html_clean",  # only to deal with napari dependencies being broken
+    "napari-orthogonal-views @ git+https://github.com/AnniekStok/napari-orthogonal-views.git@db1ac78ec240bfd6657a319828d7d0c7be712ebd"
 ]
 [project.optional-dependencies]
 testing =["napari", "pyqt5", "pytest", "pytest-cov", "pytest-qt"]

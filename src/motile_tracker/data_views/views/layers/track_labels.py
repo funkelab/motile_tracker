@@ -6,10 +6,10 @@ from typing import TYPE_CHECKING
 
 import napari
 import numpy as np
+from napari.layers import Labels
 from napari.utils import DirectLabelColormap
 from napari.utils.action_manager import action_manager
 from napari.utils.notifications import show_info, show_warning
-from napari.utils.translations import trans
 from psygnal import Signal
 
 if TYPE_CHECKING:
@@ -45,29 +45,19 @@ def _new_label(layer: TrackLabels, new_track_id=True):
     """
 
     if isinstance(layer.data, np.ndarray):
-        new_selected_label = int(np.max(layer.data) + 1)
-        if layer.selected_label == new_selected_label:
-            show_info(
-                trans._(
-                    "Current selected label is not being used. You will need to use it first "
-                    "to be able to set the current select label to the next one available",
-                )
-            )
-        else:
-            if new_track_id:
-                new_selected_track = layer.tracks_viewer.tracks.get_next_track_id()
-                layer.selected_track = new_selected_track
-            layer.selected_label = new_selected_label
-            layer.colormap.color_dict[new_selected_label] = (
-                layer.tracks_viewer.colormap.map(layer.selected_track)
-            )
-            layer.colormap = DirectLabelColormap(
-                color_dict=layer.colormap.color_dict
-            )  # to refresh, otherwise you paint with a transparent label until you release the mouse
-    else:
-        show_info(
-            trans._("Calculating empty label on non-numpy array is not supported")
+        new_selected_label = np.max(layer.data) + 1
+        if new_track_id or layer.selected_track is None:
+            new_selected_track = layer.tracks_viewer.tracks.get_next_track_id()
+            layer.selected_track = new_selected_track
+        layer.selected_label = new_selected_label
+        layer.colormap.color_dict[new_selected_label] = (
+            layer.tracks_viewer.colormap.map(layer.selected_track)
         )
+        # to refresh, otherwise you paint with a transparent label until you
+        # release the mouse
+        layer.colormap = DirectLabelColormap(color_dict=layer.colormap.color_dict)
+    else:
+        show_info("Calculating empty label on non-numpy array is not supported")
 
 
 class TrackLabels(ContourLabels):
@@ -159,14 +149,19 @@ class TrackLabels(ContourLabels):
                 )
                 self.process_click(event, label)
 
+    def assign_new_label(self, event):
+        """Function for orthoviews to connect to so the 'm' event can be processed here"""
+
+        new_label(self)
+
     def process_click(self, event: Event, label: int):
+        """Process the click event to update the selected nodes"""
+
         if (
             label is not None and label != 0 and self.colormap.map(label)[-1] != 0
         ):  # check opacity (=visibility) in the colormap
             append = "Shift" in event.modifiers
             self.tracks_viewer.selected_nodes.add(label, append)
-        else:
-            self.tracks_viewer.selected_nodes.reset()
 
     def _get_colormap(self) -> DirectLabelColormap:
         """Get a DirectLabelColormap that maps node ids to their track ids, and then
@@ -192,28 +187,28 @@ class TrackLabels(ContourLabels):
 
     def _check_mode(self):
         """Check if the mode is valid and call the ensure_valid_label function"""
-
-        self.events.mode.disconnect(
-            self._check_mode
-        )  # here disconnecting the event listener is still necessary because self.mode = paint triggers the event internally and it is not blocked with event.blocker()
+        # here disconnecting the event listener is still necessary because
+        # self.mode = paint triggers the event internally and it is not blocked with
+        # event.blocker()
+        self.events.mode.disconnect(self._check_mode)
         if self.mode == "polygon":
-            show_info(
-                trans._(
-                    "Please use the paint tool to update the label",
-                )
-            )
+            show_info("Please use the paint tool to update the label")
             self.mode = "paint"
 
         self._ensure_valid_label()
         self.events.mode.connect(self._check_mode)
 
     def redo(self):
-        """Overwrite the redo functionality of the labels layer and invoke redo action on the tracks_viewer.tracks_controller first"""
+        """Overwrite the redo functionality of the labels layer and invoke redo action on
+        the tracks_viewer.tracks_controller first
+        """
 
         self.tracks_viewer.redo()
 
     def undo(self):
-        """Overwrite undo function and invoke undo action on the tracks_viewer.tracks_controller"""
+        """Overwrite undo function and invoke undo action on the
+        tracks_viewer.tracks_controller
+        """
 
         self.tracks_viewer.undo()
 
@@ -221,8 +216,8 @@ class TrackLabels(ContourLabels):
         """_summary_
 
         Args:
-            event_val (list[tuple]): A list of paint "atoms" generated by the labels layer.
-                Each atom is a 3-tuple of arrays containing:
+            event_val (list[tuple]): A list of paint "atoms" generated by the labels
+                layer. Each atom is a 3-tuple of arrays containing:
                 - a numpy multi-index, pointing to the array elements that were
                 changed (a tuple with len ndims)
                 - the values corresponding to those elements before the change
@@ -255,13 +250,19 @@ class TrackLabels(ContourLabels):
                 )
         return new_value, actions
 
-    def _revert_paint(self, event):
+    def _revert_paint(self, _, source_layer: Labels | None = None):
         """Revert a paint event after it fails validation (no motile tracker Actions have
-        been created). This keeps the view synced with the backend data.
+        been created). If a source_layer is provided, the paint event will be reverted on
+        this layer (this is necessary for orthoviews). This keeps the view synced with
+        the backend data.
         """
-        super().undo()
 
-    def _on_paint(self, event):
+        if source_layer is not None:
+            source_layer.undo()  # revert on the orthoview
+        else:
+            super().undo()
+
+    def _on_paint(self, event, source_layer: Labels | None = None):
         """Listen to the paint event and check which track_ids have changed"""
 
         with self.events.selected_label.blocker():
@@ -302,10 +303,12 @@ class TrackLabels(ContourLabels):
 
             if len(to_delete) > 0 and len(to_add) > 0:
                 show_warning(
-                    "This paint or fill operation completely replaced one label with a new label. This is currently not supported."
-                    " If you want to update the track id of the node, please edit the edges directly instead."
+                    "This paint or fill operation completely replaced one label with a "
+                    "new label. This is currently not supported."
+                    " If you want to update the track id of the node, please edit the "
+                    "edges directly instead."
                 )
-                self._revert_paint(event)
+                self._revert_paint(event, source_layer)
                 self.refresh()
                 return
             self.tracks_viewer.tracks_controller.update_segmentations(
@@ -397,24 +400,34 @@ class TrackLabels(ContourLabels):
 
         self.events.selected_label.disconnect(self._ensure_valid_label)
         if len(self.tracks_viewer.selected_nodes) > 0:
-            self.selected_label = int(self.tracks_viewer.selected_nodes[0])
+            node = int(self.tracks_viewer.selected_nodes[0])
+            self.selected_label = node
+            self.selected_track = int(self.tracks_viewer.tracks.get_track_id(node))
         self.events.selected_label.connect(self._ensure_valid_label)
 
     def _ensure_valid_label(self, event: Event | None = None):
         """Make sure a valid label is selected, because it is not allowed to paint with a
         label that already exists at a different timepoint.
         Scenarios:
-        1. If a node with the selected label value (node id) exists at a different time point,
-        check if there is any node with the same track_id at the current time point
-            1.a if there is a node with the same track id, select that one, so that it can be used to update an existing node
-            1.b if there is no node with the same track id, create a new node id and paint with the track_id of the selected label.
-              This can be used to add a new node with the same track id at a time point where it does not (yet) exist (anymore).
-        2. if there is no existing node with this value in the graph, it is assume that you want to add a node with the current track id
-        Retrieve the track_id from self.current_track_id and use it to find if there are any nodes of this track id
-        at current time point
-        3. If no node with this label exists yet, it is valid and can be used to start a new track id.
-        Therefore, create a new node id and map a new color. Add it to the dictionary.
-        4. If a node with the label exists at the current time point, it is valid and can be used to update the existing node in a paint event. No action is needed"""
+        1. If a node with the selected label value (node id) exists at a different time
+            point, check if there is any node with the same track_id at the current time
+            point
+            1.a if there is a node with the same track id, select that one, so that it
+                can be used to update an existing node
+            1.b if there is no node with the same track id, create a new node id and
+                paint with the track_id of the selected label.
+              This can be used to add a new node with the same track id at a time point
+              where it does not (yet) exist (anymore).
+        2. if there is no existing node with this value in the graph, it is assume that
+            you want to add a node with the current track id
+        Retrieve the track_id from self.current_track_id and use it to find if there are
+        any nodes of this track id at current time point
+        3. If no node with this label exists yet, it is valid and can be used to start a
+            new track id. Therefore, create a new node id and map a new color.
+            Add it to the dictionary.
+        4. If a node with the label exists at the current time point, it is valid and
+            can be used to update the existing node in a paint event. No action is needed
+        """
 
         if self.tracks_viewer.tracks is not None and self.mode in (
             "fill",
@@ -438,7 +451,8 @@ class TrackLabels(ContourLabels):
                     # we are changing the existing node. This is fine
                     pass
                 else:
-                    # if there is already a node in that track in this frame, edit that instead
+                    # if there is already a node in that track in this frame, edit that
+                    # instead
                     edit = False
                     if (
                         self.selected_track
@@ -465,10 +479,12 @@ class TrackLabels(ContourLabels):
                         )
 
             # the current node does not exist in the graph.
-            # Use the current selected_track as the track id (will be a new track if a new label was found with "m")
+            # Use the current selected_track as the track id (will be a new track if a
+            # new label was found with "m")
             # Check that the track id is not already in this frame.
             else:
-                # if there is already a node in that track in this frame, edit that instead
+                # if there is already a node in that track in this frame, edit that
+                # instead
                 edit = False
                 if self.selected_track in self.tracks_viewer.tracks.track_id_to_node:
                     for node in self.tracks_viewer.tracks.track_id_to_node[
@@ -502,3 +518,4 @@ action_manager.register_action(
     keymapprovider=TrackLabels,
     description="",
 )
+TrackLabels.bind_key("m", overwrite=True)(new_label)
