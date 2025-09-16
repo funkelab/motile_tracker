@@ -5,6 +5,7 @@ from napari.layers import Labels, Layer, Points, Shapes
 from napari.utils.events import Event
 from napari.utils.notifications import show_info
 
+from motile_tracker.data_views.views.layers.contour_labels import ContourLabels
 from motile_tracker.data_views.views.layers.track_graph import TrackGraph
 from motile_tracker.data_views.views.layers.track_labels import TrackLabels
 from motile_tracker.data_views.views.layers.track_points import TrackPoints
@@ -24,13 +25,16 @@ def copy_layer(layer: Layer, name: str = ""):
         )
 
     elif isinstance(layer, TrackLabels):
-        res_layer = Labels(
+        res_layer = ContourLabels(
             data=layer.data,
             name=layer.name,
             opacity=layer.opacity,
             scale=layer.scale,
             colormap=layer.colormap,
         )
+        layer.update_group_labels.connect(res_layer.set_group_labels)
+        res_layer.group_labels = layer.group_labels
+
     elif isinstance(layer, TrackPoints):
         res_layer = Points(
             data=layer.data,
