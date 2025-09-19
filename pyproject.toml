@@ -45,18 +45,22 @@ dependencies =[
     "pyqtgraph",
 ]
 
-[project.optional-dependencies]
-testing =["pyqt5", "pytest", "pytest-cov", "pytest-qt"]
-docs = ["myst-parser", "sphinx", "sphinx-autoapi", "sphinx_rtd_theme", "sphinxcontrib-video"]
-dev = ["ruff", "pre-commit"]
-all = ["motile-tracker[testing,docs,dev]"]
-
 [project.urls]
 "Bug Tracker" = "https://github.com/funkelab/motile_tracker/issues"
 "Documentation" ="https://funkelab.github.io/motile_tracker/"
 
 [project.scripts]
 motile_tracker = "motile_tracker.__main__:main"
+
+[dependency-groups]
+testing =["pyqt5", "pytest", "pytest-cov", "pytest-qt"]
+docs = ["myst-parser", "sphinx", "sphinx-autoapi", "sphinx_rtd_theme", "sphinxcontrib-video"]
+dev = [
+    "ruff",
+    "pre-commit",
+    {include-group="testing"},
+    {include-group = "docs"},
+]
 
 [tool.setuptools_scm]
 write_to = "src/motile_tracker/_version.py"
