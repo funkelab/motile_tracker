@@ -28,22 +28,11 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      # note: if you need dependencies from conda, considering using
-      # setup-miniconda: https://github.com/conda-incubator/setup-miniconda
-      - name: Install conda dependencies
-        uses: conda-incubator/setup-miniconda@v3
-        with:
-          python-version: ${{ matrix.python-version }}
-          environment-file: conda_config.yml
-          channel-priority: true
-
       - name: Install pip dependencies
-        shell: bash -el {0} # this is necessary to activate the conda env
         run: |
           pip install ".[testing]"
 
       - name: Test with pytest
-        shell: bash -el {0}
         run: |
           pytest --color=yes --cov=motile-tracker --cov-report=xml --cov-report=term-missing tests
 
