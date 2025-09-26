@@ -38,7 +38,7 @@ dependencies =[
     "motile>=0.3",
     "motile_toolbox == 0.4.0",
     "pydantic>=2,<3",
-    "tifffile[all]>=2025.9.20",
+    "tifffile[all]>=2025.1.10",
     "tqdm>=4,<5",
     "dask[array]>=2021.10.0",
     "fonticon-fontawesome6>=6,<7",
