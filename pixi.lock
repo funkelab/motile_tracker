@@ -89,7 +89,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/8f/d7/9322c609343d929e75e7e5e6255e614fcc67572cfd083959cdef3b7aad79/docutils-0.21.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/7b/8f/c4d9bafc34ad7ad5d8dc16dd1347ee0e507a52c3adb6bfa8887e1c6a26ba/executing-2.2.0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/61/bf/fd60001b3abc5222d8eaa4a204cd8c0ae78e75adc688f33ce4bf25b7fafa/fasteners-0.19-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/00/85/4c894ce6a698a8c8a9d3a8049016046aa8440ffb90fdf27f69e9c1163b9b/finn_viewer-0.2.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/00/85/4c894ce6a698a8c8a9d3a8049016046aa8440ffb90fdf27f69e9c1163b9b/napari_viewer-0.2.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/27/cd/c883e1a7c447479d6e13985565080e3fea88ab5a107c21684c813dba1875/flexcache-0.3-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/fe/5e/3be305568fe5f34448807976dc82fc151d76c3e0e03958f34770286278c1/flexparser-0.4-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/31/5d/29fda080b909d7d2ceeb2825d2e447633da266ae147c20323710df04e6d3/fonticon_fontawesome6-6.4.0-py3-none-any.whl
@@ -274,7 +274,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/8f/d7/9322c609343d929e75e7e5e6255e614fcc67572cfd083959cdef3b7aad79/docutils-0.21.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/7b/8f/c4d9bafc34ad7ad5d8dc16dd1347ee0e507a52c3adb6bfa8887e1c6a26ba/executing-2.2.0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/61/bf/fd60001b3abc5222d8eaa4a204cd8c0ae78e75adc688f33ce4bf25b7fafa/fasteners-0.19-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/00/85/4c894ce6a698a8c8a9d3a8049016046aa8440ffb90fdf27f69e9c1163b9b/finn_viewer-0.2.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/00/85/4c894ce6a698a8c8a9d3a8049016046aa8440ffb90fdf27f69e9c1163b9b/napari_viewer-0.2.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/27/cd/c883e1a7c447479d6e13985565080e3fea88ab5a107c21684c813dba1875/flexcache-0.3-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/fe/5e/3be305568fe5f34448807976dc82fc151d76c3e0e03958f34770286278c1/flexparser-0.4-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/31/5d/29fda080b909d7d2ceeb2825d2e447633da266ae147c20323710df04e6d3/fonticon_fontawesome6-6.4.0-py3-none-any.whl
@@ -460,7 +460,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/8f/d7/9322c609343d929e75e7e5e6255e614fcc67572cfd083959cdef3b7aad79/docutils-0.21.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/7b/8f/c4d9bafc34ad7ad5d8dc16dd1347ee0e507a52c3adb6bfa8887e1c6a26ba/executing-2.2.0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/61/bf/fd60001b3abc5222d8eaa4a204cd8c0ae78e75adc688f33ce4bf25b7fafa/fasteners-0.19-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/00/85/4c894ce6a698a8c8a9d3a8049016046aa8440ffb90fdf27f69e9c1163b9b/finn_viewer-0.2.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/00/85/4c894ce6a698a8c8a9d3a8049016046aa8440ffb90fdf27f69e9c1163b9b/napari_viewer-0.2.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/27/cd/c883e1a7c447479d6e13985565080e3fea88ab5a107c21684c813dba1875/flexcache-0.3-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/fe/5e/3be305568fe5f34448807976dc82fc151d76c3e0e03958f34770286278c1/flexparser-0.4-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/31/5d/29fda080b909d7d2ceeb2825d2e447633da266ae147c20323710df04e6d3/fonticon_fontawesome6-6.4.0-py3-none-any.whl
@@ -650,7 +650,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/8f/d7/9322c609343d929e75e7e5e6255e614fcc67572cfd083959cdef3b7aad79/docutils-0.21.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/7b/8f/c4d9bafc34ad7ad5d8dc16dd1347ee0e507a52c3adb6bfa8887e1c6a26ba/executing-2.2.0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/61/bf/fd60001b3abc5222d8eaa4a204cd8c0ae78e75adc688f33ce4bf25b7fafa/fasteners-0.19-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/00/85/4c894ce6a698a8c8a9d3a8049016046aa8440ffb90fdf27f69e9c1163b9b/finn_viewer-0.2.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/00/85/4c894ce6a698a8c8a9d3a8049016046aa8440ffb90fdf27f69e9c1163b9b/napari_viewer-0.2.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/27/cd/c883e1a7c447479d6e13985565080e3fea88ab5a107c21684c813dba1875/flexcache-0.3-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/fe/5e/3be305568fe5f34448807976dc82fc151d76c3e0e03958f34770286278c1/flexparser-0.4-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/31/5d/29fda080b909d7d2ceeb2825d2e447633da266ae147c20323710df04e6d3/fonticon_fontawesome6-6.4.0-py3-none-any.whl
@@ -865,7 +865,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/8f/d7/9322c609343d929e75e7e5e6255e614fcc67572cfd083959cdef3b7aad79/docutils-0.21.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/7b/8f/c4d9bafc34ad7ad5d8dc16dd1347ee0e507a52c3adb6bfa8887e1c6a26ba/executing-2.2.0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/61/bf/fd60001b3abc5222d8eaa4a204cd8c0ae78e75adc688f33ce4bf25b7fafa/fasteners-0.19-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/00/85/4c894ce6a698a8c8a9d3a8049016046aa8440ffb90fdf27f69e9c1163b9b/finn_viewer-0.2.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/00/85/4c894ce6a698a8c8a9d3a8049016046aa8440ffb90fdf27f69e9c1163b9b/napari_viewer-0.2.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/27/cd/c883e1a7c447479d6e13985565080e3fea88ab5a107c21684c813dba1875/flexcache-0.3-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/fe/5e/3be305568fe5f34448807976dc82fc151d76c3e0e03958f34770286278c1/flexparser-0.4-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/31/5d/29fda080b909d7d2ceeb2825d2e447633da266ae147c20323710df04e6d3/fonticon_fontawesome6-6.4.0-py3-none-any.whl
@@ -1056,7 +1056,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/8f/d7/9322c609343d929e75e7e5e6255e614fcc67572cfd083959cdef3b7aad79/docutils-0.21.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/7b/8f/c4d9bafc34ad7ad5d8dc16dd1347ee0e507a52c3adb6bfa8887e1c6a26ba/executing-2.2.0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/61/bf/fd60001b3abc5222d8eaa4a204cd8c0ae78e75adc688f33ce4bf25b7fafa/fasteners-0.19-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/00/85/4c894ce6a698a8c8a9d3a8049016046aa8440ffb90fdf27f69e9c1163b9b/finn_viewer-0.2.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/00/85/4c894ce6a698a8c8a9d3a8049016046aa8440ffb90fdf27f69e9c1163b9b/napari_viewer-0.2.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/27/cd/c883e1a7c447479d6e13985565080e3fea88ab5a107c21684c813dba1875/flexcache-0.3-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/fe/5e/3be305568fe5f34448807976dc82fc151d76c3e0e03958f34770286278c1/flexparser-0.4-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/31/5d/29fda080b909d7d2ceeb2825d2e447633da266ae147c20323710df04e6d3/fonticon_fontawesome6-6.4.0-py3-none-any.whl
@@ -1248,7 +1248,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/8f/d7/9322c609343d929e75e7e5e6255e614fcc67572cfd083959cdef3b7aad79/docutils-0.21.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/7b/8f/c4d9bafc34ad7ad5d8dc16dd1347ee0e507a52c3adb6bfa8887e1c6a26ba/executing-2.2.0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/61/bf/fd60001b3abc5222d8eaa4a204cd8c0ae78e75adc688f33ce4bf25b7fafa/fasteners-0.19-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/00/85/4c894ce6a698a8c8a9d3a8049016046aa8440ffb90fdf27f69e9c1163b9b/finn_viewer-0.2.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/00/85/4c894ce6a698a8c8a9d3a8049016046aa8440ffb90fdf27f69e9c1163b9b/napari_viewer-0.2.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/27/cd/c883e1a7c447479d6e13985565080e3fea88ab5a107c21684c813dba1875/flexcache-0.3-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/fe/5e/3be305568fe5f34448807976dc82fc151d76c3e0e03958f34770286278c1/flexparser-0.4-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/31/5d/29fda080b909d7d2ceeb2825d2e447633da266ae147c20323710df04e6d3/fonticon_fontawesome6-6.4.0-py3-none-any.whl
@@ -1443,7 +1443,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/8f/d7/9322c609343d929e75e7e5e6255e614fcc67572cfd083959cdef3b7aad79/docutils-0.21.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/7b/8f/c4d9bafc34ad7ad5d8dc16dd1347ee0e507a52c3adb6bfa8887e1c6a26ba/executing-2.2.0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/61/bf/fd60001b3abc5222d8eaa4a204cd8c0ae78e75adc688f33ce4bf25b7fafa/fasteners-0.19-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/00/85/4c894ce6a698a8c8a9d3a8049016046aa8440ffb90fdf27f69e9c1163b9b/finn_viewer-0.2.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/00/85/4c894ce6a698a8c8a9d3a8049016046aa8440ffb90fdf27f69e9c1163b9b/napari_viewer-0.2.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/27/cd/c883e1a7c447479d6e13985565080e3fea88ab5a107c21684c813dba1875/flexcache-0.3-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/fe/5e/3be305568fe5f34448807976dc82fc151d76c3e0e03958f34770286278c1/flexparser-0.4-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/31/5d/29fda080b909d7d2ceeb2825d2e447633da266ae147c20323710df04e6d3/fonticon_fontawesome6-6.4.0-py3-none-any.whl
@@ -2219,8 +2219,8 @@ packages:
   version: '0.19'
   sha256: 758819cb5d94cdedf4e836988b74de396ceacb8e2794d21f82d131fd9ee77237
   requires_python: '>=3.6'
-- pypi: https://files.pythonhosted.org/packages/00/85/4c894ce6a698a8c8a9d3a8049016046aa8440ffb90fdf27f69e9c1163b9b/finn_viewer-0.2.0-py3-none-any.whl
-  name: finn-viewer
+- pypi: https://files.pythonhosted.org/packages/00/85/4c894ce6a698a8c8a9d3a8049016046aa8440ffb90fdf27f69e9c1163b9b/napari_viewer-0.2.0-py3-none-any.whl
+  name: napari-viewer
   version: 0.2.0
   sha256: dc6ded8f0590cdae390c5a0f70fe1aade7c9ac23a92f1c974d89a269411bda57
   requires_dist:
@@ -2268,15 +2268,15 @@ packages:
   - pyside6<6.5 ; python_full_version < '3.12' and extra == 'pyside6-experimental'
   - pyqt6>6.5 ; extra == 'pyqt6'
   - pyqt6!=6.6.1 ; sys_platform == 'darwin' and extra == 'pyqt6'
-  - finn-viewer[pyside2] ; extra == 'pyside'
+  - napari-viewer[pyside2] ; extra == 'pyside'
   - pyqt5>=5.13.2,!=5.15.0 ; extra == 'pyqt5'
-  - finn-viewer[pyqt5] ; extra == 'pyqt'
-  - finn-viewer[pyqt] ; extra == 'qt'
-  - finn-viewer[optional,pyqt] ; extra == 'all'
+  - napari-viewer[pyqt5] ; extra == 'pyqt'
+  - napari-viewer[pyqt] ; extra == 'qt'
+  - napari-viewer[optional,pyqt] ; extra == 'all'
   - zarr>=2.12.0 ; extra == 'optional-base'
   - numba>=0.57.1 ; extra == 'optional-numba'
-  - finn-viewer[optional,pyqt] ; extra == 'optional-numba'
-  - finn-viewer[optional-base,optional-numba] ; extra == 'optional'
+  - napari-viewer[optional,pyqt] ; extra == 'optional-numba'
+  - napari-viewer[optional-base,optional-numba] ; extra == 'optional'
   - triangle ; extra == 'optional'
   - partsegcore-compiled-backend>=0.15.8 ; extra == 'optional'
   - babel>=2.9.0 ; extra == 'testing'
@@ -2298,7 +2298,7 @@ packages:
   - ipython>=7.25.0 ; extra == 'testing'
   - qtconsole>=4.5.1 ; extra == 'testing'
   - rich>=12.0.0 ; extra == 'testing'
-  - finn-viewer[optional-base] ; extra == 'testing'
+  - napari-viewer[optional-base] ; extra == 'testing'
   - torch>=1.7 ; extra == 'testing-extra'
   - pygithub>=1.44.1 ; extra == 'release'
   - twine>=3.1.1 ; extra == 'release'
@@ -2309,7 +2309,7 @@ packages:
   - pre-commit>=2.9.0 ; extra == 'dev'
   - pydantic ; extra == 'dev'
   - python-dotenv ; extra == 'dev'
-  - finn[testing] ; extra == 'dev'
+  - napari[testing] ; extra == 'dev'
   - mypy ; extra == 'dev'
   - ruff ; extra == 'build'
   - pyqt5 ; extra == 'build'
@@ -4571,7 +4571,7 @@ packages:
   version: 3.2.1rc1.dev0+ga7afa91.d20250815
   sha256: 8490e814209acda6873efbffe149078fa7778feaf43fd1842e9e8f98abedacba
   requires_dist:
-  - finn-viewer>=0.2
+  - napari-viewer>=0.2
   - funtracks
   - appdirs
   - numpy>=1.26,<2.1
