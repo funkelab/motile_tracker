@@ -15,40 +15,17 @@ for more details on the concepts and method.
 
 ## Installation
 
-This application depends on [motile](https://github.com/funkelab/motile), which in
-turn depends on gurobi and ilpy. These dependencies must be installed with
-conda before installing the plugin with pip.
+Users can download and install an executable application from the github release, or
+install from `pypi` in the environment of their choice (e.g. `venv`, `conda`) with the command
+`pip install motile-tracker`.
+Currently, the motile_tracker requires python >=3.10.
 
-    conda create -n motile-tracker python=3.10
-    conda activate motile-tracker
-    conda install -c conda-forge -c funkelab -c gurobi ilpy
-    pip install motile-tracker
-
-The conda environment can also be created from the provided conda_config.yml:
-
-    conda env create -f conda_config.yml
-    conda activate motile-tracker
-
-Alternatively one can use [pixi](https://pixi.sh/).
+Developers can clone the GitHub repository and then  use `uv` to install and run the code.
+See the developer guide in `DEVELOPER.md` for more information.
 
 ## Running Motile Tracker
 
-To run the application:
-* activate the conda environment created in the [Installation Step](#installation)
-
-    conda activate motile-tracker
-
-* Run:
-
-    python -m motile_tracker
-
-or
-
-    motile_tracker
-
-If [pixi](https://pixi.sh/) is available, you can run motile-tracker using:
-
-    pixi run start
+Start the executable application, or run `motile_tracker` from the command line.
 
 ## Package the application into an executable and create the installer
 
