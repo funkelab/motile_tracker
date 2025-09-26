@@ -29,20 +29,20 @@ classifiers = [
 
 dependencies =[
     "finn-viewer>=0.2",
-    "funtracks",
-    "appdirs",
+    "funtracks>=1.3.0,<2",
+    "appdirs>=1,<2",
     "numpy >= 1.26,<2.1",
-    "magicgui",
-    "qtpy",
-    "scikit-image",
-    "motile >= 0.3",
+    "magicgui>=0.10.1",
+    "qtpy>=2.4,<3",
+    "scikit-image>=0.25",
+    "motile>=0.3",
     "motile_toolbox == 0.4.0",
-    "pydantic",
-    "tifffile[all]",
-    "tqdm",
+    "pydantic>=2,<3",
+    "tifffile[all]>=2025.9.20",
+    "tqdm>=4,<5",
     "dask[array]>=2021.10.0",
-    "fonticon-fontawesome6",
-    "pyqtgraph",
+    "fonticon-fontawesome6>=6,<7",
+    "pyqtgraph>=0.13,<1",
 ]
 
 [project.urls]
@@ -53,11 +53,22 @@ dependencies =[
 motile_tracker = "motile_tracker.__main__:main"
 
 [dependency-groups]
-testing =["pyqt5", "pytest", "pytest-cov", "pytest-qt"]
-docs = ["myst-parser", "sphinx", "sphinx-autoapi", "sphinx_rtd_theme", "sphinxcontrib-video"]
+testing =[
+    "pyqt5>=5.15",
+    "pytest>=8,<9",
+    "pytest-cov>=6",
+    "pytest-qt>=4,<5",
+]
+docs = [
+    "myst-parser>=4,<5",
+    "sphinx>=8,<9",
+    "sphinx-autoapi>=3,<4",
+    "sphinx_rtd_theme>=3,<4",
+    "sphinxcontrib-video>=0.4.1",
+]
 dev = [
-    "ruff",
-    "pre-commit",
+    "ruff>=0.13",
+    "pre-commit>=4,<5",
     {include-group="testing"},
     {include-group = "docs"},
 ]
