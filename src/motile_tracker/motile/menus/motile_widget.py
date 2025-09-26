@@ -2,10 +2,9 @@
 
 import logging
 
-from finn import Viewer
-from finn.track_data_views.views_coordinator.tracks_viewer import TracksViewer
-from finn.utils.notifications import show_warning
 from funtracks.data_model import SolutionTracks
+from napari import Viewer
+from napari.utils.notifications import show_warning
 from psygnal import Signal
 from qtpy.QtWidgets import (
     QLabel,
@@ -14,6 +13,7 @@ from qtpy.QtWidgets import (
 )
 from superqt.utils import thread_worker
 
+from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 from motile_tracker.motile.backend import MotileRun, solve
 
 from .run_editor import RunEditor
