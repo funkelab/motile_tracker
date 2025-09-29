@@ -27,7 +27,7 @@ class TracksViewer:
     - Store shared rendering information like colormaps (or symbol maps)
     """
 
-    tracks_updated = Signal(Optional[bool])  # noqa: UP007
+    tracks_updated = Signal(Optional[bool])  # noqa: UP007 UP045
 
     @classmethod
     def get_instance(cls, viewer=None):
