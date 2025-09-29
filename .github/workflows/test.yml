@@ -17,12 +17,13 @@ jobs:
     runs-on: ${{ matrix.platform }}
     strategy:
       matrix:
-        platform: [ubuntu-latest, macos-latest] # windows-latest, temporarily disabled until ilpy is fixed
+        platform: [ubuntu-latest, macos-latest, windows-latest]
         python-version: ["3.10", "3.11"]
         resolution: [highest, lowest-direct]
 
     steps:
       - uses: actions/checkout@v5
+      - uses: tlambert03/setup-qt-libs@v1
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: astral-sh/setup-uv@v6
@@ -33,9 +34,22 @@ jobs:
       - name: Install dependencies
         run: uv sync --no-dev --resolution ${{ matrix.resolution }}
 
-      - name: Test with pytest
+      - name: Set Windows resolution
+        if: runner.os == 'Windows'
+        run: Set-DisplayResolution -Width 1920 -Height 1080 -Force
+        shell: powershell
+
+      - name: Install Windows OpenGL
+        if: runner.os == 'Windows'
         run: |
-          uv run pytest --color=yes --cov=motile-tracker --cov-report=xml --cov-report=term-missing tests
+          git clone --depth 1 https://github.com/pyvista/gl-ci-helpers.git
+          powershell gl-ci-helpers/appveyor/install_opengl.ps1
+          if (Test-Path -Path "C:\Windows\system32\opengl32.dll" -PathType Leaf) {Exit 0} else {Exit 1}
+        shell: powershell
+
+      - name: Test
+        uses: aganders3/headless-gui@v2
+        run: uv run pytest --color=yes --cov=motile-tracker --cov-report=xml --cov-report=term-missing tests
 
       - name: Coverage
         uses: codecov/codecov-action@v5
