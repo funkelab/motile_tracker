@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 from napari.layers import Image, Labels, Points
 from napari.layers.utils._link_layers import layer_is_linked
 from napari.layers.utils.plane import ClippingPlane
@@ -6,6 +7,7 @@ from napari.layers.utils.plane import ClippingPlane
 from motile_tracker.data_views.views.layers.tracks_layer_group import TracksLayerGroup
 
 
+@pytest.mark.xfail(reason="Open issue on linking clipping planes in napari")
 def test_link_experimental_clipping_planes(make_napari_viewer):
     """Test if the clipping planes in the TracksLayersGroup are correctly linked by changing the position and emitting events"""
 
