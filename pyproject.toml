@@ -29,7 +29,7 @@ classifiers = [
 ]
 
 dependencies =[
-    "napari[all]>=0.5,<1",
+    "napari>=0.5,<1",
     "funtracks>=1.3.0,<2",
     "appdirs>=1,<2",
     "numpy >= 1.26,<2.1",
@@ -44,7 +44,13 @@ dependencies =[
     "dask[array]>=2021.10.0",
     "fonticon-fontawesome6>=6,<7",
     "pyqtgraph>=0.13,<1",
-    "lxml_html_clean"
+    "lxml_html_clean",
+    "zarr>=2,<3",
+]
+
+[project.optional-dependencies]
+all = [
+    "pyqt6>=6,<7",
 ]
 
 [project.entry-points."napari.manifest"]
@@ -59,7 +65,7 @@ motile_tracker = "motile_tracker.__main__:main"
 
 [dependency-groups]
 testing =[
-    "pyqt5>=5.15",
+    "pyqt6>=6,<7",
     "pytest>=8,<9",
     "pytest-cov>=6",
     "pytest-qt>=4,<5",
