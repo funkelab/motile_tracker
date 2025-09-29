@@ -44,13 +44,13 @@ dependencies =[
     "dask[array]>=2021.10.0",
     "fonticon-fontawesome6>=6,<7",
     "pyqtgraph>=0.13,<1",
-    "lxml_html_clean",
-    "zarr>=2,<3",
+    "lxml_html_clean>=0.4,<1",
+    "zarr>=2.10,<3",
 ]
 
 [project.optional-dependencies]
 all = [
-    "pyqt6>=6,<7",
+    "pyqt6>=6.3,<7",
 ]
 
 [project.entry-points."napari.manifest"]
