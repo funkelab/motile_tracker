@@ -101,10 +101,11 @@ class TestLoadTracks:
         df = pd.DataFrame(data)
 
         # test if False when scaling is applied incorrectly
-        with pytest.raises(
+        with pytest.warns(
             UserWarning, match="Could not get the segmentation value at index"
         ):
-            _test_valid(df, segmentation, scale=[1, 1, 1])
+            output = _test_valid(df, segmentation, scale=[1, 1, 1])
+            assert not output
         # test if True when scaling is applied correctly
         assert _test_valid(df, segmentation, scale=[1, 4, 4])
         # ndim of segmentation should match with the length of provided scale
