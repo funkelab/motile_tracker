@@ -1,5 +1,5 @@
 import numpy as np
-from geff.metadata._affine import Affine
+from geff.affine import Affine
 from qtpy.QtCore import Qt
 from qtpy.QtWidgets import (
     QDoubleSpinBox,
