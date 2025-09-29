@@ -9,6 +9,7 @@ from funtracks.import_export.export_to_geff import export_to_geff
 from napari._qt.qt_resources import QColoredSVGIcon
 from qtpy.QtCore import Signal
 from qtpy.QtWidgets import (
+    QAbstractItemView,
     QComboBox,
     QDialog,
     QFileDialog,
@@ -108,7 +109,9 @@ class TracksList(QGroupBox):
         self.save_dialog.setOption(QFileDialog.ShowDirsOnly, True)
 
         self.tracks_list = QListWidget()
-        self.tracks_list.setSelectionMode(1)  # single selection
+        self.tracks_list.setSelectionMode(
+            QAbstractItemView.SelectionMode.SingleSelection
+        )
         self.tracks_list.itemSelectionChanged.connect(self._selection_changed)
 
         load_menu = QHBoxLayout()
