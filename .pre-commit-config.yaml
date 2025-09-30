@@ -13,7 +13,7 @@ repos:
     rev: v0.13.2
     hooks:
       - id: ruff
-        args: [--fix]
+        args: [--fix, -v]
       - id: ruff-format
   # https://mypy.readthedocs.io/en/stable/introduction.html
   # you may wish to add this as well!
