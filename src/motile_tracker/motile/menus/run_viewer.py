@@ -22,7 +22,7 @@ from .params_viewer import SolverParamsViewer
 class RunViewer(QGroupBox):
     """A widget for viewing in progress or completed runs, including
     the progress of the solver and the parameters.
-    Output tracks and segmentation are visualized separately in napari layers.
+    Output tracks and segmentation are visualized separately in finn layers.
     """
 
     edit_run = Signal(object)

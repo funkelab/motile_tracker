@@ -1,11 +1,7 @@
 # https://just.systems
 
 test:
-    uv run pytest .
+    uv run pytest tests
 
 start:
     uv run motile_tracker
-
-[working-directory: 'docs']
-@docs-build:
-  uv run make html
