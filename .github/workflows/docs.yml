@@ -17,24 +17,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-python@v5
+      - name: Set up Python 3.11
+        uses: astral-sh/setup-uv@v6
         with:
-          python-version: '3.10'
-      - name: Install conda dependencies
-        uses: conda-incubator/setup-miniconda@v3
-        with:
-          python-version: '3.10'
-          environment-file: conda_config.yml
-          channel-priority: true
-      - name: Install pip dependencies
-        shell: bash -el {0}  # this is necessary to activate the conda env
-        run: |
-          pip install ".[docs]"
+          python-version: '3.11'
+          enable-cache: true
+      - name: Install dependencies
+        run: uv sync
       - name: Build docs
-        shell: bash -el {0}
         run: |
           cd docs/
-          make html
+          uv run make html
       - uses: actions/upload-pages-artifact@v4
         with:
           path: docs/build/html
