@@ -109,6 +109,8 @@ class TrackLabels(napari.layers.Labels):
         self.events.mode.connect(self._check_mode)
         self.viewer.dims.events.current_step.connect(self._ensure_valid_label)
 
+        _new_label(self)
+
     # Connect click events to node selection
     def click(self, _, event):
         if (
