@@ -39,13 +39,17 @@ def _new_label(layer: TrackLabels, new_track_id=True):
 
     if isinstance(layer.data, np.ndarray):
         new_selected_label = np.max(layer.data) + 1
-        if new_track_id or layer.selected_track is None:
+        if new_track_id or layer.tracks_viewer.selected_track is None:
             new_selected_track = layer.tracks_viewer.tracks.get_next_track_id()
-            layer.selected_track = new_selected_track
+            layer.tracks_viewer.selected_track = new_selected_track
         layer.selected_label = new_selected_label
         layer.colormap.color_dict[new_selected_label] = (
-            layer.tracks_viewer.colormap.map(layer.selected_track)
+            layer.tracks_viewer.colormap.map(layer.tracks_viewer.selected_track)
         )
+        layer.tracks_viewer.track_id_color = layer.tracks_viewer.colormap.map(
+            layer.tracks_viewer.selected_track
+        )
+        layer.tracks_viewer.update_track_id.emit()
         # to refresh, otherwise you paint with a transparent label until you
         # release the mouse
         layer.colormap = DirectLabelColormap(color_dict=layer.colormap.color_dict)
@@ -71,7 +75,6 @@ class TrackLabels(napari.layers.Labels):
         tracks_viewer: TracksViewer,
     ):
         self.tracks_viewer = tracks_viewer
-        self.selected_track = None
         colormap = self._get_colormap()
 
         super().__init__(
@@ -131,6 +134,8 @@ class TrackLabels(napari.layers.Labels):
         self.events.selected_label.connect(self._ensure_valid_label)
         self.events.mode.connect(self._check_mode)
         self.viewer.dims.events.current_step.connect(self._ensure_valid_label)
+
+        _new_label(self)
 
     def _get_colormap(self) -> DirectLabelColormap:
         """Get a DirectLabelColormap that maps node ids to their track ids, and then
@@ -234,7 +239,10 @@ class TrackLabels(napari.layers.Labels):
             ]  # also pass on the current time point to know which node to select later
             new_value, updated_pixels = self._parse_paint_event(event.value)
             self.tracks_viewer.tracks_controller.update_segmentations(
-                new_value, updated_pixels, current_timepoint, self.selected_track
+                new_value,
+                updated_pixels,
+                current_timepoint,
+                self.tracks_viewer.selected_track,
             )
 
     def _refresh(self):
@@ -298,7 +306,9 @@ class TrackLabels(napari.layers.Labels):
         if len(self.tracks_viewer.selected_nodes) > 0:
             node = int(self.tracks_viewer.selected_nodes[0])
             self.selected_label = node
-            self.selected_track = int(self.tracks_viewer.tracks.get_track_id(node))
+            self.tracks_viewer.selected_track = int(
+                self.tracks_viewer.tracks.get_track_id(node)
+            )
         self.events.selected_label.connect(self._ensure_valid_label)
 
     def _ensure_valid_label(self, event: Event | None = None):
@@ -337,8 +347,8 @@ class TrackLabels(napari.layers.Labels):
             # if a node with the given label is already in the graph
             if self.tracks_viewer.tracks.graph.has_node(self.selected_label):
                 # Update the track id
-                self.selected_track = self.tracks_viewer.tracks.get_track_id(
-                    self.selected_label
+                self.tracks_viewer.selected_track = (
+                    self.tracks_viewer.tracks.get_track_id(self.selected_label)
                 )
                 existing_time = self.tracks_viewer.tracks.get_time(self.selected_label)
                 if existing_time == current_timepoint:
@@ -349,11 +359,11 @@ class TrackLabels(napari.layers.Labels):
                     # instead
                     edit = False
                     if (
-                        self.selected_track
+                        self.tracks_viewer.selected_track
                         in self.tracks_viewer.tracks.track_id_to_node
                     ):
                         for node in self.tracks_viewer.tracks.track_id_to_node[
-                            self.selected_track
+                            self.tracks_viewer.selected_track
                         ]:
                             if (
                                 self.tracks_viewer.tracks.get_time(node)
@@ -378,9 +388,12 @@ class TrackLabels(napari.layers.Labels):
                 # if there is already a node in that track in this frame, edit that
                 # instead
                 edit = False
-                if self.selected_track in self.tracks_viewer.tracks.track_id_to_node:
+                if (
+                    self.tracks_viewer.selected_track
+                    in self.tracks_viewer.tracks.track_id_to_node
+                ):
                     for node in self.tracks_viewer.tracks.track_id_to_node[
-                        self.selected_track
+                        self.tracks_viewer.selected_track
                     ]:
                         if (
                             self.tracks_viewer.tracks.get_time(node)
@@ -390,7 +403,13 @@ class TrackLabels(napari.layers.Labels):
                             edit = True
                             break
 
+            self.tracks_viewer.update_track_id.emit()
             self.events.selected_label.connect(self._ensure_valid_label)
+
+        self.tracks_viewer.track_id_color = self.tracks_viewer.colormap.map(
+            self.tracks_viewer.selected_track
+        )
+        self.tracks_viewer.update_track_id.emit()
 
     @napari.layers.Labels.n_edit_dimensions.setter
     def n_edit_dimensions(self, n_edit_dimensions):

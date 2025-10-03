@@ -42,7 +42,7 @@ class TrackPoints(napari.layers.Points):
             self.tracks_viewer.tracks, self.tracks_viewer.symbolmap
         )
 
-        self.default_size = 5
+        self.default_size = 1
 
         super().__init__(
             data=points,
@@ -102,7 +102,7 @@ class TrackPoints(napari.layers.Points):
     def set_point_size(self, size: int) -> None:
         """Sets a new default point size"""
 
-        self.default_size = size
+        self.default_size = 1
         self._refresh()
 
     def _refresh(self):
@@ -138,8 +138,50 @@ class TrackPoints(napari.layers.Points):
         """Create attributes for a new node at given time point"""
 
         t = int(new_point[0])
-        track_id = self.tracks_viewer.tracks.get_next_track_id()
-        area = 0
+
+        print(
+            "checking this time point",
+            t,
+            "and this trackid ",
+            self.tracks_viewer.selected_track,
+        )
+
+        # Check if we already have a node for the current track id at this time point,
+        # since it is not allowed to have two nodes for the same track at the same time
+        # point.
+        if self.tracks_viewer.selected_track is None:
+            self.tracks_viewer.start_new_track()
+
+        if (
+            self.tracks_viewer.selected_track
+            in self.tracks_viewer.tracks.track_id_to_node
+        ):
+            for node in self.tracks_viewer.tracks.track_id_to_node[
+                self.tracks_viewer.selected_track
+            ]:
+                if self.tracks_viewer.tracks.get_time(node) == t:
+                    # We need a new node
+                    print(
+                        f"a node {node} already exists for this track {self.tracks_viewer.selected_track}, creating a new one"
+                    )
+                    track_id = self.tracks_viewer.tracks.get_next_track_id()
+                    self.tracks_viewer.selected_track = track_id
+                    self.tracks_viewer.track_id_color = self.tracks_viewer.colormap.map(
+                        track_id
+                    )
+                    area = 0
+                    break
+
+            else:
+                # no node with this track id at this time point, so we can use it
+                print("this track id is safe to use")
+                track_id = self.tracks_viewer.selected_track
+
+                area = 0
+
+        else:
+            track_id = self.tracks_viewer.selected_track
+            area = 0
 
         attributes = {
             NodeAttr.POS.value: np.array([new_point[1:]]),
@@ -167,12 +209,12 @@ class TrackPoints(napari.layers.Points):
                 )
                 self._refresh()
 
-        if event.action == "removed":
+        elif event.action == "removed":
             self.tracks_viewer.tracks_controller.delete_nodes(
                 self.tracks_viewer.selected_nodes._list
             )
 
-        if event.action == "changed":
+        elif event.action == "changed":
             # we only want to allow this update if there is no seg layer
             if self.tracks_viewer.tracking_layers.seg_layer is None:
                 positions = []

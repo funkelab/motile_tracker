@@ -1,6 +1,8 @@
 import napari
 from qtpy.QtWidgets import (
     QGroupBox,
+    QHBoxLayout,
+    QLabel,
     QPushButton,
     QVBoxLayout,
     QWidget,
@@ -16,6 +18,15 @@ class EditingMenu(QWidget):
         self.tracks_viewer = TracksViewer.get_instance(viewer)
         self.tracks_viewer.selected_nodes.list_updated.connect(self.update_buttons)
         layout = QVBoxLayout()
+
+        self.label = QLabel(f"Current Track ID: {self.tracks_viewer.selected_track}")
+        self.tracks_viewer.update_track_id.connect(self.update_track_id_color)
+        new_track_btn = QPushButton("Start new")
+        new_track_btn.clicked.connect(self.tracks_viewer.start_new_track)
+        track_layout = QHBoxLayout()
+        track_layout.addWidget(self.label)
+        track_layout.addWidget(new_track_btn)
+        layout.addLayout(track_layout)
 
         node_box = QGroupBox("Edit Node(s)")
         node_box.setMaximumHeight(60)
@@ -69,7 +80,22 @@ class EditingMenu(QWidget):
         layout.addWidget(self.redo_btn)
 
         self.setLayout(layout)
-        self.setMaximumHeight(300)
+        self.setMaximumHeight(400)
+
+    def update_track_id_color(self):
+        """Display track ID value and color"""
+
+        color = self.tracks_viewer.track_id_color
+        r, g, b, a = [int(c * 255) if i < 3 else c for i, c in enumerate(color)]
+        css_color = f"rgba({r}, {g}, {b}, {a})"
+        self.label.setText(f"Current Track ID: {self.tracks_viewer.selected_track}")
+        self.label.setStyleSheet(
+            f"""
+            color: white;
+            border: 2px solid {css_color};
+            padding: 5px;
+            """
+        )
 
     def update_buttons(self):
         """Set the buttons to enabled/disabled depending on the selected nodes"""

@@ -9,6 +9,7 @@ from funtracks.data_model.tracks_controller import TracksController
 from psygnal import Signal
 
 from motile_tracker.data_views.graph_attributes import NodeAttr
+from motile_tracker.data_views.views.layers.track_labels import new_label
 from motile_tracker.data_views.views.layers.tracks_layer_group import TracksLayerGroup
 from motile_tracker.data_views.views.tree_view.tree_widget_utils import (
     extract_lineage_tree,
@@ -28,6 +29,7 @@ class TracksViewer:
     """
 
     tracks_updated = Signal(Optional[bool])  # noqa: UP007 UP045
+    update_track_id = Signal()
 
     @classmethod
     def get_instance(cls, viewer=None):
@@ -62,6 +64,8 @@ class TracksViewer:
 
         self.tracks_list = TracksList()
         self.tracks_list.view_tracks.connect(self.update_tracks)
+        self.selected_track = None
+        self.track_id_color = None
 
         self.set_keybinds()
 
@@ -77,6 +81,16 @@ class TracksViewer:
         # self.viewer.bind_key("c")(self.set_linear_node)
         self.viewer.bind_key("z")(self.undo)
         self.viewer.bind_key("r")(self.redo)
+
+    def start_new_track(self):
+        if self.tracking_layers.seg_layer is not None:
+            new_label(self.tracking_layers.seg_layer)
+        else:
+            self.selected_track = self.tracks.get_next_track_id()
+            self.track_id_color = self.colormap.map(self.selected_track)
+            self.update_track_id.emit()
+
+        print("new selected track", self.selected_track)
 
     def _refresh(self, node: str | None = None, refresh_view: bool = False) -> None:
         """Call refresh function on napari layers and the submit signal that tracks are
@@ -193,6 +207,21 @@ class TracksViewer:
         self.set_napari_view()
         visible_tracks = self.filter_visible_nodes()
         self.tracking_layers.update_visible(visible_tracks, self.visible)
+
+        print("these node are selected", self.selected_nodes._list)
+
+        if len(self.selected_nodes) > 0:
+            self.selected_track = self.tracks.get_track_id(self.selected_nodes[-1])
+            self.track_id_color = self.colormap.map(self.selected_track)
+            self.update_track_id.emit()
+        else:
+            self.selected_track = None
+            self.track_id_color = [0, 0, 0, 0]
+
+        print(
+            "updating selected track because selection was updated. new track",
+            self.selected_track,
+        )
 
     def set_napari_view(self) -> None:
         """Adjust the current_step of the viewer to jump to the last item of the
