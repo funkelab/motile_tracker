@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 import napari
 import numpy as np
 from funtracks.data_model import NodeType, Tracks
+from napari.layers.points._points_mouse_bindings import select
 from napari.utils.notifications import show_info
 
 from motile_tracker.data_views.graph_attributes import NodeAttr
@@ -14,10 +15,19 @@ if TYPE_CHECKING:
     from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
 
+def custom_select(layer: napari.layers.Points, event):
+    """Block the current_size signal when selecting points"""
+    with layer.events.current_size.blocker():
+        yield from select(layer, event)
+
+
 class TrackPoints(napari.layers.Points):
     """Extended points layer that holds the track information and emits and
     responds to dynamics visualization signals
     """
+
+    _drag_modes = napari.layers.Points._drag_modes.copy()
+    _drag_modes[napari.layers.Points._modeclass.SELECT] = custom_select
 
     @property
     def _type_string(self) -> str:
@@ -98,6 +108,12 @@ class TrackPoints(napari.layers.Points):
         # listen to updates in the selected data (from the point selection tool)
         # to update the nodes in self.tracks_viewer.selected_nodes
         self.selected_data.events.items_changed.connect(self._update_selection)
+
+    def add(self, coords):
+        """Block the current_size event before calling the 'add' function."""
+
+        with self.events.current_size.blocker():
+            super().add(coords)
 
     def set_point_size(self, size: int) -> None:
         """Sets a new default point size"""
