@@ -52,7 +52,7 @@ class TrackPoints(napari.layers.Points):
             self.tracks_viewer.tracks, self.tracks_viewer.symbolmap
         )
 
-        self.default_size = 1
+        self.default_size = 5
 
         super().__init__(
             data=points,
@@ -118,7 +118,7 @@ class TrackPoints(napari.layers.Points):
     def set_point_size(self, size: int) -> None:
         """Sets a new default point size"""
 
-        self.default_size = 1
+        self.default_size = size
         self._refresh()
 
     def _refresh(self):
@@ -154,20 +154,11 @@ class TrackPoints(napari.layers.Points):
         """Create attributes for a new node at given time point"""
 
         t = int(new_point[0])
-
-        print(
-            "checking this time point",
-            t,
-            "and this trackid ",
-            self.tracks_viewer.selected_track,
-        )
-
         # Check if we already have a node for the current track id at this time point,
         # since it is not allowed to have two nodes for the same track at the same time
         # point.
         if self.tracks_viewer.selected_track is None:
             self.tracks_viewer.start_new_track()
-
         if (
             self.tracks_viewer.selected_track
             in self.tracks_viewer.tracks.track_id_to_node
@@ -176,10 +167,8 @@ class TrackPoints(napari.layers.Points):
                 self.tracks_viewer.selected_track
             ]:
                 if self.tracks_viewer.tracks.get_time(node) == t:
-                    # We need a new node
-                    print(
-                        f"a node {node} already exists for this track {self.tracks_viewer.selected_track}, creating a new one"
-                    )
+                    # We need a new node because one already exists for this track id at
+                    # this time point
                     track_id = self.tracks_viewer.tracks.get_next_track_id()
                     self.tracks_viewer.selected_track = track_id
                     self.tracks_viewer.track_id_color = self.tracks_viewer.colormap.map(
@@ -189,13 +178,11 @@ class TrackPoints(napari.layers.Points):
                     break
 
             else:
-                # no node with this track id at this time point, so we can use it
-                print("this track id is safe to use")
+                # no node with this track id at this time point, so we can safely use it
                 track_id = self.tracks_viewer.selected_track
-
                 area = 0
-
         else:
+            # track id does not exist yet in tracks.track_id_to_node, so it is safe to use
             track_id = self.tracks_viewer.selected_track
             area = 0
 
@@ -252,11 +239,12 @@ class TrackPoints(napari.layers.Points):
     def _update_selection(self):
         """Replaces the list of selected_nodes with the selection provided by the user"""
 
-        selected_points = self.selected_data
-        self.tracks_viewer.selected_nodes.reset()
-        for point in selected_points:
-            node_id = self.nodes[point]
-            self.tracks_viewer.selected_nodes.add(node_id, True)
+        if self.mode == "select":
+            selected_points = self.selected_data
+            self.tracks_viewer.selected_nodes.reset()
+            for point in selected_points:
+                node_id = self.nodes[point]
+                self.tracks_viewer.selected_nodes.add(node_id, True)
 
     def get_symbols(self, tracks: Tracks, symbolmap: dict[NodeType, str]) -> list[str]:
         statemap = {

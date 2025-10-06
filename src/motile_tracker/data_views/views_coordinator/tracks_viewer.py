@@ -90,8 +90,6 @@ class TracksViewer:
             self.track_id_color = self.colormap.map(self.selected_track)
             self.update_track_id.emit()
 
-        print("new selected track", self.selected_track)
-
     def _refresh(self, node: str | None = None, refresh_view: bool = False) -> None:
         """Call refresh function on napari layers and the submit signal that tracks are
         updated. Restore the selected_nodes, if possible
@@ -208,8 +206,6 @@ class TracksViewer:
         visible_tracks = self.filter_visible_nodes()
         self.tracking_layers.update_visible(visible_tracks, self.visible)
 
-        print("these node are selected", self.selected_nodes._list)
-
         if len(self.selected_nodes) > 0:
             self.selected_track = self.tracks.get_track_id(self.selected_nodes[-1])
             self.track_id_color = self.colormap.map(self.selected_track)
@@ -217,11 +213,6 @@ class TracksViewer:
         else:
             self.selected_track = None
             self.track_id_color = [0, 0, 0, 0]
-
-        print(
-            "updating selected track because selection was updated. new track",
-            self.selected_track,
-        )
 
     def set_napari_view(self) -> None:
         """Adjust the current_step of the viewer to jump to the last item of the
