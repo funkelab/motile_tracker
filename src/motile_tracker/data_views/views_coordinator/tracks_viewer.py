@@ -141,6 +141,13 @@ class TracksViewer:
         self.set_display_mode("all")
         self.tracking_layers.set_tracks(tracks, name)
         self.selected_nodes.reset()
+
+        # ensure a valid track is selected from the start
+        track_id = self.tracks.get_next_track_id()
+        self.selected_track = track_id
+        self.track_id_color = self.colormap.map(track_id)
+        self.update_track_id.emit()
+
         self.tracks_updated.emit(True)
 
     def toggle_display_mode(self, event=None) -> None:

@@ -135,8 +135,6 @@ class TrackLabels(napari.layers.Labels):
         self.events.mode.connect(self._check_mode)
         self.viewer.dims.events.current_step.connect(self._ensure_valid_label)
 
-        _new_label(self)
-
     def _get_colormap(self) -> DirectLabelColormap:
         """Get a DirectLabelColormap that maps node ids to their track ids, and then
         uses the tracks_viewer.colormap to map from track_id to color.
