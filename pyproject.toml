@@ -44,7 +44,7 @@ dependencies =[
     "dask[array]>=2021.10.0",
     "fonticon-fontawesome6>=6,<7",
     "pyqtgraph>=0.13,<1",
-    "napari-orthogonal-views @ git+https://github.com/AnniekStok/napari-orthogonal-views.git@6b147737ab2f8056d47c143277d6054792e7ba69",
+    "napari-orthogonal-views @ git+https://github.com/AnniekStok/napari-orthogonal-views.git@5c9f88b806c12d2a455fa4681f0d435a4540e782",
     "lxml_html_clean>=0.4,<1",
     "zarr>=2.10,<3",
 ]

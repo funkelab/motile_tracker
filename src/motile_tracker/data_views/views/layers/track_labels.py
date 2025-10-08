@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import random
-import time
 from typing import TYPE_CHECKING
 
 import napari
@@ -10,6 +9,11 @@ from napari.layers import Labels
 from napari.utils import DirectLabelColormap
 from napari.utils.action_manager import action_manager
 from napari.utils.notifications import show_info
+
+from motile_tracker.data_views.views.layers.click_utils import (
+    detect_click,
+    get_click_value,
+)
 
 if TYPE_CHECKING:
     from napari.utils.events import Event
@@ -121,24 +125,10 @@ class TrackLabels(napari.layers.Labels):
             )
         ):  # disable selecting in lineage mode in 3D
             # differentiate between click and drag
-            mouse_press_time = time.time()
-            dragged = False
-            yield
-            # on move
-            while event.type == "mouse_move":
-                dragged = True
-                yield
-            if dragged and time.time() - mouse_press_time < 0.5:
-                dragged = False  # suppress micro drag events and treat them as click
-            # on release
-            if not dragged:
-                label = self.get_value(
-                    event.position,
-                    view_direction=event.view_direction,
-                    dims_displayed=event.dims_displayed,
-                    world=True,
-                )
-                self.process_click(event, label)
+            was_click = yield from detect_click(event)
+            if was_click:
+                value = get_click_value(self, event)
+                self.process_click(event, value)
 
     def assign_new_label(self, event):
         """Function for orthoviews to connect to so the 'm' event can be processed here"""

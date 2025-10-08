@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import math
-import time
 from typing import TYPE_CHECKING
 
 import napari
@@ -11,6 +10,10 @@ from napari.utils.notifications import show_info
 from psygnal import Signal
 
 from motile_tracker.data_views.graph_attributes import NodeAttr
+from motile_tracker.data_views.views.layers.click_utils import (
+    detect_click,
+    get_click_value,
+)
 
 if TYPE_CHECKING:
     from napari.utils.events import Event
@@ -81,27 +84,13 @@ class TrackPoints(napari.layers.Points):
         @self.mouse_drag_callbacks.append
         def click(layer, event):
             if event.type == "mouse_press":
-                # differentiate between click and drag
-                mouse_press_time = time.time()
-                dragged = False
-                yield
-                # on move
-                while event.type == "mouse_move":
-                    dragged = True
-                    yield
-                if dragged and time.time() - mouse_press_time < 0.5:
-                    dragged = (
-                        False  # suppress micro drag events and treat them as click
-                    )
-                if not dragged:
-                    # is the value passed from the click event?
-                    point_index = layer.get_value(
-                        event.position,
-                        view_direction=event.view_direction,
-                        dims_displayed=event.dims_displayed,
-                        world=True,
-                    )
-                    self.process_point_click(point_index, event)
+                was_click = yield from detect_click(event)
+                if was_click:
+                    # find the point matching the click location, if any. Warning: the
+                    # search area depends on the point size. If points are large and
+                    # overlapping, this may result in the wrong value being returned.
+                    value = get_click_value(self, event)
+                    self.process_click(event, value)
 
         # listen to updates of the data
         self.events.data.connect(self._update_data)
@@ -115,7 +104,7 @@ class TrackPoints(napari.layers.Points):
         # to update the nodes in self.tracks_viewer.selected_nodes
         self.selected_data.events.items_changed.connect(self._update_selection)
 
-    def process_point_click(self, point_index: int | None, event: Event):
+    def process_click(self, event: Event, point_index: int | None):
         """Select the clicked point(s)"""
 
         if point_index is None:

@@ -1,5 +1,4 @@
 import inspect
-import time
 
 import napari_orthogonal_views.ortho_view_widget as ov_widget
 from napari import Viewer
@@ -11,6 +10,10 @@ from napari_orthogonal_views.ortho_view_manager import (  # noqa
     _get_manager,
 )
 
+from motile_tracker.data_views.views.layers.click_utils import (
+    detect_click,
+    get_click_value,
+)
 from motile_tracker.data_views.views.layers.track_graph import TrackGraph
 from motile_tracker.data_views.views.layers.track_labels import TrackLabels
 from motile_tracker.data_views.views.layers.track_points import TrackPoints
@@ -222,33 +225,10 @@ def track_layers_hook(
         orig_layer: TrackLabels | TrackPoints, layer: Labels | Points, event: Event
     ):
         if layer.mode == "pan_zoom":
-            mouse_press_time = time.time()
-            dragged = False
-            yield  # start
-            while event.type == "mouse_move":
-                dragged = True
-                yield
-            if dragged and time.time() - mouse_press_time < 0.5:
-                dragged = False  # treat micro drags as clicks
-
-            if not dragged:
-                if isinstance(layer, Labels):
-                    label = layer.get_value(
-                        event.position,
-                        view_direction=event.view_direction,
-                        dims_displayed=event.dims_displayed,
-                        world=True,
-                    )
-                    orig_layer.process_click(event, label)
-
-                if isinstance(layer, Points):
-                    point_index = layer.get_value(
-                        event.position,
-                        view_direction=event.view_direction,
-                        dims_displayed=event.dims_displayed,
-                        world=True,
-                    )
-                    orig_layer.process_point_click(point_index, event)
+            was_click = yield from detect_click(event)
+            if was_click:
+                value = get_click_value(layer, event)
+                orig_layer.process_click(event, value)
 
     # Wrap and attach click callback
     def click_wrapper(layer, event):
