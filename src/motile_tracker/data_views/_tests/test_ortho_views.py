@@ -88,7 +88,6 @@ def test_ortho_views(make_napari_viewer, qtbot, graph_3d, segmentation_3d):
     assert isinstance(m.bottom_widget.vm_container.viewer_model.layers[-2], Labels)
 
     # Test paint event on main viewer (indices, orig value, target_value)
-    print(viewer.layers[-2].selected_label)
     event_val = [
         (
             (np.array([1]), np.array([15]), np.array([45]), np.array([75])),
