@@ -18,8 +18,7 @@ from motile_tracker.data_views.views.layers.track_graph import TrackGraph
 from motile_tracker.data_views.views.layers.track_labels import TrackLabels
 from motile_tracker.data_views.views.layers.track_points import TrackPoints
 from motile_tracker.data_views.views_coordinator.key_binds import (
-    DEFAULT_KEYMAP,
-    LABELS_KEYMAP,
+    KEYMAP,
     bind_keymap,
 )
 
@@ -242,10 +241,9 @@ def track_layers_hook(
     copied_layer.mouse_drag_callbacks.append(click_wrapper)
 
     # Bind keys to original layer TracksViewer
+    bind_keymap(copied_layer, KEYMAP, orig_layer.tracks_viewer)
     if isinstance(orig_layer, TrackLabels):
-        bind_keymap(copied_layer, LABELS_KEYMAP, orig_layer.tracks_viewer)
-    else:
-        bind_keymap(copied_layer, DEFAULT_KEYMAP, orig_layer.tracks_viewer)
+        copied_layer.bind_key("m")(orig_layer.assign_new_label)
 
 
 def initialize_ortho_views(viewer: Viewer) -> OrthoViewManager:

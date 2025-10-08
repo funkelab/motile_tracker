@@ -15,7 +15,7 @@ from motile_tracker.data_views.views.layers.click_utils import (
     get_click_value,
 )
 from motile_tracker.data_views.views_coordinator.key_binds import (
-    DEFAULT_KEYMAP,
+    KEYMAP,
     bind_keymap,
 )
 
@@ -72,7 +72,7 @@ class TrackPoints(napari.layers.Points):
         )
 
         # Key bindings (should be specified both on the viewer (in tracks_viewer)
-        bind_keymap(self, DEFAULT_KEYMAP, self.tracks_viewer)
+        bind_keymap(self, KEYMAP, self.tracks_viewer)
 
         # Connect to click events to select nodes
         @self.mouse_drag_callbacks.append

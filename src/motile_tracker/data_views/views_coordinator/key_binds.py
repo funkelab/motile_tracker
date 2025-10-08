@@ -1,4 +1,4 @@
-DEFAULT_KEYMAP = {
+KEYMAP = {
     "q": "toggle_display_mode",
     "a": "create_edge",
     "d": "delete_node",
@@ -6,11 +6,6 @@ DEFAULT_KEYMAP = {
     "b": "delete_edge",
     "z": "undo",
     "r": "redo",
-}
-
-LABELS_KEYMAP = {
-    **DEFAULT_KEYMAP,
-    "m": "assign_new_label",
 }
 
 

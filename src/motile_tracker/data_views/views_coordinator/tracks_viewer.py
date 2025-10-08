@@ -14,7 +14,7 @@ from motile_tracker.data_views.views.tree_view.tree_widget_utils import (
     extract_lineage_tree,
 )
 from motile_tracker.data_views.views_coordinator.key_binds import (
-    DEFAULT_KEYMAP,
+    KEYMAP,
     bind_keymap,
 )
 from motile_tracker.data_views.views_coordinator.node_selection_list import (
@@ -70,7 +70,7 @@ class TracksViewer:
         self.set_keybinds()
 
     def set_keybinds(self):
-        bind_keymap(self.viewer, DEFAULT_KEYMAP, self)
+        bind_keymap(self.viewer, KEYMAP, self)
 
     def _refresh(self, node: str | None = None, refresh_view: bool = False) -> None:
         """Call refresh function on napari layers and the submit signal that tracks are
