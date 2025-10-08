@@ -249,4 +249,8 @@ class TrackPoints(napari.layers.Points):
                 1,
             )
             self.size[index] = math.ceil(self.default_size + 0.3 * self.default_size)
+
+        # emit the event to trigger update in orthogonal views
+        self.border_color = self.border_color
+        self.size = self.size
         self.refresh()
