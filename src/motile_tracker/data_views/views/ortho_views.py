@@ -48,7 +48,7 @@ def copy_layer(layer: Layer, name: str = ""):
             properties=layer.properties,
             border_color=layer.border_color,
             scale=layer.scale,
-            blending="translucent_no_depth",
+            blending=layer.blending,
         )
     else:
         res_layer = Layer.create(*layer.as_layer_data_tuple())
