@@ -2,10 +2,14 @@ import inspect
 import time
 
 import napari_orthogonal_views.ortho_view_widget as ov_widget
+from napari import Viewer
 from napari.layers import Labels, Layer, Points, Shapes
 from napari.utils.events import Event
 from napari.utils.notifications import show_info
-from napari_orthogonal_views.ortho_view_manager import _get_manager  # noqa
+from napari_orthogonal_views.ortho_view_manager import (  # noqa
+    OrthoViewManager,
+    _get_manager,
+)
 
 from motile_tracker.data_views.views.layers.track_graph import TrackGraph
 from motile_tracker.data_views.views.layers.track_labels import TrackLabels
@@ -261,3 +265,21 @@ def track_layers_hook(
     copied_layer.bind_key("b")(orig_layer.tracks_viewer.delete_edge)
     if isinstance(orig_layer, TrackLabels):
         copied_layer.bind_key("m")(orig_layer.assign_new_label)
+
+
+def initialize_ortho_views(viewer: Viewer) -> OrthoViewManager:
+    """Initialize orthoviews on the current napari Viewer and register hooks and filters.
+    Args:
+        viewer (napari.Viewer): viewer to set the orthogonal views for.
+    Returns:
+        OrthoViewManager: reference to the OrthoViewManager instance
+    """
+
+    orth_view_manager = _get_manager(viewer)
+    orth_view_manager.register_layer_hook((TrackLabels, TrackPoints), track_layers_hook)
+    orth_view_manager.register_layer_hook((TrackLabels), paint_event_hook)
+    orth_view_manager.register_layer_hook((TrackPoints), point_data_hook)
+    orth_view_manager.set_sync_filters(sync_filters)
+    orth_view_manager.activate_checkboxes = True
+
+    return orth_view_manager

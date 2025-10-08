@@ -3,19 +3,12 @@ import numpy as np
 import pytest
 from funtracks.data_model import NodeAttr, SolutionTracks
 from napari.layers import Labels, Points
-from napari_orthogonal_views.ortho_view_manager import (
-    show_orthogonal_views,
-)
 from napari_orthogonal_views.ortho_view_widget import OrthoViewWidget
 
 from motile_tracker.data_views.views.layers.track_labels import TrackLabels
 from motile_tracker.data_views.views.layers.track_points import TrackPoints
 from motile_tracker.data_views.views.ortho_views import (
-    _get_manager,
-    paint_event_hook,
-    point_data_hook,
-    sync_filters,
-    track_layers_hook,
+    initialize_ortho_views,
 )
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
@@ -74,17 +67,11 @@ class MockEvent:
 def test_ortho_views(make_napari_viewer, qtbot, graph_3d, segmentation_3d):
     """Test if the tracks layers are correctly displayed on the orthoviews"""
 
-    # Activate orthogonal views
+    # Initalize orthogonal views
     viewer = make_napari_viewer()
-    m = _get_manager(viewer)
-    m.set_sync_filters(sync_filters)
+    m = initialize_ortho_views(viewer)
 
-    m.register_layer_hook((TrackLabels, TrackPoints), track_layers_hook)
-    m.register_layer_hook((TrackLabels), paint_event_hook)
-    m.register_layer_hook((TrackPoints), point_data_hook)
-
-    show_orthogonal_views(viewer)
-
+    m.show()
     qtbot.waitUntil(lambda: m.is_shown(), timeout=1000)
     assert isinstance(m.right_widget, OrthoViewWidget)
 
