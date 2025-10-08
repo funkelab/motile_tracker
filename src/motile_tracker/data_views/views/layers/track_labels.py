@@ -14,6 +14,10 @@ from motile_tracker.data_views.views.layers.click_utils import (
     detect_click,
     get_click_value,
 )
+from motile_tracker.data_views.views_coordinator.key_binds import (
+    LABELS_KEYMAP,
+    bind_keymap,
+)
 
 if TYPE_CHECKING:
     from napari.utils.events import Event
@@ -91,17 +95,7 @@ class TrackLabels(napari.layers.Labels):
         self.viewer = viewer
 
         # Key bindings (should be specified both on the viewer (in tracks_viewer)
-        # and on the layer to overwrite napari defaults)
-        self.bind_key("q")(self.tracks_viewer.toggle_display_mode)
-        self.bind_key("a")(self.tracks_viewer.create_edge)
-        self.bind_key("d")(self.tracks_viewer.delete_node)
-        self.bind_key("Delete")(self.tracks_viewer.delete_node)
-        self.bind_key("b")(self.tracks_viewer.delete_edge)
-        # self.bind_key("s")(self.tracks_viewer.set_split_node)
-        # self.bind_key("e")(self.tracks_viewer.set_endpoint_node)
-        # self.bind_key("c")(self.tracks_viewer.set_linear_node)
-        self.bind_key("z")(self.tracks_viewer.undo)
-        self.bind_key("r")(self.tracks_viewer.redo)
+        bind_keymap(self, LABELS_KEYMAP, self.tracks_viewer)
 
         # Listen to paint events and changing the selected label
         self.mouse_drag_callbacks.append(self.click)

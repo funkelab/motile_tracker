@@ -17,6 +17,11 @@ from motile_tracker.data_views.views.layers.click_utils import (
 from motile_tracker.data_views.views.layers.track_graph import TrackGraph
 from motile_tracker.data_views.views.layers.track_labels import TrackLabels
 from motile_tracker.data_views.views.layers.track_points import TrackPoints
+from motile_tracker.data_views.views_coordinator.key_binds import (
+    DEFAULT_KEYMAP,
+    LABELS_KEYMAP,
+    bind_keymap,
+)
 
 
 # redefinition of copy_layer function
@@ -237,14 +242,10 @@ def track_layers_hook(
     copied_layer.mouse_drag_callbacks.append(click_wrapper)
 
     # Bind keys to original layer TracksViewer
-    copied_layer.bind_key("q")(orig_layer.tracks_viewer.toggle_display_mode)
-    copied_layer.bind_key("z")(orig_layer.tracks_viewer.undo)
-    copied_layer.bind_key("r")(orig_layer.tracks_viewer.redo)
-    copied_layer.bind_key("d")(orig_layer.tracks_viewer.delete_node)
-    copied_layer.bind_key("a")(orig_layer.tracks_viewer.create_edge)
-    copied_layer.bind_key("b")(orig_layer.tracks_viewer.delete_edge)
     if isinstance(orig_layer, TrackLabels):
-        copied_layer.bind_key("m")(orig_layer.assign_new_label)
+        bind_keymap(copied_layer, LABELS_KEYMAP, orig_layer.tracks_viewer)
+    else:
+        bind_keymap(copied_layer, DEFAULT_KEYMAP, orig_layer.tracks_viewer)
 
 
 def initialize_ortho_views(viewer: Viewer) -> OrthoViewManager:
