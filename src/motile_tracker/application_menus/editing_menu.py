@@ -22,7 +22,7 @@ class EditingMenu(QWidget):
         self.label = QLabel(f"Current Track ID: {self.tracks_viewer.selected_track}")
         self.tracks_viewer.update_track_id.connect(self.update_track_id_color)
         new_track_btn = QPushButton("Start new")
-        new_track_btn.clicked.connect(self.tracks_viewer.start_new_track)
+        new_track_btn.clicked.connect(self.tracks_viewer.request_new_track)
         track_layout = QHBoxLayout()
         track_layout.addWidget(self.label)
         track_layout.addWidget(new_track_btn)
