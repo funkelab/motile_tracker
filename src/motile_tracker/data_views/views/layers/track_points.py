@@ -116,6 +116,7 @@ class TrackPoints(napari.layers.Points):
 
         with self.events.current_size.blocker():
             super().add(coords)
+
     def process_click(self, event: Event, point_index: int | None):
         """Select the clicked point(s)"""
 
