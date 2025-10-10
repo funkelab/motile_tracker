@@ -82,8 +82,8 @@ class TracksViewer:
         self.viewer.bind_key("z")(self.undo)
         self.viewer.bind_key("r")(self.redo)
 
-    def start_new_track(self) -> None:
-        """Start a new track id (with new segmentation label if a seg layer is present)"""
+    def request_new_track(self) -> None:
+        """Request a new track id (with new segmentation label if a seg layer is present)"""
 
         if self.tracking_layers.seg_layer is not None:
             new_label(self.tracking_layers.seg_layer)
@@ -91,9 +91,12 @@ class TracksViewer:
             self.set_new_track_id()
 
     def set_new_track_id(self) -> None:
-        """Update the current selected track id"""
+        """Set a new track id (if needed), update the color, and emit signal. Only updates
+        the track id if the tracks.max_track_id value is used already."""
 
-        self.selected_track = self.tracks.get_next_track_id()
+        self.selected_track = self.tracks.max_track_id  # to check if available
+        if self.selected_track in self.tracks.track_id_to_node:
+            self.selected_track = self.tracks.get_next_track_id()
         self.set_track_id_color(self.selected_track)
         self.update_track_id.emit()
 
