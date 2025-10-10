@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 import napari
 import numpy as np
 from funtracks.data_model import NodeType, Tracks
+from napari.layers.points._points_mouse_bindings import select
 from napari.utils.notifications import show_info
 from psygnal import Signal
 
@@ -25,11 +26,22 @@ if TYPE_CHECKING:
     from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
 
+def custom_select(layer: napari.layers.Points, event: Event):
+    """Block the current_size signal when selecting points to avoid changing the point
+    size by accident."""
+
+    with layer.events.current_size.blocker():
+        yield from select(layer, event)
+
+
 class TrackPoints(napari.layers.Points):
     """Extended points layer that holds the track information and emits and
     responds to dynamics visualization signals
     """
 
+    # overwrite the select function to block the current_size event signal
+    _drag_modes = napari.layers.Points._drag_modes.copy()
+    _drag_modes[napari.layers.Points._modeclass.SELECT] = custom_select
     data_updated = Signal()
 
     @property
@@ -89,7 +101,7 @@ class TrackPoints(napari.layers.Points):
         # listen to updates of the data
         self.events.data.connect(self._update_data)
 
-        # connect to changing the point size in the UI
+        # connect to changing the point size in the UI (see note)
         self.events.current_size.connect(
             lambda: self.set_point_size(size=self.current_size)
         )
@@ -97,6 +109,13 @@ class TrackPoints(napari.layers.Points):
         # listen to updates in the selected data (from the point selection tool)
         # to update the nodes in self.tracks_viewer.selected_nodes
         self.selected_data.events.items_changed.connect(self._update_selection)
+
+    def add(self, coords: list[float]):
+        """Block the current_size event before calling the 'add' function to avoid calling
+        set_point_size (triggered by the current_size event) with a new point size."""
+
+        with self.events.current_size.blocker():
+            super().add(coords)
 
     def process_click(self, event: Event, point_index: int | None):
         """Select the clicked point(s)"""
@@ -109,7 +128,12 @@ class TrackPoints(napari.layers.Points):
             self.tracks_viewer.selected_nodes.add(node_id, append)
 
     def set_point_size(self, size: int) -> None:
-        """Sets a new default point size"""
+        """Sets a new default point size.
+        NOTE: This function call is triggered by the current_size event, which is emitted
+        when the user moves the 'point size' slider in the layer controls. However, this
+        event is also emitted in the 'add' and 'select' functions, so we have to block the
+         signals there to avoid increasing the point size by accident, since new or
+        selected points are displayed at a 30% bigger size."""
 
         self.default_size = size
         self._refresh()
@@ -160,7 +184,7 @@ class TrackPoints(napari.layers.Points):
         }
         return attributes
 
-    def _update_data(self, event):
+    def _update_data(self, event: Event):
         """Calls the tracks controller with to update the data in the Tracks object and
         dispatch the update
         """
