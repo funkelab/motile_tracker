@@ -158,7 +158,7 @@ class TrackPoints(napari.layers.Points):
         # since it is not allowed to have two nodes for the same track at the same time
         # point.
         if self.tracks_viewer.selected_track is None:
-            self.tracks_viewer.start_new_track()
+            self.tracks_viewer.set_new_track_id()
         if (
             self.tracks_viewer.selected_track
             in self.tracks_viewer.tracks.track_id_to_node
@@ -169,22 +169,12 @@ class TrackPoints(napari.layers.Points):
                 if self.tracks_viewer.tracks.get_time(node) == t:
                     # We need a new node because one already exists for this track id at
                     # this time point
-                    track_id = self.tracks_viewer.tracks.get_next_track_id()
-                    self.tracks_viewer.selected_track = track_id
-                    self.tracks_viewer.track_id_color = self.tracks_viewer.colormap.map(
-                        track_id
-                    )
-                    area = 0
+                    self.tracks_viewer.set_new_track_id()
                     break
 
-            else:
-                # no node with this track id at this time point, so we can safely use it
-                track_id = self.tracks_viewer.selected_track
-                area = 0
-        else:
-            # track id does not exist yet in tracks.track_id_to_node, so it is safe to use
-            track_id = self.tracks_viewer.selected_track
-            area = 0
+        # track id does not exist yet in tracks.track_id_to_node, so it is safe to use
+        track_id = self.tracks_viewer.selected_track
+        area = 0
 
         attributes = {
             NodeAttr.POS.value: np.array([new_point[1:]]),

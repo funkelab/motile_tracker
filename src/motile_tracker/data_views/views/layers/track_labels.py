@@ -40,16 +40,11 @@ def _new_label(layer: TrackLabels, new_track_id=True):
     if isinstance(layer.data, np.ndarray):
         new_selected_label = np.max(layer.data) + 1
         if new_track_id or layer.tracks_viewer.selected_track is None:
-            new_selected_track = layer.tracks_viewer.tracks.get_next_track_id()
-            layer.tracks_viewer.selected_track = new_selected_track
+            layer.tracks_viewer.set_new_track_id()
         layer.selected_label = new_selected_label
         layer.colormap.color_dict[new_selected_label] = (
-            layer.tracks_viewer.colormap.map(layer.tracks_viewer.selected_track)
+            layer.tracks_viewer.track_id_color
         )
-        layer.tracks_viewer.track_id_color = layer.tracks_viewer.colormap.map(
-            layer.tracks_viewer.selected_track
-        )
-        layer.tracks_viewer.update_track_id.emit()
         # to refresh, otherwise you paint with a transparent label until you
         # release the mouse
         layer.colormap = DirectLabelColormap(color_dict=layer.colormap.color_dict)
@@ -404,9 +399,9 @@ class TrackLabels(napari.layers.Labels):
             self.tracks_viewer.update_track_id.emit()
             self.events.selected_label.connect(self._ensure_valid_label)
 
-        self.tracks_viewer.track_id_color = self.tracks_viewer.colormap.map(
+        self.tracks_viewer.set_track_id_color(
             self.tracks_viewer.selected_track
-        )
+        )  # update the color
         self.tracks_viewer.update_track_id.emit()
 
     @napari.layers.Labels.n_edit_dimensions.setter
