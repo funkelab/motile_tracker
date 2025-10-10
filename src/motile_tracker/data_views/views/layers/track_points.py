@@ -7,10 +7,21 @@ import napari
 import numpy as np
 from funtracks.data_model import NodeType, Tracks
 from napari.utils.notifications import show_info
+from psygnal import Signal
 
 from motile_tracker.data_views.graph_attributes import NodeAttr
+from motile_tracker.data_views.views.layers.click_utils import (
+    detect_click,
+    get_click_value,
+)
+from motile_tracker.data_views.views_coordinator.key_binds import (
+    KEYMAP,
+    bind_keymap,
+)
 
 if TYPE_CHECKING:
+    from napari.utils.events import Event
+
     from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
 
@@ -18,6 +29,8 @@ class TrackPoints(napari.layers.Points):
     """Extended points layer that holds the track information and emits and
     responds to dynamics visualization signals
     """
+
+    data_updated = Signal()
 
     @property
     def _type_string(self) -> str:
@@ -59,33 +72,19 @@ class TrackPoints(napari.layers.Points):
         )
 
         # Key bindings (should be specified both on the viewer (in tracks_viewer)
-        # and on the layer to overwrite napari defaults)
-        self.bind_key("q")(self.tracks_viewer.toggle_display_mode)
-        self.bind_key("a")(self.tracks_viewer.create_edge)
-        self.bind_key("d")(self.tracks_viewer.delete_node)
-        self.bind_key("Delete")(self.tracks_viewer.delete_node)
-        self.bind_key("b")(self.tracks_viewer.delete_edge)
-        # self.bind_key("s")(self.tracks_viewer.set_split_node)
-        # self.bind_key("e")(self.tracks_viewer.set_endpoint_node)
-        # self.bind_key("c")(self.tracks_viewer.set_linear_node)
-        self.bind_key("z")(self.tracks_viewer.undo)
-        self.bind_key("r")(self.tracks_viewer.redo)
+        bind_keymap(self, KEYMAP, self.tracks_viewer)
 
         # Connect to click events to select nodes
         @self.mouse_drag_callbacks.append
         def click(layer, event):
             if event.type == "mouse_press":
-                # is the value passed from the click event?
-                point_index = layer.get_value(
-                    event.position,
-                    view_direction=event.view_direction,
-                    dims_displayed=event.dims_displayed,
-                    world=True,
-                )
-                if point_index is not None:
-                    node_id = self.nodes[point_index]
-                    append = "Shift" in event.modifiers
-                    self.tracks_viewer.selected_nodes.add(node_id, append)
+                was_click = yield from detect_click(event)
+                if was_click:
+                    # find the point matching the click location, if any. Warning: the
+                    # search area depends on the point size. If points are large and
+                    # overlapping, this may result in the wrong value being returned.
+                    value = get_click_value(self, event)
+                    self.process_click(event, value)
 
         # listen to updates of the data
         self.events.data.connect(self._update_data)
@@ -98,6 +97,16 @@ class TrackPoints(napari.layers.Points):
         # listen to updates in the selected data (from the point selection tool)
         # to update the nodes in self.tracks_viewer.selected_nodes
         self.selected_data.events.items_changed.connect(self._update_selection)
+
+    def process_click(self, event: Event, point_index: int | None):
+        """Select the clicked point(s)"""
+
+        if point_index is None:
+            self.tracks_viewer.selected_nodes.reset()
+        else:
+            node_id = self.nodes[point_index]
+            append = "Shift" in event.modifiers
+            self.tracks_viewer.selected_nodes.add(node_id, append)
 
     def set_point_size(self, size: int) -> None:
         """Sets a new default point size"""
@@ -120,6 +129,8 @@ class TrackPoints(napari.layers.Points):
             for node in self.nodes
         ]
         self.data = self.tracks_viewer.tracks.get_positions(self.nodes, incl_time=True)
+        self.data_updated.emit()  # emit update signal for the orthogonal views to connect to
+
         self.symbol = self.get_symbols(
             self.tracks_viewer.tracks, self.tracks_viewer.symbolmap
         )
@@ -238,4 +249,8 @@ class TrackPoints(napari.layers.Points):
                 1,
             )
             self.size[index] = math.ceil(self.default_size + 0.3 * self.default_size)
+
+        # emit the event to trigger update in orthogonal views
+        self.border_color = self.border_color
+        self.size = self.size
         self.refresh()

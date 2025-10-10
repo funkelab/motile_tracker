@@ -5,6 +5,7 @@ from qtpy.QtWidgets import (
 )
 
 from motile_tracker.application_menus.menu_widget import MenuWidget
+from motile_tracker.data_views.views.ortho_views import initialize_ortho_views
 from motile_tracker.data_views.views.tree_view.tree_widget import TreeWidget
 
 
@@ -21,5 +22,6 @@ class MainApp(QWidget):
 
         layout = QVBoxLayout()
         layout.addWidget(self.menu_widget)
+        initialize_ortho_views(viewer)
 
         self.setLayout(layout)
