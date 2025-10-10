@@ -5,9 +5,19 @@ from typing import TYPE_CHECKING
 
 import napari
 import numpy as np
+from napari.layers import Labels
 from napari.utils import DirectLabelColormap
 from napari.utils.action_manager import action_manager
 from napari.utils.notifications import show_info
+
+from motile_tracker.data_views.views.layers.click_utils import (
+    detect_click,
+    get_click_value,
+)
+from motile_tracker.data_views.views_coordinator.key_binds import (
+    KEYMAP,
+    bind_keymap,
+)
 
 if TYPE_CHECKING:
     from napari.utils.events import Event
@@ -83,45 +93,10 @@ class TrackLabels(napari.layers.Labels):
         self.viewer = viewer
 
         # Key bindings (should be specified both on the viewer (in tracks_viewer)
-        # and on the layer to overwrite napari defaults)
-        self.bind_key("q")(self.tracks_viewer.toggle_display_mode)
-        self.bind_key("a")(self.tracks_viewer.create_edge)
-        self.bind_key("d")(self.tracks_viewer.delete_node)
-        self.bind_key("Delete")(self.tracks_viewer.delete_node)
-        self.bind_key("b")(self.tracks_viewer.delete_edge)
-        # self.bind_key("s")(self.tracks_viewer.set_split_node)
-        # self.bind_key("e")(self.tracks_viewer.set_endpoint_node)
-        # self.bind_key("c")(self.tracks_viewer.set_linear_node)
-        self.bind_key("z")(self.tracks_viewer.undo)
-        self.bind_key("r")(self.tracks_viewer.redo)
-
-        # Connect click events to node selection
-        @self.mouse_drag_callbacks.append
-        def click(_, event):
-            if (
-                event.type == "mouse_press"
-                and self.mode == "pan_zoom"
-                and not (
-                    self.tracks_viewer.mode == "lineage"
-                    and self.viewer.dims.ndisplay == 3
-                )
-            ):  # disable selecting in lineage mode in 3D
-                label = self.get_value(
-                    event.position,
-                    view_direction=event.view_direction,
-                    dims_displayed=event.dims_displayed,
-                    world=True,
-                )
-                # check opacity (=visibility) in the colormap
-                if (
-                    label is not None
-                    and label != 0
-                    and self.colormap.map(label)[-1] != 0
-                ):
-                    append = "Shift" in event.modifiers
-                    self.tracks_viewer.selected_nodes.add(label, append)
+        bind_keymap(self, KEYMAP, self.tracks_viewer)
 
         # Listen to paint events and changing the selected label
+        self.mouse_drag_callbacks.append(self.click)
         self.events.paint.connect(self._on_paint)
         self.tracks_viewer.selected_nodes.list_updated.connect(
             self.update_selected_label
@@ -129,6 +104,37 @@ class TrackLabels(napari.layers.Labels):
         self.events.selected_label.connect(self._ensure_valid_label)
         self.events.mode.connect(self._check_mode)
         self.viewer.dims.events.current_step.connect(self._ensure_valid_label)
+
+        _new_label(self)
+
+    # Connect click events to node selection
+    def click(self, _, event):
+        if (
+            event.type == "mouse_press"
+            and self.mode == "pan_zoom"
+            and not (
+                self.tracks_viewer.mode == "lineage" and self.viewer.dims.ndisplay == 3
+            )
+        ):  # disable selecting in lineage mode in 3D
+            # differentiate between click and drag
+            was_click = yield from detect_click(event)
+            if was_click:
+                value = get_click_value(self, event)
+                self.process_click(event, value)
+
+    def assign_new_label(self, event):
+        """Function for orthoviews to connect to so the 'm' event can be processed here"""
+
+        new_label(self)
+
+    def process_click(self, event: Event, label: int):
+        """Process the click event to update the selected nodes"""
+
+        if (
+            label is not None and label != 0 and self.colormap.map(label)[-1] != 0
+        ):  # check opacity (=visibility) in the colormap
+            append = "Shift" in event.modifiers
+            self.tracks_viewer.selected_nodes.add(label, append)
 
     def _get_colormap(self) -> DirectLabelColormap:
         """Get a DirectLabelColormap that maps node ids to their track ids, and then
@@ -210,18 +216,24 @@ class TrackLabels(napari.layers.Labels):
             mask = concatenated_values == old_value
             indices = tuple(concatenated_indices[dim][mask] for dim in range(ndim))
             time_points = np.unique(indices[0])
-            for time in time_points:
-                time_mask = indices[0] == time
+            for time_point in time_points:
+                time_mask = indices[0] == time_point
                 actions.append(
                     (tuple(indices[dim][time_mask] for dim in range(ndim)), old_value)
                 )
         return new_value, actions
 
-    def _revert_paint(self, event):
+    def _revert_paint(self, _, source_layer: Labels | None = None):
         """Revert a paint event after it fails validation (no motile tracker Actions have
         been created). This keeps the view synced with the backend data.
+        been created). If a source_layer is provided, the paint event will be reverted on
+        this layer (this is necessary for orthoviews). This keeps the view synced with
+        the backend data.
         """
-        super().undo()
+        if source_layer is not None:
+            source_layer.undo()  # revert on the orthoview
+        else:
+            super().undo()
 
     def _on_paint(self, event):
         """Listen to the paint event and check which track_ids have changed"""

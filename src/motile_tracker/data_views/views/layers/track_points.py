@@ -8,15 +8,28 @@ import numpy as np
 from funtracks.data_model import NodeType, Tracks
 from napari.layers.points._points_mouse_bindings import select
 from napari.utils.notifications import show_info
+from psygnal import Signal
 
 from motile_tracker.data_views.graph_attributes import NodeAttr
+from motile_tracker.data_views.views.layers.click_utils import (
+    detect_click,
+    get_click_value,
+)
+from motile_tracker.data_views.views_coordinator.key_binds import (
+    KEYMAP,
+    bind_keymap,
+)
 
 if TYPE_CHECKING:
+    from napari.utils.events import Event
+
     from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
 
-def custom_select(layer: napari.layers.Points, event):
-    """Block the current_size signal when selecting points"""
+def custom_select(layer: napari.layers.Points, event: Event):
+    """Block the current_size signal when selecting points to avoid changing the point
+    size by accident."""
+
     with layer.events.current_size.blocker():
         yield from select(layer, event)
 
@@ -26,8 +39,10 @@ class TrackPoints(napari.layers.Points):
     responds to dynamics visualization signals
     """
 
+    # overwrite the select function to block the current_size event signal
     _drag_modes = napari.layers.Points._drag_modes.copy()
     _drag_modes[napari.layers.Points._modeclass.SELECT] = custom_select
+    data_updated = Signal()
 
     @property
     def _type_string(self) -> str:
@@ -69,38 +84,24 @@ class TrackPoints(napari.layers.Points):
         )
 
         # Key bindings (should be specified both on the viewer (in tracks_viewer)
-        # and on the layer to overwrite napari defaults)
-        self.bind_key("q")(self.tracks_viewer.toggle_display_mode)
-        self.bind_key("a")(self.tracks_viewer.create_edge)
-        self.bind_key("d")(self.tracks_viewer.delete_node)
-        self.bind_key("Delete")(self.tracks_viewer.delete_node)
-        self.bind_key("b")(self.tracks_viewer.delete_edge)
-        # self.bind_key("s")(self.tracks_viewer.set_split_node)
-        # self.bind_key("e")(self.tracks_viewer.set_endpoint_node)
-        # self.bind_key("c")(self.tracks_viewer.set_linear_node)
-        self.bind_key("z")(self.tracks_viewer.undo)
-        self.bind_key("r")(self.tracks_viewer.redo)
+        bind_keymap(self, KEYMAP, self.tracks_viewer)
 
         # Connect to click events to select nodes
         @self.mouse_drag_callbacks.append
         def click(layer, event):
             if event.type == "mouse_press":
-                # is the value passed from the click event?
-                point_index = layer.get_value(
-                    event.position,
-                    view_direction=event.view_direction,
-                    dims_displayed=event.dims_displayed,
-                    world=True,
-                )
-                if point_index is not None:
-                    node_id = self.nodes[point_index]
-                    append = "Shift" in event.modifiers
-                    self.tracks_viewer.selected_nodes.add(node_id, append)
+                was_click = yield from detect_click(event)
+                if was_click:
+                    # find the point matching the click location, if any. Warning: the
+                    # search area depends on the point size. If points are large and
+                    # overlapping, this may result in the wrong value being returned.
+                    value = get_click_value(self, event)
+                    self.process_click(event, value)
 
         # listen to updates of the data
         self.events.data.connect(self._update_data)
 
-        # connect to changing the point size in the UI
+        # connect to changing the point size in the UI (see note)
         self.events.current_size.connect(
             lambda: self.set_point_size(size=self.current_size)
         )
@@ -109,14 +110,30 @@ class TrackPoints(napari.layers.Points):
         # to update the nodes in self.tracks_viewer.selected_nodes
         self.selected_data.events.items_changed.connect(self._update_selection)
 
-    def add(self, coords):
-        """Block the current_size event before calling the 'add' function."""
+    def add(self, coords: list[float]):
+        """Block the current_size event before calling the 'add' function to avoid calling
+        set_point_size (triggered by the current_size event) with a new point size."""
 
         with self.events.current_size.blocker():
             super().add(coords)
 
+    def process_click(self, event: Event, point_index: int | None):
+        """Select the clicked point(s)"""
+
+        if point_index is None:
+            self.tracks_viewer.selected_nodes.reset()
+        else:
+            node_id = self.nodes[point_index]
+            append = "Shift" in event.modifiers
+            self.tracks_viewer.selected_nodes.add(node_id, append)
+
     def set_point_size(self, size: int) -> None:
-        """Sets a new default point size"""
+        """Sets a new default point size.
+        NOTE: This function call is triggered by the current_size event, which is emitted
+        when the user moves the 'point size' slider in the layer controls. However, this
+        event is also emitted in the 'add' and 'select' functions, so we have to block the
+         signals there to avoid increasing the point size by accident, since new or
+        selected points are displayed at a 30% bigger size."""
 
         self.default_size = size
         self._refresh()
@@ -136,6 +153,8 @@ class TrackPoints(napari.layers.Points):
             for node in self.nodes
         ]
         self.data = self.tracks_viewer.tracks.get_positions(self.nodes, incl_time=True)
+        self.data_updated.emit()  # emit update signal for the orthogonal views to connect to
+
         self.symbol = self.get_symbols(
             self.tracks_viewer.tracks, self.tracks_viewer.symbolmap
         )
@@ -184,7 +203,7 @@ class TrackPoints(napari.layers.Points):
         }
         return attributes
 
-    def _update_data(self, event):
+    def _update_data(self, event: Event):
         """Calls the tracks controller with to update the data in the Tracks object and
         dispatch the update
         """
@@ -274,4 +293,8 @@ class TrackPoints(napari.layers.Points):
                 1,
             )
             self.size[index] = math.ceil(self.default_size + 0.3 * self.default_size)
+
+        # emit the event to trigger update in orthogonal views
+        self.border_color = self.border_color
+        self.size = self.size
         self.refresh()
