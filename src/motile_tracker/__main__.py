@@ -14,7 +14,7 @@ def main():
     main_app.menu_widget.tabwidget.addTab(motile_widget, "Track with Motile")
     viewer.window.add_dock_widget(main_app)
 
-    # Start finn event loop
+    # Start napari event loop
     napari.run()
 
 
