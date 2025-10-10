@@ -1,5 +1,3 @@
-import numpy as np
-from geff.affine import Affine
 from qtpy.QtCore import Qt
 from qtpy.QtWidgets import (
     QDoubleSpinBox,
@@ -44,7 +42,8 @@ class ScaleWidget(QWidget):
     def _prefill_from_metadata(self, metadata: dict) -> None:
         """Update the scale widget, prefilling with metadata information if possible.
         Args:
-            metadata (dict): geff metadata dictionary containing 'affine' and 'axes' keys.
+            metadata (dict): geff metadata dictionary containing 'axes' key with scaling
+            information.
         """
 
         if len(metadata) > 0:
@@ -52,14 +51,14 @@ class ScaleWidget(QWidget):
             clear_layout(self.scale_layout)
             self.scale_form_layout = QFormLayout()
 
-            affine = metadata.get("affine")
-            if affine is not None:
-                affine = affine.get("matrix", None)
-                affine = Affine(matrix=affine)
-                linear = affine.linear_matrix
-                self.scale = tuple(np.diag(linear))
-            else:
-                self.scale = [1] * len(metadata.get("axes"))
+            # read scaling information from metadata, prefill with 1 for all axes if not
+            # given
+            self.scale = list([1.0] * len(metadata.get("axes")))
+            axes = metadata.get("axes", [])
+            lookup = {a["name"].lower(): a.get("scale", 1) or 1 for a in axes}
+            self.scale[-1], self.scale[-2] = lookup.get("x", 1), lookup.get("y", 1)
+            if "z" in lookup:
+                self.scale[-3] = lookup.get("z", 1)
 
             # Spinboxes for scaling in (z), y, x.
             self.z_label = QLabel("z")
