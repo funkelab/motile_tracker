@@ -105,8 +105,6 @@ class TrackLabels(napari.layers.Labels):
         self.events.mode.connect(self._check_mode)
         self.viewer.dims.events.current_step.connect(self._ensure_valid_label)
 
-        _new_label(self)
-
     # Connect click events to node selection
     def click(self, _, event):
         if (
@@ -238,17 +236,23 @@ class TrackLabels(napari.layers.Labels):
     def _on_paint(self, event):
         """Listen to the paint event and check which track_ids have changed"""
 
+    def _on_paint(self, event):
+        """Listen to the paint event and check which track_ids have changed"""
+
+        # make sure that a valid label is selected.
+        self._ensure_valid_label()
         with self.events.selected_label.blocker():
             current_timepoint = self.viewer.dims.current_step[
                 0
             ]  # also pass on the current time point to know which node to select later
-            new_value, updated_pixels = self._parse_paint_event(event.value)
+            _, updated_pixels = self._parse_paint_event(event.value)
             self.tracks_viewer.tracks_controller.update_segmentations(
-                new_value,
+                self.selected_label,
                 updated_pixels,
                 current_timepoint,
                 self.tracks_viewer.selected_track,
-            )
+            )  # paint with the updated self.selected_label, not with the value from the
+            # event, to ensure it is a valid label.
 
     def _refresh(self):
         """Refresh the data in the labels layer"""
