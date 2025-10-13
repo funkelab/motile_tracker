@@ -234,7 +234,11 @@ class TrackLabels(napari.layers.Labels):
 
         # make sure that 0 (in the case or erasing) or a valid label (in the case of
         # painting) is selected.
-        if self.mode == "erase" or self.mode == "fill" and self.selected_label == 0:
+        if (
+            self.mode == "erase"
+            or (self.mode == "fill" and self.selected_label == 0)
+            or (self.mode == "paint" and self.selected_label == 0)
+        ):
             target_value = 0
         else:
             self._ensure_valid_label()
