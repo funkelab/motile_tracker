@@ -155,11 +155,9 @@ class TracksViewer:
         self.selected_nodes.reset()
 
         # ensure a valid track is selected from the start
-        track_id = self.tracks.get_next_track_id()
-        self.selected_track = track_id
-        self.set_track_id_color(self.selected_track)
-        self.update_track_id.emit()
+        self.request_new_track()
 
+        # emite the update signal
         self.tracks_updated.emit(True)
 
     def toggle_display_mode(self, event=None) -> None:
