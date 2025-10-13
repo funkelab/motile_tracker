@@ -87,6 +87,14 @@ def test_ortho_views(make_napari_viewer, qtbot, graph_3d, segmentation_3d):
     assert isinstance(m.right_widget.vm_container.viewer_model.layers[-2], Labels)
     assert isinstance(m.bottom_widget.vm_container.viewer_model.layers[-2], Labels)
 
+    # set to paint mode and test syncing
+    viewer.layers[-2].mode = "paint"
+    assert (
+        viewer.layers[-2].mode
+        == m.right_widget.vm_container.viewer_model.layers[-2].mode
+        == m.bottom_widget.vm_container.viewer_model.layers[-2].mode
+    )
+
     # Test paint event on main viewer (indices, orig value, target_value)
     event_val = [
         (
@@ -110,13 +118,7 @@ def test_ortho_views(make_napari_viewer, qtbot, graph_3d, segmentation_3d):
     assert len(tracks_viewer.tracks.graph.nodes) == 5
 
     # test syncing of properties
-    viewer.layers[-2].mode = "paint"
-    assert (
-        viewer.layers[-2].mode
-        == m.right_widget.vm_container.viewer_model.layers[-2].mode
-        == m.bottom_widget.vm_container.viewer_model.layers[-2].mode
-    )
-    viewer.layers[-2].selected_label = 6
+    viewer.layers[-2].selected_label = 6  # forward sync only
     assert (
         viewer.layers[-2].selected_label
         == m.right_widget.vm_container.viewer_model.layers[-2].selected_label
