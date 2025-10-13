@@ -28,9 +28,8 @@ if TYPE_CHECKING:
 def new_label(layer: TrackLabels):
     """A function to override the default napari labels new_label function.
     Must be registered (see end of this file)"""
-    layer.events.selected_label.disconnect(layer._ensure_valid_label)
+
     _new_label(layer, new_track_id=True)
-    layer.events.selected_label.connect(layer._ensure_valid_label)
 
 
 def _new_label(layer: TrackLabels, new_track_id=True):
@@ -101,9 +100,7 @@ class TrackLabels(napari.layers.Labels):
         self.tracks_viewer.selected_nodes.list_updated.connect(
             self.update_selected_label
         )
-        self.events.selected_label.connect(self._ensure_valid_label)
         self.events.mode.connect(self._check_mode)
-        self.viewer.dims.events.current_step.connect(self._ensure_valid_label)
 
     # Connect click events to node selection
     def click(self, _, event):
@@ -166,7 +163,6 @@ class TrackLabels(napari.layers.Labels):
             show_info("Please use the paint tool to update the label")
             self.mode = "paint"
 
-        self._ensure_valid_label()
         self.events.mode.connect(self._check_mode)
 
     def redo(self):
@@ -236,18 +232,21 @@ class TrackLabels(napari.layers.Labels):
     def _on_paint(self, event):
         """Listen to the paint event and check which track_ids have changed"""
 
-    def _on_paint(self, event):
-        """Listen to the paint event and check which track_ids have changed"""
+        # make sure that 0 (in the case or erasing) or a valid label (in the case of
+        # painting) is selected.
+        if self.mode == "erase" or self.mode == "fill" and self.selected_label == 0:
+            target_value = 0
+        else:
+            self._ensure_valid_label()
+            target_value = self.selected_label
 
-        # make sure that a valid label is selected.
-        self._ensure_valid_label()
         with self.events.selected_label.blocker():
             current_timepoint = self.viewer.dims.current_step[
                 0
             ]  # also pass on the current time point to know which node to select later
             _, updated_pixels = self._parse_paint_event(event.value)
             self.tracks_viewer.tracks_controller.update_segmentations(
-                self.selected_label,
+                target_value,
                 updated_pixels,
                 current_timepoint,
                 self.tracks_viewer.selected_track,
@@ -311,14 +310,12 @@ class TrackLabels(napari.layers.Labels):
     def update_selected_label(self):
         """Update the selected label in the labels layer"""
 
-        self.events.selected_label.disconnect(self._ensure_valid_label)
         if len(self.tracks_viewer.selected_nodes) > 0:
             node = int(self.tracks_viewer.selected_nodes[0])
             self.selected_label = node
             self.tracks_viewer.selected_track = int(
                 self.tracks_viewer.tracks.get_track_id(node)
             )
-        self.events.selected_label.connect(self._ensure_valid_label)
 
     def _ensure_valid_label(self, event: Event | None = None):
         """Make sure a valid label is selected, because it is not allowed to paint with a
@@ -344,14 +341,7 @@ class TrackLabels(napari.layers.Labels):
             can be used to update the existing node in a paint event. No action is needed
         """
 
-        if self.tracks_viewer.tracks is not None and self.mode in (
-            "fill",
-            "paint",
-            "erase",
-            "pick",
-        ):
-            self.events.selected_label.disconnect(self._ensure_valid_label)
-
+        if self.tracks_viewer.tracks is not None:
             current_timepoint = self.viewer.dims.current_step[0]
             # if a node with the given label is already in the graph
             if self.tracks_viewer.tracks.graph.has_node(self.selected_label):
@@ -413,7 +403,6 @@ class TrackLabels(napari.layers.Labels):
                             break
 
             self.tracks_viewer.update_track_id.emit()
-            self.events.selected_label.connect(self._ensure_valid_label)
 
         self.tracks_viewer.set_track_id_color(
             self.tracks_viewer.selected_track
