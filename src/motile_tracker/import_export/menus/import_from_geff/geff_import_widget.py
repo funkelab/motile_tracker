@@ -14,7 +14,7 @@ from qtpy.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from zarr.storage import FSStore
+from zarr.storage import LocalStore
 
 from motile_tracker.import_export.menus.import_from_geff.geff_import_utils import (
     find_geff_group,
@@ -82,7 +82,7 @@ class ImportGeffWidget(QWidget):
             self.update_buttons.emit()
             return
         try:
-            store = FSStore(folder_path)
+            store = LocalStore(folder_path)
             root = zarr.group(store=store)
         except (KeyError, ValueError, OSError) as e:
             QMessageBox.critical(self, "Error", f"Could not open zarr store: {e}")
