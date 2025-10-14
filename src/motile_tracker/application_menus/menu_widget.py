@@ -5,6 +5,8 @@ from motile_tracker.application_menus.editing_menu import EditingMenu
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 from motile_tracker.motile.menus.motile_widget import MotileWidget
 
+from .track_summary_menu import TrackSummaryWidget
+
 
 class MenuWidget(QScrollArea):
     """Combines the different tracker menus into tabs for cleaner UI"""
@@ -16,12 +18,14 @@ class MenuWidget(QScrollArea):
 
         motile_widget = MotileWidget(viewer)
         editing_widget = EditingMenu(viewer)
+        track_summary_widget = TrackSummaryWidget(viewer)
 
         self.tabwidget = QTabWidget()
 
         self.tabwidget.addTab(motile_widget, "Track with Motile")
         self.tabwidget.addTab(tracks_viewer.tracks_list, "Tracks List")
         self.tabwidget.addTab(editing_widget, "Edit Tracks")
+        self.tabwidget.addTab(track_summary_widget, "Tracks Summary")
 
         layout = QVBoxLayout()
         layout.addWidget(self.tabwidget)

@@ -34,7 +34,7 @@ class TracksViewer:
     tracks_updated = Signal(Optional[bool])  # noqa: UP007 UP045
 
     @classmethod
-    def get_instance(cls, viewer=None):
+    def get_instance(cls, viewer=None) -> TracksViewer:
         if not hasattr(cls, "_instance"):
             if viewer is None:
                 raise ValueError("Make a viewer first please!")
@@ -59,6 +59,7 @@ class TracksViewer:
         }
         self.mode = "all"
         self.tracks: SolutionTracks | None = None
+        self.tracks_name: str | None = None
         self.visible: list | str = []
         self.tracking_layers = TracksLayerGroup(self.viewer, self.tracks, "", self)
         self.selected_nodes = NodeSelectionList()
@@ -121,6 +122,7 @@ class TracksViewer:
                 layer.visible = False
 
         self.set_display_mode("all")
+        self.tracks_name = name
         self.tracking_layers.set_tracks(tracks, name)
         self.selected_nodes.reset()
         self.tracks_updated.emit(True)
