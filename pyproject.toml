@@ -8,7 +8,7 @@ dynamic = ["version"]
 description = "Application for interactive tracking with global optimization"
 readme = "README.md"
 license = { text = "BSD 3-Clause License" }
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 authors = [
     { name = "Caroline Malin-Mayor", email = "malinmayorc@janelia.hhmi.org" },
 ]
@@ -39,19 +39,19 @@ dependencies =[
     "motile>=0.3",
     "motile_toolbox == 0.4.0",
     "pydantic>=2,<3",
-    "tifffile[all]>=2025.5.21",
+    "tifffile[all]>=2025.1.10",
     "tqdm>=4,<5",
     "dask[array]>=2021.10.0",
     "fonticon-fontawesome6>=6,<7",
     "pyqtgraph>=0.13,<1",
     "napari-orthogonal-views @ git+https://github.com/AnniekStok/napari-orthogonal-views.git@v0.0.4",
     "lxml_html_clean>=0.4,<1",
-    "zarr>=3.0,<4",
+    "zarr>=2.10,<4",
 ]
 
 [project.optional-dependencies]
 all = [
-    "pyqt6>=6.3,<7",
+    "pyqt6>=6.5,<7",
 ]
 
 [project.entry-points."napari.manifest"]
@@ -66,10 +66,10 @@ motile_tracker = "motile_tracker.__main__:main"
 
 [dependency-groups]
 testing =[
-    "pyqt6>=6,<7",
-    "pytest>=8,<9",
+    "pyqt6>=6.5,<7",
+    "pytest>=8.3,<9",
     "pytest-cov>=6",
-    "pytest-qt>=4,<5",
+    "pytest-qt>=4.4,<5",
 ]
 docs = [
     "myst-parser>=4,<5",
