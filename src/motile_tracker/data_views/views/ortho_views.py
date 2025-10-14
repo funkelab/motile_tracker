@@ -40,8 +40,6 @@ def copy_layer(layer: Layer, name: str = ""):
         res_layer = Labels(
             data=layer.data,
             name=layer.name,
-            opacity=layer.opacity,
-            scale=layer.scale,
             colormap=layer.colormap,
         )
 
@@ -49,13 +47,6 @@ def copy_layer(layer: Layer, name: str = ""):
         res_layer = Points(
             data=layer.data,
             name=layer.name,
-            symbol=layer.symbol,
-            face_color=layer.face_color,
-            size=layer.size,
-            properties=layer.properties,
-            border_color=layer.border_color,
-            scale=layer.scale,
-            blending=layer.blending,
         )
     else:
         res_layer = Layer.create(*layer.as_layer_data_tuple())
@@ -95,10 +86,13 @@ sync_filters = {
     },
     TrackPoints: {
         "forward_exclude": {
-            "data"
+            "data",
+            "size",
+            "current_size",
         },  # we will sync data separately on TrackPoints as we
         # need finer control
-        "reverse_exclude": set(get_property_names_from_class(Points)) - {"mode"},
+        "reverse_exclude": set(get_property_names_from_class(Points))
+        - {"mode", "size", "current_size"},
     },
     TrackLabels: {
         "reverse_exclude": set(get_property_names_from_class(Labels))

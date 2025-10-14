@@ -23,10 +23,6 @@ def test_ortho_views(make_napari_viewer, qtbot, graph_3d, segmentation_3d):
     viewer = make_napari_viewer()
     m = initialize_ortho_views(viewer)
 
-    m.show()
-    qtbot.waitUntil(lambda: m.is_shown(), timeout=1000)
-    assert isinstance(m.right_widget, OrthoViewWidget)
-
     # Create example tracks
     tracks = SolutionTracks(graph=graph_3d, segmentation=segmentation_3d, ndim=4)
     tracks_viewer = TracksViewer.get_instance(viewer)
@@ -34,10 +30,27 @@ def test_ortho_views(make_napari_viewer, qtbot, graph_3d, segmentation_3d):
 
     assert isinstance(viewer.layers[-1], TrackPoints)
     assert isinstance(viewer.layers[-2], TrackLabels)
+
+    # change attributes on the TrackLabels layer to check that they are correctly copied
+    viewer.layers[-2].contour = 1
+    viewer.layers[-2].mode = "erase"
+
+    # show orthogonal views and check attributes
+    m.show()
+    qtbot.waitUntil(lambda: m.is_shown(), timeout=1000)
+    assert isinstance(m.right_widget, OrthoViewWidget)
     assert isinstance(m.right_widget.vm_container.viewer_model.layers[-1], Points)
     assert isinstance(m.bottom_widget.vm_container.viewer_model.layers[-1], Points)
     assert isinstance(m.right_widget.vm_container.viewer_model.layers[-2], Labels)
     assert isinstance(m.bottom_widget.vm_container.viewer_model.layers[-2], Labels)
+    assert (
+        m.right_widget.vm_container.viewer_model.layers[-2].contour
+        == viewer.layers[-2].contour
+    )
+    assert (
+        m.right_widget.vm_container.viewer_model.layers[-2].mode
+        == viewer.layers[-2].mode
+    )
 
     # set to paint mode and test syncing
     viewer.layers[-2].mode = "paint"
@@ -56,6 +69,9 @@ def test_ortho_views(make_napari_viewer, qtbot, graph_3d, segmentation_3d):
         )
     ]
     event = MockEvent(event_val)
+    step = list(viewer.dims.current_step)
+    step[0] = 1
+    viewer.dims.current_step = step
     viewer.layers[-2]._on_paint(event)
 
     assert viewer.layers[-2].data[1, 15, 45, 75] == 5
@@ -63,7 +79,11 @@ def test_ortho_views(make_napari_viewer, qtbot, graph_3d, segmentation_3d):
         viewer.layers[-2].data, m.right_widget.vm_container.viewer_model.layers[-2].data
     )
 
-    # test paint even on one of the ortho views and see if a new node is added
+    # test paint event on one of the ortho views and see if a new node is added
+    assert len(tracks_viewer.tracks.graph.nodes) == 5
+    step = list(viewer.dims.current_step)
+    step[0] = 2
+    viewer.dims.current_step = step
     m.right_widget.vm_container.viewer_model.layers[-2].paint(
         coord=(2, 63, 20, 30), new_label=6, refresh=True
     )
