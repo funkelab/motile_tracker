@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 import napari
 import numpy as np
+from funtracks.exceptions import InvalidActionError
 from napari.layers import Labels
 from napari.utils import DirectLabelColormap
 from napari.utils.action_manager import action_manager
@@ -248,17 +249,25 @@ class TrackLabels(napari.layers.Labels):
             target_value = self.selected_label
 
         with self.events.selected_label.blocker():
-            current_timepoint = self.viewer.dims.current_step[
-                0
-            ]  # also pass on the current time point to know which node to select later
-            _, updated_pixels = self._parse_paint_event(event.value)
-            self.tracks_viewer.tracks_controller.update_segmentations(
-                target_value,
-                updated_pixels,
-                current_timepoint,
-                self.tracks_viewer.selected_track,
-            )  # paint with the updated self.selected_label, not with the value from the
-            # event, to ensure it is a valid label.
+            try:
+                current_timepoint = self.viewer.dims.current_step[
+                    0
+                ]  # also pass on the current time point to know which node to select later
+                _, updated_pixels = self._parse_paint_event(event.value)
+                self.tracks_viewer.tracks_controller.update_segmentations(
+                    target_value,
+                    updated_pixels,
+                    current_timepoint,
+                    self.tracks_viewer.selected_track,
+                )  # paint with the updated self.selected_label, not with the value from the
+                # event, to ensure it is a valid label.
+            except InvalidActionError as e:
+                show_info(str(e))
+                super().undo()
+                new_label(
+                    self
+                )  # help the user to paint with a new label that should be
+                # valid
 
     def _refresh(self):
         """Refresh the data in the labels layer"""
