@@ -12,7 +12,9 @@ class MockEvent:
 
 def create_event_val(
     tp: int, z: tuple[int], y: tuple[int], x: tuple[int], old_val: int, target_val: int
-):
+) -> list[
+    tuple[tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray], np.ndarray, int]
+]:
     """Create event values to simulate a paint event"""
 
     # construct coordinate lists
@@ -31,7 +33,7 @@ def create_event_val(
 
     old_vals = np.full_like(tp_idx, old_val, dtype=np.uint16)
 
-    # create the event
+    # create the event value
     event_val = [
         (
             (
@@ -63,7 +65,7 @@ def test_paint_event(make_napari_viewer, graph_3d, segmentation_3d):
     assert tracks_viewer.tracking_layers.seg_layer.selected_label == 4
     assert tracks_viewer.selected_track == 4  # new track id
 
-    # 1) Simulate paint event with new label
+    ### 1) Simulate paint event with new label
     tracks_viewer.tracking_layers.seg_layer.mode = "paint"
     step = list(
         viewer.dims.current_step
@@ -79,57 +81,58 @@ def test_paint_event(make_napari_viewer, graph_3d, segmentation_3d):
     assert len(tracks_viewer.tracks.graph.nodes) == 3  # 3 nodes before the paint event
     tracks_viewer.tracking_layers.seg_layer._on_paint(event)
 
-    assert tracks_viewer.tracking_layers.seg_layer.data[2, 15, 45, 75] == 4  # the new
-    # selected label
-    assert (
-        tracks_viewer.tracks.get_track_id(4) == 4
-    )  # test that the node is present and
-    # has the correct track id.
+    # verify the new selected label is now at painted pixels.
+    assert tracks_viewer.tracking_layers.seg_layer.data[2, 15, 45, 75] == 4
+    # verfiy that the node is present and has the correct track id.
+    assert tracks_viewer.tracks.get_track_id(4) == 4
     assert len(tracks_viewer.tracks.graph.nodes) == 4  # 4 nodes after paint event
 
-    # 2) Simulate paint event that overwrites an existing node with a new track id. Below
+    ### 2) Simulate paint event that overwrites an existing node with a new track id. Below
     # event aims to completely replace node 2 with a new label, that has track id 4, since
-    # this is currently still selected
+    # this is currently still the selected_track.
 
-    # first remove the current values (with a true paint event this happens automatically,
-    # but since were are simulating here we have to set it ourselves.)
+    # first remove the current values (with a true paint event this has happened already
+    # but since we are testing and simulating one here, we have to set it ourselves).
     tracks_viewer.tracking_layers.seg_layer.data[1, 15:25, 45:55, 75:85] = 0
     event_val = create_event_val(
         tp=1, z=(15, 25), y=(45, 55), x=(75, 85), old_val=2, target_val=60
     )
+    print(event_val)
     event = MockEvent(event_val)
 
-    # ensure we are acting at the right dims step
+    # Ensure we are acting at the right dims step
     step = list(viewer.dims.current_step)
     step[0] = 1
     viewer.dims.current_step = step
 
-    # run event and evaluate
+    # Run event and evaluate
     assert len(tracks_viewer.tracks.graph.nodes) == 4  # 4 nodes before paint event
     tracks_viewer.tracking_layers.seg_layer._on_paint(event)
-    assert (
-        len(tracks_viewer.tracks.graph.nodes) == 4
-    )  # still 4 nodes after paint event (node 2 has been replaced entirely)
+    assert len(tracks_viewer.tracks.graph.nodes) == 4  # still 4 nodes after paint event
+    # (node 2 has been replaced entirely)
     assert 2 not in tracks_viewer.tracks.graph.nodes  # node 2 is removed
-    assert (
-        tracks_viewer.tracking_layers.seg_layer.data[1, 15, 45, 75] == 5
-    )  # next available value
+    assert tracks_viewer.tracking_layers.seg_layer.data[1, 15, 45, 75] == 5  # next
+    # available value
     assert tracks_viewer.tracks.get_track_id(4) == 4  # the selected track id
 
-    # 3) simulate an erase event (paint event with label 0) that removes part of label 5
+    ### 3) simulate an erase event (paint event with label 0) that removes part of label 5
     event_val = create_event_val(
         tp=1, z=(15, 17), y=(45, 48), x=(75, 78), old_val=5, target_val=0
     )
     event = MockEvent(event_val)
 
-    # run event and evaluate
+    # Run event and evaluate
     assert len(tracks_viewer.tracks.graph.nodes) == 4  # 4 nodes before paint event
-    tracks_viewer.tracking_layers.seg_layer.mode = (
-        "erase"  # to correctly interpret painting with 0
-    )
+    tracks_viewer.tracking_layers.seg_layer.mode = "erase"  # to correctly interpret
+    # painting with 0
+
     tracks_viewer.tracking_layers.seg_layer._on_paint(event)
-    assert (
-        len(tracks_viewer.tracks.graph.nodes) == 4
-    )  # still 4 nodes after paint event (node 4 is now smaller)
+    assert len(tracks_viewer.tracks.graph.nodes) == 4  # still 4 nodes after paint event
+    # (node 4 is now smaller)
     assert tracks_viewer.tracks.graph.nodes[5]["area"] < 1000
     assert tracks_viewer.tracking_layers.seg_layer.data[1, 15, 45, 75] == 0  # erased
+
+    ### 4) Test undoing the last paint event
+    tracks_viewer.tracking_layers.seg_layer.undo()
+    assert tracks_viewer.tracks.graph.nodes[5]["area"] == 1000
+    assert tracks_viewer.tracking_layers.seg_layer.data[1, 15, 45, 75] == 5  # back at 5
