@@ -42,15 +42,20 @@ def graph_3d():
             3,
             {
                 NodeAttr.POS.value: [60, 50, 45],
-                NodeAttr.TIME.value: 1,
+                NodeAttr.TIME.value: 2,
+                NodeAttr.AREA.value: 1000,
+            },
+        ),
+        (
+            4,
+            {
+                NodeAttr.POS.value: [40, 70, 60],
+                NodeAttr.TIME.value: 2,
                 NodeAttr.AREA.value: 1000,
             },
         ),
     ]
-    edges = [
-        (1, 2),
-        (1, 3),
-    ]
+    edges = [(1, 2), (2, 3), (2, 4)]
     graph.add_nodes_from(nodes)
     graph.add_edges_from(edges)
     return graph
@@ -63,5 +68,6 @@ def segmentation_3d():
     segmentation = np.zeros(total_shape, dtype="int32")
     segmentation[0, 45:55, 45:55, 45:55] = 1
     segmentation[1, 15:25, 45:55, 75:85] = 2
-    segmentation[1, 55:65, 45:55, 40:50] = 3
+    segmentation[2, 55:65, 45:55, 40:50] = 3
+    segmentation[2, 35:45, 65:75, 55:65] = 4
     return segmentation
