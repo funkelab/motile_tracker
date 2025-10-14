@@ -3,6 +3,20 @@ import numpy as np
 import pytest
 from funtracks.data_model import NodeAttr
 
+from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
+
+
+@pytest.fixture(autouse=True)
+def reset_tracks_viewer():
+    # clear the singleton before test
+    if hasattr(TracksViewer, "_instance"):
+        del TracksViewer._instance
+
+    # after test, close all viewers and clear again
+    yield
+    if hasattr(TracksViewer, "_instance"):
+        del TracksViewer._instance
+
 
 @pytest.fixture
 def graph_3d():
