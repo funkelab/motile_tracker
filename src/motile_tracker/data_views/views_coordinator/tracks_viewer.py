@@ -157,7 +157,7 @@ class TracksViewer:
         # ensure a valid track is selected from the start
         self.request_new_track()
 
-        # emite the update signal
+        # emit the update signal
         self.tracks_updated.emit(True)
 
     def toggle_display_mode(self, event=None) -> None:
