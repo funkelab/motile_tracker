@@ -1,7 +1,5 @@
-import networkx as nx
 import numpy as np
-import pytest
-from funtracks.data_model import NodeAttr, SolutionTracks
+from funtracks.data_model import SolutionTracks
 from napari.layers import Labels, Points
 from napari_orthogonal_views.ortho_view_widget import OrthoViewWidget
 
@@ -11,52 +9,6 @@ from motile_tracker.data_views.views.ortho_views import (
     initialize_ortho_views,
 )
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
-
-
-@pytest.fixture
-def graph_3d():
-    graph = nx.DiGraph()
-    nodes = [
-        (
-            1,
-            {
-                NodeAttr.POS.value: [50, 50, 50],
-                NodeAttr.TIME.value: 0,
-            },
-        ),
-        (
-            2,
-            {
-                NodeAttr.POS.value: [20, 50, 80],
-                NodeAttr.TIME.value: 1,
-            },
-        ),
-        (
-            3,
-            {
-                NodeAttr.POS.value: [60, 50, 45],
-                NodeAttr.TIME.value: 1,
-            },
-        ),
-    ]
-    edges = [
-        (1, 2),
-        (1, 3),
-    ]
-    graph.add_nodes_from(nodes)
-    graph.add_edges_from(edges)
-    return graph
-
-
-@pytest.fixture
-def segmentation_3d():
-    frame_shape = (100, 100, 100)
-    total_shape = (5, *frame_shape)
-    segmentation = np.zeros(total_shape, dtype="int32")
-    segmentation[0, 45:55, 45:55, 45:55] = 1
-    segmentation[1, 15:25, 45:55, 75:85] = 2
-    segmentation[1, 55:65, 45:55, 40:50] = 3
-    return segmentation
 
 
 class MockEvent:
@@ -71,10 +23,6 @@ def test_ortho_views(make_napari_viewer, qtbot, graph_3d, segmentation_3d):
     viewer = make_napari_viewer()
     m = initialize_ortho_views(viewer)
 
-    m.show()
-    qtbot.waitUntil(lambda: m.is_shown(), timeout=1000)
-    assert isinstance(m.right_widget, OrthoViewWidget)
-
     # Create example tracks
     tracks = SolutionTracks(graph=graph_3d, segmentation=segmentation_3d, ndim=4)
     tracks_viewer = TracksViewer.get_instance(viewer)
@@ -82,41 +30,67 @@ def test_ortho_views(make_napari_viewer, qtbot, graph_3d, segmentation_3d):
 
     assert isinstance(viewer.layers[-1], TrackPoints)
     assert isinstance(viewer.layers[-2], TrackLabels)
+
+    # change attributes on the TrackLabels layer to check that they are correctly copied
+    viewer.layers[-2].contour = 1
+    viewer.layers[-2].mode = "erase"
+
+    # show orthogonal views and check attributes
+    m.show()
+    qtbot.waitUntil(lambda: m.is_shown(), timeout=1000)
+    assert isinstance(m.right_widget, OrthoViewWidget)
     assert isinstance(m.right_widget.vm_container.viewer_model.layers[-1], Points)
     assert isinstance(m.bottom_widget.vm_container.viewer_model.layers[-1], Points)
     assert isinstance(m.right_widget.vm_container.viewer_model.layers[-2], Labels)
     assert isinstance(m.bottom_widget.vm_container.viewer_model.layers[-2], Labels)
-
-    # Test paint event on main viewer (indices, orig value, target_value)
-    event_val = [
-        (
-            (np.array([1]), np.array([15]), np.array([45]), np.array([75])),
-            np.array([2], dtype=np.uint16),
-            np.uint16(4),
-        )
-    ]
-    event = MockEvent(event_val)
-    viewer.layers[-2]._on_paint(event)
-
-    assert viewer.layers[-2].data[1, 15, 45, 75] == 4
-    assert np.array_equal(
-        viewer.layers[-2].data, m.right_widget.vm_container.viewer_model.layers[-2].data
+    assert (
+        m.right_widget.vm_container.viewer_model.layers[-2].contour
+        == viewer.layers[-2].contour
+    )
+    assert (
+        m.right_widget.vm_container.viewer_model.layers[-2].mode
+        == viewer.layers[-2].mode
     )
 
-    # test paint even on one of the ortho views and see if a new node is added
-    m.right_widget.vm_container.viewer_model.layers[-2].paint(
-        coord=(2, 63, 20, 30), new_label=5, refresh=True
-    )
-    assert len(tracks_viewer.tracks.graph.nodes) == 5
-
-    # test syncing of properties
+    # set to paint mode and test syncing
     viewer.layers[-2].mode = "paint"
     assert (
         viewer.layers[-2].mode
         == m.right_widget.vm_container.viewer_model.layers[-2].mode
         == m.bottom_widget.vm_container.viewer_model.layers[-2].mode
     )
-    viewer.layers[-2].selected_label = 6
+
+    # Test paint event on main viewer (indices, orig value, target_value)
+    event_val = [
+        (
+            (np.array([1]), np.array([15]), np.array([45]), np.array([75])),
+            np.array([2], dtype=np.uint16),
+            np.uint16(5),
+        )
+    ]
+    event = MockEvent(event_val)
+    step = list(viewer.dims.current_step)
+    step[0] = 1
+    viewer.dims.current_step = step
+    viewer.layers[-2]._on_paint(event)
+
+    assert viewer.layers[-2].data[1, 15, 45, 75] == 5
+    assert np.array_equal(
+        viewer.layers[-2].data, m.right_widget.vm_container.viewer_model.layers[-2].data
+    )
+
+    # test paint event on one of the ortho views and see if a new node is added
+    assert len(tracks_viewer.tracks.graph.nodes) == 5
+    step = list(viewer.dims.current_step)
+    step[0] = 2
+    viewer.dims.current_step = step
+    m.right_widget.vm_container.viewer_model.layers[-2].paint(
+        coord=(2, 63, 20, 30), new_label=6, refresh=True
+    )
+    assert len(tracks_viewer.tracks.graph.nodes) == 6
+
+    # test syncing of properties
+    viewer.layers[-2].selected_label = 7  # forward sync only
     assert (
         viewer.layers[-2].selected_label
         == m.right_widget.vm_container.viewer_model.layers[-2].selected_label

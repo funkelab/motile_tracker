@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 import napari
 import numpy as np
+from funtracks.exceptions import InvalidActionError
 from napari.layers import Labels
 from napari.utils import DirectLabelColormap
 from napari.utils.action_manager import action_manager
@@ -28,6 +29,7 @@ if TYPE_CHECKING:
 def new_label(layer: TrackLabels):
     """A function to override the default napari labels new_label function.
     Must be registered (see end of this file)"""
+
     layer.events.selected_label.disconnect(layer._ensure_valid_label)
     _new_label(layer, new_track_id=True)
     layer.events.selected_label.connect(layer._ensure_valid_label)
@@ -49,12 +51,11 @@ def _new_label(layer: TrackLabels, new_track_id=True):
 
     if isinstance(layer.data, np.ndarray):
         new_selected_label = np.max(layer.data) + 1
-        if new_track_id or layer.selected_track is None:
-            new_selected_track = layer.tracks_viewer.tracks.get_next_track_id()
-            layer.selected_track = new_selected_track
+        if new_track_id or layer.tracks_viewer.selected_track is None:
+            layer.tracks_viewer.set_new_track_id()
         layer.selected_label = new_selected_label
         layer.colormap.color_dict[new_selected_label] = (
-            layer.tracks_viewer.colormap.map(layer.selected_track)
+            layer.tracks_viewer.track_id_color
         )
         # to refresh, otherwise you paint with a transparent label until you
         # release the mouse
@@ -81,7 +82,6 @@ class TrackLabels(napari.layers.Labels):
         tracks_viewer: TracksViewer,
     ):
         self.tracks_viewer = tracks_viewer
-        self.selected_track = None
         colormap = self._get_colormap()
 
         super().__init__(
@@ -103,11 +103,8 @@ class TrackLabels(napari.layers.Labels):
         self.tracks_viewer.selected_nodes.list_updated.connect(
             self.update_selected_label
         )
-        self.events.selected_label.connect(self._ensure_valid_label)
         self.events.mode.connect(self._check_mode)
-        self.viewer.dims.events.current_step.connect(self._ensure_valid_label)
-
-        _new_label(self)
+        self.events.selected_label.connect(self._ensure_valid_label)
 
     # Connect click events to node selection
     def click(self, _, event):
@@ -170,7 +167,6 @@ class TrackLabels(napari.layers.Labels):
             show_info("Please use the paint tool to update the label")
             self.mode = "paint"
 
-        self._ensure_valid_label()
         self.events.mode.connect(self._check_mode)
 
     def redo(self):
@@ -240,14 +236,38 @@ class TrackLabels(napari.layers.Labels):
     def _on_paint(self, event):
         """Listen to the paint event and check which track_ids have changed"""
 
+        # make sure that 0 (in the case or erasing) or a valid label (in the case of
+        # painting) is selected.
+        if (
+            self.mode == "erase"
+            or (self.mode == "fill" and self.selected_label == 0)
+            or (self.mode == "paint" and self.selected_label == 0)
+        ):
+            target_value = 0
+        else:
+            self._ensure_valid_label()
+            target_value = self.selected_label
+
         with self.events.selected_label.blocker():
-            current_timepoint = self.viewer.dims.current_step[
-                0
-            ]  # also pass on the current time point to know which node to select later
-            new_value, updated_pixels = self._parse_paint_event(event.value)
-            self.tracks_viewer.tracks_controller.update_segmentations(
-                new_value, updated_pixels, current_timepoint, self.selected_track
-            )
+            try:
+                current_timepoint = self.viewer.dims.current_step[
+                    0
+                ]  # also pass on the current time point to know which node to select later
+                _, updated_pixels = self._parse_paint_event(event.value)
+                self.tracks_viewer.tracks_controller.update_segmentations(
+                    target_value,
+                    updated_pixels,
+                    current_timepoint,
+                    self.tracks_viewer.selected_track,
+                )  # paint with the updated self.selected_label, not with the value from the
+                # event, to ensure it is a valid label.
+            except InvalidActionError as e:
+                show_info(str(e))
+                super().undo()
+                new_label(
+                    self
+                )  # help the user to paint with a new label that should be
+                # valid
 
     def _refresh(self):
         """Refresh the data in the labels layer"""
@@ -306,12 +326,12 @@ class TrackLabels(napari.layers.Labels):
     def update_selected_label(self):
         """Update the selected label in the labels layer"""
 
-        self.events.selected_label.disconnect(self._ensure_valid_label)
         if len(self.tracks_viewer.selected_nodes) > 0:
             node = int(self.tracks_viewer.selected_nodes[0])
             self.selected_label = node
-            self.selected_track = int(self.tracks_viewer.tracks.get_track_id(node))
-        self.events.selected_label.connect(self._ensure_valid_label)
+            self.tracks_viewer.selected_track = int(
+                self.tracks_viewer.tracks.get_track_id(node)
+            )
 
     def _ensure_valid_label(self, event: Event | None = None):
         """Make sure a valid label is selected, because it is not allowed to paint with a
@@ -337,20 +357,14 @@ class TrackLabels(napari.layers.Labels):
             can be used to update the existing node in a paint event. No action is needed
         """
 
-        if self.tracks_viewer.tracks is not None and self.mode in (
-            "fill",
-            "paint",
-            "erase",
-            "pick",
-        ):
-            self.events.selected_label.disconnect(self._ensure_valid_label)
-
+        update_colormap = False
+        if self.tracks_viewer.tracks is not None:
             current_timepoint = self.viewer.dims.current_step[0]
             # if a node with the given label is already in the graph
             if self.tracks_viewer.tracks.graph.has_node(self.selected_label):
                 # Update the track id
-                self.selected_track = self.tracks_viewer.tracks.get_track_id(
-                    self.selected_label
+                self.tracks_viewer.selected_track = (
+                    self.tracks_viewer.tracks.get_track_id(self.selected_label)
                 )
                 existing_time = self.tracks_viewer.tracks.get_time(self.selected_label)
                 if existing_time == current_timepoint:
@@ -361,11 +375,11 @@ class TrackLabels(napari.layers.Labels):
                     # instead
                     edit = False
                     if (
-                        self.selected_track
+                        self.tracks_viewer.selected_track
                         in self.tracks_viewer.tracks.track_id_to_node
                     ):
                         for node in self.tracks_viewer.tracks.track_id_to_node[
-                            self.selected_track
+                            self.tracks_viewer.selected_track
                         ]:
                             if (
                                 self.tracks_viewer.tracks.get_time(node)
@@ -389,20 +403,37 @@ class TrackLabels(napari.layers.Labels):
             else:
                 # if there is already a node in that track in this frame, edit that
                 # instead
-                edit = False
-                if self.selected_track in self.tracks_viewer.tracks.track_id_to_node:
+                if (
+                    self.tracks_viewer.selected_track
+                    in self.tracks_viewer.tracks.track_id_to_node
+                ):
                     for node in self.tracks_viewer.tracks.track_id_to_node[
-                        self.selected_track
+                        self.tracks_viewer.selected_track
                     ]:
                         if (
                             self.tracks_viewer.tracks.get_time(node)
                             == current_timepoint
                         ):
                             self.selected_label = int(node)
-                            edit = True
                             break
 
-            self.events.selected_label.connect(self._ensure_valid_label)
+                elif self.tracks_viewer.selected_track is None:
+                    self.tracks_viewer.selected_track = (
+                        self.tracks_viewer.tracks.get_next_track_id()
+                    )
+                    update_colormap = True
+
+        # update color and emit signal
+        self.tracks_viewer.set_track_id_color(self.tracks_viewer.selected_track)
+        if update_colormap:
+            self.colormap.color_dict[self.selected_label] = (
+                self.tracks_viewer.track_id_color
+            )
+            with self.events.selected_label.blocker():
+                self.colormap = DirectLabelColormap(
+                    color_dict=self.colormap.color_dict
+                )  # refresh
+        self.tracks_viewer.update_track_id.emit()
 
     @napari.layers.Labels.n_edit_dimensions.setter
     def n_edit_dimensions(self, n_edit_dimensions):

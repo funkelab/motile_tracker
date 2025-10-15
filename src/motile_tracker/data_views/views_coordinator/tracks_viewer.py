@@ -9,6 +9,7 @@ from funtracks.data_model.tracks_controller import TracksController
 from psygnal import Signal
 
 from motile_tracker.data_views.graph_attributes import NodeAttr
+from motile_tracker.data_views.views.layers.track_labels import new_label
 from motile_tracker.data_views.views.layers.tracks_layer_group import TracksLayerGroup
 from motile_tracker.data_views.views.tree_view.tree_widget_utils import (
     extract_lineage_tree,
@@ -32,6 +33,7 @@ class TracksViewer:
     """
 
     tracks_updated = Signal(Optional[bool])  # noqa: UP007 UP045
+    update_track_id = Signal()
 
     @classmethod
     def get_instance(cls, viewer=None):
@@ -66,11 +68,39 @@ class TracksViewer:
 
         self.tracks_list = TracksList()
         self.tracks_list.view_tracks.connect(self.update_tracks)
+        self.selected_track = None
+        self.track_id_color = [0, 0, 0, 0]
 
         self.set_keybinds()
 
     def set_keybinds(self):
         bind_keymap(self.viewer, KEYMAP, self)
+
+    def request_new_track(self) -> None:
+        """Request a new track id (with new segmentation label if a seg layer is present)"""
+
+        if self.tracking_layers.seg_layer is not None:
+            new_label(self.tracking_layers.seg_layer)
+        else:
+            self.set_new_track_id()
+
+    def set_new_track_id(self) -> None:
+        """Set a new track id (if needed), update the color, and emit signal. Only updates
+        the track id if the tracks.max_track_id value is used already."""
+
+        self.selected_track = self.tracks.max_track_id  # to check if available
+        if self.selected_track in self.tracks.track_id_to_node:
+            self.selected_track = self.tracks.get_next_track_id()
+        self.set_track_id_color(self.selected_track)
+        self.update_track_id.emit()
+
+    def set_track_id_color(self, track_id: int) -> None:
+        """Update self.track_id color with the rgba color or given track_id, or a list of
+        0 if the provided  track_id is None"""
+
+        self.track_id_color = (
+            [0, 0, 0, 0] if track_id is None else self.colormap.map(track_id)
+        )
 
     def _refresh(self, node: str | None = None, refresh_view: bool = False) -> None:
         """Call refresh function on napari layers and the submit signal that tracks are
@@ -123,6 +153,11 @@ class TracksViewer:
         self.set_display_mode("all")
         self.tracking_layers.set_tracks(tracks, name)
         self.selected_nodes.reset()
+
+        # ensure a valid track is selected from the start
+        self.request_new_track()
+
+        # emit the update signal
         self.tracks_updated.emit(True)
 
     def toggle_display_mode(self, event=None) -> None:
@@ -187,6 +222,14 @@ class TracksViewer:
         self.set_napari_view()
         visible_tracks = self.filter_visible_nodes()
         self.tracking_layers.update_visible(visible_tracks, self.visible)
+
+        if len(self.selected_nodes) > 0:
+            self.selected_track = self.tracks.get_track_id(self.selected_nodes[-1])
+        else:
+            self.selected_track = None
+
+        self.set_track_id_color(self.selected_track)
+        self.update_track_id.emit()
 
     def set_napari_view(self) -> None:
         """Adjust the current_step of the viewer to jump to the last item of the

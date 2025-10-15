@@ -173,7 +173,26 @@ class TrackPoints(napari.layers.Points):
         """Create attributes for a new node at given time point"""
 
         t = int(new_point[0])
-        track_id = self.tracks_viewer.tracks.get_next_track_id()
+        # Check if we already have a node for the current track id at this time point,
+        # since it is not allowed to have two nodes for the same track at the same time
+        # point.
+        if self.tracks_viewer.selected_track is None:
+            self.tracks_viewer.set_new_track_id()
+        if (
+            self.tracks_viewer.selected_track
+            in self.tracks_viewer.tracks.track_id_to_node
+        ):
+            for node in self.tracks_viewer.tracks.track_id_to_node[
+                self.tracks_viewer.selected_track
+            ]:
+                if self.tracks_viewer.tracks.get_time(node) == t:
+                    # We need a new node because one already exists for this track id at
+                    # this time point
+                    self.tracks_viewer.set_new_track_id()
+                    break
+
+        # track id does not exist yet in tracks.track_id_to_node, so it is safe to use
+        track_id = self.tracks_viewer.selected_track
         area = 0
 
         attributes = {
@@ -202,12 +221,12 @@ class TrackPoints(napari.layers.Points):
                 )
                 self._refresh()
 
-        if event.action == "removed":
+        elif event.action == "removed":
             self.tracks_viewer.tracks_controller.delete_nodes(
                 self.tracks_viewer.selected_nodes._list
             )
 
-        if event.action == "changed":
+        elif event.action == "changed":
             # we only want to allow this update if there is no seg layer
             if self.tracks_viewer.tracking_layers.seg_layer is None:
                 positions = []
@@ -229,11 +248,12 @@ class TrackPoints(napari.layers.Points):
     def _update_selection(self):
         """Replaces the list of selected_nodes with the selection provided by the user"""
 
-        selected_points = self.selected_data
-        self.tracks_viewer.selected_nodes.reset()
-        for point in selected_points:
-            node_id = self.nodes[point]
-            self.tracks_viewer.selected_nodes.add(node_id, True)
+        if self.mode == "select":
+            selected_points = self.selected_data
+            self.tracks_viewer.selected_nodes.reset()
+            for point in selected_points:
+                node_id = self.nodes[point]
+                self.tracks_viewer.selected_nodes.add(node_id, True)
 
     def get_symbols(self, tracks: Tracks, symbolmap: dict[NodeType, str]) -> list[str]:
         statemap = {
