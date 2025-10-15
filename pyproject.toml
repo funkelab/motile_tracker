@@ -46,12 +46,12 @@ dependencies =[
     "pyqtgraph>=0.13,<1",
     "napari-orthogonal-views==0.0.6",
     "lxml_html_clean>=0.4,<1",
-    "zarr>=2.10,<3",
+    "zarr>=2.10,<4",
 ]
 
 [project.optional-dependencies]
 all = [
-    "pyqt6>=6.3,<7",
+    "pyqt6>=6.5,<7",
 ]
 
 [project.entry-points."napari.manifest"]
@@ -66,10 +66,10 @@ motile_tracker = "motile_tracker.__main__:main"
 
 [dependency-groups]
 testing =[
-    "pyqt6>=6,<7",
-    "pytest>=8,<9",
+    "pyqt6>=6.5,<7",
+    "pytest>=8.3,<9",
     "pytest-cov>=6",
-    "pytest-qt>=4,<5",
+    "pytest-qt>=4.4,<5",
 ]
 docs = [
     "myst-parser>=4,<5",
