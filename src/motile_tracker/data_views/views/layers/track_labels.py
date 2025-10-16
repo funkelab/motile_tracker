@@ -19,6 +19,9 @@ from motile_tracker.data_views.views_coordinator.key_binds import (
     KEYMAP,
     bind_keymap,
 )
+from motile_tracker.data_views.views_coordinator.user_dialogs import (
+    confirm_force_operation,
+)
 
 if TYPE_CHECKING:
     from napari.utils.events import Event
@@ -262,12 +265,25 @@ class TrackLabels(napari.layers.Labels):
                 )  # paint with the updated self.selected_label, not with the value from the
                 # event, to ensure it is a valid label.
             except InvalidActionError as e:
-                show_info(str(e))
-                super().undo()
-                new_label(
-                    self
-                )  # help the user to paint with a new label that should be
-                # valid
+                # If the action is invalid, ask the user if they want to force it anyway
+                res = confirm_force_operation(message=str(e))
+                if not res:
+                    super().undo()
+
+                else:
+                    super().undo()  # undo the paint event and try again with force enabled
+                    try:
+                        self.tracks_viewer.tracks_controller.update_segmentations(
+                            target_value,
+                            updated_pixels,
+                            current_timepoint,
+                            self.tracks_viewer.selected_track,
+                            force=True,
+                        )
+                    except:  # noqa
+                        # second attempt also failed§
+                        show_info("Force operation failed, action is rejected.")
+                        super().undo()
 
     def _refresh(self):
         """Refresh the data in the labels layer"""
