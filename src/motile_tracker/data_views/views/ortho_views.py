@@ -42,6 +42,8 @@ def copy_layer(layer: Layer, name: str = ""):
             name=layer.name,
             colormap=layer.colormap,
         )
+        res_layer._undo_history = layer._undo_history
+        res_layer._redo_history = layer._redo_history
 
     elif isinstance(layer, TrackPoints):
         res_layer = Points(

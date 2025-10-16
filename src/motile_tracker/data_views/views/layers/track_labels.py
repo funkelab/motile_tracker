@@ -271,6 +271,7 @@ class TrackLabels(napari.layers.Labels):
                 self.tracks_viewer.force = always_force
                 if not force:
                     super().undo()
+                    self._refresh()
                 else:
                     super().undo()  # undo the paint event and try again with force enabled
                     self.tracks_viewer.tracks_controller.update_segmentations(
