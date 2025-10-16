@@ -262,12 +262,14 @@ class TrackLabels(napari.layers.Labels):
                     updated_pixels,
                     current_timepoint,
                     self.tracks_viewer.selected_track,
+                    force=self.tracks_viewer.force,
                 )  # paint with the updated self.selected_label, not with the value from the
                 # event, to ensure it is a valid label.
             except InvalidActionError as e:
                 # If the action is invalid, ask the user if they want to force it anyway
-                res = confirm_force_operation(message=str(e))
-                if not res:
+                force, always_force = confirm_force_operation(message=str(e))
+                self.tracks_viewer.force = always_force
+                if not force:
                     super().undo()
 
                 else:
@@ -281,7 +283,7 @@ class TrackLabels(napari.layers.Labels):
                             force=True,
                         )
                     except:  # noqa
-                        # second attempt also failed§
+                        # second attempt also failed
                         show_info("Force operation failed, action is rejected.")
                         super().undo()
 

@@ -74,6 +74,7 @@ class TracksViewer:
         self.tracks_list.view_tracks.connect(self.update_tracks)
         self.selected_track = None
         self.track_id_color = [0, 0, 0, 0]
+        self.force = False
 
         self.set_keybinds()
 
@@ -281,9 +282,12 @@ class TracksViewer:
                 node1, node2 = node2, node1
 
             try:
-                self.tracks_controller.add_edges(edges=np.array([[node1, node2]]))
+                self.tracks_controller.add_edges(
+                    edges=np.array([[node1, node2]]), force=self.force
+                )
             except InvalidActionError as e:
-                force = confirm_force_operation(message=str(e))
+                force, always_force = confirm_force_operation(message=str(e))
+                self.force = always_force
                 if force:
                     self.tracks_controller.add_edges(
                         edges=np.array([[node1, node2]]), force=True
