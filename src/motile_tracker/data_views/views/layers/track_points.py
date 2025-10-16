@@ -89,7 +89,7 @@ class TrackPoints(napari.layers.Points):
         # Connect to click events to select nodes
         @self.mouse_drag_callbacks.append
         def click(layer, event):
-            if event.type == "mouse_press":
+            if event.type == "mouse_press" and self.mode == "pan_zoom":
                 was_click = yield from detect_click(event)
                 if was_click:
                     # find the point matching the click location, if any. Warning: the
