@@ -271,21 +271,15 @@ class TrackLabels(napari.layers.Labels):
                 self.tracks_viewer.force = always_force
                 if not force:
                     super().undo()
-
                 else:
                     super().undo()  # undo the paint event and try again with force enabled
-                    try:
-                        self.tracks_viewer.tracks_controller.update_segmentations(
-                            target_value,
-                            updated_pixels,
-                            current_timepoint,
-                            self.tracks_viewer.selected_track,
-                            force=True,
-                        )
-                    except:  # noqa
-                        # second attempt also failed
-                        show_info("Force operation failed, action is rejected.")
-                        super().undo()
+                    self.tracks_viewer.tracks_controller.update_segmentations(
+                        target_value,
+                        updated_pixels,
+                        current_timepoint,
+                        self.tracks_viewer.selected_track,
+                        force=True,
+                    )
 
     def _refresh(self):
         """Refresh the data in the labels layer"""
