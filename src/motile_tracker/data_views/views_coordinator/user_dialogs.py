@@ -15,7 +15,7 @@ def confirm_force_operation(message: str) -> bool:
     msg.setIconPixmap(QIcon.fromTheme("dialog-question").pixmap(64, 64))
 
     msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
-    msg.setDefaultButton(QMessageBox.No)
+    msg.setDefaultButton(QMessageBox.Yes)
 
     result = msg.exec_()
     return result == QMessageBox.Yes
