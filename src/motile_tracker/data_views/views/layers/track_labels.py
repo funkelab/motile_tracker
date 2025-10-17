@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import random
+import warnings
 from typing import TYPE_CHECKING
 
 import napari
@@ -269,11 +270,11 @@ class TrackLabels(napari.layers.Labels):
                 # If the action is invalid, ask the user if they want to force it anyway
                 force, always_force = confirm_force_operation(message=str(e))
                 self.tracks_viewer.force = always_force
+                super().undo()
                 if not force:
-                    super().undo()
-                    self._refresh()
+                    self._refresh()  # to trigger refresh on orthoviews, if present
                 else:
-                    super().undo()  # undo the paint event and try again with force enabled
+                    # try again with force enabled
                     self.tracks_viewer.tracks_controller.update_segmentations(
                         target_value,
                         updated_pixels,
@@ -281,6 +282,11 @@ class TrackLabels(napari.layers.Labels):
                         self.tracks_viewer.selected_track,
                         force=True,
                     )
+
+            except (ValueError, RuntimeError) as e:
+                warnings.warn(str(e), stacklevel=2)
+                super().undo()
+                self._refresh()
 
     def _refresh(self):
         """Refresh the data in the labels layer"""

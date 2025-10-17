@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import math
+import warnings
 from typing import TYPE_CHECKING
 
 import napari
 import numpy as np
 from funtracks.data_model import NodeType, Tracks
+from funtracks.exceptions import InvalidActionError
 from napari.layers.points._points_mouse_bindings import select
 from napari.utils.notifications import show_info
 from psygnal import Signal
@@ -18,6 +20,9 @@ from motile_tracker.data_views.views.layers.click_utils import (
 from motile_tracker.data_views.views_coordinator.key_binds import (
     KEYMAP,
     bind_keymap,
+)
+from motile_tracker.data_views.views_coordinator.user_dialogs import (
+    confirm_force_operation,
 )
 
 if TYPE_CHECKING:
@@ -213,7 +218,22 @@ class TrackPoints(napari.layers.Points):
             if self.tracks_viewer.tracking_layers.seg_layer is None:
                 new_point = event.value[-1]
                 attributes = self._create_node_attrs(new_point)
-                self.tracks_viewer.tracks_controller.add_nodes(attributes)
+                try:
+                    self.tracks_viewer.tracks_controller.add_nodes(
+                        attributes, force=self.tracks_viewer.force
+                    )
+                except InvalidActionError as e:
+                    # If the action is invalid, ask the user if they want to force it anyway
+                    force, always_force = confirm_force_operation(message=str(e))
+                    self.tracks_viewer.force = always_force
+                    self._refresh()
+                    if force:
+                        self.tracks_viewer.tracks_controller.add_nodes(
+                            attributes, force=True
+                        )
+                except (ValueError, RuntimeError) as e:
+                    warnings.warn(str(e), stacklevel=2)
+                    self._refresh()
             else:
                 show_info(
                     "Mixed point and segmentation nodes not allowed: add points by "
