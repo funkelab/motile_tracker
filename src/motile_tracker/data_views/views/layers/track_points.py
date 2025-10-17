@@ -183,18 +183,6 @@ class TrackPoints(napari.layers.Points):
         # point.
         if self.tracks_viewer.selected_track is None:
             self.tracks_viewer.set_new_track_id()
-        if (
-            self.tracks_viewer.selected_track
-            in self.tracks_viewer.tracks.track_id_to_node
-        ):
-            for node in self.tracks_viewer.tracks.track_id_to_node[
-                self.tracks_viewer.selected_track
-            ]:
-                if self.tracks_viewer.tracks.get_time(node) == t:
-                    # We need a new node because one already exists for this track id at
-                    # this time point
-                    self.tracks_viewer.set_new_track_id()
-                    break
 
         # track id does not exist yet in tracks.track_id_to_node, so it is safe to use
         track_id = self.tracks_viewer.selected_track
