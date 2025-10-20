@@ -163,11 +163,19 @@ def point_data_hook(orig_layer: TrackPoints, copied_layer: Points) -> None:
         layer"""
 
         if hasattr(event, "action") and event.action in ("added", "changed", "removed"):
+            if orig_layer.tracks_viewer.tracks.ndim == 3 and event.action in (
+                "added",
+                "changed",
+            ):
+                show_info("Adding/moving nodes in the time dimension is not supported")
+                orig_layer._refresh()
+                return
+
+            orig_layer._update_data(event)
             with orig_layer.events.blocker_all():  # try to suppress updating visibility
                 orig_layer.selected_data = (
                     copied_layer.selected_data
                 )  # make sure the same data is selected
-            orig_layer._update_data(event)
 
     def sync_data_wrapper(event):
         return sync_data_event(orig_layer, copied_layer, event)
