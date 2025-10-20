@@ -53,8 +53,8 @@ class ScaleWidget(QWidget):
 
             # read scaling information from metadata, prefill with 1 for all axes if not
             # given
-            self.scale = list([1.0] * len(metadata.get("axes")))
-            axes = metadata.get("axes", [])
+            axes = metadata.get("axes") or []
+            self.scale = list([1.0] * len(axes)) if axes != [] else [1.0, 1.0, 1.0, 1.0]
             lookup = {a["name"].lower(): a.get("scale", 1) or 1 for a in axes}
             self.scale[-1], self.scale[-2] = lookup.get("x", 1), lookup.get("y", 1)
             if "z" in lookup:
@@ -89,7 +89,9 @@ class ScaleWidget(QWidget):
         for the time dimension.
         """
 
-        if len(self.scale) == 4:
+        if self.scale is None:
+            scale = [1.0, 1.0, 1.0, 1.0]
+        elif len(self.scale) == 4:
             scale = [
                 1,
                 self.z_spin_box.value(),
