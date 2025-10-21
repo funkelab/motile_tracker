@@ -89,9 +89,7 @@ class ScaleWidget(QWidget):
         for the time dimension.
         """
 
-        if self.scale is None:
-            scale = [1.0, 1.0, 1.0, 1.0]
-        elif len(self.scale) == 4:
+        if len(self.scale) == 4:
             scale = [
                 1,
                 self.z_spin_box.value(),
