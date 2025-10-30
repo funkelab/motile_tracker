@@ -260,12 +260,27 @@ def tracks_from_df(
         ndim=ndims,
         scale=scale,
     )
+    # TODO: update for funtracks with features
+    # # Enable features marked for recomputation
+    # features_to_compute = [
+    #     feat
+    #     for feat, val in features.items()
+    #     if val == "Recompute" and feat in tracks.annotators.all_features
+    # ]
+    # tracks.enable_features(features_to_compute)
 
-    # Enable features marked for recomputation
-    features_to_compute = [
-        feat
-        for feat, val in features.items()
-        if val == "Recompute" and feat in tracks.annotators.all_features
-    ]
-    tracks.enable_features(features_to_compute)
+    # compute the 'area' attribute if needed
+    if (
+        tracks.segmentation is not None
+        and NodeAttr.AREA.value not in df.columns
+        and len(features) > 0
+    ):
+        nodes = tracks.graph.nodes
+        times = tracks.get_times(nodes)
+        computed_attrs = [
+            tracks._compute_node_attrs(node, time)
+            for node, time in zip(nodes, times, strict=False)
+        ]
+        areas = [attrs[NodeAttr.AREA.value] for attrs in computed_attrs]
+        tracks._set_nodes_attr(nodes, NodeAttr.AREA.value, areas)
     return tracks
