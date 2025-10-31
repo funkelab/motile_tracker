@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from funtracks.import_export.import_from_geff import import_from_geff
+from funtracks.import_export.magic_imread import magic_imread
 from qtpy.QtCore import Qt
 from qtpy.QtWidgets import (
     QApplication,
@@ -58,6 +59,12 @@ class ImportGeffDialog(QDialog):
         self.segmentation_widget = SegmentationWidget(root=self.geff_widget.root)
         self.segmentation_widget.none_radio.toggled.connect(
             self._toggle_scale_widget_and_seg_id
+        )
+        self.segmentation_widget.button_group.buttonClicked.connect(
+            self._update_scale_widget
+        )
+        self.segmentation_widget.segmentation_widget.seg_path_updated.connect(
+            self._update_scale_widget
         )
         self.segmentation_widget.segmentation_widget.seg_path_updated.connect(
             self._update_finish_button
@@ -135,16 +142,61 @@ class ImportGeffDialog(QDialog):
             self.prop_map_widget.update_mapping(
                 self.geff_widget.root, self.segmentation_widget.include_seg()
             )
-
-            self.scale_widget._prefill_from_metadata(
-                dict(self.geff_widget.root.attrs.get("geff", {}))
-            )
-            self.scale_widget.setVisible(self.segmentation_widget.include_seg())
+            self._update_scale_widget()
         else:
             self.prop_map_widget.setVisible(False)
             self.scale_widget.setVisible(False)
 
         self._update_finish_button()
+        self._resize_dialog()
+
+    def _update_scale_widget(self) -> None:
+        """Update the scale widget based on segmentation selection.
+
+        Only shows the scale widget when:
+        1. A segmentation option is selected (not "None")
+        2. A valid segmentation path exists
+        3. The segmentation can be loaded successfully
+
+        Loads the segmentation to determine its dimensionality (3D or 4D).
+        """
+        # Check if user has selected to include segmentation
+        include_seg = self.segmentation_widget.include_seg()
+
+        if not include_seg:
+            # "None" is selected, hide scale widget
+            self.scale_widget.setVisible(False)
+            self._resize_dialog()
+            return
+
+        seg_path = self.segmentation_widget.get_segmentation()
+
+        if seg_path is not None and seg_path.exists():
+            try:
+                # Load segmentation to determine ndim
+                seg = magic_imread(seg_path, use_dask=True)
+                ndim = seg.ndim
+
+                # Prefill scale widget with metadata and actual ndim
+                metadata = (
+                    dict(self.geff_widget.root.attrs.get("geff", {}))
+                    if self.geff_widget.root
+                    else {}
+                )
+                self.scale_widget._prefill_from_metadata(metadata, ndim=ndim)
+                self.scale_widget.setVisible(True)
+            except (OSError, ValueError, RuntimeError, KeyError) as e:
+                # If loading fails, hide the scale widget and show error
+                QMessageBox.warning(
+                    self,
+                    "Invalid Segmentation",
+                    f"Could not load segmentation file:\n{seg_path}\n\nError: {e}",
+                )
+                self.scale_widget.setVisible(False)
+        else:
+            # Path doesn't exist yet (user hasn't selected a file)
+            self.scale_widget.setVisible(False)
+
         self._resize_dialog()
 
     def _update_finish_button(self):
@@ -160,7 +212,9 @@ class ImportGeffDialog(QDialog):
         """Toggle visibility of the scale widget based on the 'None' radio button state,
         and update the visibility of the 'seg_id' combobox in the prop map widget."""
 
-        self.scale_widget.setVisible(not checked)
+        # Update scale widget visibility based on whether segmentation is included
+        # and whether a valid path exists
+        self._update_scale_widget()
 
         # Also remove the seg_id from the fields widget
         if len(self.prop_map_widget.mapping_widgets) > 0:
