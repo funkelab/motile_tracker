@@ -39,40 +39,55 @@ class ScaleWidget(QWidget):
         )
         self.setVisible(False)
 
-    def _prefill_from_metadata(self, metadata: dict) -> None:
+    def _prefill_from_metadata(self, metadata: dict, ndim: int | None = None) -> None:
         """Update the scale widget, prefilling with metadata information if possible.
         Args:
             metadata (dict): geff metadata dictionary containing 'axes' key with scaling
-            information.
+                information.
+            ndim (int | None): The actual dimensionality of the segmentation data (3 or 4).
+                If provided, this overrides any inference from metadata. Either ndim or
+                axes in metadata must be provided.
         """
+        axes = metadata.get("axes")
 
-        if len(metadata) > 0:
-            self.setVisible(True)
-            clear_layout(self.scale_layout)
-            self.scale_form_layout = QFormLayout()
+        # We need either ndim or axes to determine dimensionality
+        if ndim is None and not axes:
+            raise ValueError(
+                "Cannot determine dimensionality: either ndim or metadata['axes'] must be provided"
+            )
 
-            # read scaling information from metadata, prefill with 1 for all axes if not
-            # given
-            axes = metadata.get("axes") or []
-            self.scale = list([1.0] * len(axes)) if axes != [] else [1.0, 1.0, 1.0, 1.0]
+        self.setVisible(True)
+        clear_layout(self.scale_layout)
+        self.scale_form_layout = QFormLayout()
+
+        # Determine dimensionality: use actual segmentation ndim if provided, otherwise axes
+        target_ndim = ndim if ndim is not None else len(axes)
+
+        # Initialize scale based on target dimensionality
+        self.scale = [1.0] * target_ndim
+
+        # Get scale values from axes metadata if available
+        if axes:
             lookup = {a["name"].lower(): a.get("scale", 1) or 1 for a in axes}
             self.scale[-1], self.scale[-2] = lookup.get("x", 1), lookup.get("y", 1)
-            if "z" in lookup:
+            if len(self.scale) == 4:
                 self.scale[-3] = lookup.get("z", 1)
 
-            # Spinboxes for scaling in (z), y, x.
-            self.z_label = QLabel("z")
+        # Create spinboxes
+        self.y_spin_box = self._scale_spin_box(self.scale[-2])
+        self.x_spin_box = self._scale_spin_box(self.scale[-1])
+
+        # Only create z spinbox if we have 4D data
+        if len(self.scale) == 4:
             self.z_spin_box = self._scale_spin_box(self.scale[-3])
-            self.z_label.setVisible(len(self.scale) == 4)
-            self.z_spin_box.setVisible(len(self.scale) == 4)
-            self.y_spin_box = self._scale_spin_box(self.scale[-2])
-            self.x_spin_box = self._scale_spin_box(self.scale[-1])
-
+            self.z_label = QLabel("z")
             self.scale_form_layout.addRow(self.z_label, self.z_spin_box)
-            self.scale_form_layout.addRow(QLabel("y"), self.y_spin_box)
-            self.scale_form_layout.addRow(QLabel("x"), self.x_spin_box)
 
-            self.scale_layout.addLayout(self.scale_form_layout)
+        # Add y and x rows to form layout
+        self.scale_form_layout.addRow(QLabel("y"), self.y_spin_box)
+        self.scale_form_layout.addRow(QLabel("x"), self.x_spin_box)
+
+        self.scale_layout.addLayout(self.scale_form_layout)
 
     def _scale_spin_box(self, value: float) -> QDoubleSpinBox:
         """Return a QDoubleSpinBox for scaling values"""
@@ -85,11 +100,14 @@ class ScaleWidget(QWidget):
         return spin_box
 
     def get_scale(self) -> list[float]:
-        """Return the scaling values in the spinboxes as a list of floats. Also return 1
-        for the time dimension.
+        """Return the scaling values in the spinboxes as a list of floats.
+
+        Returns 1 for the time dimension, and then the spatial scales based on
+        whether the data is 3D (time, y, x) or 4D (time, z, y, x).
         """
 
         if len(self.scale) == 4:
+            # 4D data
             scale = [
                 1,
                 self.z_spin_box.value(),
@@ -97,6 +115,7 @@ class ScaleWidget(QWidget):
                 self.x_spin_box.value(),
             ]
         else:
+            # 3D data
             scale = [
                 1,
                 self.y_spin_box.value(),
