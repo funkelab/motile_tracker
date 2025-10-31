@@ -76,8 +76,8 @@ class MeasurementWidget(QWidget):
     def emit_update_features(self):
         self.update_features.emit()
 
-    def get_measurements(self) -> list[str]:
-        """Return the selected measurements as a list of strings"""
+    def get_measurements(self) -> dict[str, str]:
+        """Return the selected measurements as a dict of strings"""
 
         selected_measurements = []
         for prop_name, checkbox in self.measurement_checkboxes.items():

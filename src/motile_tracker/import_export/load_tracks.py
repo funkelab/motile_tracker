@@ -167,6 +167,8 @@ def tracks_from_df(
     """
     if features is None:
         features = {}
+    # TODO: possibly don't accept the upper case keys anymore...
+    features = {key.lower(): val for key, val in features.items()}
     # check that the required columns are present
     required_columns = ["id", NodeAttr.TIME.value, "y", "x", "parent_id"]
     ndim = None
@@ -222,14 +224,15 @@ def tracks_from_df(
             NodeAttr.POS.value: pos,
         }
 
-        # add all other columns into the attributes
-        for attr in required_columns:
-            del row_dict[attr]
-        attrs.update(row_dict)
+        # add extra columns into the attributes
+        extra_attrs = {}
+        for attr in row_dict:
+            if attr in features:
+                extra_attrs[attr] = row_dict[attr]
+        attrs.update(extra_attrs)
 
         if "track_id" in df.columns:
             attrs[NodeAttr.TRACK_ID.value] = int(row["track_id"])
-
         # add the node to the graph
         graph.add_node(_id, **attrs)
 
@@ -244,9 +247,11 @@ def tracks_from_df(
     # in the case a different column than the id column was used for the seg_id, we need
     # to update the segmentation to make sure it matches the values in the id column (it
     # should be checked by now that these are unique and integers)
-    if segmentation is not None and row["seg_id"] != row["id"]:
+    if segmentation is not None and (df["seg_id"] != df["id"]).any():
         segmentation = ensure_correct_labels(df, segmentation)
 
+    # Create SolutionTracks - features from CSV columns are already on the graph nodes
+    # and will be auto-detected by funtracks (not recomputed)
     tracks = SolutionTracks(
         graph=graph,
         segmentation=segmentation,
@@ -255,6 +260,14 @@ def tracks_from_df(
         ndim=ndims,
         scale=scale,
     )
+    # TODO: update for funtracks with features
+    # # Enable features marked for recomputation
+    # features_to_compute = [
+    #     feat
+    #     for feat, val in features.items()
+    #     if val == "Recompute" and feat in tracks.annotators.all_features
+    # ]
+    # tracks.enable_features(features_to_compute)
 
     # compute the 'area' attribute if needed
     if (
@@ -270,5 +283,4 @@ def tracks_from_df(
         ]
         areas = [attrs[NodeAttr.AREA.value] for attrs in computed_attrs]
         tracks._set_nodes_attr(nodes, NodeAttr.AREA.value, areas)
-
     return tracks
