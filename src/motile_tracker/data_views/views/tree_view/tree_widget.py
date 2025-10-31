@@ -503,6 +503,7 @@ class TreeWidget(QWidget):
             Qt.Key_D: self.delete_node,
             Qt.Key_A: self.create_edge,
             Qt.Key_B: self.delete_edge,
+            Qt.Key_S: self.swap_edges,
             Qt.Key_Z: self.undo,
             Qt.Key_R: self.redo,
             Qt.Key_Q: self.toggle_display_mode,
@@ -541,6 +542,10 @@ class TreeWidget(QWidget):
     def delete_edge(self):
         """Delete an edge."""
         self.tracks_viewer.delete_edge()
+
+    def swap_edges(self):
+        """Swap the nodes by swapping upstream edges"""
+        self.tracks_viewer.swap_edges()
 
     def undo(self):
         """Undo action."""

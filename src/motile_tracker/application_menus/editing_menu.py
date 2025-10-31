@@ -53,7 +53,7 @@ class EditingMenu(QWidget):
         node_box.setLayout(node_box_layout)
 
         edge_box = QGroupBox("Edit Edge(s)")
-        edge_box.setMaximumHeight(100)
+        edge_box.setMaximumHeight(150)
         edge_box_layout = QVBoxLayout()
 
         self.delete_edge_btn = QPushButton("Break [B]")
@@ -62,9 +62,13 @@ class EditingMenu(QWidget):
         self.create_edge_btn = QPushButton("Add [A]")
         self.create_edge_btn.clicked.connect(self.tracks_viewer.create_edge)
         self.create_edge_btn.setEnabled(False)
+        self.swap_edges_btn = QPushButton("Swap [S]")
+        self.swap_edges_btn.clicked.connect(self.tracks_viewer.swap_edges)
+        self.swap_edges_btn.setEnabled(False)
 
         edge_box_layout.addWidget(self.delete_edge_btn)
         edge_box_layout.addWidget(self.create_edge_btn)
+        edge_box_layout.addWidget(self.swap_edges_btn)
 
         edge_box.setLayout(edge_box_layout)
 
@@ -80,7 +84,7 @@ class EditingMenu(QWidget):
         layout.addWidget(self.redo_btn)
 
         self.setLayout(layout)
-        self.setMaximumHeight(400)
+        self.setMaximumHeight(450)
 
     def update_track_id_color(self):
         """Display track ID value and color"""
@@ -108,6 +112,7 @@ class EditingMenu(QWidget):
             # self.linear_node_btn.setEnabled(False)
             self.delete_edge_btn.setEnabled(False)
             self.create_edge_btn.setEnabled(False)
+            self.swap_edges_btn.setEnabled(False)
 
         elif n_selected == 2:
             self.delete_node_btn.setEnabled(True)
@@ -116,6 +121,7 @@ class EditingMenu(QWidget):
             # self.linear_node_btn.setEnabled(True)
             self.delete_edge_btn.setEnabled(True)
             self.create_edge_btn.setEnabled(True)
+            self.swap_edges_btn.setEnabled(True)
 
         else:
             self.delete_node_btn.setEnabled(True)

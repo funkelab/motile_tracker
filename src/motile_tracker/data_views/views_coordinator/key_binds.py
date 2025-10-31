@@ -14,6 +14,7 @@ KEYMAP = {
     "create_edge": ["a"],
     "delete_node": ["d", "Delete"],
     "delete_edge": ["b"],
+    "swap_edges": ["s"],
     "undo": ["z"],
     "redo": ["r"],
 }
