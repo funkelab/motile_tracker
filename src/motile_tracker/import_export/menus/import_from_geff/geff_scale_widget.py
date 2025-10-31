@@ -99,12 +99,16 @@ class ScaleWidget(QWidget):
         spin_box.setDecimals(3)
         return spin_box
 
-    def get_scale(self) -> list[float]:
+    def get_scale(self) -> list[float] | None:
         """Return the scaling values in the spinboxes as a list of floats.
 
         Returns 1 for the time dimension, and then the spatial scales based on
         whether the data is 3D (time, y, x) or 4D (time, z, y, x).
+
+        Returns None if the scale widget hasn't been initialized (no segmentation).
         """
+        if self.scale is None:
+            return None
 
         if len(self.scale) == 4:
             # 4D data
