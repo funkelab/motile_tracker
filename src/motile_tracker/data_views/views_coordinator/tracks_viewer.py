@@ -286,12 +286,17 @@ class TracksViewer:
                     edges=np.array([[node1, node2]]), force=self.force
                 )
             except InvalidActionError as e:
-                force, always_force = confirm_force_operation(message=str(e))
-                self.force = always_force
-                if force:
-                    self.tracks_controller.add_edges(
-                        edges=np.array([[node1, node2]]), force=True
-                    )
+                if e.forceable:
+                    # Ask the user if the action should be forced
+                    force, always_force = confirm_force_operation(message=str(e))
+                    self.force = always_force
+                    if force:
+                        self.tracks_controller.add_edges(
+                            edges=np.array([[node1, node2]]), force=True
+                        )
+                else:
+                    # Re-raise the exception if it is not forceable
+                    raise
 
     def undo(self, event=None):
         self.tracks_controller.undo()

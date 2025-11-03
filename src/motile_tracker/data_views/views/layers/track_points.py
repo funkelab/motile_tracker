@@ -211,17 +211,18 @@ class TrackPoints(napari.layers.Points):
                         attributes, force=self.tracks_viewer.force
                     )
                 except InvalidActionError as e:
-                    # If the action is invalid, ask the user if they want to force it anyway
-                    force, always_force = confirm_force_operation(message=str(e))
-                    self.tracks_viewer.force = always_force
-                    self._refresh()
-                    if force:
-                        self.tracks_viewer.tracks_controller.add_nodes(
-                            attributes, force=True
-                        )
-                except (ValueError, RuntimeError) as e:
-                    warnings.warn(str(e), stacklevel=2)
-                    self._refresh()
+                    if e.forceable:
+                        # If the action is invalid but forceable, ask the user if they want to do so
+                        force, always_force = confirm_force_operation(message=str(e))
+                        self.tracks_viewer.force = always_force
+                        self._refresh()
+                        if force:
+                            self.tracks_viewer.tracks_controller.add_nodes(
+                                attributes, force=True
+                            )
+                    else:
+                        warnings.warn(str(e), stacklevel=2)
+                        self._refresh()
             else:
                 show_info(
                     "Mixed point and segmentation nodes not allowed: add points by "
