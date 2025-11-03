@@ -8,11 +8,13 @@ from funtracks.data_model import NodeType, SolutionTracks
 from funtracks.data_model.tracks_controller import TracksController
 from psygnal import Signal
 
-from motile_tracker.data_views.graph_attributes import NodeAttr
 from motile_tracker.data_views.views.layers.track_labels import new_label
 from motile_tracker.data_views.views.layers.tracks_layer_group import TracksLayerGroup
 from motile_tracker.data_views.views.tree_view.tree_widget_utils import (
     extract_lineage_tree,
+)
+from motile_tracker.data_views.views_coordinator.groups import (
+    CollectionWidget,
 )
 from motile_tracker.data_views.views_coordinator.key_binds import (
     KEYMAP,
@@ -71,6 +73,9 @@ class TracksViewer:
         self.selected_track = None
         self.track_id_color = [0, 0, 0, 0]
 
+        self.collection_widget = CollectionWidget(self)
+        self.collection_widget.group_changed.connect(self.update_selection)
+
         self.set_keybinds()
 
     def set_keybinds(self):
@@ -115,6 +120,7 @@ class TracksViewer:
         self.tracking_layers._refresh()
 
         self.tracks_updated.emit(refresh_view)
+        self.collection_widget._refresh()
 
         # if a new node was added, we would like to select this one now (call this after
         # emitting the signal, because if the node is a new node, we have to update the
@@ -150,6 +156,9 @@ class TracksViewer:
             if isinstance(layer, (napari.layers.Labels | napari.layers.Points)):
                 layer.visible = False
 
+        # retrieve existing groups
+        self.collection_widget.retrieve_existing_groups()
+
         self.set_display_mode("all")
         self.tracking_layers.set_tracks(tracks, name)
         self.selected_nodes.reset()
@@ -164,32 +173,40 @@ class TracksViewer:
         """Toggle the display mode between available options"""
 
         if self.mode == "lineage":
+            self.set_display_mode("group")
+        elif self.mode == "group":
             self.set_display_mode("all")
         else:
             self.set_display_mode("lineage")
 
     def set_display_mode(self, mode: str) -> None:
-        """Update the display mode and call to update colormaps for points, labels, and
-        tracks
-        """
+        """Update the display mode and call to update colormaps for points, labels, and tracks"""
 
         # toggle between 'all' and 'lineage'
         if mode == "lineage":
             self.mode = "lineage"
             self.viewer.text_overlay.text = "Toggle Display [Q]\n Lineage"
+        elif mode == "group":
+            self.mode = "group"
+            self.viewer.text_overlay.text = "Toggle Display [Q]\n Group"
         else:
             self.mode = "all"
             self.viewer.text_overlay.text = "Toggle Display [Q]\n All"
 
         self.viewer.text_overlay.visible = True
-        visible_tracks = self.filter_visible_nodes()
-        self.tracking_layers.update_visible(visible_tracks, self.visible)
+        self.filter_visible_nodes()
+        self.tracking_layers.update_visible(self.visible)
 
-    def filter_visible_nodes(self) -> list[int]:
-        """Construct a list of track_ids that should be displayed"""
+    def filter_visible_nodes(self) -> list[int] | str:
+        """Construct a list of node_ids that should be displayed according to the display
+        mode: 'all', 'lineage', or 'group'). Note that whether a node is truly
+        displayed also depends on whether it is in the current selection (not computed
+        here). Additionally, if the mode is 'lineage' and the selection is cleared we
+        keep the previous list of nodes visible to not have an entirely empty viewer.
+        """
 
         if self.tracks is None or self.tracks.graph is None:
-            return []
+            self.visible = []
         if self.mode == "lineage":
             # if no nodes are selected, check which nodes were previously visible and
             # filter those
@@ -206,22 +223,22 @@ class TracksViewer:
                 self.visible = []
                 for node in self.selected_nodes:
                     self.visible += extract_lineage_tree(self.tracks.graph, node)
-
-            return list(
-                {
-                    self.tracks.graph.nodes[node][NodeAttr.TRACK_ID.value]
-                    for node in self.visible
-                }
-            )
-        self.visible = "all"
-        return "all"
+        elif self.mode == "group":
+            if self.collection_widget.selected_collection is not None:
+                self.visible = list(
+                    self.collection_widget.selected_collection.collection
+                )
+            else:
+                self.visible = []
+        else:
+            self.visible = "all"
 
     def update_selection(self) -> None:
         """Sets the view and triggers visualization updates in other components"""
 
         self.set_napari_view()
-        visible_tracks = self.filter_visible_nodes()
-        self.tracking_layers.update_visible(visible_tracks, self.visible)
+        self.filter_visible_nodes()
+        self.tracking_layers.update_visible(self.visible)
 
         if len(self.selected_nodes) > 0:
             self.selected_track = self.tracks.get_track_id(self.selected_nodes[-1])

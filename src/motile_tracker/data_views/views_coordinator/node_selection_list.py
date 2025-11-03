@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import copy
+
 from psygnal import Signal
 from qtpy.QtCore import QObject
 
@@ -20,6 +22,7 @@ class NodeSelectionList(QObject):
         present and the keyboard modifiers used. Emit update signal
         """
 
+        self._prev_list = copy.deepcopy(self._list)
         # first check if this node was already present, if so, remove it.
         if item in self._list:
             self._list.remove(item)
@@ -39,6 +42,7 @@ class NodeSelectionList(QObject):
     def add_list(self, items: list, append: bool | None = False):
         """Add nodes from a list and emit a single signal"""
 
+        self._prev_list = copy.deepcopy(self._list)
         if append:
             for item in items:
                 if item in self._list:
@@ -58,7 +62,13 @@ class NodeSelectionList(QObject):
 
     def reset(self):
         """Empty list and emit update signal"""
+        self._prev_list = copy.deepcopy(self._list)
         self._list = []
+        self.list_updated.emit()
+
+    def restore(self):
+        """Restore the previous list of nodes"""
+        self._list = copy.deepcopy(self._prev_list)
         self.list_updated.emit()
 
     def __getitem__(self, index):
