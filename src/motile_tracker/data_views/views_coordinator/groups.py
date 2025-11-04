@@ -1,23 +1,30 @@
 from __future__ import annotations
 
 from functools import partial
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from fonticon_fa6 import FA6S
 from funtracks.features._feature import Feature
+from funtracks.import_export.export_to_geff import export_to_geff
 from napari._qt.qt_resources import QColoredSVGIcon
 from qtpy.QtCore import Signal
 from qtpy.QtWidgets import (
     QAbstractItemView,
+    QFileDialog,
     QGroupBox,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QLineEdit,
     QListWidget,
     QListWidgetItem,
+    QMessageBox,
     QPushButton,
     QVBoxLayout,
     QWidget,
 )
+from superqt.fonticon import icon as qticon
 
 from motile_tracker.data_views.views.tree_view.tree_widget_utils import (
     extract_lineage_tree,
@@ -25,6 +32,31 @@ from motile_tracker.data_views.views.tree_view.tree_widget_utils import (
 
 if TYPE_CHECKING:
     from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
+
+import networkx as nx
+
+
+def filter_graph_with_ancestors(graph: nx.DiGraph, nodes_to_keep: set) -> list[int]:
+    """
+    Filter a graph to keep only the nodes in `nodes_to_keep` and their ancestors.
+
+    Args:
+        graph (nx.DiGraph): The original directed graph.
+        nodes_to_keep (set): The set of nodes to keep in the graph.
+
+    Returns:
+        list[int]: A subset of the original nodes in the graph containing only the nodes
+            in `nodes_to_keep` and their ancestors.
+    """
+    # Set to store all nodes to keep, including ancestors
+    all_nodes_to_keep = set(nodes_to_keep)
+
+    # Traverse ancestors for each node in nodes_to_keep
+    for node in nodes_to_keep:
+        ancestors = nx.ancestors(graph, node)  # Get all ancestors of the node
+        all_nodes_to_keep.update(ancestors)  # Add ancestors to the set
+
+    return list(all_nodes_to_keep)
 
 
 class CollectionButton(QWidget):
@@ -38,13 +70,22 @@ class CollectionButton(QWidget):
         self.collection = set()
         delete_icon = QColoredSVGIcon.from_resources("delete").colored("white")
         self.node_count = QLabel(f"{len(self.collection)} nodes")
+
+        export_icon = qticon(FA6S.file_export, color="white")
+        self.export = QPushButton(icon=export_icon)
+        self.export.setFixedSize(20, 20)
+        self.export.setToolTip("Export nodes in this group to CSV or geff")
+
         self.delete = QPushButton(icon=delete_icon)
         self.delete.setFixedSize(20, 20)
         layout = QHBoxLayout()
         layout.setSpacing(1)
         layout.addWidget(self.name)
         layout.addWidget(self.node_count)
+        layout.addWidget(self.export)
         layout.addWidget(self.delete)
+        layout.setSpacing(10)
+
         self.setLayout(layout)
 
     def sizeHint(self):
@@ -243,7 +284,6 @@ class CollectionWidget(QWidget):
             for group_name, group_dict in self.tracks_viewer.tracks.features.items()
             if group_dict["is_group"]
         ]
-        print("these are the existing group features on tracks", group_features)
         group_dict = {}
         for group_name, _ in group_features:
             if group_name not in group_dict:
@@ -252,7 +292,6 @@ class CollectionWidget(QWidget):
                     for node in self.tracks_viewer.tracks.nodes()
                     if self.tracks_viewer.tracks.get_node_attr(node, group_name)
                 ]
-                print("these nodes are in group", group_name, nodes)
                 group_dict[group_name] = nodes
                 self.add_group(name=group_name, select=True)
                 self.selected_collection.collection = set(group_dict[group_name])
@@ -395,7 +434,6 @@ class CollectionWidget(QWidget):
                 in the QListWidget. Defaults to True.
         """
 
-        print("adding new group!", name)
         if name is None:
             name = self.group_name.text()
 
@@ -411,14 +449,13 @@ class CollectionWidget(QWidget):
         item.setSizeHint(group_row.minimumSizeHint())
         self.collection_list.addItem(item)
         group_row.delete.clicked.connect(partial(self._remove_group, item))
+        group_row.export.clicked.connect(partial(self.show_export_dialog, item))
+
         if select:
             self.collection_list.setCurrentRow(len(self.collection_list) - 1)
 
-        print("new row should have been added")
-
         # Register group as new feature on Tracks
         if name not in self.tracks_viewer.tracks.features:
-            print("adding this group feature to Tracks", name)
             new_feature_key = name
             new_feature: Feature = {
                 "feature_type": "node",  # This is a node feature
@@ -449,4 +486,80 @@ class CollectionWidget(QWidget):
         # remove from the features on Tracks
         del self.tracks_viewer.tracks.features[group_name]
 
-        print("removed this group", group_name)
+    def show_export_dialog(self, item: QListWidgetItem) -> None:
+        """Prompt user to choose export format (csv or geff), then export the nodes
+         belonging to this group.
+        You must pass the list item that represents the group.
+
+        Args:
+            item (QListWidgetItem):  The list item containing the CollectionButton that
+                represents a group of nodes.
+
+        """
+
+        group_name = self.collection_list.itemWidget(item).name.text()
+
+        export_type, ok = QInputDialog.getItem(
+            self,
+            "Select Export Type",
+            (
+                f"<p style='white-space: normal;'>"
+                f"<i>Export all nodes in group </i>"
+                f"<span style='color: green;'><b>{group_name}.</b></span><br>"
+                f"<i>Note that ancestors will also be included to maintain a valid graph.</i>"
+                f"</p>"
+                f"<p>Choose export format:</p>"
+            ),
+            ["CSV", "geff"],
+            0,
+            False,
+        )
+
+        if not ok:
+            return
+
+        # Keep nodes that belong to the selected group
+        nodes_to_keep = self.collection_list.itemWidget(item).collection
+        nodes_to_keep = filter_graph_with_ancestors(
+            self.tracks_viewer.tracks.graph, nodes_to_keep
+        )
+
+        if export_type == "CSV":
+            file_dialog = QFileDialog(self)
+            file_dialog.setFileMode(QFileDialog.AnyFile)
+            file_dialog.setAcceptMode(QFileDialog.AcceptSave)
+            file_dialog.setNameFilter("CSV files (*.csv)")
+            file_dialog.setDefaultSuffix("csv")
+            default_file = f"{group_name}_tracks.csv"
+            base_path = Path(file_dialog.directory().path())
+            file_dialog.selectFile(str(base_path / default_file))
+
+            if file_dialog.exec_():
+                file_path = Path(file_dialog.selectedFiles()[0])
+                self.tracks_viewer.tracks.export_tracks(file_path, nodes_to_keep)
+
+        elif export_type == "geff":
+            default_file = f"{group_name}_geff.zarr"
+
+            file_dialog = QFileDialog(self, "Save as geff file")
+            file_dialog.setFileMode(QFileDialog.AnyFile)
+            file_dialog.setAcceptMode(QFileDialog.AcceptSave)
+            file_dialog.setNameFilter("Zarr folder (*.zarr)")
+            file_dialog.setDefaultSuffix("zarr")
+
+            # Set default selected file
+            base_path = Path.home()
+            file_dialog.selectFile(str(base_path / default_file))
+
+            if file_dialog.exec_():
+                file_path = Path(file_dialog.selectedFiles()[0])
+                try:
+                    export_to_geff(
+                        self.tracks_viewer.tracks,
+                        file_path,
+                        overwrite=True,
+                        node_ids=nodes_to_keep,
+                    )  # QFileDialog
+                    # already asks whether to overwrite in an existing directory
+                except ValueError as e:
+                    QMessageBox.warning(self, "Export Error", str(e))
