@@ -115,7 +115,7 @@ def _test_valid(
         )
         return False
 
-    seg_id = row[NodeAttr.SEG_ID.value]
+    seg_id = row["seg_id"]
     coordinates = [
         int(coord / scale_value) for coord, scale_value in zip(pos, scale, strict=True)
     ]
