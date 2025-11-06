@@ -203,7 +203,7 @@ class ImportGeffDialog(QDialog):
                     geff_dir,
                     name_map,
                     segmentation_path=segmentation,
-                    extra_features=extra_features,
+                    node_features=extra_features,
                     scale=scale,
                 )
             except (ValueError, OSError, FileNotFoundError, AssertionError) as e:
