@@ -146,16 +146,16 @@ class CollectionWidget(QWidget):
         select_widget.setLayout(selection_layout)
 
         # edit layout
-        edit_widget = QGroupBox("Edit")
+        edit_widget = QGroupBox("Edit group")
         edit_layout = QVBoxLayout()
 
         add_layout = QHBoxLayout()
         self.add_nodes_btn = QPushButton("Add node(s)")
         self.add_nodes_btn.clicked.connect(self._add_selection)
         self.add_track_btn = QPushButton("Add track(s)")
-        self.add_track_btn.clicked.connect(self._add_track)
+        self.add_track_btn.clicked.connect(lambda: self._add_track(add=True))
         self.add_lineage_btn = QPushButton("Add lineage(s)")
-        self.add_lineage_btn.clicked.connect(self._add_lineage)
+        self.add_lineage_btn.clicked.connect(lambda: self._add_lineage(add=True))
         add_layout.addWidget(self.add_nodes_btn)
         add_layout.addWidget(self.add_track_btn)
         add_layout.addWidget(self.add_lineage_btn)
@@ -164,9 +164,9 @@ class CollectionWidget(QWidget):
         self.remove_node_btn = QPushButton("Remove node(s)")
         self.remove_node_btn.clicked.connect(self._remove_selection)
         self.remove_track_btn = QPushButton("Remove track(s)")
-        self.remove_track_btn.clicked.connect(self._remove_track)
+        self.remove_track_btn.clicked.connect(lambda: self._add_track(add=False))
         self.remove_lineage_btn = QPushButton("Remove lineage(s)")
-        self.remove_lineage_btn.clicked.connect(self._remove_lineage)
+        self.remove_lineage_btn.clicked.connect(lambda: self._add_lineage(add=False))
         remove_layout.addWidget(self.remove_node_btn)
         remove_layout.addWidget(self.remove_track_btn)
         remove_layout.addWidget(self.remove_lineage_btn)
@@ -182,7 +182,7 @@ class CollectionWidget(QWidget):
         new_group_layout.addWidget(self.group_name)
         self.new_group_button = QPushButton("Create")
         self.new_group_button.clicked.connect(
-            lambda: self.add_group(name=None, select=True)
+            lambda: self._add_group(name=None, select=True)
         )
         new_group_layout.addWidget(self.new_group_button)
         new_group_box.setLayout(new_group_layout)
@@ -249,17 +249,21 @@ class CollectionWidget(QWidget):
         self.tracks_viewer.selected_nodes.add_list(nodes, append=False)
 
     def _refresh(self) -> None:
-        """Removes nodes that are no longer existing from the collection"""
+        """Keep the node collection in sync with the node group attributes on the graph"""
 
-        selected = self.collection_list.selectedItems()
-        if selected:
-            self.selected_collection = self.collection_list.itemWidget(selected[0])
-            nodes = self.selected_collection.collection
+        # TODO Currently, this function only removes nodes that no longer exist in the
+        # graph. When undoing an action, a node can be put back in the graph, but in the
+        # current state it is not added back to the collection.
+
+        items = [
+            self.collection_list.itemWidget(self.collection_list.item(i))
+            for i in range(self.collection_list.count())
+        ]
+        for item in items:
+            nodes = item.collection
             graph_nodes = set(self.tracks_viewer.tracks.graph.nodes)
-            self.selected_collection.collection = {
-                item for item in nodes if item in graph_nodes
-            }
-            self.selected_collection.update_node_count()
+            item.collection = {item for item in nodes if item in graph_nodes}
+            item.update_node_count()
 
     def _select_nodes(self) -> None:
         """Select all nodes in the collection"""
@@ -293,7 +297,7 @@ class CollectionWidget(QWidget):
                     if self.tracks_viewer.tracks.get_node_attr(node, group_name)
                 ]
                 group_dict[group_name] = nodes
-                self.add_group(name=group_name, select=True)
+                self._add_group(name=group_name, select=True)
                 self.selected_collection.collection = set(group_dict[group_name])
                 self.selected_collection.update_node_count()  # update node count
 
@@ -309,7 +313,7 @@ class CollectionWidget(QWidget):
 
         self._update_buttons_and_node_count()
 
-    def add_nodes(self, nodes: list[Any] | None = None) -> None:
+    def _add_nodes(self, nodes: list[Any] | None = None) -> None:
         """Add individual nodes to the selected collection and send update signal
 
         Args:
@@ -332,43 +336,55 @@ class CollectionWidget(QWidget):
     def _add_selection(self) -> None:
         """Add the currently selected node(s) to the collection"""
 
-        self.add_nodes(self.tracks_viewer.selected_nodes._list)
+        self._add_nodes(self.tracks_viewer.selected_nodes._list)
 
-    def _add_track(self) -> None:
-        """Add the tracks belonging to selected nodes to the selected collection"""
+    def _add_track(self, add: bool = True) -> None:
+        """Adds or removes the tracks belonging to selected nodes to the selected
+        collection.
 
-        track_ids = []
-        for node_id in self.tracks_viewer.selected_nodes:
+        Args:
+            add (bool=True): when True, will add the nodes to the collection, when False,
+            it will remove them.
+        """
+
+        selected = set(self.tracks_viewer.selected_nodes)
+        nodes_to_process = []
+
+        while selected:
+            node_id = selected.pop()
             track_id = self.tracks_viewer.tracks.get_track_id(node_id)
-            if track_id in track_ids:
-                continue  # skip, since we already added all nodes with this track id
-            else:
-                track = list(
-                    {
-                        node
-                        for node, data in self.tracks_viewer.tracks.graph.nodes(
-                            data=True
-                        )
-                        if data.get("track_id") == track_id
-                    }
-                )
-                self.add_nodes(track)
-                track_ids.append(track_id)
+            track = [
+                node
+                for node in self.tracks_viewer.tracks.graph.nodes
+                if self.tracks_viewer.tracks.get_track_id(node) == track_id
+            ]
+            nodes_to_process.extend(track)
+            selected.difference_update(track)
 
-    def _add_lineage(self) -> None:
-        """Add lineages to the selected collection"""
+        self._add_nodes(nodes_to_process) if add else self._remove_nodes(
+            nodes_to_process
+        )
 
-        track_ids = []
-        for node_id in self.tracks_viewer.selected_nodes:
-            track_id = self.tracks_viewer.tracks.get_track_id(node_id)
-            if track_id in track_ids:
-                continue  # skip, since we already added all nodes with this track id
-            else:
-                lineage = extract_lineage_tree(self.tracks_viewer.tracks.graph, node_id)
-                track_ids.append(track_id)
-            self.add_nodes(lineage)
+    def _add_lineage(self, add: bool = True) -> None:
+        """Add or remove lineages to/from the selected collection
+        Args:
+            add (bool=True): when True, will add the nodes to the collection, when False,
+            it will remove them.
+        """
 
-    def remove_nodes(self, nodes: list[Any]) -> None:
+        selected = set(self.tracks_viewer.selected_nodes)
+        nodes_to_process = []
+
+        while selected:
+            node_id = selected.pop()
+            lineage = extract_lineage_tree(self.tracks_viewer.tracks.graph, node_id)
+            nodes_to_process.extend(lineage)
+            selected.difference_update(lineage)
+        self._add_nodes(nodes_to_process) if add else self._remove_nodes(
+            nodes_to_process
+        )
+
+    def _remove_nodes(self, nodes: list[Any]) -> None:
         """Remove selected nodes from the selected collection"""
 
         if self.selected_collection is not None:
@@ -388,43 +404,9 @@ class CollectionWidget(QWidget):
     def _remove_selection(self) -> None:
         """Remove individual nodes from the selected collection"""
 
-        self.remove_nodes(self.tracks_viewer.selected_nodes)
+        self._remove_nodes(self.tracks_viewer.selected_nodes)
 
-    def _remove_track(self) -> None:
-        """Remove tracks by track id from the selected collection"""
-
-        track_ids = []
-        for node_id in self.tracks_viewer.selected_nodes:
-            track_id = self.tracks_viewer.tracks.get_track_id(node_id)
-            if track_id in track_ids:
-                continue
-            else:
-                track = list(
-                    {
-                        node
-                        for node, data in self.tracks_viewer.tracks.graph.nodes(
-                            data=True
-                        )
-                        if data.get("track_id") == track_id
-                    }
-                )
-                self.remove_nodes(track)
-                track_ids.append(track_id)
-
-    def _remove_lineage(self) -> None:
-        """Remove lineages from the selected collection"""
-
-        track_ids = []
-        for node_id in self.tracks_viewer.selected_nodes:
-            track_id = self.tracks_viewer.tracks.get_track_id(node_id)
-            if track_id in track_ids:
-                continue
-            else:
-                lineage = extract_lineage_tree(self.tracks_viewer.tracks.graph, node_id)
-                self.remove_nodes(lineage)
-                track_ids.append(track_id)
-
-    def add_group(self, name: str | None = None, select: bool = True) -> None:
+    def _add_group(self, name: str | None = None, select: bool = True) -> None:
         """Create a new custom group
 
         Args:
@@ -449,7 +431,7 @@ class CollectionWidget(QWidget):
         item.setSizeHint(group_row.minimumSizeHint())
         self.collection_list.addItem(item)
         group_row.delete.clicked.connect(partial(self._remove_group, item))
-        group_row.export.clicked.connect(partial(self.show_export_dialog, item))
+        group_row.export.clicked.connect(partial(self._show_export_dialog, item))
 
         if select:
             self.collection_list.setCurrentRow(len(self.collection_list) - 1)
@@ -486,7 +468,7 @@ class CollectionWidget(QWidget):
         # remove from the features on Tracks
         del self.tracks_viewer.tracks.features[group_name]
 
-    def show_export_dialog(self, item: QListWidgetItem) -> None:
+    def _show_export_dialog(self, item: QListWidgetItem) -> None:
         """Prompt user to choose export format (csv or geff), then export the nodes
          belonging to this group.
         You must pass the list item that represents the group.
