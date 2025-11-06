@@ -1,2 +1,2 @@
-from .menus.import_external_tracks_dialog import ImportTracksDialog  # noqa
+from .menus.import_from_csv.csv_import_dialog import ImportCSVDialog  # noqa
 from .load_tracks import tracks_from_df  # noqa

@@ -1,6 +1,3 @@
-from pathlib import Path
-
-from funtracks.import_export.import_from_geff import import_from_geff
 from qtpy.QtCore import Qt
 from qtpy.QtWidgets import (
     QApplication,
@@ -14,27 +11,34 @@ from qtpy.QtWidgets import (
     QWidget,
 )
 
-from motile_tracker.import_export.menus.import_from_geff.geff_import_widget import (
-    ImportGeffWidget,
+from motile_tracker.import_export.load_tracks import tracks_from_df
+from motile_tracker.import_export.menus.import_from_csv.csv_dimension_widget import (
+    DimensionWidget,
 )
-from motile_tracker.import_export.menus.import_from_geff.geff_prop_map_widget import (
+from motile_tracker.import_export.menus.import_from_csv.csv_import_widget import (
+    ImportCSVWidget,
+)
+from motile_tracker.import_export.menus.import_from_csv.csv_prop_map_widget import (
     StandardFieldMapWidget,
 )
-from motile_tracker.import_export.menus.import_from_geff.geff_scale_widget import (
+from motile_tracker.import_export.menus.import_from_csv.csv_scale_widget import (
     ScaleWidget,
 )
-from motile_tracker.import_export.menus.import_from_geff.geff_segmentation_widgets import (
+from motile_tracker.import_export.menus.import_from_csv.csv_segmentation_widget import (
     SegmentationWidget,
 )
 
 
-class ImportGeffDialog(QDialog):
-    """Dialgo for importing external tracks from a geff file"""
+class ImportCSVDialog(QDialog):
+    """Dialog for importing external tracks from a csv file"""
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Import external tracks from geff")
-        self.name = "Tracks from Geff"
+        self.setWindowTitle("Import external tracks from csv")
+        self.name = "Tracks from CSV"
+        self.df = None
+        self.incl_z = False
+        self.seg = False
 
         # cancel and finish buttons
         self.button_layout = QHBoxLayout()
@@ -53,22 +57,26 @@ class ImportGeffDialog(QDialog):
         self.finish_button.setAutoDefault(False)
 
         # Initialize widgets and connect to update signals
-        self.geff_widget = ImportGeffWidget()
-        self.geff_widget.update_buttons.connect(self._update_segmentation_widget)
-        self.segmentation_widget = SegmentationWidget(root=self.geff_widget.root)
+        self.content_widget = QWidget()
+
+        self.csv_widget = ImportCSVWidget()
+        self.segmentation_widget = SegmentationWidget()
         self.segmentation_widget.none_radio.toggled.connect(
             self._toggle_scale_widget_and_seg_id
         )
         self.segmentation_widget.segmentation_widget.seg_path_updated.connect(
             self._update_finish_button
         )
-        self.prop_map_widget = StandardFieldMapWidget()
-        self.geff_widget.update_buttons.connect(self._update_field_map_widget)
+        self.prop_map_widget = StandardFieldMapWidget(self.df, self.incl_z, self.seg)
+        self.csv_widget.update_buttons.connect(self._update_field_map_widget)
+        self.csv_widget.update_buttons.connect(self._update_finish_button)
         self.scale_widget = ScaleWidget()
+        self.dimension_widget = DimensionWidget()
+        self.dimension_widget.update_dims.connect(self._update_field_map_widget)
 
-        self.content_widget = QWidget()
         main_layout = QVBoxLayout(self.content_widget)
-        main_layout.addWidget(self.geff_widget)
+        main_layout.addWidget(self.csv_widget)
+        main_layout.addWidget(self.dimension_widget)
         main_layout.addWidget(self.segmentation_widget)
         main_layout.addWidget(self.prop_map_widget)
         main_layout.addWidget(self.scale_widget)
@@ -80,9 +88,9 @@ class ImportGeffDialog(QDialog):
         self.scroll_area.setWidget(self.content_widget)
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.scroll_area.setMinimumWidth(500)
+        self.scroll_area.setMinimumWidth(700)
         self.scroll_area.setSizePolicy(
-            QSizePolicy.Preferred, QSizePolicy.MinimumExpanding
+            QSizePolicy.Expanding, QSizePolicy.MinimumExpanding
         )
 
         dialog_layout = QVBoxLayout()
@@ -120,28 +128,14 @@ class ImportGeffDialog(QDialog):
 
         self.move(x, y)
 
-    def _update_segmentation_widget(self) -> None:
-        """Refresh the segmentation widget based on the geff root group."""
-
-        if self.geff_widget.root is not None:
-            self.segmentation_widget.update_root(self.geff_widget.root)
-        else:
-            self.segmentation_widget.setVisible(False)
-        self._update_finish_button()
-        self._resize_dialog()
-
     def _update_field_map_widget(self) -> None:
-        """Prefill the field map widget with the geff metadata and graph attributes."""
+        """Prefill the field map widget with the csv metadata and graph attributes."""
 
-        if self.geff_widget.root is not None:
-            self.prop_map_widget.update_mapping(
-                self.geff_widget.root, self.segmentation_widget.include_seg()
-            )
-
-            self.scale_widget._prefill_from_metadata(
-                dict(self.geff_widget.root.attrs.get("geff", {}))
-            )
-            self.scale_widget.setVisible(self.segmentation_widget.include_seg())
+        self.incl_z = self.dimension_widget.incl_z
+        self.df = self.csv_widget.df
+        if self.df is not None:
+            self.prop_map_widget.update_mapping(self.df, self.incl_z, self.seg)
+            self.scale_widget.update(show=self.seg, incl_z=self.incl_z)
         else:
             self.prop_map_widget.setVisible(False)
             self.scale_widget.setVisible(False)
@@ -149,28 +143,26 @@ class ImportGeffDialog(QDialog):
         self._update_finish_button()
         self._resize_dialog()
 
-    def _update_finish_button(self):
+    def _update_finish_button(self) -> None:
         """Update the finish button status depending on whether a segmentation is required
-        and whether a valid geff root is present."""
+        and whether a valid csv root is present."""
 
         include_seg = self.segmentation_widget.include_seg()
         has_seg = self.segmentation_widget.get_segmentation() is not None
         valid_seg = not (include_seg and not has_seg)
-        self.finish_button.setEnabled(self.geff_widget.root is not None and valid_seg)
+        self.finish_button.setEnabled(self.csv_widget.df is not None and valid_seg)
 
     def _toggle_scale_widget_and_seg_id(self, checked: bool) -> None:
         """Toggle visibility of the scale widget based on the 'None' radio button state,
         and update the visibility of the 'seg_id' combobox in the prop map widget."""
 
+        self.seg = not checked
         self.scale_widget.setVisible(not checked)
 
         # Also remove the seg_id from the fields widget
         if len(self.prop_map_widget.mapping_widgets) > 0:
             self.prop_map_widget.mapping_widgets["seg_id"].setVisible(not checked)
             self.prop_map_widget.mapping_labels["seg_id"].setVisible(not checked)
-            self.prop_map_widget.optional_features["area"]["recompute"].setEnabled(
-                not checked
-            )
 
         self._update_finish_button()
         self._resize_dialog()
@@ -180,17 +172,10 @@ class ImportGeffDialog(QDialog):
         self.reject()
 
     def _finish(self) -> None:
-        """Tries to read the geff file and optional segmentation image and apply the
+        """Tries to read the csv file and optional segmentation image and apply the
         attribute to column mapping to construct a Tracks object"""
 
-        if self.geff_widget.root is not None:
-            store_path = Path(
-                self.geff_widget.root.store.path
-            )  # e.g. /.../my_store.zarr
-            group_path = Path(self.geff_widget.root.path)  # e.g. 'tracks'
-            geff_dir = store_path / group_path
-
-            self.name = self.geff_widget.dir_name
+        if self.df is not None:
             scale = self.scale_widget.get_scale()
 
             segmentation = self.segmentation_widget.get_segmentation()
@@ -199,12 +184,8 @@ class ImportGeffDialog(QDialog):
             extra_features = self.prop_map_widget.get_optional_props()
 
             try:
-                self.tracks = import_from_geff(
-                    geff_dir,
-                    name_map,
-                    segmentation_path=segmentation,
-                    extra_features=extra_features,
-                    scale=scale,
+                self.tracks = tracks_from_df(
+                    self.df, segmentation, scale, name_map, extra_features
                 )
             except (ValueError, OSError, FileNotFoundError, AssertionError) as e:
                 QMessageBox.critical(self, "Error", f"Failed to load tracks: {e}")
