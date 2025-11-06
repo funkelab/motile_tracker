@@ -223,7 +223,7 @@ class TrackPoints(napari.layers.Points):
 
         elif event.action == "removed":
             self.tracks_viewer.tracks_controller.delete_nodes(
-                self.tracks_viewer.selected_nodes._list
+                self.tracks_viewer.selected_nodes.as_list
             )
 
         elif event.action == "changed":

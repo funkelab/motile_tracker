@@ -140,7 +140,7 @@ class TracksViewer:
             tracks (funtracks.data_model.Tracks): The tracks to visualize in napari.
             name (str): The name of the tracks to display in the layer names
         """
-        self.selected_nodes._list = []
+        self.selected_nodes._set = {}
 
         if self.tracks is not None:
             self.tracks.refresh.disconnect(self._refresh)
@@ -259,7 +259,7 @@ class TracksViewer:
     def delete_node(self, event=None):
         """Calls the tracks controller to delete currently selected nodes"""
 
-        self.tracks_controller.delete_nodes(self.selected_nodes._list)
+        self.tracks_controller.delete_nodes(self.selected_nodes.as_list)
 
     def delete_edge(self, event=None):
         """Calls the tracks controller to delete an edge between the two currently

@@ -241,12 +241,9 @@ class CollectionWidget(QWidget):
     def _invert_selection(self) -> None:
         """Invert the current selection"""
 
-        nodes = [
-            node
-            for node in self.tracks_viewer.tracks.graph.nodes
-            if node not in self.tracks_viewer.selected_nodes
-        ]
-        self.tracks_viewer.selected_nodes.add_list(nodes, append=False)
+        all_nodes = set(self.tracks_viewer.tracks.graph.nodes)
+        inverted = list(all_nodes - set(self.tracks_viewer.selected_nodes))
+        self.tracks_viewer.selected_nodes.add_list(inverted, append=False)
 
     def _refresh(self) -> None:
         """Keep the node collection in sync with the node group attributes on the graph"""
@@ -336,7 +333,7 @@ class CollectionWidget(QWidget):
     def _add_selection(self) -> None:
         """Add the currently selected node(s) to the collection"""
 
-        self._add_nodes(self.tracks_viewer.selected_nodes._list)
+        self._add_nodes(self.tracks_viewer.selected_nodes.as_list)
 
     def _add_track(self, add: bool = True) -> None:
         """Adds or removes the tracks belonging to selected nodes to the selected
