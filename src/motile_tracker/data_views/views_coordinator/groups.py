@@ -283,7 +283,7 @@ class CollectionWidget(QWidget):
         group_features = [
             (group_name, group_dict)
             for group_name, group_dict in self.tracks_viewer.tracks.features.items()
-            if group_dict["is_group"]
+            if group_dict["value_type"] == "bool"
         ]
         group_dict = {}
         for group_name, _ in group_features:
@@ -443,7 +443,6 @@ class CollectionWidget(QWidget):
                 "display_name": name,
                 "required": False,  # The feature is not required
                 "default_value": False,  # Default value for nodes without this feature
-                "is_group": True,
             }
 
             # Add the new feature to the FeatureDict of the Tracks instance
