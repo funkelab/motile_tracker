@@ -301,7 +301,7 @@ class StandardFieldMapWidget(QWidget):
             "z": "The world z-coordinate of the node.",
             "y": "The world y-coordinate of the node.",
             "x": "The world x-coordinate of the node.",
-            NodeAttr.SEG_ID.value: "The integer label value in the segmentation file.",
+            "seg_id": "The integer label value in the segmentation file.",
             NodeAttr.TRACK_ID.value: "<html><body><p style='white-space:pre-wrap; width: "
             "300px;'>"
             "(Optional) The tracklet id that this node belongs "
