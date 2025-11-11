@@ -29,7 +29,14 @@ class TestLoadTracks:
             ValueError,
             match="The 'id' column must contain unique values",
         ):
-            tracks_from_df(df)
+            name_map = {
+                "id": "id",
+                "parent_id": "parent_id",
+                "time": "time",
+                "y": "y",
+                "x": "x",
+            }
+            tracks_from_df(df, name_map)
 
     def test_string_ids(self):
         """Test that string ids are converted to unique integers"""
@@ -63,8 +70,15 @@ class TestLoadTracks:
             "x": [15, 25, 35],
         }
         df = pd.DataFrame(data)
+        name_map = {
+            "id": "id",
+            "parent_id": "parent_id",
+            "time": "time",
+            "y": "y",
+            "x": "x",
+        }
         scale = [1, 2, 1]
-        tracks = tracks_from_df(df, scale=scale)
+        tracks = tracks_from_df(df, name_map=name_map, scale=scale)
         assert tracks.scale == scale
 
     def test_valid_segmentation(self):
@@ -78,6 +92,7 @@ class TestLoadTracks:
             "x": [0.75, 1.5, 1.6667],
             "seg_id": [1, 2, 3],
         }
+
         df = pd.DataFrame(data)
         segmentation = np.array(
             [
@@ -144,10 +159,20 @@ class TestLoadTracks:
             "x": [3, 6, 6.6667],
             "seg_id": [1, 2, 3],
         }
+        name_map = {
+            "id": "id",
+            "parent_id": "parent_id",
+            "time": "time",
+            "z": "z",
+            "y": "y",
+            "x": "x",
+            "seg_id": "seg_id",
+        }
+
         seg_4d = np.array([segmentation, segmentation, segmentation])
         df = pd.DataFrame(data)
         assert _test_valid(df, seg_4d, scale=[1, 1, 4, 4])
-        tracks = tracks_from_df(df, seg_4d, scale=[1, 1, 4, 4])
+        tracks = tracks_from_df(df, name_map, seg_4d, scale=[1, 1, 4, 4])
         assert tracks.graph.number_of_nodes() == 3
         assert tracks.graph.number_of_edges() == 2
 
@@ -176,9 +201,16 @@ class TestLoadTracks:
                 [[0, 0, 0], [0, 40, 40], [0, 0, 40]],
             ]
         )
-
+        name_map = {
+            "id": "id",
+            "parent_id": "parent_id",
+            "time": "time",
+            "y": "y",
+            "x": "x",
+            "seg_id": "seg_id",
+        }
         np.testing.assert_array_equal(new_segmentation, expected_segmentation)
-        tracks = tracks_from_df(df, segmentation)
+        tracks = tracks_from_df(df, name_map=name_map, segmentation=segmentation)
         np.testing.assert_array_equal(tracks.segmentation, expected_segmentation)
         assert tracks.graph.number_of_nodes() == 4
         assert tracks.graph.number_of_edges() == 0
@@ -202,8 +234,29 @@ class TestLoadTracks:
             [[[1, 1, 1], [2, 3, 3], [2, 3, 3]], [[0, 0, 0], [0, 4, 4], [0, 0, 4]]]
         )
 
+        name_map = {
+            "id": "id",
+            "parent_id": "parent_id",
+            "time": "time",
+            "y": "y",
+            "x": "x",
+            "seg_id": "seg_id",
+        }
+        node_features = [
+            {
+                "prop_name": "area",
+                "feature": "Area",
+                "recompute": True,  # In geff, but should be recomputed
+                "dtype": "float",
+            },
+        ]
+
         tracks = tracks_from_df(
-            df, segmentation, scale=(1, 1, 1), features={"Area": "Recompute"}
+            df,
+            name_map=name_map,
+            segmentation=segmentation,
+            scale=(1, 1, 1),
+            node_features=node_features,
         )
 
         assert tracks.get_node_attr(1, NodeAttr.AREA.value) == 3
@@ -212,7 +265,11 @@ class TestLoadTracks:
         assert tracks.get_node_attr(4, NodeAttr.AREA.value) == 3
 
         tracks = tracks_from_df(
-            df, segmentation, scale=(1, 2, 1), features={"Area": "Recompute"}
+            df,
+            name_map=name_map,
+            segmentation=segmentation,
+            scale=(1, 2, 1),
+            node_features=node_features,
         )
 
         assert tracks.get_node_attr(1, NodeAttr.AREA.value) == 6
@@ -220,17 +277,16 @@ class TestLoadTracks:
         assert tracks.get_node_attr(3, NodeAttr.AREA.value) == 8
         assert tracks.get_node_attr(4, NodeAttr.AREA.value) == 6
 
-        tracks = tracks_from_df(
-            df, segmentation=None, scale=(1, 2, 1), features={"Area": "Recompute"}
-        )  # no seg provided, should return None
+        with pytest.raises(ValueError, match="Please provide a segmentation"):
+            tracks_from_df(
+                df,
+                name_map=name_map,
+                segmentation=None,
+                scale=(1, 2, 1),
+                node_features=node_features,
+            )  # no seg provided, cannot compute features
 
-        assert tracks.get_node_attr(1, NodeAttr.AREA.value) is None
-
-        tracks = tracks_from_df(
-            df, segmentation, scale=(1, 2, 1), features={}
-        )  # no area measurement provided, it is auto-computed
-        # TODO: uncomment this when behavior is stabilized (funtracks v2.0)
-        # assert tracks.get_node_attr(1, NodeAttr.AREA.value) is not None
+        # Import area feature without recomputing
 
         data = {
             NodeAttr.TIME.value: [0, 0, 0, 1],
@@ -239,20 +295,34 @@ class TestLoadTracks:
             "parent_id": [None, 1, 2, 3],
             "y": [0, 1.6667, 1.333, 1.333],
             "x": [1, 0.33333, 1.66667, 1.66667],
-            "area": [1, 2, 3, 4],
+            "custom_area": [1, 2, 3, 4],
         }
         df = pd.DataFrame(data)
         # Area column provided by the dataframe (csv_import_dialog is in
         # charge of mapping a custom column to a column named 'area' (to be updated in
         # future version that supports additional measured features)
+
+        node_features = [
+            {
+                "prop_name": "custom_area",
+                "feature": "Area",
+                "recompute": False,
+                "dtype": "float",
+            },
+        ]
+
         tracks = tracks_from_df(
-            df, segmentation, scale=(1, 1, 1), features={"Area": "area"}
+            df,
+            name_map=name_map,
+            segmentation=segmentation,
+            scale=(1, 1, 1),
+            node_features=node_features,
         )
 
-        assert tracks.get_node_attr(1, NodeAttr.AREA.value) == 1
-        assert tracks.get_node_attr(2, NodeAttr.AREA.value) == 2
-        assert tracks.get_node_attr(3, NodeAttr.AREA.value) == 3
-        assert tracks.get_node_attr(4, NodeAttr.AREA.value) == 4
+        assert tracks.get_node_attr(1, "custom_area") == 1
+        assert tracks.get_node_attr(2, "custom_area") == 2
+        assert tracks.get_node_attr(3, "custom_area") == 3
+        assert tracks.get_node_attr(4, "custom_area") == 4
 
     def test_load_sample_data(self):
         test_dir = os.path.abspath(__file__)
@@ -265,12 +335,14 @@ class TestLoadTracks:
         # Retrieve selected columns for each required field, and optional columns for
         # additional attributes
         name_map = {
+            "id": "id",
+            "parent_id": "parent_id",
             "time": "t",
+            "y": "y",
+            "x": "x",
+            "seg_id": "seg_id",
         }
-        # Create new columns for each feature based on the original column values
-        for feature, column in name_map.items():
-            df[feature] = df[column]
 
-        tracks = tracks_from_df(df)
+        tracks = tracks_from_df(df, name_map)
         for node in tracks.graph.nodes():
             assert isinstance(node, int)
