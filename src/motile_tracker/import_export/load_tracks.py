@@ -5,6 +5,10 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 from funtracks.data_model import SolutionTracks
+from funtracks.import_export.feature_import import (
+    ImportedNodeFeature,
+    register_features,
+)
 
 from motile_tracker.data_views.graph_attributes import NodeAttr
 
@@ -133,9 +137,10 @@ def _test_valid(
 
 def tracks_from_df(
     df: pd.DataFrame,
+    name_map: dict[str, str],
     segmentation: np.ndarray | None = None,
     scale: list[float] | None = None,
-    features: dict[str, str] | None = None,
+    node_features: list[ImportedNodeFeature] | None = None,
 ) -> SolutionTracks:
     """Turns a pandas data frame with columns:
         t,[z],y,x,id,parent_id,[seg_id], [optional custom attr 1], ...
@@ -147,6 +152,14 @@ def tracks_from_df(
         df (pd.DataFrame):
             a pandas DataFrame containing columns
             t,[z],y,x,id,parent_id,[seg_id], [optional custom attr 1], ...
+        name_map (dict[str,str]): dictionary mapping required fields to node properties.
+            Should include:
+                time,
+                (z),
+                y,
+                x,
+                (seg_id), if a segmentation is provided
+                (tracklet_id), optional, if it is a solution
         segmentation (np.ndarray | None, optional):
             An optional accompanying segmentation.
             If provided, assumes that the seg_id column in the dataframe exists and
@@ -154,10 +167,8 @@ def tracks_from_df(
         scale (list[float] | None, optional):
             The scale of the segmentation (including the time dimension). Defaults to
             None.
-        features (dict[str: str] | None, optional)
-            Dict mapping measurement attributes (area, volume) to value that specifies a
-            column from which to import. If value equals to "Recompute", recompute these
-            values instead of importing them from a column. Defaults to None.
+        node_features (list[ImportedNodeFeature] | None, optional): optional features to
+            include in the Tracks object.
 
     Returns:
         SolutionTracks: a solution tracks object
@@ -165,22 +176,22 @@ def tracks_from_df(
         ValueError: if the segmentation IDs in the dataframe do not match the provided
             segmentation
     """
-    if features is None:
-        features = {}
-    # TODO: possibly don't accept the upper case keys anymore...
-    features = {key.lower(): val for key, val in features.items()}
-    # check that the required columns are present
-    required_columns = ["id", NodeAttr.TIME.value, "y", "x", "parent_id"]
-    ndim = None
+
+    required = ["id", "time", "z", "y", "x"]
     if segmentation is not None:
-        required_columns.append("seg_id")
-        ndim = segmentation.ndim
-        if ndim == 4:
-            required_columns.append("z")
-    for column in required_columns:
-        assert column in df.columns, (
-            f"Required column {column} not found in dataframe columns {df.columns}"
-        )
+        required.append("seg_id")
+
+    cols = {}
+    for key, value in name_map.items():
+        if value is None or value not in df.columns:
+            if key in required:
+                raise ValueError(f"No column is provided for required property {key} ")
+            else:
+                continue  # e.g. track_id is not required
+        else:
+            cols[key] = df[value]
+
+    df = pd.DataFrame(cols)
 
     if segmentation is not None and not _test_valid(df, segmentation, scale):
         raise ValueError(
@@ -195,7 +206,7 @@ def tracks_from_df(
 
     # Convert custom attributes stored as strings back to lists
     for col in df.columns:
-        if col not in required_columns:
+        if col not in name_map:
             df[col] = df[col].apply(
                 lambda x: ast.literal_eval(x)
                 if isinstance(x, str) and x.startswith("[") and x.endswith("]")
@@ -206,6 +217,12 @@ def tracks_from_df(
         NodeAttr.TIME.value
     )  # sort the dataframe to ensure that parents get added to the graph before children
     df = ensure_integer_ids(df)  # Ensure that the 'id' column contains integer values
+
+    extra_features = []
+    if node_features is not None:
+        extra_features.extend(
+            [f["prop_name"] for f in node_features if not f["recompute"]]
+        )
 
     graph = nx.DiGraph()
     for _, row in df.iterrows():
@@ -227,7 +244,7 @@ def tracks_from_df(
         # add extra columns into the attributes
         extra_attrs = {}
         for attr in row_dict:
-            if attr in features:
+            if attr in extra_features:
                 extra_attrs[attr] = row_dict[attr]
         attrs.update(extra_attrs)
 
@@ -260,27 +277,7 @@ def tracks_from_df(
         ndim=ndims,
         scale=scale,
     )
-    # TODO: update for funtracks with features
-    # # Enable features marked for recomputation
-    # features_to_compute = [
-    #     feat
-    #     for feat, val in features.items()
-    #     if val == "Recompute" and feat in tracks.annotators.all_features
-    # ]
-    # tracks.enable_features(features_to_compute)
 
-    # compute the 'area' attribute if needed
-    if (
-        tracks.segmentation is not None
-        and NodeAttr.AREA.value not in df.columns
-        and len(features) > 0
-    ):
-        nodes = tracks.graph.nodes
-        times = tracks.get_times(nodes)
-        computed_attrs = [
-            tracks._compute_node_attrs(node, time)
-            for node, time in zip(nodes, times, strict=False)
-        ]
-        areas = [attrs[NodeAttr.AREA.value] for attrs in computed_attrs]
-        tracks._set_nodes_attr(nodes, NodeAttr.AREA.value, areas)
+    register_features(tracks, node_features)
+
     return tracks

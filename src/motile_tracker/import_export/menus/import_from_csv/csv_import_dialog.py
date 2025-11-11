@@ -178,14 +178,14 @@ class ImportCSVDialog(QDialog):
         if self.df is not None:
             scale = self.scale_widget.get_scale()
 
-            segmentation = self.segmentation_widget.get_segmentation()
+            segmentation = self.segmentation_widget.load_segmentation()
             name_map = self.prop_map_widget.get_name_map()
             name_map = {k: (None if v == "None" else v) for k, v in name_map.items()}
             extra_features = self.prop_map_widget.get_optional_props()
 
             try:
                 self.tracks = tracks_from_df(
-                    self.df, segmentation, scale, name_map, extra_features
+                    self.df, name_map, segmentation, scale, extra_features
                 )
             except (ValueError, OSError, FileNotFoundError, AssertionError) as e:
                 QMessageBox.critical(self, "Error", f"Failed to load tracks: {e}")

@@ -4,6 +4,7 @@ import inspect
 import zarr
 from funtracks.data_model.graph_attributes import NodeAttr
 from funtracks.features import _regionprops_features
+from funtracks.import_export.feature_import import ImportedNodeFeature
 from qtpy.QtCore import Qt
 from qtpy.QtWidgets import (
     QCheckBox,
@@ -283,12 +284,12 @@ class StandardFieldMapWidget(QWidget):
                     feature_key = selected
 
                 optional_features.append(
-                    {
-                        "prop_name": attr,
-                        "feature": feature_key,
-                        "recompute": bool(widgets["recompute"].isChecked()),
-                        "dtype": self.attr_types.get(attr, "str"),
-                    }
+                    ImportedNodeFeature(
+                        prop_name=attr,
+                        feature=feature_key,
+                        recompute=bool(widgets["recompute"].isChecked()),
+                        dtype=self.attr_types.get(attr, "str"),
+                    )
                 )
 
         return optional_features

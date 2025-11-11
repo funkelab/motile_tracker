@@ -1,6 +1,9 @@
 import os
 from pathlib import Path
 
+import numpy as np
+import tifffile
+import zarr
 from psygnal import Signal
 from qtpy.QtWidgets import (
     QButtonGroup,
@@ -10,6 +13,7 @@ from qtpy.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMessageBox,
     QPushButton,
     QRadioButton,
     QSizePolicy,
@@ -202,3 +206,24 @@ class SegmentationWidget(QWidget):
         if self.external_segmentation_radio.isChecked():
             return self.segmentation_widget.get_segmentation_path()
         return None
+
+    def load_segmentation(self) -> np.ndarray | None:
+        """Return the associated segmentation image file"""
+
+        # Check if a valid path to a segmentation image file is provided and load it
+        path = self.get_segmentation()
+        if path is not None and os.path.exists(path):
+            if str(path).endswith(".tif"):
+                segmentation = tifffile.imread(path)
+            elif ".zarr" in str(path):
+                segmentation = zarr.open(path)
+            else:
+                QMessageBox.warning(
+                    self,
+                    "Invalid file type",
+                    "Please provide a tiff or zarr file for the segmentation image stack",
+                )
+                return None
+        else:
+            segmentation = None
+        return segmentation
