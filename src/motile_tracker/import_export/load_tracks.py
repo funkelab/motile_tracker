@@ -181,17 +181,19 @@ def tracks_from_df(
     if segmentation is not None:
         required.append("seg_id")
 
-    cols = {}
+    cols = df.copy()
+
+    # add/duplicate mapped columns as new ones
     for key, value in name_map.items():
         if value is None or value not in df.columns:
             if key in required:
-                raise ValueError(f"No column is provided for required property {key} ")
-            else:
-                continue  # e.g. track_id is not required
-        else:
-            cols[key] = df[value]
+                raise ValueError(f"No column is provided for required property {key}")
+            continue
 
-    df = pd.DataFrame(cols)
+        # If the mapping points to an existing column, duplicate its data
+        cols[key] = df[value]
+
+    df = cols
 
     if segmentation is not None and not _test_valid(df, segmentation, scale):
         raise ValueError(
@@ -223,7 +225,7 @@ def tracks_from_df(
         extra_features.extend(
             [f["prop_name"] for f in node_features if not f["recompute"]]
         )
-
+    print("extra_features", extra_features)
     graph = nx.DiGraph()
     for _, row in df.iterrows():
         row_dict = row.to_dict()
@@ -244,6 +246,7 @@ def tracks_from_df(
         # add extra columns into the attributes
         extra_attrs = {}
         for attr in row_dict:
+            print("extra attr", attr)
             if attr in extra_features:
                 extra_attrs[attr] = row_dict[attr]
         attrs.update(extra_attrs)
@@ -278,6 +281,7 @@ def tracks_from_df(
         scale=scale,
     )
 
-    register_features(tracks, node_features)
+    if node_features is not None:
+        register_features(tracks, node_features)
 
     return tracks
