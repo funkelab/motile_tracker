@@ -1,15 +1,12 @@
 import difflib
-import inspect
 
 import zarr
 from funtracks.data_model.graph_attributes import NodeAttr
-from funtracks.features import _regionprops_features
 from qtpy.QtCore import Qt
 from qtpy.QtWidgets import (
     QCheckBox,
     QComboBox,
     QFormLayout,
-    QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -25,10 +22,12 @@ from motile_tracker.import_export.menus.import_from_geff.geff_import_utils impor
 class StandardFieldMapWidget(QWidget):
     """QWidget to map motile attributes to geff node properties."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+    ):
         super().__init__()
 
-        self.node_attrs: list[str] = []
+        self.node_attrs = []
         self.metadata = None
         self.mapping_labels = {}
         self.mapping_widgets = {}
@@ -61,53 +60,21 @@ class StandardFieldMapWidget(QWidget):
             "checkbox is checked, the feature will be recomputed, otherwise it will "
             "directly be imported from the data."
         )
-
-        self.optional_mapping_layout = QGridLayout()
+        self.optional_mapping_layout = QVBoxLayout()
         optional_box.setLayout(self.optional_mapping_layout)
         box_layout.addWidget(optional_box, alignment=Qt.AlignTop)
-        self.optional_features = {}
 
         self.setVisible(False)
 
-    def _get_attr_dtype_kind(self, root: zarr.Group, attr: str) -> str:
-        """
-        Determine the data type for a property stored under
-        root['nodes']['props'][attr].
-
-        Returns:
-            One of: 'bool', 'int', 'float', 'str', or 'object'
-        """
-        node = root["nodes"]["props"][attr]
-
-        # Try to find a child array and inspect its dtype
-        for name in getattr(node, "keys", list)():
-            child = node[name]
-            if hasattr(child, "dtype"):
-                kind = child.dtype.kind
-                # Convert numpy kind to readable type
-                if kind == "b":
-                    return "bool"
-                elif kind in ("i", "u"):
-                    return "int"
-                elif kind == "f":
-                    return "float"
-                elif kind in ("S", "U"):
-                    return "str"
-                else:
-                    return "object"
-
     def update_mapping(self, root: zarr.Group | None = None, seg: bool = False) -> None:
-        """Update the mapping widget with the provided root group and segmentation flag."""
+        """Update the mapping widget with the provided root group and segmentation
+        flag."""
 
         if root is not None:
             self.setVisible(True)
             self.node_attrs = list(root["nodes"]["props"].group_keys())
             self.metadata = dict(root.attrs.get("geff", {}))
 
-            # Retrieve attribute types from the zarr group
-            self.attr_types = {
-                attr: self._get_attr_dtype_kind(root, attr) for attr in self.node_attrs
-            }
             self.props_left = []
             self.standard_fields = [
                 NodeAttr.TIME.value,
@@ -126,10 +93,13 @@ class StandardFieldMapWidget(QWidget):
                 if len(axes_types) == 3:
                     self.standard_fields.insert(1, "z")
             else:
-                # allow z option if axes info missing
-                self.standard_fields.insert(1, "z")
+                self.standard_fields.insert(
+                    1, "z"
+                )  # also provide the option to choose z if
+                # no axes information is available
 
-            # Map graph spatiotemporal data and optionally the track and lineage attributes
+            # Map graph spatiotemporal data and optionally the track and lineage
+            # attributes
             self.mapping_labels = {}
             self.mapping_widgets = {}
             clear_layout(self.mapping_layout)  # clear layout first
@@ -150,132 +120,23 @@ class StandardFieldMapWidget(QWidget):
                         label.setVisible(False)
 
             # Optional extra features
-            self.feature_options = {}
-            for name, func in inspect.getmembers(
-                _regionprops_features, inspect.isfunction
-            ):
-                if func.__module__ == "funtracks.features._regionprops_features":
-                    sig = inspect.signature(func)
-                    if "ndim" in sig.parameters:
-                        ndim = 4 if "z" in self.standard_fields else 3
-                        feature = func(ndim)  # call with ndim
-                    else:
-                        feature = func()  # Call without ndim
-                    display_name = feature.get("display_name", name)
-                    self.feature_options[name] = display_name
-
-            # Clear existing optional layout and widgets
             clear_layout(self.optional_mapping_layout)
             self.optional_features = {}
-
-            # Add header
-            header_prop = QLabel("Name")
-            header_assign = QLabel("Assign as Feature")
-            header_recompute = QLabel("Recompute")
-            header_prop.setAlignment(Qt.AlignLeft)
-            header_assign.setAlignment(Qt.AlignLeft)
-            header_recompute.setAlignment(Qt.AlignLeft)
-            self.optional_mapping_layout.addWidget(header_prop, 0, 0)
-            self.optional_mapping_layout.addWidget(header_assign, 0, 1)
-            self.optional_mapping_layout.addWidget(header_recompute, 0, 2)
-            self._update_props_left()
-
-            # Add a row per remaining property
-            row_idx = 1
             for attribute in self.props_left:
-                # Prop checkbox
+                row_layout = QHBoxLayout()
                 attr_checkbox = QCheckBox(attribute)
-                # Feature option combobox
-                feature_option = QComboBox()
-                # Numerical types => list regionprops features
-                if self.attr_types.get(attribute) in {"int", "float"}:
-                    feature_option.addItems(list(self.feature_options.values()))
-                elif self.attr_types.get(attribute) in {"bool", "object"}:
-                    # Boolean or unknown/object types => grouping option
-                    feature_option.addItem("Group")
-
-                # Always have "Custom" as last option
-                feature_option.addItem("Custom")
-
-                # Recompute checkbox - initially disabled
-                recompute_checkbox = QCheckBox()
-                recompute_checkbox.setEnabled(False)
-
-                # When the combobox selection changes, update recompute checkbox enable
-                def make_on_change(checkbox, combo):
-                    def on_change(index):
-                        selected_feature = combo.currentText()
-                        # Enable recompute only if the selected feature corresponds to a regionprops feature
-                        if selected_feature in self.feature_options.values():
-                            checkbox.setEnabled(True)
-                        else:
-                            checkbox.setEnabled(False)
-                            checkbox.setChecked(False)
-
-                    return on_change
-
-                feature_option.currentIndexChanged.connect(
-                    make_on_change(recompute_checkbox, feature_option)
-                )
-
-                # initialize recompute enabled state based on current selection
-                make_on_change(recompute_checkbox, feature_option)(
-                    feature_option.currentIndex()
-                )
-
-                # Place widgets into the grid
-                self.optional_mapping_layout.addWidget(attr_checkbox, row_idx, 0)
-                self.optional_mapping_layout.addWidget(feature_option, row_idx, 1)
-                self.optional_mapping_layout.addWidget(recompute_checkbox, row_idx, 2)
-
-                # Save references for later retrieval
+                recompute_checkbox = QCheckBox("Recompute")
+                activate_checkbox = bool(attribute == NodeAttr.AREA.value and seg)
+                recompute_checkbox.setEnabled(activate_checkbox)
+                row_layout.addWidget(attr_checkbox)
+                row_layout.addWidget(recompute_checkbox)
+                self.optional_mapping_layout.addLayout(row_layout)
                 self.optional_features[attribute] = {
                     "attr_checkbox": attr_checkbox,
-                    "feature_option": feature_option,
                     "recompute": recompute_checkbox,
                 }
-
-                row_idx += 1
         else:
             self.setVisible(False)
-
-    def get_optional_props(self) -> list[dict]:
-        """Get all the extra features that are requested and their settings. Only entries
-        whose checkbox in the prop_name column is checked are returned.
-
-        Returns a list of dicts like:
-        {
-            "prop_name": "area",
-            "feature": <class name for regionprops feature> or 'Group' or 'Custom',
-            "recompute": True/False
-            "dtype": str/int/float/bool
-        }
-        """
-        optional_features = []
-        for attr, widgets in self.optional_features.items():
-            if widgets["attr_checkbox"].isChecked():
-                selected = widgets["feature_option"].currentText()
-                # If selected is one of the displayed regionprops names, map back to the feature key
-                if selected in self.feature_options.values():
-                    # find the key (function name/class name) for this display_name
-                    feature_key = next(
-                        (k for k, v in self.feature_options.items() if v == selected),
-                        selected,
-                    )
-                else:
-                    # Group or Custom (keep as is)
-                    feature_key = selected
-
-                optional_features.append(
-                    {
-                        "prop_name": attr,
-                        "feature": feature_key,
-                        "recompute": bool(widgets["recompute"].isChecked()),
-                        "dtype": self.attr_types.get(attr, "str"),
-                    }
-                )
-
-        return optional_features
 
     def _get_tooltip(self, attribute: str) -> str:
         """Return the tooltip for the given attribute"""
@@ -300,15 +161,18 @@ class StandardFieldMapWidget(QWidget):
 
     def _update_props_left(self) -> None:
         """Update the list of columns that have not been mapped yet"""
+
         self.props_left = [
             attr for attr in self.node_attrs if attr not in self.get_name_map().values()
         ]
 
-    def _get_initial_mapping(self) -> dict[str, str]:
+    def _get_initial_mapping(
+        self,
+    ) -> dict[str:str]:
         """Make an initial guess for mapping of geff columns to fields"""
 
-        mapping: dict[str, str] = {}
-        self.props_left = self.node_attrs.copy()
+        mapping = {}
+        self.props_left: list = self.node_attrs.copy()
 
         # check if the axes information is in the metadata, if so, use it for initial
         # mapping
@@ -346,10 +210,21 @@ class StandardFieldMapWidget(QWidget):
 
         return mapping
 
-    def get_name_map(self) -> dict[str, str]:
+    def get_name_map(self) -> dict[str:str]:
         """Return a mapping from feature name to geff field name"""
 
         return {
             attribute: combo.currentText()
             for attribute, combo in self.mapping_widgets.items()
         }
+
+    def get_optional_props(self) -> dict[str:bool]:
+        """Get all the extra features that are requested and whether they should be
+        recomputed"""
+
+        optional_features = {}
+        for attr, checkbox_dict in self.optional_features.items():
+            if checkbox_dict["attr_checkbox"].isChecked():
+                optional_features[attr] = checkbox_dict["recompute"].isChecked()
+
+        return optional_features
