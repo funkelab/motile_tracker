@@ -178,13 +178,13 @@ class TrackPoints(napari.layers.Points):
         """Create attributes for a new node at given time point"""
 
         t = int(new_point[0])
-        # Check if we already have a node for the current track id at this time point,
-        # since it is not allowed to have two nodes for the same track at the same time
-        # point.
+
+        # Activate a new track_id if necessary
         if self.tracks_viewer.selected_track is None:
             self.tracks_viewer.set_new_track_id()
 
-        # track id does not exist yet in tracks.track_id_to_node, so it is safe to use
+        # take the track_id of the selected track (funtracks will check that there is no
+        # node with this track_id at this time point yet, and assign a new one otherwise.)
         track_id = self.tracks_viewer.selected_track
         area = 0
 
