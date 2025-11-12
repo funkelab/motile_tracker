@@ -26,10 +26,6 @@ from qtpy.QtWidgets import (
 )
 from superqt.fonticon import icon as qticon
 
-from motile_tracker.data_views.views.tree_view.tree_widget_utils import (
-    extract_lineage_tree,
-)
-
 if TYPE_CHECKING:
     from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
@@ -325,10 +321,8 @@ class CollectionWidget(QWidget):
         while selected:
             node_id = selected.pop()
             track_id = self.tracks_viewer.tracks.get_track_id(node_id)
-            track = [
-                node
-                for node in self.tracks_viewer.tracks.graph.nodes
-                if self.tracks_viewer.tracks.get_track_id(node) == track_id
+            track = self.tracks_viewer.tracks.track_annotator.tracklet_id_to_nodes[
+                track_id
             ]
             nodes_to_process.extend(track)
             selected.difference_update(track)
@@ -349,7 +343,11 @@ class CollectionWidget(QWidget):
 
         while selected:
             node_id = selected.pop()
-            lineage = extract_lineage_tree(self.tracks_viewer.tracks.graph, node_id)
+            lineage_key = self.tracks_viewer.tracks.track_annotator.lineage_key
+            lineage_id = self.tracks_viewer.tracks.get_node_attr(node_id, lineage_key)
+            lineage = self.tracks_viewer.tracks.track_annotator.lineage_id_to_nodes[
+                lineage_id
+            ]
             nodes_to_process.extend(lineage)
             selected.difference_update(lineage)
         self._add_nodes(nodes_to_process) if add else self._remove_nodes(
