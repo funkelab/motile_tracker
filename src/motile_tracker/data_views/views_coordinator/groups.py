@@ -1,25 +1,20 @@
 from __future__ import annotations
 
 from functools import partial
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from fonticon_fa6 import FA6S
 from funtracks.features._feature import Feature
-from funtracks.import_export.export_to_geff import export_to_geff
 from napari._qt.qt_resources import QColoredSVGIcon
 from qtpy.QtCore import Signal
 from qtpy.QtWidgets import (
     QAbstractItemView,
-    QFileDialog,
     QGroupBox,
     QHBoxLayout,
-    QInputDialog,
     QLabel,
     QLineEdit,
     QListWidget,
     QListWidgetItem,
-    QMessageBox,
     QPushButton,
     QVBoxLayout,
     QWidget,
@@ -32,6 +27,7 @@ if TYPE_CHECKING:
 from motile_tracker.data_views.views.tree_view.tree_widget_utils import (
     extract_lineage_tree,
 )
+from motile_tracker.import_export.menus.export_dialog import ExportDialog
 
 
 class CollectionButton(QWidget):
@@ -460,65 +456,12 @@ class CollectionWidget(QWidget):
         """
 
         group_name = self.collection_list.itemWidget(item).name.text()
-
-        export_type, ok = QInputDialog.getItem(
-            self,
-            "Select Export Type",
-            (
-                f"<p style='white-space: normal;'>"
-                f"<i>Export all nodes in group </i>"
-                f"<span style='color: green;'><b>{group_name}.</b></span><br>"
-                f"<i>Note that ancestors will also be included to maintain a valid graph.</i>"
-                f"</p>"
-                f"<p>Choose export format:</p>"
-            ),
-            ["CSV", "geff"],
-            0,
-            False,
-        )
-
-        if not ok:
-            return
-
-        # Keep nodes that belong to the selected group
         nodes_to_keep = self.collection_list.itemWidget(item).collection
 
-        if export_type == "CSV":
-            file_dialog = QFileDialog(self)
-            file_dialog.setFileMode(QFileDialog.AnyFile)
-            file_dialog.setAcceptMode(QFileDialog.AcceptSave)
-            file_dialog.setNameFilter("CSV files (*.csv)")
-            file_dialog.setDefaultSuffix("csv")
-            default_file = f"{group_name}_tracks.csv"
-            base_path = Path(file_dialog.directory().path())
-            file_dialog.selectFile(str(base_path / default_file))
-
-            if file_dialog.exec_():
-                file_path = Path(file_dialog.selectedFiles()[0])
-                self.tracks_viewer.tracks.export_tracks(file_path, nodes_to_keep)
-
-        elif export_type == "geff":
-            default_file = f"{group_name}_geff.zarr"
-
-            file_dialog = QFileDialog(self, "Save as geff file")
-            file_dialog.setFileMode(QFileDialog.AnyFile)
-            file_dialog.setAcceptMode(QFileDialog.AcceptSave)
-            file_dialog.setNameFilter("Zarr folder (*.zarr)")
-            file_dialog.setDefaultSuffix("zarr")
-
-            # Set default selected file
-            base_path = Path.home()
-            file_dialog.selectFile(str(base_path / default_file))
-
-            if file_dialog.exec_():
-                file_path = Path(file_dialog.selectedFiles()[0])
-                try:
-                    export_to_geff(
-                        self.tracks_viewer.tracks,
-                        file_path,
-                        overwrite=True,
-                        node_ids=nodes_to_keep,
-                    )  # QFileDialog
-                    # already asks whether to overwrite in an existing directory
-                except ValueError as e:
-                    QMessageBox.warning(self, "Export Error", str(e))
+        # Keep nodes that belong to the selected group and export
+        ExportDialog.show_export_dialog(
+            self,
+            tracks=self.tracks_viewer.tracks,
+            name=group_name,
+            nodes_to_keep=nodes_to_keep,
+        )
