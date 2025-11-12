@@ -29,6 +29,10 @@ from superqt.fonticon import icon as qticon
 if TYPE_CHECKING:
     from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
+from motile_tracker.data_views.views.tree_view.tree_widget_utils import (
+    extract_lineage_tree,
+)
+
 
 class CollectionButton(QWidget):
     """Widget holding a name and delete icon for listing in the QListWidget. Also contains
@@ -344,10 +348,17 @@ class CollectionWidget(QWidget):
         while selected:
             node_id = selected.pop()
             lineage_key = self.tracks_viewer.tracks.track_annotator.lineage_key
-            lineage_id = self.tracks_viewer.tracks.get_node_attr(node_id, lineage_key)
-            lineage = self.tracks_viewer.tracks.track_annotator.lineage_id_to_nodes[
-                lineage_id
-            ]
+            if lineage_key in self.tracks_viewer.tracks.features:
+                lineage_id = self.tracks_viewer.tracks.get_node_attr(
+                    node_id, lineage_key
+                )
+                lineage = self.tracks_viewer.tracks.track_annotator.lineage_id_to_nodes[
+                    lineage_id
+                ]
+            else:
+                # fallback in case the lineage feature is not activated
+                lineage = extract_lineage_tree(self.tracks_viewer.tracks.graph, node_id)
+
             nodes_to_process.extend(lineage)
             selected.difference_update(lineage)
         self._add_nodes(nodes_to_process) if add else self._remove_nodes(
