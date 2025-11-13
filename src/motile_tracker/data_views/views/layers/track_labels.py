@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import random
+import warnings
 from typing import TYPE_CHECKING
 
 import napari
@@ -18,6 +19,9 @@ from motile_tracker.data_views.views.layers.click_utils import (
 from motile_tracker.data_views.views_coordinator.key_binds import (
     KEYMAP,
     bind_keymap,
+)
+from motile_tracker.data_views.views_coordinator.user_dialogs import (
+    confirm_force_operation,
 )
 
 if TYPE_CHECKING:
@@ -259,15 +263,30 @@ class TrackLabels(napari.layers.Labels):
                     updated_pixels,
                     current_timepoint,
                     self.tracks_viewer.selected_track,
+                    force=self.tracks_viewer.force,
                 )  # paint with the updated self.selected_label, not with the value from the
                 # event, to ensure it is a valid label.
             except InvalidActionError as e:
-                show_info(str(e))
-                super().undo()
-                new_label(
-                    self
-                )  # help the user to paint with a new label that should be
-                # valid
+                if e.forceable:
+                    # If the action is invalid, ask the user if they want to force it anyway
+                    force, always_force = confirm_force_operation(message=str(e))
+                    self.tracks_viewer.force = always_force
+                    super().undo()
+                    if not force:
+                        self._refresh()  # to trigger refresh on orthoviews, if present
+                    else:
+                        # try again with force enabled
+                        self.tracks_viewer.tracks_controller.update_segmentations(
+                            target_value,
+                            updated_pixels,
+                            current_timepoint,
+                            self.tracks_viewer.selected_track,
+                            force=True,
+                        )
+                else:
+                    warnings.warn(str(e), stacklevel=2)
+                    super().undo()
+                    self._refresh()
 
     def _refresh(self):
         """Refresh the data in the labels layer"""
