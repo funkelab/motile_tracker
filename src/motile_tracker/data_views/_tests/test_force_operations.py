@@ -1,9 +1,11 @@
 """Tests for force operations functionality in user interactions.
 
 This module tests the force option dialog and the force parameter behavior
-when performing operations like adding nodes, adding edges, and updating
-segmentations that would normally fail due to conflicts.
+when performing operations like adding nodes and edges that would normally fail due to
+conflicts.
 """
+
+from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
@@ -18,8 +20,6 @@ from motile_tracker.data_views.views_coordinator.user_dialogs import (
 
 
 class MockEvent:
-    """Mock event for simulating paint/edit events."""
-
     def __init__(self, value):
         self.value = value
 
@@ -29,7 +29,8 @@ def create_event_val(
 ) -> list[
     tuple[tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray], np.ndarray, int]
 ]:
-    """Create event values to simulate a paint event."""
+    """Create event values to simulate a paint event"""
+
     # construct coordinate lists
     z = np.arange(z[0], z[1])
     y = np.arange(y[0], y[1])
@@ -63,62 +64,77 @@ def create_event_val(
     return event_val
 
 
-def test_confirm_force_operation_yes(qtbot, monkeypatch):
-    """Test the confirm_force_operation dialog when user clicks 'Yes'."""
+@pytest.mark.parametrize(
+    "button_index, expected",
+    [
+        (0, (True, True)),  # Yes, always
+        (1, (True, False)),  # Yes
+        (2, (False, False)),  # No
+    ],
+)
+def test_confirm_force_operation_all_buttons(
+    qtbot, monkeypatch, button_index, expected
+):
+    """Test confirm_force_operation for each button and print which was clicked."""
 
-    # Mock the message box exec_ to automatically click 'Yes'
+    clicked_texts = []  # Store clicked button labels for printing
+
     def mock_exec(self):
-        # Simulate clicking the first button (Yes)
-        self._clicked_button = self.buttons()[0]
+        # Simulate clicking one of the buttons based on param
+        self._clicked_button = self.buttons()[button_index]
+        clicked_texts.append(self._clicked_button.text())
         return 0
 
+    # Patch QMessageBox behavior
     monkeypatch.setattr(QMessageBox, "exec_", mock_exec)
     monkeypatch.setattr(QMessageBox, "clickedButton", lambda self: self._clicked_button)
 
+    # Run the dialog under test
     force, always_force = confirm_force_operation("Test operation conflict")
-    assert force is True
-    assert always_force is False
+
+    # Print results
+    print(f"Simulated click on: '{clicked_texts[0]}' → Returned: {force, always_force}")
+
+    # Verify correctness
+    assert (force, always_force) == expected
 
 
-def test_confirm_force_operation_yes_always(qtbot, monkeypatch):
-    """Test the confirm_force_operation dialog when user clicks 'Yes, always'."""
+@pytest.mark.parametrize(
+    "confirm_response, expect_force_retry",
+    [
+        ((True, True), True),  # User clicks "Yes, always"
+        ((True, False), True),  # User clicks "Yes"
+        ((False, False), False),  # User clicks "No"
+    ],
+)
+def test_on_paint_invalid_action_upstream_division1_forceable(
+    make_napari_viewer,
+    graph_3d,
+    segmentation_3d,
+    monkeypatch,
+    confirm_response,
+    expect_force_retry,
+):
+    """Test paint event processing
 
-    # Mock the message box exec_ to automatically click 'Yes, always'
-    def mock_exec(self):
-        # Simulate clicking the second button (Yes, always)
-        self._clicked_button = self.buttons()[1]
-        return 0
+    1) Paint with a the track_id (3) of node 4, at the time point of node 2. This is
+        technically invalid, because node 2 has already divided upstream. Therefore, the
+        force dialog should pop up.
 
-    monkeypatch.setattr(QMessageBox, "exec_", mock_exec)
-    monkeypatch.setattr(QMessageBox, "clickedButton", lambda self: self._clicked_button)
-
-    force, always_force = confirm_force_operation("Test operation conflict")
-    assert force is True
-    assert always_force is True
-
-
-def test_confirm_force_operation_no(qtbot, monkeypatch):
-    """Test the confirm_force_operation dialog when user clicks 'No'."""
-
-    # Mock the message box exec_ to automatically click 'No'
-    def mock_exec(self):
-        # Simulate clicking the third button (No)
-        self._clicked_button = self.buttons()[2]
-        return 0
-
-    monkeypatch.setattr(QMessageBox, "exec_", mock_exec)
-    monkeypatch.setattr(QMessageBox, "clickedButton", lambda self: self._clicked_button)
-
-    force, always_force = confirm_force_operation("Test operation conflict")
-    assert force is False
-    assert always_force is False
+    2) (Control) Setting tracks_viewer.selected_track to None should allow painting with
+        a new track_id, therefore, no InvalidActionError should be raised, and no dialog
+        should be triggered.
 
 
-def test_add_nodes_force_on_conflict(make_napari_viewer, graph_3d, segmentation_3d):
-    """Test adding a node at an existing time point with force=True.
+    TP
+    0      1                   1            Control:        1                1
+           |                   |                            |                |
+    1      2       -1->        2   5                        2       -2->     2    5
+          / \\     (force)     /    |                       / \\              / \
+    2    3   4               3     4                      3   4            3   4
 
-    This should normally fail but succeed when force=True.
     """
+
     viewer = make_napari_viewer()
 
     # Create example tracks
@@ -126,62 +142,113 @@ def test_add_nodes_force_on_conflict(make_napari_viewer, graph_3d, segmentation_
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
 
-    # Node 2 exists at time 1 with track_id 1
-    # Try to add another node at time 1 with the same track_id
-    # This should fail without force
-    attributes = {
-        "track_id": 1,
-        "t": 1,
-        "z": 30,
-        "y": 30,
-        "x": 30,
-        "area": 500,
-    }
+    ### 1) Simulate paint event with new label
+    tracks_viewer.tracking_layers.seg_layer.mode = "paint"
+    step = list(
+        viewer.dims.current_step
+    )  # make sure the viewer is at the correct dims step
+    step[0] = 1
+    viewer.dims.current_step = step
+    tracks_viewer.selected_track = 3
 
-    # Should raise InvalidActionError without force
-    with pytest.raises(InvalidActionError) as exc_info:
-        tracks_viewer.tracks_controller.add_nodes([attributes], force=False)
-    assert exc_info.value.forceable is True
+    # use random target_value, will be overwritten automatically to ensure valid label
+    event_val = create_event_val(
+        tp=1, z=(15, 18), y=(45, 48), x=(75, 73), old_val=0, target_val=5
+    )
+    event = MockEvent(event_val)
 
-    # Should succeed with force=True
-    initial_node_count = len(tracks_viewer.tracks.graph.nodes)
-    tracks_viewer.tracks_controller.add_nodes([attributes], force=True)
-    assert len(tracks_viewer.tracks.graph.nodes) == initial_node_count + 1
+    # Mock internals
+    update_mock = MagicMock()
+    seg_layer = tracks_viewer.tracking_layers.seg_layer
+    seg_layer.tracks_viewer.tracks_controller.update_segmentations = update_mock
+
+    # First call raises InvalidActionError(forceable=True)
+    update_mock.side_effect = [
+        InvalidActionError("Mock invalid action", forceable=True),
+        None,  # second call (if retried)
+    ]
+
+    # Mock the confirm_force_operation dialog
+    monkeypatch.setattr(
+        "motile_tracker.data_views.views.layers.track_labels.confirm_force_operation",
+        lambda message: confirm_response,
+    )
+
+    # Mock undo and refresh
+    parent_class = seg_layer.__class__.__mro__[1]
+    undo_mock = MagicMock(name="undo")
+    monkeypatch.setattr(parent_class, "undo", undo_mock)
+    seg_layer._refresh = MagicMock()
+    seg_layer.tracks_viewer.force = False
+
+    # Run test
+    seg_layer._on_paint(event)
+
+    # Verify
+    if expect_force_retry:
+        # It should have called update_segmentations twice (retry with force)
+        assert update_mock.call_count == 2
+        # Force flag should match confirm_response[1]
+        assert seg_layer.tracks_viewer.force == confirm_response[1]
+        seg_layer._refresh.assert_not_called()
+    else:
+        # Only first call attempted, then undo + refresh
+        assert update_mock.call_count == 1
+        seg_layer._refresh.assert_called_once()
+        parent_class.undo.assert_called_once()
+
+    ### 2) Control case (no dialog triggered)
+    # Reset mocks and behavior
+    update_mock.reset_mock()
+    undo_mock.reset_mock()
+    seg_layer._refresh.reset_mock()
+
+    # Make update_segmentations succeed immediately
+    update_mock.side_effect = None
+
+    # Control condition: no track selected
+    tracks_viewer.selected_track = None
+
+    seg_layer._on_paint(event)
+
+    # It should have been called exactly once, no InvalidActionError branch
+    assert update_mock.call_count == 1, "update_segmentations should succeed normally"
+    undo_mock.assert_not_called()
+    seg_layer._refresh.assert_not_called()
 
 
-def test_add_edges_force_on_conflict(make_napari_viewer, graph_3d, segmentation_3d):
-    """Test adding an edge that creates a conflict with force=True.
+@pytest.mark.parametrize(
+    "confirm_response, expect_force_retry",
+    [
+        ((True, True), True),  # User clicks "Yes, always"
+        ((True, False), True),  # User clicks "Yes"
+        ((False, False), False),  # User clicks "No"
+    ],
+)
+def test_on_paint_invalid_action_upstream_division2_forceable(
+    make_napari_viewer,
+    graph_3d,
+    segmentation_3d,
+    monkeypatch,
+    confirm_response,
+    expect_force_retry,
+):
+    """Test paint event processing
 
-    Adding edge (3, 4) would create a division from node 2 (which already
-    has children 3 and 4), resulting in a node with 3 children.
-    This should fail without force but succeed with force=True.
+    1) Paint with the track_id of node 2 at time point 2. This is invalid, because node 2
+        has already divided at time point 1.
+
+    2) (Control) Setting tracks_viewer.selected_track to None should allow painting with
+        a new track_id.
+
+    0      1                   1            Control:        1                1
+           |                   |                            |                |
+    1      2       -1->        2                            2       -2->     2
+          / \\     (force)      |                           / \\              / \
+    2    3   4              3  5  4                       3   4            3   4  5
+
     """
-    viewer = make_napari_viewer()
 
-    # Create example tracks with edges: (1, 2), (2, 3), (2, 4)
-    tracks = SolutionTracks(graph=graph_3d, segmentation=segmentation_3d, ndim=4)
-    tracks_viewer = TracksViewer.get_instance(viewer)
-    tracks_viewer.update_tracks(tracks=tracks, name="test")
-
-    # Try to add edge (3, 4) which would give node 2 three children
-    # This should fail without force
-    edge = np.array([[3, 4]])
-
-    with pytest.raises(InvalidActionError) as exc_info:
-        tracks_viewer.tracks_controller.add_edges(edges=edge, force=False)
-    assert exc_info.value.forceable is True
-
-    # Should succeed with force=True
-    initial_edge_count = len(tracks_viewer.tracks.graph.edges)
-    tracks_viewer.tracks_controller.add_edges(edges=edge, force=True)
-    assert len(tracks_viewer.tracks.graph.edges) == initial_edge_count + 1
-    assert (3, 4) in tracks_viewer.tracks.graph.edges
-
-
-def test_update_segmentations_force_on_conflict(
-    make_napari_viewer, graph_3d, segmentation_3d
-):
-    """Test updating segmentation that would create invalid state with force=True."""
     viewer = make_napari_viewer()
 
     # Create example tracks
@@ -189,82 +256,113 @@ def test_update_segmentations_force_on_conflict(
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
 
-    # Try to paint over node 3 with a label that has a different track_id
-    # and would create an invalid connection
-    tracks_viewer.selected_track = 2  # different from node 3's track_id
-
-    # Get the pixels for node 3
-    time = 2
-    pixels = np.where(segmentation_3d[time] == 3)
-    updated_pixels = np.stack([np.full(len(pixels[0]), time), *pixels])
-
-    # This should raise InvalidActionError without force
-    with pytest.raises(InvalidActionError) as exc_info:
-        tracks_viewer.tracks_controller.update_segmentations(
-            target_value=0,  # erasing
-            updated_pixels=updated_pixels,
-            time=time,
-            track_id=tracks_viewer.selected_track,
-            force=False,
-        )
-    assert exc_info.value.forceable is True
-
-    # Should succeed with force=True
-    tracks_viewer.tracks_controller.update_segmentations(
-        target_value=0,  # erasing
-        updated_pixels=updated_pixels,
-        time=time,
-        track_id=tracks_viewer.selected_track,
-        force=True,
-    )
-
-
-def test_paint_with_force_dialog_yes(
-    make_napari_viewer, qtbot, monkeypatch, graph_3d, segmentation_3d
-):
-    """Test paint operation that triggers force dialog and user clicks 'Yes'."""
-    viewer = make_napari_viewer()
-
-    # Create example tracks
-    tracks = SolutionTracks(graph=graph_3d, segmentation=segmentation_3d, ndim=4)
-    tracks_viewer = TracksViewer.get_instance(viewer)
-    tracks_viewer.update_tracks(tracks=tracks, name="test")
-
-    # Mock the dialog to return 'Yes' (force=True, always_force=False)
-    def mock_confirm(message):
-        return True, False
-
-    monkeypatch.setattr(
-        "motile_tracker.data_views.views.layers.track_labels.confirm_force_operation",
-        mock_confirm,
-    )
-
-    # Select track 1 and try to paint at time 1 where node 2 already exists
-    tracks_viewer.selected_track = 1
-    tracks_viewer.tracking_layers.seg_layer.selected_label = 5
-
-    step = list(viewer.dims.current_step)
-    step[0] = 1
+    ### 1) Simulate paint event with new label
+    tracks_viewer.tracking_layers.seg_layer.mode = "paint"
+    step = list(
+        viewer.dims.current_step
+    )  # make sure the viewer is at the correct dims step
+    step[0] = 2
     viewer.dims.current_step = step
+    tracks_viewer.selected_track = 1
 
-    # Try to paint where node 2 already exists (should trigger conflict)
+    # use random target_value, will be overwritten automatically to ensure valid label
     event_val = create_event_val(
-        tp=1, z=(15, 25), y=(45, 55), x=(75, 85), old_val=2, target_val=5
+        tp=2, z=(15, 18), y=(45, 48), x=(75, 73), old_val=0, target_val=5
     )
     event = MockEvent(event_val)
-    tracks_viewer.tracking_layers.seg_layer.mode = "paint"
 
-    tracks_viewer.tracking_layeSrs.seg_layer._on_paint(event)
+    # Mock internals
+    update_mock = MagicMock()
+    seg_layer = tracks_viewer.tracking_layers.seg_layer
+    seg_layer.tracks_viewer.tracks_controller.update_segmentations = update_mock
 
-    # The operation should have been forced through
-    # Node 2 should be modified or replaced
-    assert tracks_viewer.force is False  # should remain False for 'Yes' option
+    # First call raises InvalidActionError(forceable=True)
+    update_mock.side_effect = [
+        InvalidActionError("Mock invalid action", forceable=True),
+        None,  # second call (if retried)
+    ]
+
+    # Mock the confirm_force_operation dialog
+    monkeypatch.setattr(
+        "motile_tracker.data_views.views.layers.track_labels.confirm_force_operation",
+        lambda message: confirm_response,
+    )
+
+    # Mock undo and refresh
+    parent_class = seg_layer.__class__.__mro__[1]
+    undo_mock = MagicMock(name="undo")
+    monkeypatch.setattr(parent_class, "undo", undo_mock)
+    seg_layer._refresh = MagicMock()
+    seg_layer.tracks_viewer.force = False
+
+    # Run test
+    seg_layer._on_paint(event)
+
+    # Verify
+    if expect_force_retry:
+        # It should have called update_segmentations twice (retry with force)
+        assert update_mock.call_count == 2
+        # Force flag should match confirm_response[1]
+        assert seg_layer.tracks_viewer.force == confirm_response[1]
+        seg_layer._refresh.assert_not_called()
+    else:
+        # Only first call attempted, then undo + refresh
+        assert update_mock.call_count == 1
+        seg_layer._refresh.assert_called_once()
+        parent_class.undo.assert_called_once()
+
+    ### 2) Control case (no dialog triggered)
+    # Reset mocks and behavior
+    update_mock.reset_mock()
+    undo_mock.reset_mock()
+    seg_layer._refresh.reset_mock()
+
+    # Make update_segmentations succeed immediately
+    update_mock.side_effect = None
+
+    # Control condition: no track selected
+    tracks_viewer.selected_track = None
+
+    seg_layer._on_paint(event)
+
+    # It should have been called exactly once, no InvalidActionError branch
+    assert update_mock.call_count == 1, "update_segmentations should succeed normally"
+    undo_mock.assert_not_called()
+    seg_layer._refresh.assert_not_called()
 
 
-def test_paint_with_force_dialog_yes_always(
-    make_napari_viewer, qtbot, monkeypatch, graph_3d, segmentation_3d
+@pytest.mark.parametrize(
+    "confirm_response, expect_force_retry",
+    [
+        ((True, True), True),  # User clicks “Yes, always”
+        ((True, False), True),  # User clicks “Yes”
+        ((False, False), False),  # User clicks “No”
+    ],
+)
+def test_invalid_edge_force(
+    make_napari_viewer,
+    graph_3d,
+    segmentation_3d,
+    monkeypatch,
+    confirm_response,
+    expect_force_retry,
 ):
-    """Test paint operation with 'Yes, always' sets the force flag permanently."""
+    r"""Test paint event processing
+
+    1) Add a new, disconnected node (5)
+    2) Create an edge between node 5 and 4. This is invalid, because 4 already has an
+        incoming edge. Therefore, the force dialog should be triggered.
+
+    TP
+    0      1                   1                   1
+           |                   |                   |
+    1      2       -1->        2    5   -2->       2   5
+          / \                 / \      (force)     |   |
+    2    3   4               3   4                 3   4
+
+
+    """
+
     viewer = make_napari_viewer()
 
     # Create example tracks
@@ -272,203 +370,53 @@ def test_paint_with_force_dialog_yes_always(
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
 
-    # Mock the dialog to return 'Yes, always' (force=True, always_force=True)
-    def mock_confirm(message):
-        return True, True
-
-    monkeypatch.setattr(
-        "motile_tracker.data_views.views.layers.track_labels.confirm_force_operation",
-        mock_confirm,
-    )
-
-    # Verify force is initially False
-    assert tracks_viewer.force is False
-
-    # Select track 1 and try to paint at time 1 where node 2 already exists
-    tracks_viewer.selected_track = 1
-    tracks_viewer.tracking_layers.seg_layer.selected_label = 5
-
-    step = list(viewer.dims.current_step)
+    ### 1) Simulate paint event with new label
+    tracks_viewer.tracking_layers.seg_layer.mode = "paint"
+    step = list(
+        viewer.dims.current_step
+    )  # make sure the viewer is at the correct dims step
     step[0] = 1
     viewer.dims.current_step = step
+    tracks_viewer.selected_track = None  # paint with a new track_id
 
-    # Try to paint where node 2 already exists
+    # use random target_value, will be overwritten automatically to ensure valid label
     event_val = create_event_val(
-        tp=1, z=(15, 25), y=(45, 55), x=(75, 85), old_val=2, target_val=5
+        tp=1, z=(15, 17), y=(45, 47), x=(75, 78), old_val=0, target_val=5
     )
     event = MockEvent(event_val)
-    tracks_viewer.tracking_layers.seg_layer.mode = "paint"
-
+    assert len(tracks_viewer.tracks.graph.nodes) == 4  # 4 nodes before the paint event
     tracks_viewer.tracking_layers.seg_layer._on_paint(event)
+    assert len(tracks_viewer.tracks.graph.nodes) == 5  # 5 nodes after the paint event
 
-    # The force flag should now be set to True permanently
-    assert tracks_viewer.force is True
+    ### 2) Add an invalid edge and verify that the dialog was called
+    tracks_viewer.selected_nodes = [5, 4]
 
+    # Mock add_edges
+    add_edges_mock = MagicMock()
+    add_edges_mock.side_effect = [
+        InvalidActionError("Mock invalid edge", forceable=True),  # first call fails
+        None,  # second call (forced)
+    ]
+    tracks_viewer.tracks_controller.add_edges = add_edges_mock
 
-def test_paint_with_force_dialog_no(
-    make_napari_viewer, qtbot, monkeypatch, graph_3d, segmentation_3d
-):
-    """Test paint operation that triggers force dialog and user clicks 'No'."""
-    viewer = make_napari_viewer()
-
-    # Create example tracks
-    tracks = SolutionTracks(graph=graph_3d, segmentation=segmentation_3d, ndim=4)
-    tracks_viewer = TracksViewer.get_instance(viewer)
-    tracks_viewer.update_tracks(tracks=tracks, name="test")
-
-    # Mock the dialog to return 'No' (force=False, always_force=False)
-    def mock_confirm(message):
-        return False, False
-
-    monkeypatch.setattr(
-        "motile_tracker.data_views.views.layers.track_labels.confirm_force_operation",
-        mock_confirm,
-    )
-
-    # Select track 1 and try to paint at time 1 where node 2 already exists
-    tracks_viewer.selected_track = 1
-    tracks_viewer.tracking_layers.seg_layer.selected_label = 5
-
-    step = list(viewer.dims.current_step)
-    step[0] = 1
-    viewer.dims.current_step = step
-
-    # Try to paint where node 2 already exists
-    event_val = create_event_val(
-        tp=1, z=(15, 25), y=(45, 55), x=(75, 85), old_val=2, target_val=5
-    )
-    event = MockEvent(event_val)
-    tracks_viewer.tracking_layers.seg_layer.mode = "paint"
-
-    initial_node_count = len(tracks_viewer.tracks.graph.nodes)
-    tracks_viewer.tracking_layers.seg_layer._on_paint(event)
-
-    # The operation should have been cancelled
-    # Node count should remain the same
-    assert len(tracks_viewer.tracks.graph.nodes) == initial_node_count
-    assert tracks_viewer.force is False
-
-
-def test_add_point_with_force_dialog(
-    make_napari_viewer, qtbot, monkeypatch, graph_3d, segmentation_3d
-):
-    """Test adding a point that triggers force dialog."""
-    viewer = make_napari_viewer()
-
-    # Create tracks without segmentation to enable point adding
-    tracks = SolutionTracks(graph=graph_3d, segmentation=None, ndim=4)
-    tracks_viewer = TracksViewer.get_instance(viewer)
-    tracks_viewer.update_tracks(tracks=tracks, name="test")
-
-    # Mock the dialog to return 'Yes'
-    def mock_confirm(message):
-        return True, False
-
-    monkeypatch.setattr(
-        "motile_tracker.data_views.views.layers.track_points.confirm_force_operation",
-        mock_confirm,
-    )
-
-    # Try to add a point at time 1 with track_id 1 (where node 2 already exists)
-    tracks_viewer.selected_track = 1
-
-    step = list(viewer.dims.current_step)
-    step[0] = 1
-    viewer.dims.current_step = step
-
-    # Simulate adding a point
-    initial_node_count = len(tracks_viewer.tracks.graph.nodes)
-    new_point = np.array([[1, 30, 30, 30]])  # t, z, y, x
-
-    # Manually set up the point data to trigger the add
-    tracks_viewer.tracking_layers.graph_layer.data = np.vstack(
-        [tracks_viewer.tracking_layers.graph_layer.data, new_point]
-    )
-
-    # Create a mock event to trigger _update_data
-    class MockPointEvent:
-        def __init__(self):
-            self.action = "added"
-            self.data_indices = [
-                len(tracks_viewer.tracking_layers.graph_layer.data) - 1
-            ]
-            self.value = new_point
-
-    event = MockPointEvent()
-    tracks_viewer.tracking_layers.graph_layer._update_data(event)
-
-    # The operation should have been forced through
-    assert len(tracks_viewer.tracks.graph.nodes) > initial_node_count
-
-
-def test_add_edge_with_force_through_viewer(
-    make_napari_viewer, qtbot, monkeypatch, graph_3d, segmentation_3d
-):
-    """Test adding an edge through the viewer that triggers force dialog."""
-    viewer = make_napari_viewer()
-
-    # Create example tracks
-    tracks = SolutionTracks(graph=graph_3d, segmentation=segmentation_3d, ndim=4)
-    tracks_viewer = TracksViewer.get_instance(viewer)
-    tracks_viewer.update_tracks(tracks=tracks, name="test")
-
-    # Mock the dialog to return 'Yes'
-    def mock_confirm(message):
-        return True, False
-
+    # Mock dialog
     monkeypatch.setattr(
         "motile_tracker.data_views.views_coordinator.tracks_viewer.confirm_force_operation",
-        mock_confirm,
+        lambda message: confirm_response,
     )
 
-    # Try to create an edge that would cause a conflict
-    # Add edge (3, 4) which would give node 2 three children
-    tracks_viewer.node_selection_list.selected_ids = [3, 4]
+    # Run create_edge()
+    tracks_viewer.create_edge()
 
-    initial_edge_count = len(tracks_viewer.tracks.graph.edges)
-    tracks_viewer.link_nodes()
+    if expect_force_retry:
+        # Dialog triggered and retried
+        assert add_edges_mock.call_count == 2
+        assert tracks_viewer.force == confirm_response[1]
+    else:
+        # Not retried
+        assert add_edges_mock.call_count == 1
+        assert tracks_viewer.force is False
 
-    # The operation should have been forced through
-    assert len(tracks_viewer.tracks.graph.edges) > initial_edge_count
-    assert (3, 4) in tracks_viewer.tracks.graph.edges
-
-
-def test_force_flag_persists_across_operations(
-    make_napari_viewer, qtbot, monkeypatch, graph_3d, segmentation_3d
-):
-    """Test that the force flag persists across multiple operations when set."""
-    viewer = make_napari_viewer()
-
-    # Create example tracks
-    tracks = SolutionTracks(graph=graph_3d, segmentation=segmentation_3d, ndim=4)
-    tracks_viewer = TracksViewer.get_instance(viewer)
-    tracks_viewer.update_tracks(tracks=tracks, name="test")
-
-    # Set force to True
-    tracks_viewer.force = True
-
-    # Try operations that would normally fail - they should succeed without dialog
-    # 1. Add node at conflicting time
-    attributes = {
-        "track_id": 1,
-        "t": 1,
-        "z": 30,
-        "y": 30,
-        "x": 30,
-        "area": 500,
-    }
-
-    initial_node_count = len(tracks_viewer.tracks.graph.nodes)
-    tracks_viewer.tracks_controller.add_nodes([attributes], force=True)
-    assert len(tracks_viewer.tracks.graph.nodes) == initial_node_count + 1
-
-    # 2. Add conflicting edge
-    new_node_id = max(tracks_viewer.tracks.graph.nodes) + 1
-    edge = np.array([[3, new_node_id]])
-
-    initial_edge_count = len(tracks_viewer.tracks.graph.edges)
-    tracks_viewer.tracks_controller.add_edges(edges=edge, force=True)
-    assert len(tracks_viewer.tracks.graph.edges) == initial_edge_count + 1
-
-    # Force flag should still be True
-    assert tracks_viewer.force is True
+    # Check that the correct edge was attempted
+    called_edges = add_edges_mock.call_args_list[0][1]["edges"]
+    np.testing.assert_array_equal(called_edges, np.array([[5, 4]]))
