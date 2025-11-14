@@ -1,2 +1,2 @@
-from .menus.import_from_csv.csv_import_dialog import ImportCSVDialog  # noqa
+from .menus.import_dialog import ImportDialog  # noqa
 from .load_tracks import tracks_from_df  # noqa

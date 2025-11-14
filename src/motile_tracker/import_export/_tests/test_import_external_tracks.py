@@ -298,7 +298,7 @@ class TestLoadTracks:
             "custom_area": [1, 2, 3, 4],
         }
         df = pd.DataFrame(data)
-        # Area column provided by the dataframe (csv_import_dialog is in
+        # Area column provided by the dataframe (import_dialog is in
         # charge of mapping a custom column to a column named 'area' (to be updated in
         # future version that supports additional measured features)
 

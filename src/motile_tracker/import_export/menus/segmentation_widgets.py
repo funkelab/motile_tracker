@@ -21,7 +21,7 @@ from qtpy.QtWidgets import (
     QWidget,
 )
 
-from motile_tracker.import_export.menus.import_from_geff.geff_import_utils import (
+from motile_tracker.import_export.menus.geff_import_utils import (
     clear_layout,
 )
 
