@@ -18,15 +18,13 @@ from motile_tracker.import_export.menus.import_from_csv.csv_dimension_widget imp
 from motile_tracker.import_export.menus.import_from_csv.csv_import_widget import (
     ImportCSVWidget,
 )
-from motile_tracker.import_export.menus.import_from_csv.csv_prop_map_widget import (
-    StandardFieldMapWidget,
-)
 from motile_tracker.import_export.menus.import_from_csv.csv_scale_widget import (
     ScaleWidget,
 )
 from motile_tracker.import_export.menus.import_from_csv.csv_segmentation_widget import (
     SegmentationWidget,
 )
+from motile_tracker.import_export.menus.prop_map_widget import StandardFieldMapWidget
 
 
 class ImportCSVDialog(QDialog):
@@ -67,7 +65,7 @@ class ImportCSVDialog(QDialog):
         self.segmentation_widget.segmentation_widget.seg_path_updated.connect(
             self._update_finish_button
         )
-        self.prop_map_widget = StandardFieldMapWidget(self.df, self.incl_z, self.seg)
+        self.prop_map_widget = StandardFieldMapWidget()
         self.csv_widget.update_buttons.connect(self._update_field_map_widget)
         self.csv_widget.update_buttons.connect(self._update_finish_button)
         self.scale_widget = ScaleWidget()
@@ -134,7 +132,9 @@ class ImportCSVDialog(QDialog):
         self.incl_z = self.dimension_widget.incl_z
         self.df = self.csv_widget.df
         if self.df is not None:
-            self.prop_map_widget.update_mapping(self.df, self.incl_z, self.seg)
+            self.prop_map_widget.extract_csv_property_fields(
+                self.df, self.incl_z, self.seg
+            )
             self.scale_widget.update(show=self.seg, incl_z=self.incl_z)
         else:
             self.prop_map_widget.setVisible(False)

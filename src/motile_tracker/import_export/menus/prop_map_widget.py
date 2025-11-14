@@ -1,6 +1,7 @@
 import difflib
 import inspect
 
+import pandas as pd
 import zarr
 from funtracks.data_model.graph_attributes import NodeAttr
 from funtracks.features import _regionprops_features
@@ -48,7 +49,7 @@ class StandardFieldMapWidget(QWidget):
         mapping_box.setToolTip(
             "<html><body><p style='white-space:pre-wrap; width: 300px;'>"
             "Map spatiotemporal attributes and optional track and lineage attributes to "
-            "geff node properties."
+            "node properties."
         )
         self.mapping_layout = QFormLayout()
         mapping_box.setLayout(self.mapping_layout)
@@ -97,7 +98,43 @@ class StandardFieldMapWidget(QWidget):
                 else:
                     return "object"
 
-    def update_mapping(self, root: zarr.Group | None = None, seg: bool = False) -> None:
+    def extract_csv_property_fields(
+        self, df: pd.DataFrame, incl_z: bool = False, seg: bool = False
+    ) -> None:
+        """Update the mapping widget with the provided root group and segmentation flag."""
+
+        self.incl_z = incl_z
+        self.df = df
+        if self.df is not None:
+            self.setVisible(True)
+            self.node_attrs = list(self.df.columns)
+
+            # Retrieve attribute types
+            self.attr_types = {
+                attr: str(self.df[attr].dtype) for attr in self.node_attrs
+            }
+            self.props_left = []
+            self.standard_fields = [
+                "id",
+                "parent_id",
+                NodeAttr.TIME.value,
+                "y",
+                "x",
+                "tracklet_id",
+                "lineage_id",
+                "seg_id",
+            ]
+
+            if self.incl_z:
+                self.standard_fields.insert(3, "z")
+
+            self.update_mapping(seg)
+        else:
+            self.setVisible(False)
+
+    def extract_geff_property_fields(
+        self, root: zarr.Group | None = None, seg: bool = False
+    ) -> None:
         """Update the mapping widget with the provided root group and segmentation flag."""
 
         if root is not None:
@@ -130,59 +167,64 @@ class StandardFieldMapWidget(QWidget):
                 # allow z option if axes info missing
                 self.standard_fields.insert(1, "z")
 
-            # Map graph spatiotemporal data and optionally the track and lineage attributes
-            self.mapping_labels = {}
-            self.mapping_widgets = {}
-            clear_layout(self.mapping_layout)  # clear layout first
-            initial_mapping = self._get_initial_mapping()
-            for attribute, geff_attr in initial_mapping.items():
-                if attribute in self.standard_fields:
-                    combo = QComboBox()
-                    combo.addItems(self.node_attrs + ["None"])  # also add None
-                    combo.setCurrentText(geff_attr)
-                    combo.currentIndexChanged.connect(self._update_props_left)
-                    label = QLabel(attribute)
-                    label.setToolTip(self._get_tooltip(attribute))
-                    self.mapping_widgets[attribute] = combo
-                    self.mapping_labels[attribute] = label
-                    self.mapping_layout.addRow(label, combo)
-                    if attribute == "seg_id" and not seg:
-                        combo.setVisible(False)
-                        label.setVisible(False)
-
-            # Optional extra features
-            self.feature_options = {}
-            for name, func in inspect.getmembers(
-                _regionprops_features, inspect.isfunction
-            ):
-                if func.__module__ == "funtracks.features._regionprops_features":
-                    sig = inspect.signature(func)
-                    if "ndim" in sig.parameters:
-                        ndim = 4 if "z" in self.standard_fields else 3
-                        feature = func(ndim)  # call with ndim
-                    else:
-                        feature = func()  # Call without ndim
-                    display_name = feature.get("display_name", name)
-                    self.feature_options[name] = display_name
-
-            # Clear existing optional layout and widgets
-            clear_layout(self.optional_mapping_layout)
-            self.optional_features = {}
-
-            # Add header
-            header_prop = QLabel("Name")
-            header_assign = QLabel("Assign as Feature")
-            header_recompute = QLabel("Recompute")
-            header_prop.setAlignment(Qt.AlignLeft)
-            header_assign.setAlignment(Qt.AlignLeft)
-            header_recompute.setAlignment(Qt.AlignLeft)
-            self.optional_mapping_layout.addWidget(header_prop, 0, 0)
-            self.optional_mapping_layout.addWidget(header_assign, 0, 1)
-            self.optional_mapping_layout.addWidget(header_recompute, 0, 2)
-            self._update_props_left()
-            self.setMinimumHeight(350)
+            self.update_mapping(seg)
         else:
             self.setVisible(False)
+
+    def update_mapping(self, seg: bool = False) -> None:
+        """Map graph spatiotemporal data and optionally the track and lineage attributes
+        Arg:
+            seg (bool = False): whether a segmentation is associated with this data
+        """
+
+        self.mapping_labels = {}
+        self.mapping_widgets = {}
+        clear_layout(self.mapping_layout)  # clear layout first
+        initial_mapping = self._get_initial_mapping()
+        # for attribute, geff_attr in initial_mapping.items():
+        for attribute in self.standard_fields:
+            combo = QComboBox()
+            combo.addItems(self.node_attrs + ["None"])  # also add None
+            combo.setCurrentText(initial_mapping.get(attribute, "None"))
+            combo.currentIndexChanged.connect(self._update_props_left)
+            label = QLabel(attribute)
+            label.setToolTip(self._get_tooltip(attribute))
+            self.mapping_widgets[attribute] = combo
+            self.mapping_labels[attribute] = label
+            self.mapping_layout.addRow(label, combo)
+            if attribute == "seg_id" and not seg:
+                combo.setVisible(False)
+                label.setVisible(False)
+
+        # Optional extra features
+        self.feature_options = []
+        for name, func in inspect.getmembers(_regionprops_features, inspect.isfunction):
+            if func.__module__ == "funtracks.features._regionprops_features":
+                sig = inspect.signature(func)
+                if "ndim" in sig.parameters:
+                    ndim = 4 if "z" in self.standard_fields else 3
+                    feature = func(ndim)  # call with ndim
+                else:
+                    feature = func()  # Call without ndim
+                display_name = feature.get("display_name", name)
+                self.feature_options.append(display_name)
+
+        # Clear existing optional layout and widgets
+        clear_layout(self.optional_mapping_layout)
+        self.optional_features = {}
+
+        # Add header
+        header_prop = QLabel("Name")
+        header_assign = QLabel("Assign as Feature")
+        header_recompute = QLabel("Recompute")
+        header_prop.setAlignment(Qt.AlignLeft)
+        header_assign.setAlignment(Qt.AlignLeft)
+        header_recompute.setAlignment(Qt.AlignLeft)
+        self.optional_mapping_layout.addWidget(header_prop, 0, 0)
+        self.optional_mapping_layout.addWidget(header_assign, 0, 1)
+        self.optional_mapping_layout.addWidget(header_recompute, 0, 2)
+        self._update_props_left()
+        self.setMinimumHeight(350)
 
     def _add_optional_prop(self, attribute) -> None:
         # Add a row per remaining property
@@ -193,9 +235,16 @@ class StandardFieldMapWidget(QWidget):
             # Feature option combobox
             feature_option = QComboBox()
             # Numerical types => list regionprops features
-            if self.attr_types.get(attribute) in {"int", "float"}:
-                feature_option.addItems(list(self.feature_options.values()))
-            elif self.attr_types.get(attribute) in {"bool", "object"}:
+            if self.attr_types.get(attribute) in {
+                "int",
+                "int32",
+                "int64",
+                "float",
+                "float32",
+                "float64",
+            }:
+                feature_option.addItems(self.feature_options)
+            elif self.attr_types.get(attribute) in {"bool", "object", "0"}:
                 # Boolean or unknown/object types => grouping option
                 feature_option.addItem("Group")
 
@@ -211,7 +260,7 @@ class StandardFieldMapWidget(QWidget):
                 def on_change(index):
                     selected_feature = combo.currentText()
                     # Enable recompute only if the selected feature corresponds to a regionprops feature
-                    if selected_feature in self.feature_options.values():
+                    if selected_feature in self.feature_options:
                         checkbox.setEnabled(True)
                     else:
                         checkbox.setEnabled(False)
@@ -263,7 +312,7 @@ class StandardFieldMapWidget(QWidget):
         Returns a list of dicts like:
         {
             "prop_name": "area",
-            "feature": <class name for regionprops feature> or 'Group' or 'Custom',
+            "feature": <Display name for regionprops feature> or 'Group' or 'Custom',
             "recompute": True/False
             "dtype": str/int/float/bool
         }
@@ -272,21 +321,10 @@ class StandardFieldMapWidget(QWidget):
         for attr, widgets in self.optional_features.items():
             if widgets["attr_checkbox"].isChecked():
                 selected = widgets["feature_option"].currentText()
-                # If selected is one of the displayed regionprops names, map back to the feature key
-                if selected in self.feature_options.values():
-                    # find the key (function name/class name) for this display_name
-                    feature_key = next(
-                        (k for k, v in self.feature_options.items() if v == selected),
-                        selected,
-                    )
-                else:
-                    # Group or Custom (keep as is)
-                    feature_key = selected
-
                 optional_features.append(
                     ImportedNodeFeature(
                         prop_name=attr,
-                        feature=feature_key,
+                        feature=selected,
                         recompute=bool(widgets["recompute"].isChecked()),
                         dtype=self.attr_types.get(attr, "str"),
                     )
@@ -359,12 +397,15 @@ class StandardFieldMapWidget(QWidget):
             if attribute in mapping:
                 continue
             if len(self.props_left) > 0:
+                lower_map = {p.lower(): p for p in self.props_left}
                 closest = difflib.get_close_matches(
-                    attribute, self.props_left, n=1, cutoff=0.6
+                    attribute.lower(), lower_map.keys(), n=1, cutoff=0.5
                 )
                 if closest:
-                    mapping[attribute] = closest[0]
-                    self.props_left.remove(closest[0])
+                    # map back to the original case
+                    best_match = lower_map[closest[0]]
+                    mapping[attribute] = best_match
+                    self.props_left.remove(best_match)
                 else:
                     mapping[attribute] = "None"
             else:

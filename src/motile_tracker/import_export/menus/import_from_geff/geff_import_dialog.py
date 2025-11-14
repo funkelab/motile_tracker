@@ -17,15 +17,13 @@ from qtpy.QtWidgets import (
 from motile_tracker.import_export.menus.import_from_geff.geff_import_widget import (
     ImportGeffWidget,
 )
-from motile_tracker.import_export.menus.import_from_geff.geff_prop_map_widget import (
-    StandardFieldMapWidget,
-)
 from motile_tracker.import_export.menus.import_from_geff.geff_scale_widget import (
     ScaleWidget,
 )
 from motile_tracker.import_export.menus.import_from_geff.geff_segmentation_widgets import (
     SegmentationWidget,
 )
+from motile_tracker.import_export.menus.prop_map_widget import StandardFieldMapWidget
 
 
 class ImportGeffDialog(QDialog):
@@ -134,7 +132,7 @@ class ImportGeffDialog(QDialog):
         """Prefill the field map widget with the geff metadata and graph attributes."""
 
         if self.geff_widget.root is not None:
-            self.prop_map_widget.update_mapping(
+            self.prop_map_widget.extract_geff_property_fields(
                 self.geff_widget.root, self.segmentation_widget.include_seg()
             )
 

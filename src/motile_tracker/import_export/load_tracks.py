@@ -225,7 +225,6 @@ def tracks_from_df(
         extra_features.extend(
             [f["prop_name"] for f in node_features if not f["recompute"]]
         )
-    print("extra_features", extra_features)
     graph = nx.DiGraph()
     for _, row in df.iterrows():
         row_dict = row.to_dict()
@@ -246,7 +245,6 @@ def tracks_from_df(
         # add extra columns into the attributes
         extra_attrs = {}
         for attr in row_dict:
-            print("extra attr", attr)
             if attr in extra_features:
                 extra_attrs[attr] = row_dict[attr]
         attrs.update(extra_attrs)
