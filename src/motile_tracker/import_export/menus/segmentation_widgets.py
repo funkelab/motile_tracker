@@ -1,6 +1,8 @@
 import os
 from pathlib import Path
 
+import numpy as np
+import tifffile
 import zarr
 from psygnal import Signal
 from qtpy.QtWidgets import (
@@ -11,6 +13,7 @@ from qtpy.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMessageBox,
     QPushButton,
     QRadioButton,
     QSizePolicy,
@@ -18,7 +21,7 @@ from qtpy.QtWidgets import (
     QWidget,
 )
 
-from motile_tracker.import_export.menus.import_from_geff.geff_import_utils import (
+from motile_tracker.import_export.menus.geff_import_utils import (
     clear_layout,
 )
 
@@ -146,8 +149,92 @@ class FileFolderDialog(QDialog):
         return None
 
 
-class SegmentationWidget(QWidget):
-    """QWidget for specifying pixel calibration"""
+class CSVSegmentationWidget(QWidget):
+    """QWidget to select segmentation data when importing from CSV"""
+
+    def __init__(self):
+        super().__init__()
+
+        # Button group for mutual exclusivity
+        self.button_group = QButtonGroup(self)
+        self.button_group.setExclusive(True)
+
+        # Add "None" option
+        none_radio_layout = QHBoxLayout()
+        self.none_radio = QRadioButton("None")
+        none_radio_layout.addWidget(self.none_radio)
+        self.button_group.addButton(self.none_radio)
+        self.none_radio.setChecked(True)
+
+        # External segmentation as a radio button
+        external_segmentation_radio_layout = QVBoxLayout()
+        self.external_segmentation_radio = QRadioButton("Add segmentation")
+        external_segmentation_radio_layout.addWidget(self.external_segmentation_radio)
+        self.button_group.addButton(self.external_segmentation_radio)
+        self.external_segmentation_radio.toggled.connect(self._toggle_segmentation)
+        self.segmentation_widget = ExternalSegmentationWidget()
+        self.segmentation_widget.setVisible(False)
+
+        # Assemble group box layout
+        box_layout = QVBoxLayout()
+        box_layout.addLayout(none_radio_layout)
+        box_layout.addLayout(external_segmentation_radio_layout)
+        box_layout.addWidget(self.segmentation_widget)
+
+        main_layout = QVBoxLayout()
+        box = QGroupBox("Segmentation data")
+        box.setLayout(box_layout)
+        main_layout.addWidget(box)
+        self.setSizePolicy(self.sizePolicy().horizontalPolicy(), QSizePolicy.Minimum)
+        self.setLayout(main_layout)
+
+        self.setToolTip(
+            "<html><body><p style='white-space:pre-wrap; width: 300px;'>"
+            "If your tracking data is associated with segmentation data, select it here."
+        )
+
+    def _toggle_segmentation(self, checked: bool) -> None:
+        """Toggle visibility of the segmentation widget based on the radio button
+        state."""
+        self.segmentation_widget.setVisible(checked)
+        self.adjustSize()
+
+    def include_seg(self) -> bool:
+        """Return True if any segmentation radio button is checked, else False."""
+
+        return self.external_segmentation_radio.isChecked()
+
+    def get_segmentation(self) -> Path | None:
+        """Return the path to selected segmentation data"""
+
+        if self.external_segmentation_radio.isChecked():
+            return self.segmentation_widget.get_segmentation_path()
+        return None
+
+    def load_segmentation(self) -> np.ndarray | None:
+        """Return the associated segmentation image file"""
+
+        # Check if a valid path to a segmentation image file is provided and load it
+        path = self.get_segmentation()
+        if path is not None and os.path.exists(path):
+            if str(path).endswith(".tif"):
+                segmentation = tifffile.imread(path)
+            elif ".zarr" in str(path):
+                segmentation = zarr.open(path)
+            else:
+                QMessageBox.warning(
+                    self,
+                    "Invalid file type",
+                    "Please provide a tiff or zarr file for the segmentation image stack",
+                )
+                return None
+        else:
+            segmentation = None
+        return segmentation
+
+
+class GeffSegmentationWidget(QWidget):
+    """QWidget to select segmentation data when importing from geff"""
 
     def __init__(self, root: zarr.Group | None = None):
         super().__init__()
