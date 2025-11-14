@@ -18,13 +18,11 @@ from motile_tracker.import_export.menus.import_from_csv.csv_dimension_widget imp
 from motile_tracker.import_export.menus.import_from_csv.csv_import_widget import (
     ImportCSVWidget,
 )
-from motile_tracker.import_export.menus.import_from_csv.csv_scale_widget import (
-    ScaleWidget,
-)
 from motile_tracker.import_export.menus.import_from_csv.csv_segmentation_widget import (
     SegmentationWidget,
 )
 from motile_tracker.import_export.menus.prop_map_widget import StandardFieldMapWidget
+from motile_tracker.import_export.menus.scale_widget import ScaleWidget
 
 
 class ImportCSVDialog(QDialog):
@@ -135,7 +133,8 @@ class ImportCSVDialog(QDialog):
             self.prop_map_widget.extract_csv_property_fields(
                 self.df, self.incl_z, self.seg
             )
-            self.scale_widget.update(show=self.seg, incl_z=self.incl_z)
+            if self.seg:
+                self.scale_widget.update(incl_z=self.incl_z)
         else:
             self.prop_map_widget.setVisible(False)
             self.scale_widget.setVisible(False)
@@ -157,7 +156,8 @@ class ImportCSVDialog(QDialog):
         and update the visibility of the 'seg_id' combobox in the prop map widget."""
 
         self.seg = not checked
-        self.scale_widget.setVisible(not checked)
+        if self.seg:
+            self.scale_widget.update(incl_z=self.incl_z)
 
         # Also remove the seg_id from the fields widget
         if len(self.prop_map_widget.mapping_widgets) > 0:

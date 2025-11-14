@@ -17,17 +17,15 @@ from qtpy.QtWidgets import (
 from motile_tracker.import_export.menus.import_from_geff.geff_import_widget import (
     ImportGeffWidget,
 )
-from motile_tracker.import_export.menus.import_from_geff.geff_scale_widget import (
-    ScaleWidget,
-)
 from motile_tracker.import_export.menus.import_from_geff.geff_segmentation_widgets import (
     SegmentationWidget,
 )
 from motile_tracker.import_export.menus.prop_map_widget import StandardFieldMapWidget
+from motile_tracker.import_export.menus.scale_widget import ScaleWidget
 
 
 class ImportGeffDialog(QDialog):
-    """Dialgo for importing external tracks from a geff file"""
+    """Dialog for importing external tracks from a geff file"""
 
     def __init__(self):
         super().__init__()
@@ -136,9 +134,7 @@ class ImportGeffDialog(QDialog):
                 self.geff_widget.root, self.segmentation_widget.include_seg()
             )
 
-            self.scale_widget._prefill_from_metadata(
-                dict(self.geff_widget.root.attrs.get("geff", {}))
-            )
+            self.scale_widget.update(dict(self.geff_widget.root.attrs.get("geff", {})))
             self.scale_widget.setVisible(self.segmentation_widget.include_seg())
         else:
             self.prop_map_widget.setVisible(False)

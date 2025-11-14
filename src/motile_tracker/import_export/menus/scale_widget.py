@@ -39,18 +39,17 @@ class ScaleWidget(QWidget):
         )
         self.setVisible(False)
 
-    def _prefill_from_metadata(self, metadata: dict) -> None:
-        """Update the scale widget, prefilling with metadata information if possible.
+    def update(self, metadata: dict | None = None, incl_z: bool = False) -> None:
+        """
+        Add widgets to the layout, prefilled from available information if possible
+
         Args:
             metadata (dict): geff metadata dictionary containing 'axes' key with scaling
             information.
+            incl_z (bool): whether to include 'z' (provide this if metadata is not available)
         """
 
-        if len(metadata) > 0:
-            self.setVisible(True)
-            clear_layout(self.scale_layout)
-            self.scale_form_layout = QFormLayout()
-
+        if metadata is not None and len(metadata) > 0:
             # read scaling information from metadata, prefill with 1 for all axes if not
             # given
             self.scale = list([1.0] * len(metadata.get("axes")))
@@ -60,19 +59,27 @@ class ScaleWidget(QWidget):
             if "z" in lookup:
                 self.scale[-3] = lookup.get("z", 1)
 
-            # Spinboxes for scaling in (z), y, x.
-            self.z_label = QLabel("z")
-            self.z_spin_box = self._scale_spin_box(self.scale[-3])
-            self.z_label.setVisible(len(self.scale) == 4)
-            self.z_spin_box.setVisible(len(self.scale) == 4)
-            self.y_spin_box = self._scale_spin_box(self.scale[-2])
-            self.x_spin_box = self._scale_spin_box(self.scale[-1])
+        else:
+            ndim = 4 if incl_z else 3
+            self.scale = list([1.0] * ndim)
 
-            self.scale_form_layout.addRow(self.z_label, self.z_spin_box)
-            self.scale_form_layout.addRow(QLabel("y"), self.y_spin_box)
-            self.scale_form_layout.addRow(QLabel("x"), self.x_spin_box)
+        self.setVisible(True)
+        clear_layout(self.scale_layout)
+        self.scale_form_layout = QFormLayout()
 
-            self.scale_layout.addLayout(self.scale_form_layout)
+        # Spinboxes for scaling in (z), y, x.
+        self.z_label = QLabel("z")
+        self.z_spin_box = self._scale_spin_box(self.scale[-3])
+        self.z_label.setVisible(len(self.scale) == 4)
+        self.z_spin_box.setVisible(len(self.scale) == 4)
+        self.y_spin_box = self._scale_spin_box(self.scale[-2])
+        self.x_spin_box = self._scale_spin_box(self.scale[-1])
+
+        self.scale_form_layout.addRow(self.z_label, self.z_spin_box)
+        self.scale_form_layout.addRow(QLabel("y"), self.y_spin_box)
+        self.scale_form_layout.addRow(QLabel("x"), self.x_spin_box)
+
+        self.scale_layout.addLayout(self.scale_form_layout)
 
     def _scale_spin_box(self, value: float) -> QDoubleSpinBox:
         """Return a QDoubleSpinBox for scaling values"""
