@@ -6,6 +6,7 @@ import napari.layers
 import networkx as nx
 import numpy as np
 import pandas as pd
+from funtracks.annotators._regionprops_annotator import RegionpropsAnnotator
 from funtracks.data_model import NodeType, Tracks
 
 from motile_tracker.data_views.graph_attributes import NodeAttr
@@ -54,6 +55,13 @@ def extract_sorted_tracks(
         out_edges = solution_nx_graph.out_edges(parent_node)
         soln_copy.remove_edges_from(out_edges)
 
+    # find regionprops annotator
+    regionprops_annotator = next(
+        annotator
+        for annotator in tracks.annotators
+        if isinstance(annotator, RegionpropsAnnotator)
+    )
+
     # Process each weakly connected component as a separate track
     for node_set in nx.weakly_connected_components(soln_copy):
         # Sort nodes in each weakly connected component by their time attribute to
@@ -93,8 +101,19 @@ def extract_sorted_tracks(
                 "symbol": symbol,
             }
 
-            if tracks.get_area(node) is not None:
-                track_dict["area"] = tracks.get_area(node)
+            if regionprops_annotator is not None:
+                for feature_key, feature in regionprops_annotator.features.items():
+                    name = feature["display_name"]
+                    val = tracks.get_node_attr(node, feature_key)
+                    if isinstance(val, list | tuple):
+                        for i, v in enumerate(val):
+                            if isinstance(name, list | tuple):
+                                display_name = name[i]
+                            else:
+                                display_name = f"{name}_{i}"
+                            track_dict[display_name] = v
+                    else:
+                        track_dict[name] = val
 
             if len(pos) == 3:
                 track_dict["z"] = pos[0]
@@ -130,9 +149,6 @@ def extract_sorted_tracks(
         node["x_axis_pos"] = x_axis_order.index(node["track_id"])
 
     df = pd.DataFrame(track_list)
-    if "area" in df.columns:
-        df["area"] = df["area"].fillna(0)
-
     return df, x_axis_order
 
 
@@ -248,3 +264,36 @@ def extract_lineage_tree(graph: nx.DiGraph, node_id: str) -> list[str]:
     nodes.add(root_node)
 
     return list(nodes)
+
+
+def get_features_from_tracks(tracks: Tracks | None = None) -> list[str]:
+    """Extract the regionprops feature display names currently activated on Tracks.
+
+    Args:
+        tracks (Tracks | None): the Tracks instance to extract features from
+
+    Returns:
+        features_to_plot (list[str]): list of the feature names to plot, or an empty list
+        if tracks is None
+    """
+
+    features_to_plot = []
+    if tracks is not None:
+        regionprops_annotator = next(
+            annotator
+            for annotator in tracks.annotators
+            if isinstance(annotator, RegionpropsAnnotator)
+        )
+        if regionprops_annotator is not None:
+            for feature in regionprops_annotator.features.values():
+                if feature["num_values"] > 1:
+                    for i in range(feature["num_values"]):
+                        name = feature["display_name"]
+                        if isinstance(name, list | tuple):
+                            features_to_plot.append(name[i])
+                        else:
+                            features_to_plot.append(f"{feature['display_name']}_{i}")
+                else:
+                    features_to_plot.append(feature["display_name"])
+
+    return features_to_plot
