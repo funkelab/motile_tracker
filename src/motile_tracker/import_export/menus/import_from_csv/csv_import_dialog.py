@@ -18,11 +18,11 @@ from motile_tracker.import_export.menus.import_from_csv.csv_dimension_widget imp
 from motile_tracker.import_export.menus.import_from_csv.csv_import_widget import (
     ImportCSVWidget,
 )
-from motile_tracker.import_export.menus.import_from_csv.csv_segmentation_widget import (
-    SegmentationWidget,
-)
 from motile_tracker.import_export.menus.prop_map_widget import StandardFieldMapWidget
 from motile_tracker.import_export.menus.scale_widget import ScaleWidget
+from motile_tracker.import_export.menus.segmentation_widgets import (
+    CSVSegmentationWidget,
+)
 
 
 class ImportCSVDialog(QDialog):
@@ -56,7 +56,7 @@ class ImportCSVDialog(QDialog):
         self.content_widget = QWidget()
 
         self.csv_widget = ImportCSVWidget()
-        self.segmentation_widget = SegmentationWidget()
+        self.segmentation_widget = CSVSegmentationWidget()
         self.segmentation_widget.none_radio.toggled.connect(
             self._toggle_scale_widget_and_seg_id
         )

@@ -21,6 +21,10 @@ from qtpy.QtWidgets import (
     QWidget,
 )
 
+from motile_tracker.import_export.menus.import_from_geff.geff_import_utils import (
+    clear_layout,
+)
+
 
 class ExternalSegmentationWidget(QWidget):
     """Widget for specifying the path to an external segmentation image file or folder."""
@@ -145,8 +149,8 @@ class FileFolderDialog(QDialog):
         return None
 
 
-class SegmentationWidget(QWidget):
-    """QWidget for specifying pixel calibration"""
+class CSVSegmentationWidget(QWidget):
+    """QWidget to select segmentation data when importing from CSV"""
 
     def __init__(self):
         super().__init__()
@@ -227,3 +231,112 @@ class SegmentationWidget(QWidget):
         else:
             segmentation = None
         return segmentation
+
+
+class GeffSegmentationWidget(QWidget):
+    """QWidget to select segmentation data when importing from geff"""
+
+    def __init__(self, root: zarr.Group | None = None):
+        super().__init__()
+
+        self.root = root
+
+        # Button group for mutual exclusivity
+        self.button_group = QButtonGroup(self)
+        self.button_group.setExclusive(True)
+        self.related_object_radio_buttons = {}
+
+        # Add "None" option
+        none_radio_layout = QHBoxLayout()
+        self.none_radio = QRadioButton("None")
+        none_radio_layout.addWidget(self.none_radio)
+        self.button_group.addButton(self.none_radio)
+        self.none_radio.setChecked(True)
+
+        # Empty layout to which related objects can be added
+        self.related_objects_layout = QVBoxLayout()
+
+        # External segmentation as a radio button
+        external_segmentation_radio_layout = QVBoxLayout()
+        self.external_segmentation_radio = QRadioButton("Use external segmentation")
+        external_segmentation_radio_layout.addWidget(self.external_segmentation_radio)
+        self.button_group.addButton(self.external_segmentation_radio)
+        self.external_segmentation_radio.toggled.connect(self._toggle_segmentation)
+        self.segmentation_widget = ExternalSegmentationWidget()
+        self.segmentation_widget.setVisible(False)
+
+        # Assemble group box layout
+        box_layout = QVBoxLayout()
+        box_layout.addLayout(none_radio_layout)
+        box_layout.addLayout(self.related_objects_layout)
+        box_layout.addLayout(external_segmentation_radio_layout)
+        box_layout.addWidget(self.segmentation_widget)
+
+        main_layout = QVBoxLayout()
+        box = QGroupBox("Segmentation data")
+        box.setLayout(box_layout)
+        main_layout.addWidget(box)
+        self.setSizePolicy(self.sizePolicy().horizontalPolicy(), QSizePolicy.Minimum)
+        self.setLayout(main_layout)
+
+        self.setToolTip(
+            "<html><body><p style='white-space:pre-wrap; width: 300px;'>"
+            "Optionally select a segmentation image, or use associated data if provided"
+            " in the geff directory."
+        )
+        self.setVisible(False)
+
+    def update_root(self, root: zarr.Group | None) -> None:
+        """Update the root group and populate related objects if available.
+        Args:
+            root (zarr.Group | None): The root group of the geff zarr store.
+        """
+        self.root = root
+        clear_layout(self.related_objects_layout)
+        self.related_object_radio_buttons = {}
+        if self.root is not None:
+            self.setVisible(True)
+            metadata = dict(self.root.attrs)
+            related_objects = metadata.get("geff", {}).get("related_objects", None)
+            if related_objects:
+                for obj in related_objects:
+                    if obj.get("type") == "labels":
+                        radio = QRadioButton(f"Related data: {obj.get('path', None)}")
+                        radio.setChecked(True)
+                        self.button_group.addButton(radio)
+                        self.related_object_radio_buttons[obj.get("path", None)] = radio
+                        self.related_objects_layout.addWidget(radio)
+        else:
+            self.setVisible(False)
+
+    def _toggle_segmentation(self, checked: bool) -> None:
+        """Toggle visibility of the segmentation widget based on the radio button
+        state."""
+        self.segmentation_widget.setVisible(checked)
+        self.adjustSize()
+
+    def include_seg(self) -> bool:
+        """Return True if any segmentation radio button is checked, else False."""
+
+        # Check external segmentation radio
+        if self.external_segmentation_radio.isChecked():
+            return True
+        # Check related object radios
+        for radio in self.related_object_radio_buttons.values():
+            if radio.isChecked():
+                return True
+        return False
+
+    def get_segmentation(self) -> Path | None:
+        """Return the path to selected related object or external segmentation"""
+
+        for path, radio in self.related_object_radio_buttons.items():
+            if radio.isChecked():
+                store_path = Path(self.root.store.path)  # e.g. /.../geff.zarr
+                group_path = Path(self.root.path)  # e.g. 'tracks'
+                full_group_path = store_path / group_path  # /.../geff.zarr/tracks
+                seg_path = (full_group_path / path).resolve()
+                return seg_path
+        if self.external_segmentation_radio.isChecked():
+            return self.segmentation_widget.get_segmentation_path()
+        return None

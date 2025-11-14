@@ -17,11 +17,11 @@ from qtpy.QtWidgets import (
 from motile_tracker.import_export.menus.import_from_geff.geff_import_widget import (
     ImportGeffWidget,
 )
-from motile_tracker.import_export.menus.import_from_geff.geff_segmentation_widgets import (
-    SegmentationWidget,
-)
 from motile_tracker.import_export.menus.prop_map_widget import StandardFieldMapWidget
 from motile_tracker.import_export.menus.scale_widget import ScaleWidget
+from motile_tracker.import_export.menus.segmentation_widgets import (
+    GeffSegmentationWidget,
+)
 
 
 class ImportGeffDialog(QDialog):
@@ -51,7 +51,7 @@ class ImportGeffDialog(QDialog):
         # Initialize widgets and connect to update signals
         self.geff_widget = ImportGeffWidget()
         self.geff_widget.update_buttons.connect(self._update_segmentation_widget)
-        self.segmentation_widget = SegmentationWidget(root=self.geff_widget.root)
+        self.segmentation_widget = GeffSegmentationWidget(root=self.geff_widget.root)
         self.segmentation_widget.none_radio.toggled.connect(
             self._toggle_scale_widget_and_seg_id
         )
