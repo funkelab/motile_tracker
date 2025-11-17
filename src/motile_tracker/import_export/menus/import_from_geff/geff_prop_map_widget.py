@@ -176,8 +176,8 @@ class StandardFieldMapWidget(QWidget):
 
         # check if the axes information is in the metadata, if so, use it for initial
         # mapping
-        if hasattr(self.metadata, "axes"):
-            axes_names = [ax.name for ax in self.metadata.axes]
+        if "axes" in self.metadata:
+            axes_names = [ax.get("name") for ax in self.metadata["axes"]]
             for attribute in self.standard_fields:
                 if attribute in axes_names:
                     mapping[attribute] = attribute
@@ -216,6 +216,7 @@ class StandardFieldMapWidget(QWidget):
         return {
             attribute: combo.currentText()
             for attribute, combo in self.mapping_widgets.items()
+            if not (attribute == "z" and combo.currentText() == "None")
         }
 
     def get_optional_props(self) -> dict[str:bool]:
@@ -228,3 +229,22 @@ class StandardFieldMapWidget(QWidget):
                 optional_features[attr] = checkbox_dict["recompute"].isChecked()
 
         return optional_features
+
+    def update_z_visibility(self, ndim: int | None) -> None:
+        """Update visibility of z field based on segmentation dimensionality.
+
+        Args:
+            ndim: Number of dimensions in segmentation (3 for 2D+time, 4 for 3D+time).
+                  If None, defaults to showing z field.
+        """
+        if "z" not in self.mapping_widgets:
+            return
+
+        # Show z only for 4D (3D+time) segmentations, or when ndim is unknown
+        show_z = ndim is None or ndim == 4
+        self.mapping_widgets["z"].setVisible(show_z)
+        self.mapping_labels["z"].setVisible(show_z)
+
+        # If hiding z, set it to None
+        if not show_z:
+            self.mapping_widgets["z"].setCurrentText("None")

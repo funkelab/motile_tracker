@@ -2,6 +2,7 @@ from pathlib import Path
 
 from funtracks.import_export.import_from_geff import import_from_geff
 from funtracks.import_export.magic_imread import magic_imread
+from geff_spec.utils import axes_from_lists
 from qtpy.QtCore import Qt
 from qtpy.QtWidgets import (
     QApplication,
@@ -185,6 +186,9 @@ class ImportGeffDialog(QDialog):
                 )
                 self.scale_widget._prefill_from_metadata(metadata, ndim=ndim)
                 self.scale_widget.setVisible(True)
+
+                # Update z field visibility based on segmentation dimensionality
+                self.prop_map_widget.update_z_visibility(ndim)
             except (OSError, ValueError, RuntimeError, KeyError) as e:
                 # If loading fails, hide the scale widget and show error
                 QMessageBox.warning(
@@ -224,12 +228,69 @@ class ImportGeffDialog(QDialog):
                 not checked
             )
 
+            # If "None" is selected (no segmentation), show z field since we don't know ndim
+            if checked:
+                self.prop_map_widget.update_z_visibility(None)
+
         self._update_finish_button()
         self._resize_dialog()
 
     def _cancel(self) -> None:
         """Close the dialog without loading tracks."""
         self.reject()
+
+    def _generate_axes_metadata(
+        self,
+        name_map: dict[str, str | None],
+        scale: list[float] | None,
+        segmentation_path: Path,
+    ) -> None:
+        """Generate axes metadata when missing from geff file.
+
+        Uses the user-provided name_map and scale information to construct
+        axes metadata that matches the segmentation dimensionality.
+
+        Args:
+            name_map: Mapping from standard fields (t, z, y, x) to node property names
+            scale: Scale values from scale widget [t, (z), y, x]
+            segmentation_path: Path to segmentation file to determine ndim
+        """
+        # Load segmentation to get ndim
+        seg = magic_imread(segmentation_path, use_dask=True)
+        ndim = seg.ndim
+
+        # Build axis names and types based on dimensionality
+        # Use "time" to match NodeAttr.TIME.value used in standard_fields
+        if ndim == 3:  # 2D+time
+            axis_keys = ["time", "y", "x"]
+            axis_types = ["time", "space", "space"]
+        else:  # 3D+time (ndim == 4)
+            axis_keys = ["time", "z", "y", "x"]
+            axis_types = ["time", "space", "space", "space"]
+
+        # Get actual node property names from name_map
+        axis_names = []
+        for key in axis_keys:
+            prop_name = name_map.get(key)
+            if prop_name is None:
+                # Fall back to standard name if not in name_map
+                prop_name = key
+            axis_names.append(prop_name)
+
+        # Use provided scale or default to 1.0
+        axis_scales = [1.0] * ndim if scale is None else scale
+
+        # Generate axes using geff_spec utility
+        axes = axes_from_lists(
+            axis_names=axis_names,
+            axis_types=axis_types,
+            axis_scales=axis_scales,
+        )
+
+        # Inject into geff root attrs
+        geff_metadata = dict(self.geff_widget.root.attrs.get("geff", {}))
+        geff_metadata["axes"] = [ax.model_dump(exclude_none=True) for ax in axes]
+        self.geff_widget.root.attrs["geff"] = geff_metadata
 
     def _finish(self) -> None:
         """Tries to read the geff file and optional segmentation image and apply the
@@ -249,6 +310,11 @@ class ImportGeffDialog(QDialog):
             name_map = self.prop_map_widget.get_name_map()
             name_map = {k: (None if v == "None" else v) for k, v in name_map.items()}
             extra_features = self.prop_map_widget.get_optional_props()
+
+            # Generate axes metadata if missing (required for funtracks validation)
+            geff_metadata = dict(self.geff_widget.root.attrs.get("geff", {}))
+            if "axes" not in geff_metadata and segmentation is not None:
+                self._generate_axes_metadata(name_map, scale, segmentation)
 
             try:
                 self.tracks = import_from_geff(
