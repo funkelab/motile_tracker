@@ -63,8 +63,13 @@ def test_geff_import_2d_with_segmentation(
     assert dialog.tracks.ndim == 3
 
 
-def test_geff_import_3d_with_segmentation(qtbot, tmp_path, graph_3d, segmentation_3d):
+def test_geff_import_3d_with_segmentation(
+    qtbot, tmp_path, graph_3d, segmentation_3d, monkeypatch
+):
     """Test exporting and re-importing 3D tracks with segmentation."""
+    # Mock _resize_dialog to avoid screen access in headless CI
+    monkeypatch.setattr(ImportGeffDialog, "_resize_dialog", lambda self: None)
+
     # Create tracks and export to GEFF
     tracks = Tracks(graph_3d, segmentation=segmentation_3d, ndim=4)
     geff_path = tmp_path / "test_tracks_3d.zarr"
@@ -103,8 +108,11 @@ def test_geff_import_3d_with_segmentation(qtbot, tmp_path, graph_3d, segmentatio
     assert dialog.tracks.ndim == 4
 
 
-def test_geff_import_without_segmentation(qtbot, tmp_path, graph_2d):
+def test_geff_import_without_segmentation(qtbot, tmp_path, graph_2d, monkeypatch):
     """Test importing without segmentation."""
+    # Mock _resize_dialog to avoid screen access in headless CI
+    monkeypatch.setattr(ImportGeffDialog, "_resize_dialog", lambda self: None)
+
     # Create tracks and export to GEFF (no segmentation)
     tracks = Tracks(graph_2d, segmentation=None, ndim=3)
     geff_path = tmp_path / "test_tracks_no_seg.zarr"
@@ -142,6 +150,9 @@ def test_geff_import_without_axes_metadata(
 
     This tests the automatic axes generation when metadata is missing.
     """
+    # Mock _resize_dialog to avoid screen access in headless CI
+    monkeypatch.setattr(ImportGeffDialog, "_resize_dialog", lambda self: None)
+
     # Mock QMessageBox to prevent blocking popups, but surface errors
     from unittest.mock import MagicMock
 
