@@ -13,11 +13,16 @@ from motile_tracker.import_export.menus.import_from_geff.geff_import_dialog impo
 )
 
 
-def test_geff_import_2d_with_segmentation(qtbot, tmp_path, graph_2d, segmentation_2d):
+def test_geff_import_2d_with_segmentation(
+    qtbot, tmp_path, graph_2d, segmentation_2d, monkeypatch
+):
     """Test exporting and re-importing 2D tracks with segmentation.
 
     This tests whether the full workflow works end-to-end.
     """
+    # Mock _resize_dialog to avoid screen access in headless CI
+    monkeypatch.setattr(ImportGeffDialog, "_resize_dialog", lambda self: None)
+
     # Create tracks and export to GEFF (as motile_tracker does in tracks_list.py:237)
     tracks = Tracks(graph_2d, segmentation=segmentation_2d, ndim=3)
     geff_path = tmp_path / "test_tracks.zarr"
