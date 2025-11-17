@@ -140,7 +140,7 @@ def test_track_df(graph_2d):
         background_value=0,
     )
 
-    track_df = extract_sorted_tracks(tracks, colormap)
+    track_df, _ = extract_sorted_tracks(tracks, colormap)
     assert isinstance(track_df, pd.DataFrame)
     assert track_df.loc[track_df["node_id"] == 1, "area"].values[0] == 1245
     assert track_df.loc[track_df["node_id"] == 2, "area"].values[0] == 0
