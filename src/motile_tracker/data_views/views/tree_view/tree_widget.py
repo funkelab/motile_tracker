@@ -614,14 +614,14 @@ class TreeWidget(QWidget):
             self.graph = None
         else:
             if reset_view:
-                self.track_df = extract_sorted_tracks(
+                self.track_df, self.axis_order = extract_sorted_tracks(
                     self.tracks_viewer.tracks, self.tracks_viewer.colormap
                 )
             else:
-                self.track_df = extract_sorted_tracks(
+                self.track_df, self.axis_order = extract_sorted_tracks(
                     self.tracks_viewer.tracks,
                     self.tracks_viewer.colormap,
-                    self.track_df,
+                    self.axis_order,
                 )
             self.graph = self.tracks_viewer.tracks.graph
 

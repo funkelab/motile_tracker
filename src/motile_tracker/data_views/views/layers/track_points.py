@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import math
+import warnings
 from typing import TYPE_CHECKING
 
 import napari
 import numpy as np
 from funtracks.data_model import NodeType, Tracks
+from funtracks.exceptions import InvalidActionError
 from napari.layers.points._points_mouse_bindings import select
 from napari.utils.notifications import show_info
 from psygnal import Signal
@@ -18,6 +20,9 @@ from motile_tracker.data_views.views.layers.click_utils import (
 from motile_tracker.data_views.views_coordinator.key_binds import (
     KEYMAP,
     bind_keymap,
+)
+from motile_tracker.data_views.views_coordinator.user_dialogs import (
+    confirm_force_operation,
 )
 
 if TYPE_CHECKING:
@@ -89,7 +94,7 @@ class TrackPoints(napari.layers.Points):
         # Connect to click events to select nodes
         @self.mouse_drag_callbacks.append
         def click(layer, event):
-            if event.type == "mouse_press":
+            if event.type == "mouse_press" and self.mode == "pan_zoom":
                 was_click = yield from detect_click(event)
                 if was_click:
                     # find the point matching the click location, if any. Warning: the
@@ -173,25 +178,13 @@ class TrackPoints(napari.layers.Points):
         """Create attributes for a new node at given time point"""
 
         t = int(new_point[0])
-        # Check if we already have a node for the current track id at this time point,
-        # since it is not allowed to have two nodes for the same track at the same time
-        # point.
+
+        # Activate a new track_id if necessary
         if self.tracks_viewer.selected_track is None:
             self.tracks_viewer.set_new_track_id()
-        if (
-            self.tracks_viewer.selected_track
-            in self.tracks_viewer.tracks.track_id_to_node
-        ):
-            for node in self.tracks_viewer.tracks.track_id_to_node[
-                self.tracks_viewer.selected_track
-            ]:
-                if self.tracks_viewer.tracks.get_time(node) == t:
-                    # We need a new node because one already exists for this track id at
-                    # this time point
-                    self.tracks_viewer.set_new_track_id()
-                    break
 
-        # track id does not exist yet in tracks.track_id_to_node, so it is safe to use
+        # take the track_id of the selected track (funtracks will check that there is no
+        # node with this track_id at this time point yet, and assign a new one otherwise.)
         track_id = self.tracks_viewer.selected_track
         area = 0
 
@@ -213,7 +206,23 @@ class TrackPoints(napari.layers.Points):
             if self.tracks_viewer.tracking_layers.seg_layer is None:
                 new_point = event.value[-1]
                 attributes = self._create_node_attrs(new_point)
-                self.tracks_viewer.tracks_controller.add_nodes(attributes)
+                try:
+                    self.tracks_viewer.tracks_controller.add_nodes(
+                        attributes, force=self.tracks_viewer.force
+                    )
+                except InvalidActionError as e:
+                    if e.forceable:
+                        # If the action is invalid but forceable, ask the user if they want to do so
+                        force, always_force = confirm_force_operation(message=str(e))
+                        self.tracks_viewer.force = always_force
+                        self._refresh()
+                        if force:
+                            self.tracks_viewer.tracks_controller.add_nodes(
+                                attributes, force=True
+                            )
+                    else:
+                        warnings.warn(str(e), stacklevel=2)
+                        self._refresh()
             else:
                 show_info(
                     "Mixed point and segmentation nodes not allowed: add points by "
