@@ -22,6 +22,7 @@ class MenuWidget(QScrollArea):
         self.tabwidget.addTab(motile_widget, "Track with Motile")
         self.tabwidget.addTab(tracks_viewer.tracks_list, "Tracks List")
         self.tabwidget.addTab(editing_widget, "Edit Tracks")
+        self.tabwidget.addTab(tracks_viewer.collection_widget, "Groups")
 
         layout = QVBoxLayout()
         layout.addWidget(self.tabwidget)
