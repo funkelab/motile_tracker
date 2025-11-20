@@ -49,14 +49,13 @@ class ScaleWidget(QWidget):
             incl_z (bool): whether to include 'z' (provide this if metadata is not available)
         """
 
-        if metadata is not None and len(metadata) > 0:
-            # read scaling information from metadata, prefill with 1 for all axes if not
-            # given
-            self.scale = list([1.0] * len(metadata.get("axes")))
-            axes = metadata.get("axes", [])
+        axes = metadata.get("axes") if metadata is not None else None
+
+        if axes:
             lookup = {a["name"].lower(): a.get("scale", 1) or 1 for a in axes}
+            self.scale = [1.0] * len(axes)  # time + spatial dims
             self.scale[-1], self.scale[-2] = lookup.get("x", 1), lookup.get("y", 1)
-            if "z" in lookup:
+            if len(self.scale) == 4:
                 self.scale[-3] = lookup.get("z", 1)
 
         else:
@@ -91,12 +90,19 @@ class ScaleWidget(QWidget):
         spin_box.setDecimals(3)
         return spin_box
 
-    def get_scale(self) -> list[float]:
-        """Return the scaling values in the spinboxes as a list of floats. Also return 1
-        for the time dimension.
+    def get_scale(self) -> list[float] | None:
+        """Return the scaling values in the spinboxes as a list of floats.
+
+        Returns 1 for the time dimension, and then the spatial scales based on
+        whether the data is 3D (time, y, x) or 4D (time, z, y, x).
+
+        Returns None if the scale widget hasn't been initialized (no segmentation).
         """
+        if self.scale is None:
+            return None
 
         if len(self.scale) == 4:
+            # 4D data
             scale = [
                 1,
                 self.z_spin_box.value(),
@@ -104,6 +110,7 @@ class ScaleWidget(QWidget):
                 self.x_spin_box.value(),
             ]
         else:
+            # 3D data
             scale = [
                 1,
                 self.y_spin_box.value(),

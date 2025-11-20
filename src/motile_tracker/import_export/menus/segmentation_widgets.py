@@ -35,14 +35,16 @@ class ExternalSegmentationWidget(QWidget):
         super().__init__()
 
         self.image_path_line = QLineEdit(self)
-        self.image_browse_button = QPushButton("Browse", self)
+        self.image_path_line.editingFinished.connect(self._verify_path)
+        self.image_browse_button = QPushButton("Browse")
         self.image_browse_button.setAutoDefault(0)
         self.image_browse_button.clicked.connect(self._browse_segmentation)
 
         image_widget = QWidget()
         image_layout = QVBoxLayout()
         image_sublayout = QHBoxLayout()
-        image_sublayout.addWidget(QLabel("Segmentation data path:"))
+        self.seg_label = QLabel("Segmentation data path:")
+        image_sublayout.addWidget(self.seg_label)
         image_sublayout.addWidget(self.image_path_line)
         image_sublayout.addWidget(self.image_browse_button)
 
@@ -69,10 +71,29 @@ class ExternalSegmentationWidget(QWidget):
         """Open custom dialog to select either a file or a folder"""
 
         dialog = FileFolderDialog(self)
-        if dialog.exec_():
-            selected_path = dialog.get_selected_path()
-            if selected_path:
-                self.image_path_line.setText(selected_path)
+
+        def _on_finished(result: int) -> None:
+            if result == dialog.Accepted:
+                selected_path = dialog.get_selected_path()
+                if selected_path:
+                    self.image_path_line.setText(selected_path)
+            self.seg_path_updated.emit()
+
+        dialog.finished.connect(_on_finished)
+        dialog.open()
+
+    def _verify_path(self) -> None:
+        """Check that the path exists and is of type .zarr or tiff, change style sheet if
+        invalid"""
+
+        path = self.image_path_line.text()
+        valid = (
+            path.endswith((".tif", ".tiff")) or ".zarr" in path
+        ) and os.path.exists(path)
+        if not valid:
+            self.seg_label.setStyleSheet("color: red;")
+        else:
+            self.seg_label.setStyleSheet("")
 
         self.seg_path_updated.emit()
 
@@ -152,6 +173,8 @@ class FileFolderDialog(QDialog):
 class CSVSegmentationWidget(QWidget):
     """QWidget to select segmentation data when importing from CSV"""
 
+    seg_updated = Signal(bool)
+
     def __init__(self):
         super().__init__()
 
@@ -165,6 +188,9 @@ class CSVSegmentationWidget(QWidget):
         none_radio_layout.addWidget(self.none_radio)
         self.button_group.addButton(self.none_radio)
         self.none_radio.setChecked(True)
+        self.button_group.buttonToggled.connect(
+            lambda: self.seg_updated.emit(self.none_radio.isChecked())
+        )
 
         # External segmentation as a radio button
         external_segmentation_radio_layout = QVBoxLayout()
@@ -174,6 +200,9 @@ class CSVSegmentationWidget(QWidget):
         self.external_segmentation_radio.toggled.connect(self._toggle_segmentation)
         self.segmentation_widget = ExternalSegmentationWidget()
         self.segmentation_widget.setVisible(False)
+        self.segmentation_widget.seg_path_updated.connect(
+            lambda: self.seg_updated.emit(self.none_radio.isChecked())
+        )
 
         # Assemble group box layout
         box_layout = QVBoxLayout()
@@ -236,6 +265,8 @@ class CSVSegmentationWidget(QWidget):
 class GeffSegmentationWidget(QWidget):
     """QWidget to select segmentation data when importing from geff"""
 
+    seg_updated = Signal(bool)
+
     def __init__(self, root: zarr.Group | None = None):
         super().__init__()
 
@@ -252,6 +283,9 @@ class GeffSegmentationWidget(QWidget):
         none_radio_layout.addWidget(self.none_radio)
         self.button_group.addButton(self.none_radio)
         self.none_radio.setChecked(True)
+        self.button_group.buttonToggled.connect(
+            lambda: self.seg_updated.emit(self.none_radio.isChecked())
+        )
 
         # Empty layout to which related objects can be added
         self.related_objects_layout = QVBoxLayout()
@@ -264,6 +298,9 @@ class GeffSegmentationWidget(QWidget):
         self.external_segmentation_radio.toggled.connect(self._toggle_segmentation)
         self.segmentation_widget = ExternalSegmentationWidget()
         self.segmentation_widget.setVisible(False)
+        self.segmentation_widget.seg_path_updated.connect(
+            lambda: self.seg_updated.emit(self.none_radio.isChecked())
+        )
 
         # Assemble group box layout
         box_layout = QVBoxLayout()
