@@ -277,7 +277,10 @@ class TestLoadTracks:
         assert tracks.get_node_attr(3, NodeAttr.AREA.value) == 8
         assert tracks.get_node_attr(4, NodeAttr.AREA.value) == 6
 
-        with pytest.raises(ValueError, match="Please provide a segmentation"):
+        with pytest.raises(
+            ValueError,
+            match="Requested computation of feature Area but no such feature found in computed features. Perhaps you need to provide a segmentation?",
+        ):
             tracks_from_df(
                 df,
                 name_map=name_map,
@@ -286,8 +289,7 @@ class TestLoadTracks:
                 node_features=node_features,
             )  # no seg provided, cannot compute features
 
-        # Import area feature without recomputing
-
+        # Import custom area feature, assign to Area, without immediate recomputation
         data = {
             NodeAttr.TIME.value: [0, 0, 0, 1],
             "seg_id": [1, 2, 3, 4],
@@ -298,10 +300,6 @@ class TestLoadTracks:
             "custom_area": [1, 2, 3, 4],
         }
         df = pd.DataFrame(data)
-        # Area column provided by the dataframe (import_dialog is in
-        # charge of mapping a custom column to a column named 'area' (to be updated in
-        # future version that supports additional measured features)
-
         node_features = [
             {
                 "prop_name": "custom_area",
@@ -323,6 +321,73 @@ class TestLoadTracks:
         assert tracks.get_node_attr(2, "custom_area") == 2
         assert tracks.get_node_attr(3, "custom_area") == 3
         assert tracks.get_node_attr(4, "custom_area") == 4
+
+        # Import custom feature, assign to Circularity, with immediate recomputation
+        data = {
+            NodeAttr.TIME.value: [0, 0, 0, 1],
+            "seg_id": [1, 2, 3, 4],
+            "id": [1, 2, 3, 4],
+            "parent_id": [None, 1, 2, 3],
+            "y": [0, 1.6667, 1.333, 1.333],
+            "x": [1, 0.33333, 1.66667, 1.66667],
+            "custom_circ": [1, 2, 3, 4],
+        }
+        df = pd.DataFrame(data)
+        node_features = [
+            {
+                "prop_name": "custom_circ",
+                "feature": "Circularity",
+                "recompute": True,
+                "dtype": "float",
+            },
+        ]
+
+        tracks = tracks_from_df(
+            df,
+            name_map=name_map,
+            segmentation=segmentation,
+            scale=(1, 1, 1),
+            node_features=node_features,
+        )
+
+        assert tracks.get_node_attr(1, "custom_circ") != 1
+        assert tracks.get_node_attr(2, "custom_circ") != 2
+        assert tracks.get_node_attr(3, "custom_circ") != 3
+        assert tracks.get_node_attr(4, "custom_circ") != 4
+
+        # Import a feature as a Group
+        data = {
+            NodeAttr.TIME.value: [0, 0, 0, 1],
+            "seg_id": [1, 2, 3, 4],
+            "id": [1, 2, 3, 4],
+            "parent_id": [None, 1, 2, 3],
+            "y": [0, 1.6667, 1.333, 1.333],
+            "x": [1, 0.33333, 1.66667, 1.66667],
+            "custom_group": [True, True, False, False],
+        }
+        df = pd.DataFrame(data)
+
+        node_features = [
+            {
+                "prop_name": "custom_group",
+                "feature": "Group",
+                "recompute": False,
+                "dtype": "bool",
+            },
+        ]
+
+        tracks = tracks_from_df(
+            df,
+            name_map=name_map,
+            segmentation=segmentation,
+            scale=(1, 1, 1),
+            node_features=node_features,
+        )
+
+        assert tracks.get_node_attr(1, "custom_group") is True
+        assert tracks.get_node_attr(2, "custom_group") is True
+        assert tracks.get_node_attr(3, "custom_group") is False
+        assert tracks.get_node_attr(4, "custom_group") is False
 
     def test_load_sample_data(self):
         test_dir = os.path.abspath(__file__)
