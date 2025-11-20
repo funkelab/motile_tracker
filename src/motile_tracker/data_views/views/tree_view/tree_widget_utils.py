@@ -6,7 +6,6 @@ import napari.layers
 import networkx as nx
 import numpy as np
 import pandas as pd
-from funtracks.annotators._regionprops_annotator import RegionpropsAnnotator
 from funtracks.data_model import NodeType, Tracks
 
 from motile_tracker.data_views.graph_attributes import NodeAttr
@@ -55,13 +54,6 @@ def extract_sorted_tracks(
         out_edges = solution_nx_graph.out_edges(parent_node)
         soln_copy.remove_edges_from(out_edges)
 
-    # find regionprops annotator
-    regionprops_annotator = next(
-        annotator
-        for annotator in tracks.annotators
-        if isinstance(annotator, RegionpropsAnnotator)
-    )
-
     # Process each weakly connected component as a separate track
     for node_set in nx.weakly_connected_components(soln_copy):
         # Sort nodes in each weakly connected component by their time attribute to
@@ -101,20 +93,19 @@ def extract_sorted_tracks(
                 "symbol": symbol,
             }
 
-            if regionprops_annotator is not None:
-                for feature_key, feature in tracks.features.items():
-                    if feature_key not in track_dict:
-                        name = feature["display_name"]
-                        val = tracks.get_node_attr(node, feature_key)
-                        if isinstance(val, list | tuple):
-                            for i, v in enumerate(val):
-                                if isinstance(name, list | tuple):
-                                    display_name = name[i]
-                                else:
-                                    display_name = f"{name}_{i}"
-                                track_dict[display_name] = v
-                        else:
-                            track_dict[name] = val
+            for feature_key, feature in tracks.features.items():
+                if feature_key not in track_dict:
+                    name = feature["display_name"]
+                    val = tracks.get_node_attr(node, feature_key)
+                    if isinstance(val, list | tuple):
+                        for i, v in enumerate(val):
+                            if isinstance(name, list | tuple):
+                                display_name = name[i]
+                            else:
+                                display_name = f"{name}_{i}"
+                            track_dict[display_name] = v
+                    else:
+                        track_dict[name] = val
 
             if len(pos) == 3:
                 track_dict["z"] = pos[0]
