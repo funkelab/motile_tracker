@@ -2,8 +2,8 @@ import os
 from pathlib import Path
 
 import numpy as np
-import tifffile
 import zarr
+from funtracks.import_export.magic_imread import magic_imread
 from psygnal import Signal
 from qtpy.QtWidgets import (
     QButtonGroup,
@@ -39,6 +39,7 @@ class ExternalSegmentationWidget(QWidget):
         self.image_browse_button = QPushButton("Browse")
         self.image_browse_button.setAutoDefault(0)
         self.image_browse_button.clicked.connect(self._browse_segmentation)
+        self.valid = False
 
         image_widget = QWidget()
         image_layout = QVBoxLayout()
@@ -77,6 +78,7 @@ class ExternalSegmentationWidget(QWidget):
                 selected_path = dialog.get_selected_path()
                 if selected_path:
                     self.image_path_line.setText(selected_path)
+                    self._verify_path()
             self.seg_path_updated.emit()
 
         dialog.finished.connect(_on_finished)
@@ -87,10 +89,15 @@ class ExternalSegmentationWidget(QWidget):
         invalid"""
 
         path = self.image_path_line.text()
-        valid = (
-            path.endswith((".tif", ".tiff")) or ".zarr" in path
-        ) and os.path.exists(path)
-        if not valid:
+        is_tiff = path.endswith((".tif", ".tiff"))
+        is_zarr = ".zarr" in path
+        is_dir_with_tiff_images = os.path.isdir(path) and any(
+            f.endswith((".tif", ".tiff")) for f in os.listdir(path)
+        )
+        path_exists = os.path.exists(path)
+
+        self.valid = path_exists and (is_tiff or is_zarr or is_dir_with_tiff_images)
+        if not self.valid:
             self.seg_label.setStyleSheet("color: red;")
         else:
             self.seg_label.setStyleSheet("")
@@ -116,12 +123,12 @@ class FileFolderDialog(QDialog):
         self.path_line_edit = QLineEdit(self)
 
         self.file_button = QPushButton("Select file", self)
-        self.file_button.clicked.connect(self.select_file)
+        self.file_button.clicked.connect(self._select_file)
         self.file_button.setAutoDefault(False)
         self.file_button.setDefault(False)
 
         self.folder_button = QPushButton("Select folder", self)
-        self.folder_button.clicked.connect(self.select_folder)
+        self.folder_button.clicked.connect(self._select_folder)
         self.folder_button.setAutoDefault(False)
         self.folder_button.setDefault(False)
 
@@ -137,7 +144,7 @@ class FileFolderDialog(QDialog):
         main_layout.addLayout(button_layout)
         main_layout.addWidget(self.ok_button)
 
-    def select_file(self):
+    def _select_file(self):
         """Open File dialog to select a file and set it to the line edit."""
 
         file, _ = QFileDialog.getOpenFileName(
@@ -149,7 +156,7 @@ class FileFolderDialog(QDialog):
         if file:
             self.path_line_edit.setText(file)
 
-    def select_folder(self):
+    def _select_folder(self):
         """Open Folder dialog to select a folder and set it to the line edit."""
 
         folder = QFileDialog.getExistingDirectory(
@@ -225,6 +232,7 @@ class CSVSegmentationWidget(QWidget):
     def _toggle_segmentation(self, checked: bool) -> None:
         """Toggle visibility of the segmentation widget based on the radio button
         state."""
+
         self.segmentation_widget.setVisible(checked)
         self.adjustSize()
 
@@ -233,7 +241,7 @@ class CSVSegmentationWidget(QWidget):
 
         return self.external_segmentation_radio.isChecked()
 
-    def get_segmentation(self) -> Path | None:
+    def get_segmentation_path(self) -> Path | None:
         """Return the path to selected segmentation data"""
 
         if self.external_segmentation_radio.isChecked():
@@ -241,29 +249,23 @@ class CSVSegmentationWidget(QWidget):
         return None
 
     def load_segmentation(self) -> np.ndarray | None:
-        """Return the associated segmentation image file"""
+        """Return the associated segmentation image array if a valid path is given."""
 
-        # Check if a valid path to a segmentation image file is provided and load it
-        path = self.get_segmentation()
-        if path is not None and os.path.exists(path):
-            if str(path).endswith(".tif"):
-                segmentation = tifffile.imread(path)
-            elif ".zarr" in str(path):
-                segmentation = zarr.open(path)
-            else:
-                QMessageBox.warning(
-                    self,
-                    "Invalid file type",
-                    "Please provide a tiff or zarr file for the segmentation image stack",
-                )
-                return None
+        path = self.get_segmentation_path()
+        if path is not None and os.path.exists(path) and self.segmentation_widget.valid:
+            segmentation = magic_imread(path, use_dask=False)
+            return segmentation
         else:
-            segmentation = None
-        return segmentation
+            QMessageBox.critical(
+                self,
+                "Invalid file type",
+                "Please provide a tiff or zarr file for the segmentation image stack",
+            )
+            return None
 
 
 class GeffSegmentationWidget(QWidget):
-    """QWidget to select segmentation data when importing from geff"""
+    """QWidget to select segmentation data when importing from geff."""
 
     seg_updated = Signal(bool)
 
@@ -364,7 +366,7 @@ class GeffSegmentationWidget(QWidget):
                 return True
         return False
 
-    def get_segmentation(self) -> Path | None:
+    def get_segmentation_path(self) -> Path | None:
         """Return the path to selected related object or external segmentation"""
 
         for path, radio in self.related_object_radio_buttons.items():

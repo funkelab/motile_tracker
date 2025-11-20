@@ -35,11 +35,12 @@ from motile_tracker.import_export.menus.segmentation_widgets import (
 
 
 class ImportDialog(QDialog):
-    """Dialog for importing external tracks from a csv or geff file"""
+    """Dialog for importing external tracks from CSV or geff."""
 
-    def __init__(self, import_type: str = "csv"):
+    def __init__(self, import_type: str = "csv") -> None:
         """
         Construct import dialog depending on the data type.
+
         Args:
             import_type (str): either 'geff' or 'csv'
         """
@@ -162,6 +163,48 @@ class ImportDialog(QDialog):
         self._update_finish_button()
         self._resize_dialog()
 
+    def infer_dims_from_segmentation(self) -> None:
+        """Infer whether to include z dimension based on the selected segmentation file,
+        if present. If not present, we do allow incl_z (but the user can select 'None' if
+        it is 2D + time data without segmentation.)."""
+
+        # Check if user has selected to include segmentation
+        self.seg = self.segmentation_widget.include_seg()
+
+        if not self.seg:
+            self.incl_z = (
+                True  # when no segmentation is selected, we cannot infer dims,
+            )
+            # so we keep z in case it is needed
+            return
+
+        seg_path = self.segmentation_widget.get_segmentation_path()
+        if seg_path is not None and seg_path.exists():
+            try:
+                # Load segmentation to determine ndim
+                seg = magic_imread(seg_path, use_dask=True)
+                ndim = seg.ndim
+                self.incl_z = ndim == 4
+
+            except (OSError, ValueError, RuntimeError, KeyError) as e:
+                # If loading fails, hide the scale widget and show error
+                QMessageBox.warning(
+                    self,
+                    "Invalid Segmentation",
+                    f"Could not load segmentation file:\n{seg_path}\n\nError: {e}",
+                )
+                return
+
+    def _update_segmentation_widget(self) -> None:
+        """Refresh the geff segmentation widget based on the geff root group."""
+
+        if self.import_widget.root is not None:
+            self.segmentation_widget.update_root(self.import_widget.root)
+        else:
+            self.segmentation_widget.setVisible(False)
+        self._update_finish_button()
+        self._resize_dialog()
+
     def _resize_dialog(self) -> None:
         """Dynamic widget resizing depending on the visible contents"""
 
@@ -193,53 +236,13 @@ class ImportDialog(QDialog):
 
         self.move(x, y)
 
-    def _update_segmentation_widget(self) -> None:
-        """Refresh the segmentation widget based on the geff root group."""
-
-        if self.import_widget.root is not None:
-            self.segmentation_widget.update_root(self.import_widget.root)
-        else:
-            self.segmentation_widget.setVisible(False)
-        self._update_finish_button()
-        self._resize_dialog()
-
-    def infer_dims_from_segmentation(self) -> None:
-        """Infer whether to include z dimension based on the selected segmentation file."""
-
-        # Check if user has selected to include segmentation
-        self.seg = self.segmentation_widget.include_seg()
-
-        if not self.seg:
-            self.incl_z = (
-                True  # when no segmentation is selected, we cannot infer dims,
-            )
-            # so we keep z in case it is needed
-            return
-
-        seg_path = self.segmentation_widget.get_segmentation()
-        if seg_path is not None and seg_path.exists():
-            try:
-                # Load segmentation to determine ndim
-                seg = magic_imread(seg_path, use_dask=True)
-                ndim = seg.ndim
-                self.incl_z = ndim == 4
-
-            except (OSError, ValueError, RuntimeError, KeyError) as e:
-                # If loading fails, hide the scale widget and show error
-                QMessageBox.warning(
-                    self,
-                    "Invalid Segmentation",
-                    f"Could not load segmentation file:\n{seg_path}\n\nError: {e}",
-                )
-                return
-
-    def _update_finish_button(self):
+    def _update_finish_button(self) -> None:
         """Update the finish button status depending on whether a segmentation is required
         and whether a valid geff root or pandas dataframe is present. Duplicate region
         properties are not allowed."""
 
         include_seg = self.segmentation_widget.include_seg()
-        has_seg = self.segmentation_widget.get_segmentation() is not None
+        has_seg = self.segmentation_widget.get_segmentation_path() is not None
         valid_seg = not (include_seg and not has_seg)
 
         if self.import_type == "geff":
@@ -327,7 +330,7 @@ class ImportDialog(QDialog):
                 self.name = self.import_widget.dir_name
                 scale = self.scale_widget.get_scale() if self.seg else None
 
-                segmentation = self.segmentation_widget.get_segmentation()
+                segmentation_path = self.segmentation_widget.get_segmentation_path()
                 name_map = self.prop_map_widget.get_name_map()
                 name_map = {
                     k: (None if v == "None" else v) for k, v in name_map.items()
@@ -337,8 +340,8 @@ class ImportDialog(QDialog):
                 # Generate axes metadata if missing (required for funtracks validation)
                 geff_metadata = dict(self.import_widget.root.attrs.get("geff", {}))
                 if "axes" not in geff_metadata:
-                    if segmentation is not None:
-                        self._generate_axes_metadata(name_map, scale, segmentation)
+                    if segmentation_path is not None:
+                        self._generate_axes_metadata(name_map, scale, segmentation_path)
                     else:
                         if name_map["z"] is None:
                             del name_map[
@@ -348,7 +351,7 @@ class ImportDialog(QDialog):
                     self.tracks = import_from_geff(
                         geff_dir,
                         name_map,
-                        segmentation_path=segmentation,
+                        segmentation_path=segmentation_path,
                         node_features=extra_features,
                         scale=scale,
                     )
@@ -359,8 +362,12 @@ class ImportDialog(QDialog):
         else:
             if self.df is not None:
                 scale = self.scale_widget.get_scale()
-
-                segmentation = self.segmentation_widget.load_segmentation()
+                if self.seg:
+                    segmentation = self.segmentation_widget.load_segmentation()
+                    if segmentation is None:
+                        return  # error loading segmentation already shown
+                else:
+                    segmentation = None
                 name_map = self.prop_map_widget.get_name_map()
                 name_map = {
                     k: (None if v == "None" else v) for k, v in name_map.items()

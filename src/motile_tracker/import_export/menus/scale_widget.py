@@ -17,12 +17,10 @@ class ScaleWidget(QWidget):
     """Widget to specify the spatial scaling of the graph in relation to its segmentation
     data."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
 
         self.scale = None
-
-        # wrap content layout in a QGroupBox
         self.scale_layout = QVBoxLayout()
         box = QGroupBox("Scaling")
         box.setLayout(self.scale_layout)
@@ -45,8 +43,9 @@ class ScaleWidget(QWidget):
 
         Args:
             metadata (dict): geff metadata dictionary containing 'axes' key with scaling
-            information.
-            incl_z (bool): whether to include 'z' (provide this if metadata is not available)
+                information.
+            incl_z (bool): whether to include 'z' (provide this if metadata is not
+                available)
         """
 
         axes = metadata.get("axes") if metadata is not None else None

@@ -10,8 +10,7 @@ from qtpy.QtWidgets import (
 
 
 class DimensionWidget(QWidget):
-    """Widget to specify the spatial scaling of the graph in relation to its segmentation
-    data."""
+    """Widget to specify whether to import 2D+time or 3D+time data."""
 
     update_dims = Signal()
 

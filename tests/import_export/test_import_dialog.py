@@ -116,6 +116,7 @@ def test_csv_import_2d_with_segmentation(
     dialog.segmentation_widget.segmentation_widget.image_path_line.setText(
         str(seg_path)
     )
+    dialog.segmentation_widget.segmentation_widget.valid = True
     dialog.segmentation_widget.segmentation_widget.seg_path_updated.emit()
 
     # Verify that seg and incl_z are True
@@ -130,8 +131,7 @@ def test_csv_import_2d_with_segmentation(
     # Set seg_id mapping to "None" since node id == seg_id (automapping is incorrect)
     prop_map = dialog.prop_map_widget
     seg_combo = prop_map.mapping_widgets["seg_id"]
-    seg_combo.setCurrentText("id")
-    prop_map._update_props_left()
+    seg_combo.setCurrentText("ID")
 
     # Import the tracks
     dialog._finish()
@@ -180,6 +180,7 @@ def test_csv_import_3d_with_segmentation(
     dialog.segmentation_widget.segmentation_widget.image_path_line.setText(
         str(seg_path)
     )
+    dialog.segmentation_widget.segmentation_widget.valid = True
     dialog.segmentation_widget.segmentation_widget.seg_path_updated.emit()
 
     # Verify that seg and incl_z are True
@@ -194,7 +195,7 @@ def test_csv_import_3d_with_segmentation(
     # Set seg_id mapping to "None" since node id == seg_id (automapping is incorrect)
     prop_map = dialog.prop_map_widget
     seg_combo = prop_map.mapping_widgets["seg_id"]
-    seg_combo.setCurrentText("id")
+    seg_combo.setCurrentText("ID")
     prop_map._update_props_left()
 
     # Import the tracks

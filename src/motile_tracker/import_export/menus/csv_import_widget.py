@@ -17,7 +17,7 @@ from qtpy.QtWidgets import (
 
 
 class ImportCSVWidget(QWidget):
-    """QWidget for loading a CSV from file"""
+    """QWidget for loading a CSV file as pandas dataframe."""
 
     update_buttons = Signal()
 

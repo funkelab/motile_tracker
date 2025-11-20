@@ -29,7 +29,7 @@ from motile_tracker.import_export.menus.geff_import_utils import (
 
 
 class StandardFieldMapWidget(QWidget):
-    """QWidget to map motile attributes to geff node properties."""
+    """QWidget to map motile run attributes to node properties in csv or geff."""
 
     props_updated = Signal()
 
@@ -45,7 +45,7 @@ class StandardFieldMapWidget(QWidget):
         self.mapping_widgets = {}
 
         # Group box for property field mapping
-        box = QGroupBox("Property mapping")
+        box = QGroupBox("Map properties")
         box_layout = QHBoxLayout()
         box.setLayout(box_layout)
         main_layout = QVBoxLayout()
@@ -176,62 +176,79 @@ class StandardFieldMapWidget(QWidget):
 
         self.update_mapping(seg)
 
-    def update_mapping(self, seg: bool = False) -> None:
-        """Map graph spatiotemporal data and optionally the track and lineage attributes
-        Arg:
-            seg (bool = False): whether a segmentation is associated with this data
+    def _update_props_left(self) -> None:
+        """Update the list of columns that have not been mapped yet"""
+
+        self.props_left = [
+            attr for attr in self.node_attrs if attr not in self.get_name_map().values()
+        ]
+
+        optional_features = list(self.optional_features.keys())
+        for attribute in optional_features:
+            if attribute not in self.props_left:
+                self._remove_optional_prop(attribute)
+
+        for attribute in self.props_left:
+            if attribute not in self.optional_features:
+                self._add_optional_prop(attribute)
+
+    def _get_initial_mapping(self) -> dict[str, str]:
+        """Make an initial guess for mapping of geff columns to fields"""
+
+        mapping: dict[str, str] = {}
+        self.props_left = self.node_attrs.copy()
+
+        # check if the axes information is in the metadata, if so, use it for initial
+        # mapping
+        if hasattr(self.metadata, "axes"):
+            axes_names = [ax.name for ax in self.metadata.axes]
+            for attribute in self.standard_fields:
+                if attribute in axes_names:
+                    mapping[attribute] = attribute
+                    self.props_left.remove(attribute)
+
+        # if fields could not be assigned via the metadata, try find exact matches for
+        # standard fields
+        for attribute in self.standard_fields:
+            if attribute in mapping:
+                continue
+            if attribute in self.props_left:
+                mapping[attribute] = attribute
+                self.props_left.remove(attribute)
+
+        # assign closest remaining column as best guess for remaining standard fields
+        for attribute in self.standard_fields:
+            if attribute in mapping:
+                continue
+            if len(self.props_left) > 0:
+                lower_map = {p.lower(): p for p in self.props_left}
+                closest = difflib.get_close_matches(
+                    attribute.lower(), lower_map.keys(), n=1, cutoff=0.4
+                )
+                if closest:
+                    # map back to the original case
+                    best_match = lower_map[closest[0]]
+                    mapping[attribute] = best_match
+                    self.props_left.remove(best_match)
+                else:
+                    mapping[attribute] = "None"
+            else:
+                mapping[attribute] = "None"
+
+        return mapping
+
+    def _add_optional_prop(self, attribute: str) -> None:
+        """Add an attribute to the dictionary of optional features and create the
+        associated widgets in the grid layout:
+        - Checkbox to include/exclude the attribute
+        - Combobox to select the feature option (regionprops feature, 'Group', or 'Custom')
+        - Checkbox to indicate whether to recompute the feature (only for regionprops
+        features)
+
+        Args:
+            attribute (str): The attribute name to add as an optional feature
         """
 
-        self.mapping_labels = {}
-        self.mapping_widgets = {}
-        clear_layout(self.mapping_layout)  # clear layout first
-        initial_mapping = self._get_initial_mapping()
-        for attribute in self.standard_fields:
-            combo = QComboBox()
-            combo.addItems(self.node_attrs + ["None"])  # also add None
-            combo.setCurrentText(initial_mapping.get(attribute, "None"))
-            combo.currentIndexChanged.connect(self._update_props_left)
-            label = QLabel(attribute)
-            label.setToolTip(self._get_tooltip(attribute))
-            self.mapping_widgets[attribute] = combo
-            self.mapping_labels[attribute] = label
-            self.mapping_layout.addRow(label, combo)
-            if attribute == "seg_id" and not seg:
-                combo.setVisible(False)
-                label.setVisible(False)
-
-        # Optional extra features
-        self.feature_options = []
-        for name, func in inspect.getmembers(_regionprops_features, inspect.isfunction):
-            if func.__module__ == "funtracks.features._regionprops_features":
-                sig = inspect.signature(func)
-                if "ndim" in sig.parameters:
-                    ndim = 4 if "z" in self.standard_fields else 3
-                    feature = func(ndim)  # call with ndim
-                else:
-                    feature = func()  # Call without ndim
-                display_name = feature.get("display_name", name)
-                self.feature_options.append(display_name)
-
-        # Clear existing optional layout and widgets
-        clear_layout(self.optional_mapping_layout)
-        self.optional_features = {}
-
-        # Add header
-        header_prop = QLabel("Name")
-        header_assign = QLabel("Assign as Feature")
-        header_recompute = QLabel("Recompute")
-        header_prop.setAlignment(Qt.AlignLeft)
-        header_assign.setAlignment(Qt.AlignLeft)
-        header_recompute.setAlignment(Qt.AlignLeft)
-        self.optional_mapping_layout.addWidget(header_prop, 0, 0)
-        self.optional_mapping_layout.addWidget(header_assign, 0, 1)
-        self.optional_mapping_layout.addWidget(header_recompute, 0, 2)
-        self._update_props_left()
-        self.setMinimumHeight(350)
-
-    def _add_optional_prop(self, attribute) -> None:
-        # Add a row per remaining property
         row_idx = len(self.optional_features) + 1  # +1 for header row
 
         # Prop checkbox
@@ -339,6 +356,90 @@ class StandardFieldMapWidget(QWidget):
 
         self.props_updated.emit()
 
+    def _get_tooltip(self, attribute: str) -> str:
+        """Return the tooltip for the given attribute"""
+
+        tooltips = {
+            "id": "Unique identifier for the node.",
+            "time": "The time point of the node. Must be an integer",
+            "z": "The world z-coordinate of the node.",
+            "y": "The world y-coordinate of the node.",
+            "x": "The world x-coordinate of the node.",
+            "seg_id": "The integer label value in the segmentation file.",
+            DEFAULT_TRACKLET_KEY: "<html><body><p style='white-space:pre-wrap; width: "
+            "300px;'>"
+            "(Optional) The tracklet id that this node belongs "
+            "to, defined as a single chain with at most one incoming and one outgoing "
+            "edge.",
+            DEFAULT_LINEAGE_KEY: "<html><body><p style='white-space:pre-wrap; width: "
+            "(Optional) Lineage id that this node belongs to, defined as "
+            "weakly connected component in the graph.",
+        }
+
+        return tooltips.get(attribute, "")
+
+    def update_mapping(self, seg: bool = False) -> None:
+        """Map graph spatiotemporal data and optionally the track and lineage attributes
+        Arg:
+            seg (bool = False): whether a segmentation is associated with this data
+        """
+
+        self.mapping_labels = {}
+        self.mapping_widgets = {}
+        clear_layout(self.mapping_layout)  # clear layout first
+        initial_mapping = self._get_initial_mapping()
+        for attribute in self.standard_fields:
+            combo = QComboBox()
+            combo.addItems(self.node_attrs + ["None"])  # also add None
+            combo.setCurrentText(initial_mapping.get(attribute, "None"))
+            combo.currentIndexChanged.connect(self._update_props_left)
+            label = QLabel(attribute)
+            label.setToolTip(self._get_tooltip(attribute))
+            self.mapping_widgets[attribute] = combo
+            self.mapping_labels[attribute] = label
+            self.mapping_layout.addRow(label, combo)
+            if attribute == "seg_id" and not seg:
+                combo.setVisible(False)
+                label.setVisible(False)
+
+        # Optional extra features
+        self.feature_options = []
+        for name, func in inspect.getmembers(_regionprops_features, inspect.isfunction):
+            if func.__module__ == "funtracks.features._regionprops_features":
+                sig = inspect.signature(func)
+                if "ndim" in sig.parameters:
+                    ndim = 4 if "z" in self.standard_fields else 3
+                    feature = func(ndim)  # call with ndim
+                else:
+                    feature = func()  # Call without ndim
+                display_name = feature.get("display_name", name)
+                self.feature_options.append(display_name)
+
+        # Clear existing optional layout and widgets
+        clear_layout(self.optional_mapping_layout)
+        self.optional_features = {}
+
+        # Add header
+        header_prop = QLabel("Name")
+        header_assign = QLabel("Assign as Feature")
+        header_recompute = QLabel("Recompute")
+        header_prop.setAlignment(Qt.AlignLeft)
+        header_assign.setAlignment(Qt.AlignLeft)
+        header_recompute.setAlignment(Qt.AlignLeft)
+        self.optional_mapping_layout.addWidget(header_prop, 0, 0)
+        self.optional_mapping_layout.addWidget(header_assign, 0, 1)
+        self.optional_mapping_layout.addWidget(header_recompute, 0, 2)
+        self._update_props_left()
+        self.setMinimumHeight(350)
+
+    def get_name_map(self) -> dict[str, str]:
+        """Return a mapping from feature name to geff field name"""
+
+        return {
+            attribute: combo.currentText()
+            for attribute, combo in self.mapping_widgets.items()
+        }
+
     def get_optional_props(self) -> list[dict]:
         """Get all the extra features that are requested and their settings. Only entries
         whose checkbox in the prop_name column is checked are returned.
@@ -365,93 +466,3 @@ class StandardFieldMapWidget(QWidget):
                 )
 
         return optional_features
-
-    def _get_tooltip(self, attribute: str) -> str:
-        """Return the tooltip for the given attribute"""
-
-        tooltips = {
-            "id": "Unique identifier for the node.",
-            "time": "The time point of the node. Must be an integer",
-            "z": "The world z-coordinate of the node.",
-            "y": "The world y-coordinate of the node.",
-            "x": "The world x-coordinate of the node.",
-            "seg_id": "The integer label value in the segmentation file.",
-            DEFAULT_TRACKLET_KEY: "<html><body><p style='white-space:pre-wrap; width: "
-            "300px;'>"
-            "(Optional) The tracklet id that this node belongs "
-            "to, defined as a single chain with at most one incoming and one outgoing "
-            "edge.",
-            DEFAULT_LINEAGE_KEY: "<html><body><p style='white-space:pre-wrap; width: "
-            "(Optional) Lineage id that this node belongs to, defined as "
-            "weakly connected component in the graph.",
-        }
-
-        return tooltips.get(attribute, "")
-
-    def _update_props_left(self) -> None:
-        """Update the list of columns that have not been mapped yet"""
-        self.props_left = [
-            attr for attr in self.node_attrs if attr not in self.get_name_map().values()
-        ]
-
-        optional_features = list(self.optional_features.keys())
-        for attribute in optional_features:
-            if attribute not in self.props_left:
-                self._remove_optional_prop(attribute)
-
-        for attribute in self.props_left:
-            if attribute not in self.optional_features:
-                self._add_optional_prop(attribute)
-
-    def _get_initial_mapping(self) -> dict[str, str]:
-        """Make an initial guess for mapping of geff columns to fields"""
-
-        mapping: dict[str, str] = {}
-        self.props_left = self.node_attrs.copy()
-
-        # check if the axes information is in the metadata, if so, use it for initial
-        # mapping
-        if hasattr(self.metadata, "axes"):
-            axes_names = [ax.name for ax in self.metadata.axes]
-            for attribute in self.standard_fields:
-                if attribute in axes_names:
-                    mapping[attribute] = attribute
-                    self.props_left.remove(attribute)
-
-        # if fields could not be assigned via the metadata, try find exact matches for
-        # standard fields
-        for attribute in self.standard_fields:
-            if attribute in mapping:
-                continue
-            if attribute in self.props_left:
-                mapping[attribute] = attribute
-                self.props_left.remove(attribute)
-
-        # assign closest remaining column as best guess for remaining standard fields
-        for attribute in self.standard_fields:
-            if attribute in mapping:
-                continue
-            if len(self.props_left) > 0:
-                lower_map = {p.lower(): p for p in self.props_left}
-                closest = difflib.get_close_matches(
-                    attribute.lower(), lower_map.keys(), n=1, cutoff=0.4
-                )
-                if closest:
-                    # map back to the original case
-                    best_match = lower_map[closest[0]]
-                    mapping[attribute] = best_match
-                    self.props_left.remove(best_match)
-                else:
-                    mapping[attribute] = "None"
-            else:
-                mapping[attribute] = "None"
-
-        return mapping
-
-    def get_name_map(self) -> dict[str, str]:
-        """Return a mapping from feature name to geff field name"""
-
-        return {
-            attribute: combo.currentText()
-            for attribute, combo in self.mapping_widgets.items()
-        }
