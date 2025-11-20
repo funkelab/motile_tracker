@@ -6,6 +6,7 @@ import napari
 import numpy as np
 from funtracks.data_model import NodeType, SolutionTracks
 from funtracks.data_model.tracks_controller import TracksController
+from funtracks.exceptions import InvalidActionError
 from psygnal import Signal
 
 from motile_tracker.data_views.graph_attributes import NodeAttr
@@ -22,6 +23,9 @@ from motile_tracker.data_views.views_coordinator.node_selection_list import (
     NodeSelectionList,
 )
 from motile_tracker.data_views.views_coordinator.tracks_list import TracksList
+from motile_tracker.data_views.views_coordinator.user_dialogs import (
+    confirm_force_operation,
+)
 
 
 class TracksViewer:
@@ -70,6 +74,7 @@ class TracksViewer:
         self.tracks_list.view_tracks.connect(self.update_tracks)
         self.selected_track = None
         self.track_id_color = [0, 0, 0, 0]
+        self.force = False
 
         self.set_keybinds()
 
@@ -276,7 +281,22 @@ class TracksViewer:
             if time1 > time2:
                 node1, node2 = node2, node1
 
-            self.tracks_controller.add_edges(edges=np.array([[node1, node2]]))
+            try:
+                self.tracks_controller.add_edges(
+                    edges=np.array([[node1, node2]]), force=self.force
+                )
+            except InvalidActionError as e:
+                if e.forceable:
+                    # Ask the user if the action should be forced
+                    force, always_force = confirm_force_operation(message=str(e))
+                    self.force = always_force
+                    if force:
+                        self.tracks_controller.add_edges(
+                            edges=np.array([[node1, node2]]), force=True
+                        )
+                else:
+                    # Re-raise the exception if it is not forceable
+                    raise
 
     def undo(self, event=None):
         self.tracks_controller.undo()
