@@ -569,7 +569,7 @@ class TreeWidget(QWidget):
         self.tree_widget._update_viewed_data(self.view_direction)
         self.tree_widget.set_view(
             view_direction=self.view_direction,
-            feature=self.tree_widget.feature,
+            plot_type=self.tree_widget.plot_type,
             reset_view=False,
         )
 
