@@ -102,18 +102,19 @@ def extract_sorted_tracks(
             }
 
             if regionprops_annotator is not None:
-                for feature_key, feature in regionprops_annotator.features.items():
-                    name = feature["display_name"]
-                    val = tracks.get_node_attr(node, feature_key)
-                    if isinstance(val, list | tuple):
-                        for i, v in enumerate(val):
-                            if isinstance(name, list | tuple):
-                                display_name = name[i]
-                            else:
-                                display_name = f"{name}_{i}"
-                            track_dict[display_name] = v
-                    else:
-                        track_dict[name] = val
+                for feature_key, feature in tracks.features.items():
+                    if feature_key not in track_dict:
+                        name = feature["display_name"]
+                        val = tracks.get_node_attr(node, feature_key)
+                        if isinstance(val, list | tuple):
+                            for i, v in enumerate(val):
+                                if isinstance(name, list | tuple):
+                                    display_name = name[i]
+                                else:
+                                    display_name = f"{name}_{i}"
+                                track_dict[display_name] = v
+                        else:
+                            track_dict[name] = val
 
             if len(pos) == 3:
                 track_dict["z"] = pos[0]
@@ -277,15 +278,11 @@ def get_features_from_tracks(tracks: Tracks | None = None) -> list[str]:
         if tracks is None
     """
 
+    features_to_ignore = ["Time", "Tracklet ID"]
     features_to_plot = []
     if tracks is not None:
-        regionprops_annotator = next(
-            annotator
-            for annotator in tracks.annotators
-            if isinstance(annotator, RegionpropsAnnotator)
-        )
-        if regionprops_annotator is not None:
-            for feature in regionprops_annotator.features.values():
+        for feature in tracks.features.values():
+            if feature["value_type"] in ("float", "int"):
                 if feature["num_values"] > 1:
                     for i in range(feature["num_values"]):
                         name = feature["display_name"]
@@ -296,4 +293,7 @@ def get_features_from_tracks(tracks: Tracks | None = None) -> list[str]:
                 else:
                     features_to_plot.append(feature["display_name"])
 
+    features_to_plot = [
+        feature for feature in features_to_plot if feature not in features_to_ignore
+    ]
     return features_to_plot
