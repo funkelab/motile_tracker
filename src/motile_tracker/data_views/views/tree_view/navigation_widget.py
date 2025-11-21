@@ -21,16 +21,15 @@ class NavigationWidget(QWidget):
         lineage_df: pd.DataFrame,
         view_direction: str,
         selected_nodes: NodeSelectionList,
-        feature: str,
+        plot_type: str,
     ):
         """Widget for controlling navigation in the tree widget
 
         Args:
             track_df (pd.DataFrame): The dataframe holding the track information
-            view_direction (str): The view direction of the tree widget. Options:
-                "vertical", "horizontal".
+            view_direction (str): The view direction of the tree widget. Options: "vertical", "horizontal".
             selected_nodes (NodeSelectionList): The list of selected nodes.
-            feature (str): The feature currently being displayed
+            plot_type (str): either 'tree' or 'feature'
         """
 
         super().__init__()
@@ -38,7 +37,8 @@ class NavigationWidget(QWidget):
         self.lineage_df = lineage_df
         self.view_direction = view_direction
         self.selected_nodes = selected_nodes
-        self.feature = feature
+        self.plot_type = plot_type
+        self.feature = None
 
         navigation_box = QGroupBox("Navigation [\u2b05 \u27a1 \u2b06 \u2b07]")
         navigation_layout = QHBoxLayout()
@@ -102,8 +102,8 @@ class NavigationWidget(QWidget):
                 next_node = self.get_next_track_node(
                     self.lineage_df, node_id, forward=False
                 )
-                # if not found, look in the whole dataframe to enable jumping to the
-                # next node outside the current tree view content
+                # if not found, look in the whole dataframe
+                # to enable jumping to the next node outside the current tree view content
                 if next_node is None:
                     next_node = self.get_next_track_node(
                         self.track_df, node_id, forward=False
@@ -123,14 +123,13 @@ class NavigationWidget(QWidget):
         """Get the node at the same time point in an adjacent track.
 
         Args:
-            df (pd.DataFrame): The dataframe to be used (full track_df or subset
-                lineage_df).
+            df (pd.DataFrame): The dataframe to be used (full track_df or subset lineage_df).
             node_id (str): The current node ID to get the next from.
             forward (bool, optional): If true, pick the next track (right/down).
                 Otherwise, pick the previous track (left/up). Defaults to True.
         """
         # Determine which axis to use for finding neighbors
-        axis_label = "area" if self.feature == "area" else "x_axis_pos"
+        axis_label = self.feature if self.plot_type == "feature" else "x_axis_pos"
 
         if df.empty:
             return None
@@ -153,7 +152,6 @@ class NavigationWidget(QWidget):
             )
             neighbor = neighbors.loc[closest_index_label, "node_id"]
             return neighbor
-        return None
 
     def get_predecessor(self, node_id: str) -> str | None:
         """Get the predecessor node of the given node_id
@@ -171,7 +169,6 @@ class NavigationWidget(QWidget):
         parent_row = self.track_df.loc[self.track_df["node_id"] == parent_id]
         if not parent_row.empty:
             return parent_row["node_id"].values[0]
-        return None
 
     def get_successor(self, node_id: str) -> str | None:
         """Get the successor node of the given node_id. If there are two children,
@@ -188,4 +185,3 @@ class NavigationWidget(QWidget):
         if not children.empty:
             child = children.to_dict("records")[0]
             return child["node_id"]
-        return None
