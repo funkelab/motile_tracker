@@ -28,6 +28,49 @@ from motile_tracker.import_export.menus.geff_import_utils import (
 )
 
 
+def get_attr_dtype_zarr(root: zarr.Group, attr: str) -> str:
+    """
+    Determine the data type for a property stored under
+    root['nodes']['props'][attr].
+
+    Returns:
+        One of: 'bool', 'int', 'float', 'str', or 'object'
+    """
+    node = root["nodes"]["props"][attr]
+
+    # Try to find a child array and inspect its dtype
+    for name in getattr(node, "keys", list)():
+        child = node[name]
+        if hasattr(child, "dtype"):
+            kind = child.dtype.kind
+            # Convert numpy kind to readable type
+            if kind == "b":
+                return "bool"
+            elif kind in ("i", "u"):
+                return "int"
+            elif kind == "f":
+                return "float"
+            elif kind in ("S", "U"):
+                return "str"
+            else:
+                return "object"
+
+
+def get_attr_dtype_pandas(series: pd.Series) -> str:
+    """Extract the data type of a pandas series as one of 'bool', 'int', 'float', 'str',
+    or 'object'
+    """
+
+    if pd.api.types.is_integer_dtype(series):
+        return "int"
+    elif pd.api.types.is_float_dtype(series):
+        return "float"
+    elif pd.api.types.is_bool_dtype(series):
+        return "bool"
+    else:
+        return str(series.dtype)
+
+
 class StandardFieldMapWidget(QWidget):
     """QWidget to map motile run attributes to node properties in csv or geff."""
 
@@ -80,33 +123,6 @@ class StandardFieldMapWidget(QWidget):
 
         self.setVisible(False)
 
-    def _get_attr_dtype_kind(self, root: zarr.Group, attr: str) -> str:
-        """
-        Determine the data type for a property stored under
-        root['nodes']['props'][attr].
-
-        Returns:
-            One of: 'bool', 'int', 'float', 'str', or 'object'
-        """
-        node = root["nodes"]["props"][attr]
-
-        # Try to find a child array and inspect its dtype
-        for name in getattr(node, "keys", list)():
-            child = node[name]
-            if hasattr(child, "dtype"):
-                kind = child.dtype.kind
-                # Convert numpy kind to readable type
-                if kind == "b":
-                    return "bool"
-                elif kind in ("i", "u"):
-                    return "int"
-                elif kind == "f":
-                    return "float"
-                elif kind in ("S", "U"):
-                    return "str"
-                else:
-                    return "object"
-
     def extract_csv_property_fields(
         self, df: pd.DataFrame, seg: bool, incl_z: bool
     ) -> None:
@@ -120,7 +136,9 @@ class StandardFieldMapWidget(QWidget):
         self.node_attrs = list(self.df.columns)
 
         # Retrieve attribute types
-        self.attr_types = {attr: str(self.df[attr].dtype) for attr in self.node_attrs}
+        self.attr_types = {
+            attr: get_attr_dtype_pandas(self.df[attr]) for attr in self.node_attrs
+        }
         self.props_left = []
         self.standard_fields = [
             "id",
@@ -152,7 +170,7 @@ class StandardFieldMapWidget(QWidget):
 
         # Retrieve attribute types from the zarr group
         self.attr_types = {
-            attr: self._get_attr_dtype_kind(root, attr) for attr in self.node_attrs
+            attr: get_attr_dtype_zarr(root, attr) for attr in self.node_attrs
         }
         self.props_left = []
         self.standard_fields = [
@@ -261,11 +279,7 @@ class StandardFieldMapWidget(QWidget):
             self.attr_types.get(attribute)
             in {
                 "int",
-                "int32",
-                "int64",
                 "float",
-                "float32",
-                "float64",
             }
             and self.seg
         ):
