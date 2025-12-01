@@ -283,10 +283,13 @@ class TrackPoints(napari.layers.Points):
 
         if isinstance(visible_nodes, str):
             self.shown[:] = True
-        elif self.tracks_viewer.mode == "group":
-            visible_nodes += (
-                self.tracks_viewer.selected_nodes
-            )  # include selected nodes as well
+        else:
+            # For lineage or group mode, visible_nodes is a list of node IDs
+            # In group mode, also include selected nodes so they remain visible
+            if self.tracks_viewer.mode == "group":
+                visible_nodes = (
+                    list(visible_nodes) + self.tracks_viewer.selected_nodes.as_list
+                )
             indices = np.where(np.isin(self.properties["node_id"], visible_nodes))[
                 0
             ].tolist()

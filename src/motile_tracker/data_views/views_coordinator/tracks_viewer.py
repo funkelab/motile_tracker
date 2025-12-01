@@ -145,7 +145,7 @@ class TracksViewer:
             tracks (funtracks.data_model.Tracks): The tracks to visualize in napari.
             name (str): The name of the tracks to display in the layer names
         """
-        self.selected_nodes._set = {}
+        self.selected_nodes._set = set()
 
         if self.tracks is not None:
             self.tracks.refresh.disconnect(self._refresh)
