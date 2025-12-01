@@ -4,9 +4,9 @@ import numpy as np
 import pandas as pd
 import pytest
 from funtracks.data_model import SolutionTracks
-from funtracks.import_export import tracks_from_df
 from motile_toolbox.candidate_graph.graph_attributes import NodeAttr
 
+from motile_tracker.import_export import tracks_from_df
 from motile_tracker.import_export.load_tracks import (
     ensure_correct_labels,
     ensure_integer_ids,
@@ -361,7 +361,7 @@ class TestEdgeCases:
         )
 
         # tracks_from_df validates that parent exists
-        with pytest.raises(ValueError, match="missing nodes"):
+        with pytest.raises(AssertionError, match="not in graph"):
             tracks_from_df(df)
 
 
@@ -396,5 +396,5 @@ class TestValidationErrors:
         )
 
         # tracks_from_df validates required columns
-        with pytest.raises(ValueError, match="None values"):
+        with pytest.raises(AssertionError, match="Required column"):
             tracks_from_df(df)
