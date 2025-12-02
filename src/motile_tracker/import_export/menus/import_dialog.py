@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from funtracks.import_export import tracks_from_df
 from funtracks.import_export.import_from_geff import import_from_geff
 from funtracks.import_export.magic_imread import magic_imread
 from geff_spec.utils import axes_from_lists
@@ -16,7 +17,6 @@ from qtpy.QtWidgets import (
     QWidget,
 )
 
-from motile_tracker.import_export.load_tracks import tracks_from_df
 from motile_tracker.import_export.menus.csv_dimension_widget import (
     DimensionWidget,
 )
