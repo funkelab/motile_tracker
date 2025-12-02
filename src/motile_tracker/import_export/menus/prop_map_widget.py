@@ -369,27 +369,42 @@ class StandardFieldMapWidget(QWidget):
 
         self.props_updated.emit()
 
+    def _wrap_tooltip(self, text: str) -> str:
+        """Wrap tooltip with fixed width."""
+
+        if not text:
+            return ""
+        return (
+            f"<html><body>"
+            f"<p style='white-space:pre-wrap; width: 300px;'>"
+            f"{text}"
+            f"</p></body></html>"
+        )
+
     def _get_tooltip(self, attribute: str) -> str:
         """Return the tooltip for the given attribute"""
 
         tooltips = {
             "id": "Unique identifier for the node.",
-            "time": "The time point of the node. Must be an integer",
+            "time": "The time point of the node. Must be an integer.",
             "z": "The world z-coordinate of the node.",
             "y": "The world y-coordinate of the node.",
             "x": "The world x-coordinate of the node.",
-            "seg_id": "The integer label value in the segmentation file.",
-            DEFAULT_TRACKLET_KEY: "<html><body><p style='white-space:pre-wrap; width: "
-            "300px;'>"
-            "(Optional) The tracklet id that this node belongs "
-            "to, defined as a single chain with at most one incoming and one outgoing "
-            "edge.",
-            DEFAULT_LINEAGE_KEY: "<html><body><p style='white-space:pre-wrap; width: "
-            "(Optional) Lineage id that this node belongs to, defined as "
-            "weakly connected component in the graph.",
+            "seg_id": (
+                "The integer label value in the segmentation file. Choose None "
+                "if the label values are identical to the node IDs."
+            ),
+            DEFAULT_TRACKLET_KEY: (
+                "(Optional) The tracklet id this node belongs to, defined as a "
+                "single chain with at most one incoming and one outgoing edge."
+            ),
+            DEFAULT_LINEAGE_KEY: (
+                "(Optional) Lineage id this node belongs to, defined as a weakly "
+                "connected component in the graph."
+            ),
         }
 
-        return tooltips.get(attribute, "")
+        return self._wrap_tooltip(tooltips.get(attribute, ""))
 
     def update_mapping(self, seg: bool = False) -> None:
         """Map graph spatiotemporal data and optionally the track and lineage attributes
