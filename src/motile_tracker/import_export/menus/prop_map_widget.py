@@ -8,7 +8,6 @@ from funtracks.annotators._track_annotator import (
     DEFAULT_TRACKLET_KEY,
 )
 from funtracks.features import _regionprops_features
-from funtracks.import_export.feature_import import ImportedNodeFeature
 from psygnal import Signal
 from qtpy.QtCore import Qt
 from qtpy.QtWidgets import (
@@ -447,36 +446,66 @@ class StandardFieldMapWidget(QWidget):
         self.setMinimumHeight(350)
 
     def get_name_map(self) -> dict[str, str]:
-        """Return a mapping from feature name to geff field name"""
+        """Return a mapping from standard field name to source property name.
 
-        return {
+        Includes both standard fields (time, x, y, etc.) and any Custom/Group
+        features selected in optional features.
+        """
+        name_map = {
             attribute: combo.currentText()
             for attribute, combo in self.mapping_widgets.items()
         }
 
-    def get_optional_props(self) -> list[dict]:
-        """Get all the extra features that are requested and their settings. Only entries
-        whose checkbox in the prop_name column is checked are returned.
-
-        Returns a list of dicts like:
-        {
-            "prop_name": "area",
-            "feature": <Display name for regionprops feature> or 'Group' or 'Custom',
-            "recompute": True/False
-            "dtype": str/int/float/bool
-        }
-        """
-        optional_features = []
+        # Add Custom and Group features to name_map
         for attr, widgets in self.optional_features.items():
             if widgets["attr_checkbox"].isChecked():
                 selected = widgets["feature_option"].currentText()
-                optional_features.append(
-                    ImportedNodeFeature(
-                        prop_name=attr,
-                        feature=selected,
-                        recompute=bool(widgets["recompute"].isChecked()),
-                        dtype=self.attr_types.get(attr, "str"),
-                    )
-                )
+                if selected in ("Custom", "Group"):
+                    # Map property name to itself (identity mapping)
+                    name_map[attr] = attr
 
-        return optional_features
+        return name_map
+
+    def get_features(self) -> dict[str, str]:
+        """Get features dict for tracks_from_df (CSV import).
+
+        Returns dict mapping feature display name to either:
+        - Column name (to load from that column)
+        - "Recompute" (to compute from segmentation)
+
+        Custom and Group features are excluded (handled via name_map).
+        """
+        features = {}
+        for attr, widgets in self.optional_features.items():
+            if widgets["attr_checkbox"].isChecked():
+                selected = widgets["feature_option"].currentText()
+                recompute = widgets["recompute"].isChecked()
+
+                if selected in ("Custom", "Group"):
+                    # Custom/Group features are added to name_map instead
+                    continue
+                elif recompute:
+                    features[selected] = "Recompute"
+                else:
+                    features[selected] = attr  # column name
+        return features
+
+    def get_node_features(self) -> dict[str, bool]:
+        """Get node_features dict for import_from_geff (GEFF import).
+
+        Returns dict mapping property name to recompute boolean.
+
+        Custom and Group features are excluded (handled via name_map).
+        """
+        node_features = {}
+        for attr, widgets in self.optional_features.items():
+            if widgets["attr_checkbox"].isChecked():
+                selected = widgets["feature_option"].currentText()
+                recompute = widgets["recompute"].isChecked()
+
+                if selected in ("Custom", "Group"):
+                    # Custom/Group features are added to name_map instead
+                    continue
+
+                node_features[attr] = recompute
+        return node_features

@@ -332,10 +332,9 @@ class ImportDialog(QDialog):
 
                 segmentation_path = self.segmentation_widget.get_segmentation_path()
                 name_map = self.prop_map_widget.get_name_map()
-                name_map = {
-                    k: (None if v == "None" else v) for k, v in name_map.items()
-                }
-                extra_features = self.prop_map_widget.get_optional_props()
+                # Remove entries with "None" value - funtracks doesn't accept None mappings
+                name_map = {k: v for k, v in name_map.items() if v != "None"}
+                node_features = self.prop_map_widget.get_node_features()
 
                 # Generate axes metadata if missing (required for funtracks validation)
                 geff_metadata = dict(self.import_widget.root.attrs.get("geff", {}))
@@ -343,16 +342,14 @@ class ImportDialog(QDialog):
                     if segmentation_path is not None:
                         self._generate_axes_metadata(name_map, scale, segmentation_path)
                     else:
-                        if name_map["z"] is None:
-                            del name_map[
-                                "z"
-                            ]  # remove z from name_map if no segmentation is provided
+                        if "z" not in name_map:
+                            pass  # z already removed by filtering above
                 try:
                     self.tracks = import_from_geff(
                         geff_dir,
                         name_map,
                         segmentation_path=segmentation_path,
-                        node_features=extra_features,
+                        node_features=node_features,
                         scale=scale,
                     )
                 except (ValueError, OSError, FileNotFoundError, AssertionError) as e:
@@ -369,14 +366,17 @@ class ImportDialog(QDialog):
                 else:
                     segmentation = None
                 name_map = self.prop_map_widget.get_name_map()
-                name_map = {
-                    k: (None if v == "None" else v) for k, v in name_map.items()
-                }
-                extra_features = self.prop_map_widget.get_optional_props()
+                # Remove entries with "None" value - funtracks doesn't accept None mappings
+                name_map = {k: v for k, v in name_map.items() if v != "None"}
+                features = self.prop_map_widget.get_features()
 
                 try:
                     self.tracks = tracks_from_df(
-                        self.df, name_map, segmentation, scale, extra_features
+                        self.df,
+                        segmentation=segmentation,
+                        scale=scale,
+                        features=features,
+                        name_map=name_map,
                     )
                 except (ValueError, OSError, FileNotFoundError, AssertionError) as e:
                     QMessageBox.critical(self, "Error", f"Failed to load tracks: {e}")
