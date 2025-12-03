@@ -29,31 +29,23 @@ class EditingMenu(QWidget):
         layout.addLayout(track_layout)
 
         node_box = QGroupBox("Edit Node(s)")
-        node_box.setMaximumHeight(60)
+        node_box.setMaximumHeight(120)
         node_box_layout = QVBoxLayout()
 
         self.delete_node_btn = QPushButton("Delete [D]")
         self.delete_node_btn.clicked.connect(self.tracks_viewer.delete_node)
         self.delete_node_btn.setEnabled(False)
-        # self.split_node_btn = QPushButton("Set split [S]")
-        # self.split_node_btn.clicked.connect(self.tracks_viewer.set_split_node)
-        # self.split_node_btn.setEnabled(False)
-        # self.endpoint_node_btn = QPushButton("Set endpoint [E]")
-        # self.endpoint_node_btn.clicked.connect(self.tracks_viewer.set_endpoint_node)
-        # self.endpoint_node_btn.setEnabled(False)
-        # self.linear_node_btn = QPushButton("Set linear [C]")
-        # self.linear_node_btn.clicked.connect(self.tracks_viewer.set_linear_node)
-        # self.linear_node_btn.setEnabled(False)
+        self.swap_nodes_btn = QPushButton("Swap [S]")
+        self.swap_nodes_btn.clicked.connect(self.tracks_viewer.swap_nodes)
+        self.swap_nodes_btn.setEnabled(False)
 
         node_box_layout.addWidget(self.delete_node_btn)
-        # node_box_layout.addWidget(self.split_node_btn)
-        # node_box_layout.addWidget(self.endpoint_node_btn)
-        # node_box_layout.addWidget(self.linear_node_btn)
+        node_box_layout.addWidget(self.swap_nodes_btn)
 
         node_box.setLayout(node_box_layout)
 
         edge_box = QGroupBox("Edit Edge(s)")
-        edge_box.setMaximumHeight(150)
+        edge_box.setMaximumHeight(120)
         edge_box_layout = QVBoxLayout()
 
         self.delete_edge_btn = QPushButton("Break [B]")
@@ -62,13 +54,9 @@ class EditingMenu(QWidget):
         self.create_edge_btn = QPushButton("Add [A]")
         self.create_edge_btn.clicked.connect(self.tracks_viewer.create_edge)
         self.create_edge_btn.setEnabled(False)
-        self.swap_edges_btn = QPushButton("Swap [S]")
-        self.swap_edges_btn.clicked.connect(self.tracks_viewer.swap_edges)
-        self.swap_edges_btn.setEnabled(False)
 
         edge_box_layout.addWidget(self.delete_edge_btn)
         edge_box_layout.addWidget(self.create_edge_btn)
-        edge_box_layout.addWidget(self.swap_edges_btn)
 
         edge_box.setLayout(edge_box_layout)
 
@@ -107,26 +95,17 @@ class EditingMenu(QWidget):
         n_selected = len(self.tracks_viewer.selected_nodes)
         if n_selected == 0:
             self.delete_node_btn.setEnabled(False)
-            # self.split_node_btn.setEnabled(False)
-            # self.endpoint_node_btn.setEnabled(False)
-            # self.linear_node_btn.setEnabled(False)
             self.delete_edge_btn.setEnabled(False)
             self.create_edge_btn.setEnabled(False)
-            self.swap_edges_btn.setEnabled(False)
+            self.swap_nodes_btn.setEnabled(False)
 
         elif n_selected == 2:
             self.delete_node_btn.setEnabled(True)
-            # self.split_node_btn.setEnabled(True)
-            # self.endpoint_node_btn.setEnabled(True)
-            # self.linear_node_btn.setEnabled(True)
             self.delete_edge_btn.setEnabled(True)
             self.create_edge_btn.setEnabled(True)
-            self.swap_edges_btn.setEnabled(True)
+            self.swap_nodes_btn.setEnabled(True)
 
         else:
             self.delete_node_btn.setEnabled(True)
-            # self.split_node_btn.setEnabled(True)
-            # self.endpoint_node_btn.setEnabled(True)
-            # self.linear_node_btn.setEnabled(True)
             self.delete_edge_btn.setEnabled(False)
             self.create_edge_btn.setEnabled(False)
