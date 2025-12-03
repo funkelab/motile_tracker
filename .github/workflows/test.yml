@@ -35,7 +35,7 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync --no-dev --resolution ${{ matrix.resolution }}
+        run: uv sync --no-dev --group testing --resolution ${{ matrix.resolution }}
 
       - name: Set Windows resolution
         if: runner.os == 'Windows'
