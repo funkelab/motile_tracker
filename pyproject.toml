@@ -85,10 +85,19 @@ docs = [
 dev = [
     "ruff>=0.13",
     "pre-commit>=4,<5",
-    "gurobipy>=12,<13",  # my personal license only works with 12
     "numba>=0.62.1",
     {include-group="testing"},
     {include-group = "docs"},
+]
+# For gurobi, install separately: uv pip install "gurobipy>=12,<13"
+
+[tool.uv]
+# gurobi12 and gurobi13 conflict with each other (mutually exclusive version pins)
+conflicts = [
+    [
+        {extra = "gurobi12"},
+        {extra = "gurobi13"},
+    ],
 ]
 
 [tool.setuptools_scm]
