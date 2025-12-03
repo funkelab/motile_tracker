@@ -30,7 +30,9 @@ def test_export_dialog_cancel(monkeypatch, mock_tracks, fake_parent):
         "qtpy.QtWidgets.QInputDialog.getItem", lambda *a, **kw: ("CSV", False)
     )
 
-    result = ExportDialog.show_export_dialog(fake_parent, mock_tracks, name="TestGroup")
+    result = ExportDialog.show_export_dialog(
+        fake_parent, mock_tracks, name="TestGroup", nodes_to_keep={1, 2}
+    )
     assert result is False
     mock_tracks.export_tracks.assert_not_called()
 
@@ -60,11 +62,18 @@ def test_export_dialog_csv(monkeypatch, mock_tracks, fake_parent, tmp_path):
     )
 
     # Run the dialog method
-    result = ExportDialog.show_export_dialog(fake_parent, mock_tracks, name="MyGroup")
+    with patch(
+        "motile_tracker.import_export.menus.export_dialog.export_to_csv"
+    ) as mock_export_csv:
+        result = ExportDialog.show_export_dialog(
+            fake_parent, mock_tracks, name="MyGroup", nodes_to_keep={1, 2}
+        )
 
     # Assertions
     assert result is True
-    mock_tracks.export_tracks.assert_called_once_with(test_file)
+    mock_export_csv.assert_called_once_with(
+        mock_tracks, test_file, {1, 2}, use_display_names=True
+    )
 
     # Verify QFileDialog was instantiated once
     mock_file_dialog_class.assert_called_once()
@@ -95,11 +104,13 @@ def test_export_dialog_geff(monkeypatch, mock_tracks, fake_parent, tmp_path):
         "motile_tracker.import_export.menus.export_dialog.export_to_geff"
     ) as mock_export_geff:
         result = ExportDialog.show_export_dialog(
-            fake_parent, mock_tracks, name="MyGroup"
+            fake_parent, mock_tracks, name="MyGroup", nodes_to_keep={1, 2}
         )
 
     assert result is True
-    mock_export_geff.assert_called_once_with(mock_tracks, test_file, overwrite=True)
+    mock_export_geff.assert_called_once_with(
+        mock_tracks, test_file, overwrite=True, node_ids={1, 2}
+    )
     mock_file_dialog_class.assert_called_once()
 
 
@@ -135,7 +146,7 @@ def test_export_dialog_geff_error(monkeypatch, mock_tracks, fake_parent, tmp_pat
         ) as mock_warning,
     ):
         result = ExportDialog.show_export_dialog(
-            fake_parent, mock_tracks, name="ErrGroup"
+            fake_parent, mock_tracks, name="ErrGroup", nodes_to_keep={3}
         )
 
     assert result is False
