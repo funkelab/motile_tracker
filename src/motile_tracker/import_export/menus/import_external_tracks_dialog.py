@@ -201,7 +201,7 @@ class ImportTracksDialog(QDialog):
                 ):
                     df["area"] = self.data_widget.df[features[feature]]
         else:
-            features = []
+            features = {}
 
         # Try to create a Tracks object with the provided CSV file, the attr:column
         # dictionaries, and the scaling information

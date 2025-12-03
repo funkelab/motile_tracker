@@ -267,26 +267,26 @@ class TrackLabels(napari.layers.Labels):
                 )  # paint with the updated self.selected_label, not with the value from the
                 # event, to ensure it is a valid label.
             except InvalidActionError as e:
-                # If the action is invalid, ask the user if they want to force it anyway
-                force, always_force = confirm_force_operation(message=str(e))
-                self.tracks_viewer.force = always_force
-                super().undo()
-                if not force:
-                    self._refresh()  # to trigger refresh on orthoviews, if present
+                if e.forceable:
+                    # If the action is invalid, ask the user if they want to force it anyway
+                    force, always_force = confirm_force_operation(message=str(e))
+                    self.tracks_viewer.force = always_force
+                    super().undo()
+                    if not force:
+                        self._refresh()  # to trigger refresh on orthoviews, if present
+                    else:
+                        # try again with force enabled
+                        self.tracks_viewer.tracks_controller.update_segmentations(
+                            target_value,
+                            updated_pixels,
+                            current_timepoint,
+                            self.tracks_viewer.selected_track,
+                            force=True,
+                        )
                 else:
-                    # try again with force enabled
-                    self.tracks_viewer.tracks_controller.update_segmentations(
-                        target_value,
-                        updated_pixels,
-                        current_timepoint,
-                        self.tracks_viewer.selected_track,
-                        force=True,
-                    )
-
-            except (ValueError, RuntimeError) as e:
-                warnings.warn(str(e), stacklevel=2)
-                super().undo()
-                self._refresh()
+                    warnings.warn(str(e), stacklevel=2)
+                    super().undo()
+                    self._refresh()
 
     def _refresh(self):
         """Refresh the data in the labels layer"""

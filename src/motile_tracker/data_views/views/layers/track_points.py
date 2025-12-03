@@ -178,13 +178,13 @@ class TrackPoints(napari.layers.Points):
         """Create attributes for a new node at given time point"""
 
         t = int(new_point[0])
-        # Check if we already have a node for the current track id at this time point,
-        # since it is not allowed to have two nodes for the same track at the same time
-        # point.
+
+        # Activate a new track_id if necessary
         if self.tracks_viewer.selected_track is None:
             self.tracks_viewer.set_new_track_id()
 
-        # track id does not exist yet in tracks.track_id_to_node, so it is safe to use
+        # take the track_id of the selected track (funtracks will check that there is no
+        # node with this track_id at this time point yet, and assign a new one otherwise.)
         track_id = self.tracks_viewer.selected_track
         area = 0
 
@@ -211,17 +211,18 @@ class TrackPoints(napari.layers.Points):
                         attributes, force=self.tracks_viewer.force
                     )
                 except InvalidActionError as e:
-                    # If the action is invalid, ask the user if they want to force it anyway
-                    force, always_force = confirm_force_operation(message=str(e))
-                    self.tracks_viewer.force = always_force
-                    self._refresh()
-                    if force:
-                        self.tracks_viewer.tracks_controller.add_nodes(
-                            attributes, force=True
-                        )
-                except (ValueError, RuntimeError) as e:
-                    warnings.warn(str(e), stacklevel=2)
-                    self._refresh()
+                    if e.forceable:
+                        # If the action is invalid but forceable, ask the user if they want to do so
+                        force, always_force = confirm_force_operation(message=str(e))
+                        self.tracks_viewer.force = always_force
+                        self._refresh()
+                        if force:
+                            self.tracks_viewer.tracks_controller.add_nodes(
+                                attributes, force=True
+                            )
+                    else:
+                        warnings.warn(str(e), stacklevel=2)
+                        self._refresh()
             else:
                 show_info(
                     "Mixed point and segmentation nodes not allowed: add points by "
@@ -231,7 +232,7 @@ class TrackPoints(napari.layers.Points):
 
         elif event.action == "removed":
             self.tracks_viewer.tracks_controller.delete_nodes(
-                self.tracks_viewer.selected_nodes._list
+                self.tracks_viewer.selected_nodes.as_list
             )
 
         elif event.action == "changed":
@@ -272,18 +273,24 @@ class TrackPoints(napari.layers.Points):
         symbols = [symbolmap[statemap[degree]] for _, degree in tracks.graph.out_degree]
         return symbols
 
-    def update_point_outline(self, visible: list[int] | str) -> None:
+    def update_point_outline(self, visible_nodes: list[int] | str) -> None:
         """Update the outline color of the selected points and visibility according to
         display mode
 
         Args:
-            visible (list[int] | str): A list of track ids, or "all"
+            visible_nodes (list[int] | str): A list of node ids, or "all"
         """
-        # filter out the non-selected tracks if in lineage mode
-        if visible == "all":
+
+        if isinstance(visible_nodes, str):
             self.shown[:] = True
         else:
-            indices = np.where(np.isin(self.properties["track_id"], visible))[
+            # For lineage or group mode, visible_nodes is a list of node IDs
+            # In group mode, also include selected nodes so they remain visible
+            if self.tracks_viewer.mode == "group":
+                visible_nodes = (
+                    list(visible_nodes) + self.tracks_viewer.selected_nodes.as_list
+                )
+            indices = np.where(np.isin(self.properties["node_id"], visible_nodes))[
                 0
             ].tolist()
             self.shown[:] = False

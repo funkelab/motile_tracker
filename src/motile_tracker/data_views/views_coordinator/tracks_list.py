@@ -5,7 +5,6 @@ from warnings import warn
 import napari
 from fonticon_fa6 import FA6S
 from funtracks.data_model import Tracks
-from funtracks.import_export.export_to_geff import export_to_geff
 from napari._qt.qt_resources import QColoredSVGIcon
 from qtpy.QtCore import Signal
 from qtpy.QtWidgets import (
@@ -15,17 +14,16 @@ from qtpy.QtWidgets import (
     QFileDialog,
     QGroupBox,
     QHBoxLayout,
-    QInputDialog,
     QLabel,
     QListWidget,
     QListWidgetItem,
-    QMessageBox,
     QPushButton,
     QVBoxLayout,
     QWidget,
 )
 from superqt.fonticon import icon as qticon
 
+from motile_tracker.import_export.menus.export_dialog import ExportDialog
 from motile_tracker.import_export.menus.import_external_tracks_dialog import (
     ImportTracksDialog,
 )
@@ -188,56 +186,15 @@ class TracksList(QGroupBox):
                 represents a set of tracks.
         """
 
-        export_type, ok = QInputDialog.getItem(
-            self,
-            "Select Export Type",
-            "Choose export format:",
-            ["CSV", "geff"],
-            0,
-            False,
-        )
-
-        if not ok:
-            return
-
         widget: TracksButton = self.tracks_list.itemWidget(item)
         tracks: Tracks = widget.tracks
-        default_name: str = widget.name.text()
+        name: str = widget.name.text()
 
-        if export_type == "CSV":
-            file_dialog = QFileDialog(self)
-            file_dialog.setFileMode(QFileDialog.AnyFile)
-            file_dialog.setAcceptMode(QFileDialog.AcceptSave)
-            file_dialog.setNameFilter("CSV files (*.csv)")
-            file_dialog.setDefaultSuffix("csv")
-            default_file = f"{default_name}_tracks.csv"
-            base_path = Path(file_dialog.directory().path())
-            file_dialog.selectFile(str(base_path / default_file))
-
-            if file_dialog.exec_():
-                file_path = Path(file_dialog.selectedFiles()[0])
-                tracks.export_tracks(file_path)
-
-        elif export_type == "geff":
-            default_file = f"{default_name}_geff.zarr"
-
-            file_dialog = QFileDialog(self, "Save as geff file")
-            file_dialog.setFileMode(QFileDialog.AnyFile)
-            file_dialog.setAcceptMode(QFileDialog.AcceptSave)
-            file_dialog.setNameFilter("Zarr folder (*.zarr)")
-            file_dialog.setDefaultSuffix("zarr")
-
-            # Set default selected file
-            base_path = Path.home()
-            file_dialog.selectFile(str(base_path / default_file))
-
-            if file_dialog.exec_():
-                file_path = Path(file_dialog.selectedFiles()[0])
-                try:
-                    export_to_geff(tracks, file_path, overwrite=True)  # QFileDialog
-                    # already asks whether to overwrite in an existing directory
-                except ValueError as e:
-                    QMessageBox.warning(self, "Export Error", str(e))
+        ExportDialog.show_export_dialog(
+            self,
+            tracks=tracks,
+            name=name,
+        )
 
     def save_tracks(self, item: QListWidgetItem):
         """Saves a tracks object from the list. You must pass the list item that

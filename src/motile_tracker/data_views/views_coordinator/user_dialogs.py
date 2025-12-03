@@ -9,7 +9,7 @@ def confirm_force_operation(message: str) -> tuple[bool, bool]:
 
     Returns:
         (force_now, set_always)
-        - force_now: True if user selected 'Yes' or 'Yes'
+        - force_now: True if user selected 'Yes' or 'Yes, always'
         - set_always: True if user selected 'Yes, always'
     """
 
