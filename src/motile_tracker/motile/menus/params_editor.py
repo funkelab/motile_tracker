@@ -1,5 +1,6 @@
 from functools import partial
 from types import NoneType
+from typing import get_args, get_origin
 
 from qtpy.QtCore import Signal
 from qtpy.QtWidgets import (
@@ -14,6 +15,25 @@ from qtpy.QtWidgets import (
 from motile_tracker.motile.backend import SolverParams
 
 from .param_values import EditableParamValue
+
+
+def _get_base_type(annotation: type) -> type:
+    """Extract the base numeric type from a type annotation.
+
+    For example:
+        int -> int
+        float -> float
+        int | None -> int
+        float | None -> float
+    """
+    # Check if it's a Union type (e.g., int | None)
+    if get_origin(annotation) is not None:
+        args = get_args(annotation)
+        # Filter out NoneType and return the first remaining type
+        for arg in args:
+            if arg is not NoneType:
+                return arg
+    return annotation
 
 
 class EditableParam(QWidget):
@@ -40,12 +60,12 @@ class EditableParam(QWidget):
         super().__init__()
         self.param_name = param_name
         field = solver_params.model_fields[param_name]
-        self.dtype = field.annotation
+        self.dtype = _get_base_type(field.annotation)
         self.title = field.title
         self.negative = negative
         self.param_label = self._param_label_widget()
         self.param_label.setToolTip(field.description)
-        self.param_value = EditableParamValue(float, self.negative)
+        self.param_value = EditableParamValue(self.dtype, self.negative)
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
@@ -143,6 +163,11 @@ class SolverParamsEditor(QWidget):
                 "distance_cost",
                 "iou_cost",
             ],
+            "chunking": [
+                "window_size",
+                "overlap_size",
+                "single_window_start",
+            ],
         }
         self.iou_row: OptionalEditableParam
 
@@ -156,6 +181,9 @@ class SolverParamsEditor(QWidget):
         )
         main_layout.addWidget(
             self._params_group("Attribute Weights", "attribute_costs", negative=True)
+        )
+        main_layout.addWidget(
+            self._params_group("Chunked Solving", "chunking", negative=False)
         )
         self.setLayout(main_layout)
 

@@ -8,6 +8,7 @@ from qtpy.QtWidgets import (
 )
 
 from motile_tracker.motile.backend import SolverParams
+from motile_tracker.motile.menus.params_editor import _get_base_type
 
 from .param_values import StaticParamValue
 
@@ -28,11 +29,11 @@ class ParamView(QWidget):
         super().__init__()
         self.param_name = param_name
         field = solver_params.model_fields[param_name]
-        self.dtype = field.annotation
+        self.dtype = _get_base_type(field.annotation)
         self.title = field.title
         self.param_label = QLabel(self.title)
         self.param_label.setToolTip(field.description)
-        self.param_value = StaticParamValue()
+        self.param_value = StaticParamValue(self.dtype)
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
@@ -82,6 +83,11 @@ class SolverParamsViewer(QWidget):
                 "distance_cost",
                 "iou_cost",
             ],
+            "chunking": [
+                "window_size",
+                "overlap_size",
+                "single_window_start",
+            ],
         }
         main_layout = QVBoxLayout()
         main_layout.addWidget(
@@ -94,6 +100,9 @@ class SolverParamsViewer(QWidget):
             self._params_group(
                 title="Attribute Weights", param_category="attribute_costs"
             )
+        )
+        main_layout.addWidget(
+            self._params_group(title="Chunked Solving", param_category="chunking")
         )
         main_layout.setContentsMargins(0, 0, 0, 0)
         self.setLayout(main_layout)
