@@ -19,6 +19,7 @@ jobs:
       # disable resyncing on uv run
       UV_NO_SYNC: "1"
     strategy:
+      fail-fast: false
       matrix:
         platform: [ubuntu-latest, macos-latest, windows-latest]
         python-version: ["3.10", "3.11"]
