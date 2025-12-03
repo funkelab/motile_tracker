@@ -47,9 +47,13 @@ dependencies =[
     "napari-orthogonal-views==0.0.6",
     "lxml_html_clean>=0.4,<1",
     "zarr>=2.10,<4",
+    "numba>=0.62.1",
 ]
 
 [project.optional-dependencies]
+gurobi = ["gurobipy"]
+gurobi12 = ["gurobipy>=12,<13"]
+gurobi13 = ["gurobipy>=13,<14"]
 all = [
     "pyqt6>=6.5,<7",
 ]
@@ -81,6 +85,7 @@ docs = [
 dev = [
     "ruff>=0.13",
     "pre-commit>=4,<5",
+    "gurobipy>=12,<13",  # my personal license only works with 12
     {include-group="testing"},
     {include-group = "docs"},
 ]
