@@ -8,7 +8,7 @@ dynamic = ["version"]
 description = "Application for interactive tracking with global optimization"
 readme = "README.md"
 license = { text = "BSD 3-Clause License" }
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 authors = [
     { name = "Caroline Malin-Mayor", email = "malinmayorc@janelia.hhmi.org" },
 ]
@@ -23,8 +23,9 @@ classifiers = [
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Image Processing",
 ]
 
@@ -46,7 +47,7 @@ dependencies =[
     "pyqtgraph>=0.13,<1",
     "napari-orthogonal-views==0.0.6",
     "lxml_html_clean>=0.4,<1",
-    "zarr>=2.10,<4",
+    "zarr>=2.18.7,<4",
 ]
 
 [project.optional-dependencies]
