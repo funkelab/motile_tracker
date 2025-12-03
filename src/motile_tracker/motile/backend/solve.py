@@ -4,6 +4,7 @@ import logging
 import time
 from collections.abc import Callable
 
+import ilpy
 import networkx as nx
 import numpy as np
 from motile import Solver, TrackGraph
@@ -20,6 +21,15 @@ from motile_toolbox.candidate_graph import (
 from .solver_params import SolverParams
 
 logger = logging.getLogger(__name__)
+
+
+def _check_gurobi_available() -> bool:
+    """Check if Gurobi is available as an ILP backend."""
+    try:
+        ilpy.solver_backends.create_solver_backend(ilpy.Preference.Gurobi)
+        return True
+    except RuntimeError:
+        return False
 
 
 def solve(
@@ -88,6 +98,10 @@ def construct_solver(cand_graph: nx.DiGraph, solver_params: SolverParams) -> Sol
         Solver: A motile solver with the specified graph, costs, and
             constraints.
     """
+    if _check_gurobi_available():
+        logger.info("Using Gurobi ILP backend")
+    else:
+        logger.info("Using SCIP ILP backend (Gurobi not available)")
     solver = Solver(TrackGraph(cand_graph, frame_attribute=NodeAttr.TIME.value))
     solver.add_constraint(MaxChildren(solver_params.max_children))
     solver.add_constraint(MaxParents(1))

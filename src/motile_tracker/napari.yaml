@@ -27,6 +27,9 @@ contributions:
     - id: motile-tracker.Mouse_Embryo_Membrane
       python_name: motile_tracker.example_data:Mouse_Embryo_Membrane
       title: "Load Mouse Embryo_Membrane tracking dataset"
+    - id: motile-tracker.show_log
+      python_name: motile_tracker.widgets.log_widget:show_log_window
+      title: "Show Log"
   widgets:
     - command: motile-tracker.main_app
       display_name: Motile Main Widget
@@ -34,6 +37,8 @@ contributions:
       display_name: Motile Menus Widget
     - command: motile-tracker.tree_widget
       display_name: Motile Lineage View
+    - command: motile-tracker.show_log
+      display_name: Show Log
   sample_data:
     - command: motile-tracker.Fluo_N2DL_HeLa
       key: "Fluo-N2DL-HeLa"

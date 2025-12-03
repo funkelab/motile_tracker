@@ -1,8 +1,13 @@
 import sys
 
-import napari
+# Set up logging BEFORE other imports to capture tqdm and other output
+from motile_tracker.utils.logging import setup_logging
 
-from motile_tracker.application_menus.main_app import MainApp
+setup_logging()
+
+import napari  # noqa: E402
+
+from motile_tracker.application_menus.main_app import MainApp  # noqa: E402
 
 
 def main() -> None:
