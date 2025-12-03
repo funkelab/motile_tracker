@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from funtracks.data_model import Tracks
+from funtracks.import_export import export_to_csv
 from funtracks.import_export.export_to_geff import export_to_geff
 from qtpy.QtWidgets import (
     QFileDialog,
@@ -63,7 +64,7 @@ class ExportDialog:
 
             if file_dialog.exec_():
                 file_path = Path(file_dialog.selectedFiles()[0])
-                tracks.export_tracks(file_path, nodes_to_keep)
+                export_to_csv(tracks, file_path, nodes_to_keep, use_display_names=True)
                 return True
 
         elif export_type == "geff":
