@@ -54,6 +54,7 @@ between them. Recommended to be negative, since bigger IoU is better.""",
         description=r"""Number of time frames to solve at once when using chunked solving.
 If None, solve all frames at once. If set, the problem will be solved in windows
 of this size, with overlapping regions pinned to maintain consistency.""",
+        json_schema_extra={"ui_default": 50},
     )
     overlap_size: int | None = Field(
         None,
@@ -61,6 +62,7 @@ of this size, with overlapping regions pinned to maintain consistency.""",
         description=r"""Number of time frames to overlap between windows when using chunked solving.
 Only used if window_size is set. The overlap region from the previous window will
 be pinned when solving the next window. Must be less than window_size.""",
+        json_schema_extra={"ui_default": 5},
     )
     single_window_start: int | None = Field(
         None,
@@ -68,4 +70,5 @@ be pinned when solving the next window. Must be less than window_size.""",
         description=r"""If set along with window_size, only solve a single window starting at this
 frame index. Useful for interactively testing parameters on a small portion of the data
 before running on the full dataset.""",
+        json_schema_extra={"ui_default": 0},
     )

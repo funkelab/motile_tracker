@@ -102,6 +102,11 @@ class OptionalEditableParam(EditableParam):
             solver_params (SolverParams): _description_
             negative (bool, optional): _description_. Defaults to False.
         """
+        # Get ui_default before calling super().__init__ (which calls update_from_params)
+        field = solver_params.model_fields[param_name]
+        extra = field.json_schema_extra or {}
+        self.ui_default = extra.get("ui_default", 0)
+
         super().__init__(param_name, solver_params, negative)
         self.param_label.toggled.connect(self.toggle_enable)
 
@@ -115,6 +120,8 @@ class OptionalEditableParam(EditableParam):
         if param_val is None:
             self.param_label.setChecked(False)
             self.param_value.setEnabled(False)
+            # Show ui_default in the disabled spinbox
+            self.param_value.update_value(self.ui_default)
         else:
             self.param_label.setChecked(True)
             self.param_value.setEnabled(True)
