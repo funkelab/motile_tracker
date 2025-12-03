@@ -6,6 +6,7 @@ segmentation inclusion.
 """
 
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pandas as pd
 import pytest
@@ -15,6 +16,29 @@ from funtracks.data_model import SolutionTracks, Tracks
 from funtracks.import_export.export_to_geff import export_to_geff
 
 from motile_tracker.import_export.menus.import_dialog import ImportDialog
+
+
+@pytest.fixture(autouse=True)
+def mock_qmessagebox(monkeypatch):
+    """Mock QMessageBox to prevent blocking popups in all tests.
+
+    Raises AssertionError if a critical dialog is shown, surfacing the error message.
+    """
+    mock_msgbox = MagicMock()
+
+    def critical_side_effect(parent, title, message):
+        raise AssertionError(f"Unexpected error dialog: {title} - {message}")
+
+    mock_msgbox.critical.side_effect = critical_side_effect
+    monkeypatch.setattr(
+        "motile_tracker.import_export.menus.import_dialog.QMessageBox",
+        mock_msgbox,
+    )
+    monkeypatch.setattr(
+        "motile_tracker.import_export.menus.geff_import_widget.QMessageBox",
+        mock_msgbox,
+    )
+    return mock_msgbox
 
 
 @pytest.fixture
@@ -406,20 +430,6 @@ def test_geff_import_without_axes_metadata(
     """
     # Mock _resize_dialog to avoid screen access in headless CI
     monkeypatch.setattr(ImportDialog, "_resize_dialog", lambda self: None)
-
-    # Mock QMessageBox to prevent blocking popups, but surface errors
-    from unittest.mock import MagicMock
-
-    mock_msgbox = MagicMock()
-
-    def critical_side_effect(parent, title, message):
-        raise AssertionError(f"Import failed: {message}")
-
-    mock_msgbox.critical.side_effect = critical_side_effect
-    monkeypatch.setattr(
-        "motile_tracker.import_export.menus.import_dialog.QMessageBox",
-        mock_msgbox,
-    )
 
     # Create tracks and export to GEFF (this creates valid axes metadata)
     tracks = Tracks(graph_2d, segmentation=segmentation_2d, ndim=3)
