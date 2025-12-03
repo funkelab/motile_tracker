@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class SolverParams(BaseModel):
     """The set of solver parameters supported in the motile tracker.
     Used to build the UI as well as store parameters for runs.
     """
+
+    model_config = ConfigDict(validate_assignment=True)
 
     max_edge_distance: float = Field(
         50.0,

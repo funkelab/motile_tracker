@@ -1,3 +1,5 @@
+import pytest
+
 from motile_tracker.motile.backend import SolverParams, solve
 
 
@@ -71,3 +73,14 @@ def test_solve_single_window(segmentation_3d):
     for node in solution.nodes:
         node_time = solution.nodes[node].get(NodeAttr.TIME.value)
         assert 1 <= node_time < 4, f"Node {node} has time {node_time}, expected 1-3"
+
+
+def test_solve_single_window_invalid_start(segmentation_3d):
+    """Test that invalid window_start raises ValueError."""
+    params = SolverParams()
+    params.appear_cost = None
+    params.window_size = 3
+    params.single_window_start = 100  # Beyond data range (5 frames)
+
+    with pytest.raises(ValueError, match="beyond last frame"):
+        solve(params, segmentation_3d)

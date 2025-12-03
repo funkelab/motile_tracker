@@ -54,6 +54,16 @@ def solve(
             the time and ids of the passed in segmentation labels. See the
             motile_toolbox for exact implementation details.
     """
+    # For single window mode, slice input data to only process needed frames
+    time_offset = 0
+    if (
+        solver_params.window_size is not None
+        and solver_params.single_window_start is not None
+    ):
+        input_data, time_offset = _slice_input_for_single_window(
+            input_data, solver_params.window_size, solver_params.single_window_start
+        )
+
     if input_data.ndim == 2:
         cand_graph = compute_graph_from_points_list(
             input_data, solver_params.max_edge_distance, scale=scale
@@ -70,7 +80,9 @@ def solve(
     # Check if single window mode or chunked solving is enabled
     if solver_params.window_size is not None:
         if solver_params.single_window_start is not None:
-            return _solve_single_window(cand_graph, solver_params, on_solver_update)
+            return _solve_single_window_sliced(
+                cand_graph, solver_params, on_solver_update, time_offset
+            )
         return _solve_chunked(cand_graph, solver_params, on_solver_update)
 
     return _solve_full(cand_graph, solver_params, on_solver_update)
@@ -131,61 +143,110 @@ def _solve_window(
     return graph_to_nx(solution_graph)
 
 
-def _solve_single_window(
-    cand_graph: nx.DiGraph,
-    solver_params: SolverParams,
-    on_solver_update: Callable | None = None,
-) -> nx.DiGraph:
-    """Solve just a single window for interactive parameter testing.
+def _slice_input_for_single_window(
+    input_data: np.ndarray,
+    window_size: int,
+    window_start: int,
+) -> tuple[np.ndarray, int]:
+    """Slice input data to only include frames needed for single window solving.
 
-    This is useful for quickly testing solver parameters on a small portion
-    of the data before running on the full dataset.
+    This avoids building the full candidate graph when only solving a single window.
 
     Args:
-        cand_graph: The full candidate graph with all nodes and edges.
-        solver_params: The solver parameters including window_size and single_window_start.
-        on_solver_update: Callback for solver progress updates.
+        input_data: The full input segmentation or points list.
+        window_size: Number of frames in the window.
+        window_start: Starting frame index for the window.
 
     Returns:
-        The solution graph for just the single window.
+        A tuple of (sliced_data, time_offset) where time_offset is the actual
+        start frame used (may differ from window_start if it was out of bounds).
+
+    Raises:
+        ValueError: If window_start is beyond the data range.
     """
-    window_size = solver_params.window_size
-    window_start = solver_params.single_window_start
-
-    # Get the frame range from the candidate graph
-    times = [cand_graph.nodes[n][NodeAttr.TIME.value] for n in cand_graph.nodes]
-    if not times:
-        return nx.DiGraph()
-
-    min_time = min(times)
-    max_time = max(times)
+    if input_data.ndim == 2:
+        # Points list: filter rows by time column (first column is time)
+        times = input_data[:, 0].astype(int)
+        min_time = int(times.min()) if len(times) > 0 else 0
+        max_time = int(times.max()) if len(times) > 0 else 0
+    else:
+        # Segmentation: time is first axis
+        min_time = 0
+        max_time = input_data.shape[0] - 1
 
     # Validate window_start
     if window_start < min_time:
-        logger.warning(
-            "single_window_start (%d) is before first frame (%d), using first frame",
-            window_start,
-            min_time,
+        raise ValueError(
+            f"single_window_start ({window_start}) is before first frame ({min_time})"
         )
-        window_start = min_time
+    if window_start > max_time:
+        raise ValueError(
+            f"single_window_start ({window_start}) is beyond last frame ({max_time})"
+        )
 
-    window_end = min(window_start + window_size, max_time + 1)
+    # Warn if window extends beyond data
+    window_end = window_start + window_size
+    if window_end > max_time + 1:
+        logger.warning(
+            "Window end (%d) extends beyond last frame (%d), "
+            "window will be truncated to frames %d-%d",
+            window_end,
+            max_time,
+            window_start,
+            max_time,
+        )
+        window_end = max_time + 1
 
+    if input_data.ndim == 2:
+        # Filter points in the window and adjust time values
+        mask = (times >= window_start) & (times < window_end)
+        sliced_data = input_data[mask].copy()
+        sliced_data[:, 0] = sliced_data[:, 0] - window_start
+        return sliced_data, window_start
+    else:
+        sliced_data = input_data[window_start:window_end]
+        return sliced_data, window_start
+
+
+def _solve_single_window_sliced(
+    cand_graph: nx.DiGraph,
+    solver_params: SolverParams,
+    on_solver_update: Callable | None = None,
+    time_offset: int = 0,
+) -> nx.DiGraph:
+    """Solve a single window from pre-sliced input data.
+
+    This is used after the input data has already been sliced to the window range.
+    The candidate graph node times start at 0, so we need to add time_offset back
+    to the solution graph to get the correct original time values.
+
+    Args:
+        cand_graph: The candidate graph built from sliced input data.
+        solver_params: The solver parameters.
+        on_solver_update: Callback for solver progress updates.
+        time_offset: The time offset to add back to node times in the solution.
+
+    Returns:
+        The solution graph with corrected time values.
+    """
     logger.info(
         "Solving single window: frames %d to %d (exclusive)",
-        window_start,
-        window_end,
+        time_offset,
+        time_offset + (solver_params.window_size or 0),
     )
 
-    # Extract and solve
-    window_subgraph = _extract_window_subgraph(cand_graph, window_start, window_end)
     start_time = time.time()
-    solution = _solve_window(window_subgraph, solver_params, on_solver_update)
+    solution = _solve_window(cand_graph, solver_params, on_solver_update)
     logger.info("Single window solution took %.2f seconds", time.time() - start_time)
 
     if solution is None:
         logger.warning("Window has no nodes")
         return nx.DiGraph()
+
+    # Add time_offset back to node times to restore original time values
+    if time_offset > 0:
+        for node in solution.nodes:
+            solution.nodes[node][NodeAttr.TIME.value] += time_offset
 
     logger.debug(
         "Single window solution has %d nodes, %d edges",
@@ -231,6 +292,15 @@ def _solve_chunked(
     min_time = min(times)
     max_time = max(times)
     total_frames = max_time - min_time + 1
+
+    # Warn if window_size is larger than data - chunking won't help
+    if window_size >= total_frames:
+        logger.warning(
+            "window_size (%d) is >= total frames (%d), "
+            "chunked solving will behave like full solving",
+            window_size,
+            total_frames,
+        )
 
     logger.info(
         "Starting chunked solve: %d frames, window_size=%d, overlap_size=%d",
