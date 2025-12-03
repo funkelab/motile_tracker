@@ -232,7 +232,7 @@ class TrackPoints(napari.layers.Points):
 
         elif event.action == "removed":
             self.tracks_viewer.tracks_controller.delete_nodes(
-                self.tracks_viewer.selected_nodes._list
+                self.tracks_viewer.selected_nodes.as_list
             )
 
         elif event.action == "changed":
@@ -273,18 +273,24 @@ class TrackPoints(napari.layers.Points):
         symbols = [symbolmap[statemap[degree]] for _, degree in tracks.graph.out_degree]
         return symbols
 
-    def update_point_outline(self, visible: list[int] | str) -> None:
+    def update_point_outline(self, visible_nodes: list[int] | str) -> None:
         """Update the outline color of the selected points and visibility according to
         display mode
 
         Args:
-            visible (list[int] | str): A list of track ids, or "all"
+            visible_nodes (list[int] | str): A list of node ids, or "all"
         """
-        # filter out the non-selected tracks if in lineage mode
-        if visible == "all":
+
+        if isinstance(visible_nodes, str):
             self.shown[:] = True
         else:
-            indices = np.where(np.isin(self.properties["track_id"], visible))[
+            # For lineage or group mode, visible_nodes is a list of node IDs
+            # In group mode, also include selected nodes so they remain visible
+            if self.tracks_viewer.mode == "group":
+                visible_nodes = (
+                    list(visible_nodes) + self.tracks_viewer.selected_nodes.as_list
+                )
+            indices = np.where(np.isin(self.properties["node_id"], visible_nodes))[
                 0
             ].tolist()
             self.shown[:] = False

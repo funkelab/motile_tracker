@@ -22,7 +22,7 @@ jobs:
         resolution: [highest, lowest-direct]
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: tlambert03/setup-qt-libs@v1
 
       - name: Set up Python ${{ matrix.python-version }}
