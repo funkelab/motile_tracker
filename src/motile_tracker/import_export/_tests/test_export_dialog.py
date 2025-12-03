@@ -62,13 +62,18 @@ def test_export_dialog_csv(monkeypatch, mock_tracks, fake_parent, tmp_path):
     )
 
     # Run the dialog method
-    result = ExportDialog.show_export_dialog(
-        fake_parent, mock_tracks, name="MyGroup", nodes_to_keep={1, 2}
-    )
+    with patch(
+        "motile_tracker.import_export.menus.export_dialog.export_to_csv"
+    ) as mock_export_csv:
+        result = ExportDialog.show_export_dialog(
+            fake_parent, mock_tracks, name="MyGroup", nodes_to_keep={1, 2}
+        )
 
     # Assertions
     assert result is True
-    mock_tracks.export_tracks.assert_called_once_with(test_file, {1, 2})
+    mock_export_csv.assert_called_once_with(
+        mock_tracks, test_file, {1, 2}, use_display_names=True
+    )
 
     # Verify QFileDialog was instantiated once
     mock_file_dialog_class.assert_called_once()
