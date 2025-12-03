@@ -1,5 +1,6 @@
 import napari
 from qtpy.QtWidgets import (
+    QCheckBox,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -21,12 +22,27 @@ class EditingMenu(QWidget):
 
         self.label = QLabel(f"Current Track ID: {self.tracks_viewer.selected_track}")
         self.tracks_viewer.update_track_id.connect(self.update_track_id_color)
+
         new_track_btn = QPushButton("Start new")
         new_track_btn.clicked.connect(self.tracks_viewer.request_new_track)
         track_layout = QHBoxLayout()
         track_layout.addWidget(self.label)
         track_layout.addWidget(new_track_btn)
         layout.addLayout(track_layout)
+
+        # Checkbox for activating/deactivating contours for lineage/group display
+        self.contour_checkbox = QCheckBox("Show contours (Lineage/Group mode)")
+        self.contour_checkbox.setToolTip(
+            "<html><body><p style='white-space:pre-wrap; width: 400px;'>"
+            "When checked, displays contours for node labels that are not in the current lineage(s) or group. When not checked, these nodes are hidden entirely."
+        )
+        self.contour_checkbox.clicked.connect(self._update_contours)
+        self.tracks_viewer.tracks_updated.connect(
+            lambda: self.contour_checkbox.setVisible(True)
+            if self.tracks_viewer.tracking_layers.seg_layer is not None
+            else self.contour_checkbox.setVisible(False)
+        )
+        layout.addWidget(self.contour_checkbox)
 
         node_box = QGroupBox("Edit Node(s)")
         node_box.setMaximumHeight(60)
@@ -124,3 +140,10 @@ class EditingMenu(QWidget):
             # self.linear_node_btn.setEnabled(True)
             self.delete_edge_btn.setEnabled(False)
             self.create_edge_btn.setEnabled(False)
+
+    def _update_contours(self, state: bool) -> None:
+        """Update whether or not to display contours for lineage/group nodes in TrackLabels."""
+
+        self.tracks_viewer.use_contours = state
+        self.tracks_viewer.filter_visible_nodes()
+        self.tracks_viewer.tracking_layers.update_visible(self.tracks_viewer.visible)

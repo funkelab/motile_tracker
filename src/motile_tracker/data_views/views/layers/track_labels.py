@@ -16,6 +16,7 @@ from motile_tracker.data_views.views.layers.click_utils import (
     detect_click,
     get_click_value,
 )
+from motile_tracker.data_views.views.layers.contour_labels import ContourLabels
 from motile_tracker.data_views.views_coordinator.key_binds import (
     KEYMAP,
     bind_keymap,
@@ -68,7 +69,7 @@ def _new_label(layer: TrackLabels, new_track_id=True):
         show_info("Calculating empty label on non-numpy array is not supported")
 
 
-class TrackLabels(napari.layers.Labels):
+class TrackLabels(ContourLabels):
     """Extended labels layer that holds the track information and emits
     and responds to dynamics visualization signals"""
 
@@ -295,40 +296,62 @@ class TrackLabels(napari.layers.Labels):
         self.refresh()
 
     def update_label_colormap(self, visible: list[int] | str) -> None:
-        """Updates the opacity of the label colormap to highlight the selected label
-        and optionally hide cells not belonging to the current lineage
-
-        Visible is a list of visible node id
+        """Updates opacity of the label colormap to highlight the selected label
+        and optionally hide non-visible cells.
         """
+
         with self.events.selected_label.blocker():
-            highlighted = self.tracks_viewer.selected_nodes
+            highlighted = set(self.tracks_viewer.selected_nodes)
 
-            # update the opacity of the cyclic label colormap values according to
-            # whether nodes are visible/invisible/highlighted
+            # Contour state
             if visible == "all":
-                self.colormap.color_dict = {
-                    key: np.array(
-                        [
-                            *value[:-1],
-                            0.6 if key is not None and key != 0 else value[-1],
-                        ],
-                        dtype=np.float32,
-                    )
-                    for key, value in self.colormap.color_dict.items()
-                }
-
+                self.group_labels = None
+                if self.tracks_viewer.use_contours:
+                    self.contour = 0
             else:
-                self.colormap.color_dict = {
-                    key: np.array([*value[:-1], 0], dtype=np.float32)
-                    for key, value in self.colormap.color_dict.items()
-                }
-                for node in visible:
-                    # find the index in the colormap
-                    self.colormap.color_dict[node][-1] = 0.6
+                # visible is a list of nodes
+                if self.tracks_viewer.use_contours:
+                    self.group_labels = visible
+                    # make sure contours are activated.
+                    self.contour = 1 if self.contour == 0 else self.contour
+                else:
+                    self.group_labels = None  # keep current contour setting
 
-            for node in highlighted:
-                self.colormap.color_dict[node][-1] = 1  # full opacity
-            # create a new colormap from the updated colors (to ensure refresh)
+            # Alpha rules
+            def base_alpha(key):
+                """Return the base alpha for a given label key (not including
+                highlighting). Background label (0/None) should always be fully
+                transparent. Visible labels get an alpha of 0.6. Non visible labels (that
+                  are not in the 'visible' list) get 0 when tracks_viewer.use_contours is
+                  False, and 0.6 when True."""
+
+                # do not change the background, it should always be fully transparent
+                if key is None or key == 0:
+                    return None
+
+                if visible == "all":
+                    return 0.6
+
+                # visible is list
+                if not self.tracks_viewer.use_contours:
+                    # hide non-visible keys
+                    return 0.6 if key in visible else 0
+                else:
+                    # contour groups: same alpha as `visible=="all"`
+                    return 0.6
+
+            # Apply alpha updates
+            for key, color in self.colormap.color_dict.items():
+                alpha = base_alpha(key)
+                if alpha is not None:
+                    color[-1] = alpha
+
+            # Highlighting of selected labaels
+            for key in highlighted:
+                if key in self.colormap.color_dict:
+                    self.colormap.color_dict[key][-1] = 1.0
+
+            # Set the new colormap (to trigger refresh)
             self.colormap = DirectLabelColormap(color_dict=self.colormap.color_dict)
 
     def new_colormap(self):
