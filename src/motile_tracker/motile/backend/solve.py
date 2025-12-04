@@ -338,7 +338,12 @@ def _solve_chunked(
         )
 
         # Extract subgraph for this window (includes PIN_ATTR if set on cand_graph)
-        window_subgraph = _extract_window_subgraph(cand_graph, window_start, window_end)
+        nodes_in_window = [
+            n
+            for n in cand_graph.nodes
+            if window_start <= cand_graph.nodes[n][NodeAttr.TIME.value] < window_end
+        ]
+        window_subgraph = cand_graph.subgraph(nodes_in_window).copy()
 
         # Solve this window
         window_solution_nx = _solve_window(
@@ -394,32 +399,6 @@ def _solve_chunked(
     )
 
     return combined_solution
-
-
-def _extract_window_subgraph(
-    cand_graph: nx.DiGraph, start_frame: int, end_frame: int
-) -> nx.DiGraph:
-    """Extract a subgraph containing only nodes in the given frame range.
-
-    Args:
-        cand_graph: The full candidate graph.
-        start_frame: The start frame (inclusive).
-        end_frame: The end frame (exclusive).
-
-    Returns:
-        A new DiGraph containing nodes in [start_frame, end_frame) and
-        edges between them.
-    """
-    # Get nodes in the frame range
-    nodes_in_window = [
-        n
-        for n in cand_graph.nodes
-        if start_frame <= cand_graph.nodes[n][NodeAttr.TIME.value] < end_frame
-    ]
-
-    # Create subgraph with these nodes
-    subgraph = cand_graph.subgraph(nodes_in_window).copy()
-    return subgraph
 
 
 def _set_pinning_on_graph(
