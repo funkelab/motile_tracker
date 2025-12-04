@@ -8,7 +8,6 @@ from qtpy.QtWidgets import (
 )
 
 from motile_tracker.motile.backend import SolverParams
-from motile_tracker.motile.menus.params_editor import _get_base_type
 
 from .param_values import StaticParamValue
 
@@ -29,11 +28,10 @@ class ParamView(QWidget):
         super().__init__()
         self.param_name = param_name
         field = solver_params.model_fields[param_name]
-        self.dtype = _get_base_type(field.annotation)
         self.title = field.title
         self.param_label = QLabel(self.title)
         self.param_label.setToolTip(field.description)
-        self.param_value = StaticParamValue(self.dtype)
+        self.param_value = StaticParamValue()
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)

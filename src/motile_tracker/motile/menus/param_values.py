@@ -28,18 +28,9 @@ class StaticParamValue(QLabel):
 
     valueChanged = Signal(object)
 
-    def __init__(self, dtype: type = float) -> None:
-        """Initialize the static parameter value widget.
-
-        Args:
-            dtype: The expected data type (int or float) for formatting.
-        """
-        super().__init__()
-        self.dtype = dtype
-
     def update_value(self, value: int | float | None) -> None:
         if value is not None:
-            text = str(int(value)) if self.dtype is int else f"{value:.1f}"
+            text = str(value) if isinstance(value, int) else f"{value:.1f}"
             self.setText(text)
 
     def get_value(self) -> int | float:
