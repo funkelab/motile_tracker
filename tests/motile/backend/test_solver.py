@@ -38,22 +38,13 @@ def test_solve_chunked(segmentation_3d, graph_3d):
     assert set(full_solution.edges) == set(chunked_solution.edges)
 
 
-def test_solve_chunked_no_overlap(segmentation_3d, graph_3d):
-    """Test chunked solving with no overlap."""
+def test_solve_chunked_overlap_required():
+    """Test that overlap_size must be at least 1."""
     params = SolverParams()
-    params.appear_cost = None
-    # full_solution = solve(params, segmentation_3d)
+    params.window_size = 3
 
-    params_chunked = SolverParams()
-    params_chunked.appear_cost = None
-    params_chunked.window_size = 3
-    params_chunked.overlap_size = 0
-    chunked_solution = solve(params_chunked, segmentation_3d)
-
-    # Without overlap, the solutions may differ because there's no continuity
-    # constraint between windows. We just check that it runs without error
-    # and produces a valid graph.
-    assert chunked_solution.number_of_nodes() > 0
+    with pytest.raises(ValueError, match="overlap_size must be at least 1"):
+        params.overlap_size = 0
 
 
 def test_solve_single_window(segmentation_3d):

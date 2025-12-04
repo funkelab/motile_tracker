@@ -287,7 +287,9 @@ def _solve_chunked(
         The combined solution graph from all windows.
     """
     window_size = solver_params.window_size
-    overlap_size = solver_params.overlap_size or 0
+    overlap_size = solver_params.overlap_size
+    if overlap_size is None:
+        raise ValueError("overlap_size is required when window_size is set")
 
     if overlap_size >= window_size:
         raise ValueError(

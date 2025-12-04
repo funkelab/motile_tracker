@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class SolverParams(BaseModel):
@@ -74,3 +74,10 @@ frame index. Useful for interactively testing parameters on a small portion of t
 before running on the full dataset.""",
         json_schema_extra={"ui_default": 0},
     )
+
+    @field_validator("overlap_size")
+    @classmethod
+    def overlap_size_must_be_positive(cls, v: int | None) -> int | None:
+        if v is not None and v < 1:
+            raise ValueError("overlap_size must be at least 1")
+        return v
