@@ -54,16 +54,27 @@ def solve(
             the time and ids of the passed in segmentation labels. See the
             motile_toolbox for exact implementation details.
     """
-    # For single window mode, slice input data to only process needed frames
-    time_offset = 0
+    # Single window mode: slice input, solve, and return early
     if (
         solver_params.window_size is not None
         and solver_params.single_window_start is not None
     ):
-        input_data, time_offset = _slice_input_for_single_window(
-            input_data, solver_params.window_size, solver_params.single_window_start
-        )
+        return _solve_single_window(input_data, solver_params, on_solver_update, scale)
 
+    cand_graph = _build_candidate_graph(input_data, solver_params, scale)
+
+    if solver_params.window_size is not None:
+        return _solve_chunked(cand_graph, solver_params, on_solver_update)
+
+    return _solve_full(cand_graph, solver_params, on_solver_update)
+
+
+def _build_candidate_graph(
+    input_data: np.ndarray,
+    solver_params: SolverParams,
+    scale: list | None = None,
+) -> nx.DiGraph:
+    """Build the candidate graph from input data."""
     if input_data.ndim == 2:
         cand_graph = compute_graph_from_points_list(
             input_data, solver_params.max_edge_distance, scale=scale
@@ -76,16 +87,7 @@ def solve(
             scale=scale,
         )
     logger.debug("Cand graph has %d nodes", cand_graph.number_of_nodes())
-
-    # Check if single window mode or chunked solving is enabled
-    if solver_params.window_size is not None:
-        if solver_params.single_window_start is not None:
-            return _solve_single_window_sliced(
-                cand_graph, solver_params, on_solver_update, time_offset
-            )
-        return _solve_chunked(cand_graph, solver_params, on_solver_update)
-
-    return _solve_full(cand_graph, solver_params, on_solver_update)
+    return cand_graph
 
 
 def _solve_full(
@@ -138,7 +140,9 @@ def _solve_window(
 
     # Construct and solve
     solver = construct_solver(window_subgraph, solver_params)
+    start_time = time.time()
     solution = solver.solve(verbose=False, on_event=on_solver_update)
+    logger.info("Window solved in %.2f seconds", time.time() - start_time)
     solution_graph = solver.get_selected_subgraph(solution=solution)
     return graph_to_nx(solution_graph)
 
@@ -208,32 +212,38 @@ def _slice_input_for_single_window(
         return sliced_data, window_start
 
 
-def _solve_single_window_sliced(
-    cand_graph: nx.DiGraph,
+def _solve_single_window(
+    input_data: np.ndarray,
     solver_params: SolverParams,
     on_solver_update: Callable | None = None,
-    time_offset: int = 0,
+    scale: list | None = None,
 ) -> nx.DiGraph:
-    """Solve a single window from pre-sliced input data.
+    """Solve a single window for interactive parameter testing.
 
-    This is used after the input data has already been sliced to the window range.
-    The candidate graph node times start at 0, so we need to add time_offset back
-    to the solution graph to get the correct original time values.
+    Slices the input data to only include frames in the window, builds
+    a candidate graph from that slice, solves, and restores original time values.
 
     Args:
-        cand_graph: The candidate graph built from sliced input data.
-        solver_params: The solver parameters.
+        input_data: The full input segmentation or points list.
+        solver_params: The solver parameters including window_size and single_window_start.
         on_solver_update: Callback for solver progress updates.
-        time_offset: The time offset to add back to node times in the solution.
+        scale: The scale of the data in each dimension.
 
     Returns:
-        The solution graph with corrected time values.
+        The solution graph with original time values.
     """
+    # Slice input data to only process needed frames
+    sliced_data, time_offset = _slice_input_for_single_window(
+        input_data, solver_params.window_size, solver_params.single_window_start
+    )
+
     logger.info(
         "Solving single window: frames %d to %d (exclusive)",
         time_offset,
         time_offset + (solver_params.window_size or 0),
     )
+
+    cand_graph = _build_candidate_graph(sliced_data, solver_params, scale)
 
     start_time = time.time()
     solution = _solve_window(cand_graph, solver_params, on_solver_update)
