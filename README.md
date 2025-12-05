@@ -20,6 +20,34 @@ install from `pypi` in the environment of their choice (e.g. `venv`, `conda`) wi
 `pip install motile-tracker`.
 Currently, the motile_tracker requires python >=3.10.
 
+### Recommended extras
+
+For better performance, you can install optional extras:
+
+- **numba**: Speeds up candidate graph construction significantly.
+  ```bash
+  pip install motile-tracker[numba]
+  ```
+
+- **gurobi**: Uses the Gurobi solver instead of the default open-source solver. Gurobi is
+  much faster but requires a license (free for academics).
+  ```bash
+  pip install motile-tracker[gurobi]
+  ```
+
+You can install multiple extras at once: `pip install motile-tracker[numba,gurobi]`
+
+### Gurobi license version mismatch
+
+If you have a Gurobi license and encounter an error about license version mismatch,
+you may need to install a specific version of `gurobipy` that matches your license.
+Use one of the version-specific extras:
+
+```bash
+pip install motile-tracker[gurobi12]  # For Gurobi 12.x licenses
+pip install motile-tracker[gurobi13]  # For Gurobi 13.x licenses
+```
+
 Developers can clone the GitHub repository and then  use `uv` to install and run the code.
 See the developer guide in `DEVELOPER.md` for more information.
 
