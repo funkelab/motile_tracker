@@ -87,6 +87,11 @@ class RunEditor(QGroupBox):
             enable_iou = False
         self.solver_params_widget.iou_row.toggle_visible(enable_iou)
 
+    def _update_max_frames(self) -> None:
+        """Update the max frame constraint from viewer dims."""
+        max_frame = self.viewer.dims.range[0].stop
+        self.solver_params_widget.set_max_frames(int(max_frame))
+
     def _labels_layer_widget(self) -> QWidget:
         """Create the widget to select the input layer. Uses magicgui,
         but explicitly connects to the viewer layers events to keep it synced.
@@ -110,6 +115,7 @@ class RunEditor(QGroupBox):
         layers_events.removed.connect(self.update_labels_layers)
         layers_events.reordered.connect(self.update_labels_layers)
         self.layer_selection_box.currentTextChanged.connect(self.update_layer_selection)
+        self.viewer.dims.events.range.connect(self._update_max_frames)
 
         size_policy = self.layer_selection_box.sizePolicy()
         size_policy.setHorizontalPolicy(QSizePolicy.MinimumExpanding)
