@@ -15,13 +15,13 @@ from qtpy.QtWidgets import (
     QWidget,
 )
 
-from motile_tracker.import_export.menus.import_from_geff.geff_import_utils import (
+from motile_tracker.import_export.menus.geff_import_utils import (
     find_geff_group,
 )
 
 
 class ImportGeffWidget(QWidget):
-    """QWidget for selecting geff directory"""
+    """QWidget for selecting a geff zarr directory to import."""
 
     update_buttons = Signal()
 
@@ -31,7 +31,6 @@ class ImportGeffWidget(QWidget):
         self.root = None
         self.dir_name = None
 
-        # QlineEdit for geff file path and browse button
         self.geff_path_line = QLineEdit(self)
         self.geff_path_line.setFocus()
         self.geff_path_line.setFocusPolicy(Qt.StrongFocus)
@@ -73,7 +72,7 @@ class ImportGeffWidget(QWidget):
             self._load_geff(folder_path)
 
     def _load_geff(self, folder_path: Path) -> None:
-        """Load the graph and display the geffFieldMapWidget"""
+        """Find the geff group in the selected folder_path and send update signal."""
 
         self.root = None
         if not os.path.exists(folder_path):

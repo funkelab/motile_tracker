@@ -1,10 +1,10 @@
 import napari
 import pandas as pd
+from funtracks.import_export import tracks_from_df
 
 from motile_tracker.application_menus import MainApp
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 from motile_tracker.example_data import Fluo_N2DL_HeLa
-from motile_tracker.import_export.load_tracks import tracks_from_df
 
 if __name__ == "__main__":
     # load the example data

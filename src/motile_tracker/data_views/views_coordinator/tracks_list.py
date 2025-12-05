@@ -24,11 +24,8 @@ from qtpy.QtWidgets import (
 from superqt.fonticon import icon as qticon
 
 from motile_tracker.import_export.menus.export_dialog import ExportDialog
-from motile_tracker.import_export.menus.import_external_tracks_dialog import (
-    ImportTracksDialog,
-)
-from motile_tracker.import_export.menus.import_from_geff.geff_import_dialog import (
-    ImportGeffDialog,
+from motile_tracker.import_export.menus.import_dialog import (
+    ImportDialog,
 )
 
 
@@ -129,16 +126,8 @@ class TracksList(QGroupBox):
         layout.addLayout(load_menu)
         self.setLayout(layout)
 
-    def _load_tracks_from_geff(self):
-        dialog = ImportGeffDialog()
-        if dialog.exec_() == QDialog.Accepted:
-            tracks = dialog.tracks
-            name = dialog.name
-            if tracks is not None:
-                self.add_tracks(tracks, name, select=True)
-
-    def _load_external_tracks(self):
-        dialog = ImportTracksDialog()
+    def _load_tracks(self, import_type: str):
+        dialog = ImportDialog(import_type)
         if dialog.exec_() == QDialog.Accepted:
             tracks = dialog.tracks
             name = dialog.name
@@ -228,9 +217,9 @@ class TracksList(QGroupBox):
         if self.dropdown_menu.currentText() == "Motile Run":
             self.load_motile_run()
         elif self.dropdown_menu.currentText() == "External tracks from CSV":
-            self._load_external_tracks()
+            self._load_tracks(import_type="csv")
         elif self.dropdown_menu.currentText() == "External tracks from geff":
-            self._load_tracks_from_geff()
+            self._load_tracks("geff")
 
     def load_motile_run(self):
         """Load a set of tracks from disk. The user selects the directory created
