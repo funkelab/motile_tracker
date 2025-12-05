@@ -8,7 +8,7 @@ dynamic = ["version"]
 description = "Application for interactive tracking with global optimization"
 readme = "README.md"
 license = { text = "BSD 3-Clause License" }
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 authors = [
     { name = "Caroline Malin-Mayor", email = "malinmayorc@janelia.hhmi.org" },
 ]
@@ -23,13 +23,14 @@ classifiers = [
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Image Processing",
 ]
 
 dependencies =[
-    "napari>=0.5,<1",
+    "napari>=0.6.2,<1",
     "funtracks>=1.6.0a1,<2",
     "appdirs>=1,<2",
     "numpy>=2,<3",
@@ -46,12 +47,12 @@ dependencies =[
     "pyqtgraph>=0.13,<1",
     "napari-orthogonal-views==0.0.7",
     "lxml_html_clean>=0.4,<1",
-    "zarr>=2.10,<4",
+    "zarr>=2.18.7,<4",
 ]
 
 [project.optional-dependencies]
 all = [
-    "pyqt6>=6.5,<7",
+    "pyqt6>=6.7,<7",
 ]
 
 [project.entry-points."napari.manifest"]
@@ -66,7 +67,7 @@ motile_tracker = "motile_tracker.__main__:main"
 
 [dependency-groups]
 testing =[
-    "pyqt6>=6.5,<7",
+    "pyqt6>=6.7,<7",
     "pytest>=8.3,<9",
     "pytest-cov>=6",
     "pytest-qt>=4.4,<5",

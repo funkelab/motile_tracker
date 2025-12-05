@@ -15,10 +15,14 @@ jobs:
   test:
     name: ${{ matrix.platform }} py${{ matrix.python-version }} ${{ matrix.resolution }}
     runs-on: ${{ matrix.platform }}
+    env:
+      # disable resyncing on uv run
+      UV_NO_SYNC: "1"
     strategy:
+      fail-fast: false
       matrix:
         platform: [ubuntu-latest, macos-latest, windows-latest]
-        python-version: ["3.10", "3.11"]
+        python-version: ["3.11", "3.12", "3.13"]
         resolution: [highest, lowest-direct]
 
     steps:
@@ -32,7 +36,7 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync --no-dev --resolution ${{ matrix.resolution }}
+        run: uv sync --no-dev --group testing --resolution ${{ matrix.resolution }}
 
       - name: Set Windows resolution
         if: runner.os == 'Windows'
