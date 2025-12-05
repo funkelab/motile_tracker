@@ -1,5 +1,6 @@
 from functools import partial
 from types import NoneType
+from typing import get_args, get_origin
 
 from qtpy.QtCore import Signal
 from qtpy.QtWidgets import (
@@ -14,6 +15,25 @@ from qtpy.QtWidgets import (
 from motile_tracker.motile.backend import SolverParams
 
 from .param_values import EditableParamValue
+
+
+def _get_base_type(annotation: type) -> type:
+    """Extract the base numeric type from a type annotation.
+
+    For example:
+        int -> int
+        float -> float
+        int | None -> int
+        float | None -> float
+    """
+    # Check if it's a Union type (e.g., int | None)
+    if get_origin(annotation) is not None:
+        args = get_args(annotation)
+        # Filter out NoneType and return the first remaining type
+        for arg in args:
+            if arg is not NoneType:
+                return arg
+    return annotation
 
 
 class EditableParam(QWidget):
@@ -40,12 +60,12 @@ class EditableParam(QWidget):
         super().__init__()
         self.param_name = param_name
         field = solver_params.model_fields[param_name]
-        self.dtype = field.annotation
+        self.dtype = _get_base_type(field.annotation)
         self.title = field.title
         self.negative = negative
         self.param_label = self._param_label_widget()
         self.param_label.setToolTip(field.description)
-        self.param_value = EditableParamValue(float, self.negative)
+        self.param_value = EditableParamValue(self.dtype, self.negative)
 
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
@@ -82,6 +102,11 @@ class OptionalEditableParam(EditableParam):
             solver_params (SolverParams): _description_
             negative (bool, optional): _description_. Defaults to False.
         """
+        # Get ui_default before calling super().__init__ (which calls update_from_params)
+        field = solver_params.model_fields[param_name]
+        extra = field.json_schema_extra or {}
+        self.ui_default = extra.get("ui_default", 0)
+
         super().__init__(param_name, solver_params, negative)
         self.param_label.toggled.connect(self.toggle_enable)
 
@@ -95,6 +120,8 @@ class OptionalEditableParam(EditableParam):
         if param_val is None:
             self.param_label.setChecked(False)
             self.param_value.setEnabled(False)
+            # Show ui_default in the disabled spinbox
+            self.param_value.update_value(self.ui_default)
         else:
             self.param_label.setChecked(True)
             self.param_value.setEnabled(True)
@@ -143,8 +170,16 @@ class SolverParamsEditor(QWidget):
                 "distance_cost",
                 "iou_cost",
             ],
+            "chunking": [
+                "window_size",
+                "overlap_size",
+                "single_window_start",
+            ],
         }
         self.iou_row: OptionalEditableParam
+        self.window_size_row: OptionalEditableParam
+        self.overlap_size_row: OptionalEditableParam
+        self.single_window_start_row: OptionalEditableParam
 
         main_layout = QVBoxLayout()
         main_layout.setContentsMargins(0, 0, 0, 0)
@@ -157,7 +192,13 @@ class SolverParamsEditor(QWidget):
         main_layout.addWidget(
             self._params_group("Attribute Weights", "attribute_costs", negative=True)
         )
+        main_layout.addWidget(
+            self._params_group("Chunked Solving", "chunking", negative=False)
+        )
         self.setLayout(main_layout)
+
+        # Set up cross-field validation for chunking parameters
+        self._setup_chunking_constraints()
 
     def _params_group(self, title: str, param_category: str, negative: bool) -> QWidget:
         widget = QGroupBox(title)
@@ -178,6 +219,91 @@ class SolverParamsEditor(QWidget):
             self.new_params.connect(param_row.update_from_params)
             if param_name == "iou_cost":
                 self.iou_row = param_row
+            elif param_name == "window_size":
+                self.window_size_row = param_row
+            elif param_name == "overlap_size":
+                self.overlap_size_row = param_row
+            elif param_name == "single_window_start":
+                self.single_window_start_row = param_row
             layout.addWidget(param_row)
         widget.setLayout(layout)
         return widget
+
+    def _setup_chunking_constraints(self) -> None:
+        """Set up validation constraints for chunking fields."""
+        # Track which chunking mode was last used (overlap=chunked, single_window_start=single)
+        # Default to overlap (chunked solving)
+        self._last_chunking_mode = "overlap"
+
+        # Set window_size minimum to 2
+        self.window_size_row.param_value.setMinimum(2)
+
+        # Set overlap_size minimum to 1
+        self.overlap_size_row.param_value.setMinimum(1)
+
+        # When window_size value changes, update overlap_size max
+        self.window_size_row.param_value.valueChanged.connect(
+            self._update_overlap_constraints
+        )
+
+        # When window_size checkbox toggles, enable/disable dependent fields
+        self.window_size_row.param_label.toggled.connect(self._toggle_chunking_fields)
+
+        # Mutual exclusion: overlap_size and single_window_start
+        self.overlap_size_row.param_label.toggled.connect(self._on_overlap_toggled)
+        self.single_window_start_row.param_label.toggled.connect(
+            self._on_single_window_toggled
+        )
+
+        # Initialize state: disable dependent fields if window_size is unchecked
+        if not self.window_size_row.param_label.isChecked():
+            self.overlap_size_row.setEnabled(False)
+            self.single_window_start_row.setEnabled(False)
+
+    def _update_overlap_constraints(self, window_size: int | None) -> None:
+        """Update overlap_size spinbox maximum based on window_size."""
+        if window_size is not None and window_size > 1:
+            self.overlap_size_row.param_value.setMaximum(window_size - 1)
+            # Clamp current value if needed
+            if self.overlap_size_row.param_value.value() >= window_size:
+                self.overlap_size_row.param_value.setValue(window_size - 1)
+
+    def _toggle_chunking_fields(self, enabled: bool) -> None:
+        """Enable/disable overlap_size and single_window_start based on window_size."""
+        self.overlap_size_row.setEnabled(enabled)
+        self.single_window_start_row.setEnabled(enabled)
+        if enabled:
+            # Auto-check the last used chunking mode
+            if self._last_chunking_mode == "overlap":
+                self.overlap_size_row.param_label.setChecked(True)
+            else:
+                self.single_window_start_row.param_label.setChecked(True)
+        else:
+            # Uncheck dependent fields so they emit None
+            self.overlap_size_row.param_label.setChecked(False)
+            self.single_window_start_row.param_label.setChecked(False)
+
+    def _on_overlap_toggled(self, checked: bool) -> None:
+        """When overlap_size is checked, uncheck single_window_start and remember choice."""
+        if checked:
+            self._last_chunking_mode = "overlap"
+            self.single_window_start_row.param_label.setChecked(False)
+
+    def _on_single_window_toggled(self, checked: bool) -> None:
+        """When single_window_start is checked, uncheck overlap_size and remember choice."""
+        if checked:
+            self._last_chunking_mode = "single_window"
+            self.overlap_size_row.param_label.setChecked(False)
+
+    def set_max_frames(self, max_frame: int) -> None:
+        """Set the maximum frame index for single_window_start.
+
+        Args:
+            max_frame: The maximum valid frame index (typically num_frames - 1).
+        """
+        # single_window_start can be at most max_frame - 1 (need at least 2 frames)
+        max_start = max(0, max_frame - 1)
+        self.single_window_start_row.param_value.setMaximum(max_start)
+        # Clamp current value if needed
+        if self.single_window_start_row.param_value.value() > max_start:
+            self.single_window_start_row.param_value.setValue(max_start)
