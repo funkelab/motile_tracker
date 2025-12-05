@@ -75,6 +75,13 @@ before running on the full dataset.""",
         json_schema_extra={"ui_default": 0},
     )
 
+    @field_validator("window_size")
+    @classmethod
+    def window_size_must_be_at_least_two(cls, v: int | None) -> int | None:
+        if v is not None and v < 2:
+            raise ValueError("window_size must be at least 2")
+        return v
+
     @field_validator("overlap_size")
     @classmethod
     def overlap_size_must_be_positive(cls, v: int | None) -> int | None:
