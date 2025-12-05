@@ -52,7 +52,7 @@ dependencies =[
 
 [project.optional-dependencies]
 all = [
-    "pyqt6>=6.5,<7",
+    "pyqt6>=6.7,<7",
 ]
 
 [project.entry-points."napari.manifest"]
