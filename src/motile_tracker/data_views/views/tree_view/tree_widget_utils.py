@@ -95,7 +95,7 @@ def extract_sorted_tracks(
 
             for feature_key, feature in tracks.features.items():
                 if feature_key not in track_dict:
-                    name = feature["display_name"]
+                    name = feature.get("display_name", feature_key)
                     val = tracks.get_node_attr(node, feature_key)
                     if isinstance(val, list | tuple):
                         for i, v in enumerate(val):
