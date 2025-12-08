@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 
 import zarr
+from funtracks.utils import open_zarr_store
 from psygnal import Signal
 from qtpy.QtCore import Qt
 from qtpy.QtWidgets import (
@@ -82,12 +83,8 @@ class ImportGeffWidget(QWidget):
             QMessageBox.critical(self, "Error", f"Path does not exist: {folder_path}")
             self.update_buttons.emit()
             return
-        if zarr.__version__.startswith("3"):
-            store_cls = zarr.storage.LocalStore
-        else:
-            store_cls = zarr.storage.FSStore
         try:
-            store = store_cls(folder_path)
+            store = open_zarr_store(folder_path)
             root = zarr.group(store=store)
         except (KeyError, ValueError, OSError) as e:
             QMessageBox.critical(self, "Error", f"Could not open zarr store: {e}")

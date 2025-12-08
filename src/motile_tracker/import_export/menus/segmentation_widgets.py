@@ -4,6 +4,7 @@ from pathlib import Path
 import numpy as np
 import zarr
 from funtracks.import_export.magic_imread import magic_imread
+from funtracks.utils import get_store_path
 from psygnal import Signal
 from qtpy.QtWidgets import (
     QButtonGroup,
@@ -371,7 +372,7 @@ class GeffSegmentationWidget(QWidget):
 
         for path, radio in self.related_object_radio_buttons.items():
             if radio.isChecked():
-                store_path = Path(self.root.store.path)  # e.g. /.../geff.zarr
+                store_path = get_store_path(self.root.store)  # e.g. /.../geff.zarr
                 group_path = Path(self.root.path)  # e.g. 'tracks'
                 full_group_path = store_path / group_path  # /.../geff.zarr/tracks
                 seg_path = (full_group_path / path).resolve()
