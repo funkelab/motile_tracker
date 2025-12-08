@@ -29,6 +29,7 @@ class ImportGeffWidget(QWidget):
         super().__init__()
 
         self.root = None
+        self.store_path: Path | None = None  # Path to the zarr store on disk
         self.dir_name = None
 
         self.geff_path_line = QLineEdit(self)
@@ -57,6 +58,7 @@ class ImportGeffWidget(QWidget):
         folder_path = self.geff_path_line.text().strip()
         if not folder_path:
             self.root = None
+            self.store_path = None
             self.update_buttons.emit()  # to remove any widgets and disable finish button
         else:
             # try to load, will raise an error if no zarr group can be found
@@ -75,6 +77,7 @@ class ImportGeffWidget(QWidget):
         """Find the geff group in the selected folder_path and send update signal."""
 
         self.root = None
+        self.store_path = None
         if not os.path.exists(folder_path):
             QMessageBox.critical(self, "Error", f"Path does not exist: {folder_path}")
             self.update_buttons.emit()
@@ -100,5 +103,6 @@ class ImportGeffWidget(QWidget):
             return
 
         self.root = geff_group
+        self.store_path = folder_path
         self.dir_name = os.path.basename(folder_path)
         self.update_buttons.emit()

@@ -321,9 +321,7 @@ class ImportDialog(QDialog):
 
         if self.import_type == "geff":
             if self.import_widget.root is not None:
-                store_path = Path(
-                    self.import_widget.root.store.path
-                )  # e.g. /.../my_store.zarr
+                store_path = self.import_widget.store_path
                 group_path = Path(self.import_widget.root.path)  # e.g. 'tracks'
                 geff_dir = store_path / group_path
 
