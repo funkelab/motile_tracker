@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 
 import zarr
+from funtracks.utils import open_zarr_store
 from psygnal import Signal
 from qtpy.QtCore import Qt
 from qtpy.QtWidgets import (
@@ -15,13 +16,13 @@ from qtpy.QtWidgets import (
     QWidget,
 )
 
-from motile_tracker.import_export.menus.import_from_geff.geff_import_utils import (
+from motile_tracker.import_export.menus.geff_import_utils import (
     find_geff_group,
 )
 
 
 class ImportGeffWidget(QWidget):
-    """QWidget for selecting geff directory"""
+    """QWidget for selecting a geff zarr directory to import."""
 
     update_buttons = Signal()
 
@@ -29,9 +30,9 @@ class ImportGeffWidget(QWidget):
         super().__init__()
 
         self.root = None
+        self.store_path: Path | None = None  # Path to the zarr store on disk
         self.dir_name = None
 
-        # QlineEdit for geff file path and browse button
         self.geff_path_line = QLineEdit(self)
         self.geff_path_line.setFocus()
         self.geff_path_line.setFocusPolicy(Qt.StrongFocus)
@@ -58,6 +59,7 @@ class ImportGeffWidget(QWidget):
         folder_path = self.geff_path_line.text().strip()
         if not folder_path:
             self.root = None
+            self.store_path = None
             self.update_buttons.emit()  # to remove any widgets and disable finish button
         else:
             # try to load, will raise an error if no zarr group can be found
@@ -73,19 +75,16 @@ class ImportGeffWidget(QWidget):
             self._load_geff(folder_path)
 
     def _load_geff(self, folder_path: Path) -> None:
-        """Load the graph and display the geffFieldMapWidget"""
+        """Find the geff group in the selected folder_path and send update signal."""
 
         self.root = None
+        self.store_path = None
         if not os.path.exists(folder_path):
             QMessageBox.critical(self, "Error", f"Path does not exist: {folder_path}")
             self.update_buttons.emit()
             return
-        if zarr.__version__.startswith("3"):
-            store_cls = zarr.storage.LocalStore
-        else:
-            store_cls = zarr.storage.FSStore
         try:
-            store = store_cls(folder_path)
+            store = open_zarr_store(folder_path)
             root = zarr.group(store=store)
         except (KeyError, ValueError, OSError) as e:
             QMessageBox.critical(self, "Error", f"Could not open zarr store: {e}")
@@ -101,5 +100,6 @@ class ImportGeffWidget(QWidget):
             return
 
         self.root = geff_group
+        self.store_path = folder_path
         self.dir_name = os.path.basename(folder_path)
         self.update_buttons.emit()
