@@ -125,7 +125,7 @@ def read_ctc_dataset(
 
     # Check if 'points' dataset exists in the zarr file
     points_name = "points_crop" if crop_region else "points"
-    if "points_file" not in zarr_store:
+    if points_name not in zarr_store:
         logger.info("extracting centroids...")
         centroids_list = []
         for t in range(seg_data.shape[0]):  # Iterate over time frames
@@ -139,7 +139,12 @@ def read_ctc_dataset(
         all_centroids = np.vstack(centroids_list)
 
         # Save the centroids inside the zarr file under the 'points' key
-        zarr_store.create_dataset(points_name, data=all_centroids, overwrite=True)
+        points_array = setup_zarr_array(
+            ds_zarr / points_name,
+            shape=all_centroids.shape,
+            dtype=all_centroids.dtype,
+        )
+        points_array[:] = all_centroids
         logger.info("Centroids extracted and saved")
     else:
         # If 'points' dataset exists, load it
