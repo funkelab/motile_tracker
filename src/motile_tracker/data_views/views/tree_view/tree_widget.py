@@ -453,7 +453,10 @@ class TreeWidget(QWidget):
 
         # Add buttons to change which feature to display
         features_to_plot = get_features_from_tracks(self.tracks_viewer.tracks)
-        self.plot_type_widget = TreeViewFeatureWidget(features_to_plot)
+        self.plot_type_widget = TreeViewFeatureWidget(
+            features_to_plot,
+            get_features=lambda: get_features_from_tracks(self.tracks_viewer.tracks),
+        )
         self.plot_type_widget.change_plot_type.connect(self._set_plot_type)
 
         # Add navigation widget
@@ -717,7 +720,18 @@ class TreeWidget(QWidget):
             self.view_direction = "vertical"
         else:
             self.view_direction = "horizontal"
-        self.navigation_widget.feature = self.plot_type_widget.get_current_feature()
+
+        current_feature = self.plot_type_widget.get_current_feature()
+
+        # Check if we need to rebuild dataframes for a newly computed feature
+        if (
+            plot_type == "feature"
+            and current_feature is not None
+            and current_feature not in self.track_df.columns
+        ):
+            self._update_track_data(reset_view=False)
+
+        self.navigation_widget.feature = current_feature
         self.navigation_widget.view_direction = self.view_direction
 
         if self.mode == "all":
@@ -730,7 +744,7 @@ class TreeWidget(QWidget):
             df,
             self.view_direction,
             self.plot_type,
-            self.plot_type_widget.get_current_feature(),
+            current_feature,
             self.selected_nodes,
             reset_view=True,
         )

@@ -273,6 +273,9 @@ def get_features_from_tracks(tracks: Tracks | None = None) -> list[str]:
     features_to_plot = []
     if tracks is not None:
         for feature in tracks.features.values():
+            # Skip edge features - only show node features in dropdown
+            if feature["feature_type"] == "edge":
+                continue
             if feature["value_type"] in ("float", "int"):
                 if feature["num_values"] > 1:
                     for i in range(feature["num_values"]):
