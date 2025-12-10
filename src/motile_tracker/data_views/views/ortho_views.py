@@ -14,6 +14,7 @@ from motile_tracker.data_views.views.layers.click_utils import (
     detect_click,
     get_click_value,
 )
+from motile_tracker.data_views.views.layers.contour_labels import ContourLabels
 from motile_tracker.data_views.views.layers.track_graph import TrackGraph
 from motile_tracker.data_views.views.layers.track_labels import TrackLabels
 from motile_tracker.data_views.views.layers.track_points import TrackPoints
@@ -37,10 +38,12 @@ def copy_layer(layer: Layer, name: str = ""):
         )
 
     elif isinstance(layer, TrackLabels):
-        res_layer = Labels(
+        res_layer = ContourLabels(
             data=layer.data,
             name=layer.name,
             colormap=layer.colormap,
+            opacity=layer.opacity,
+            scale=layer.scale,
         )
         res_layer._undo_history = layer._undo_history
         res_layer._redo_history = layer._redo_history
