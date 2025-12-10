@@ -1,5 +1,4 @@
 import logging
-import os
 import shutil
 import zipfile
 from pathlib import Path
@@ -9,6 +8,7 @@ import numpy as np
 import tifffile
 import zarr
 from appdirs import AppDirs
+from funtracks.utils import setup_zarr_array, setup_zarr_group
 from napari.types import LayerData
 from skimage.measure import regionprops
 
@@ -125,7 +125,7 @@ def read_ctc_dataset(
 
     # Check if 'points' dataset exists in the zarr file
     points_name = "points_crop" if crop_region else "points"
-    if "points_file" not in zarr_store:
+    if points_name not in zarr_store:
         logger.info("extracting centroids...")
         centroids_list = []
         for t in range(seg_data.shape[0]):  # Iterate over time frames
@@ -139,7 +139,12 @@ def read_ctc_dataset(
         all_centroids = np.vstack(centroids_list)
 
         # Save the centroids inside the zarr file under the 'points' key
-        zarr_store.create_dataset(points_name, data=all_centroids, overwrite=True)
+        points_array = setup_zarr_array(
+            ds_zarr / points_name,
+            shape=all_centroids.shape,
+            dtype=all_centroids.dtype,
+        )
+        points_array[:] = all_centroids
         logger.info("Centroids extracted and saved")
     else:
         # If 'points' dataset exists, load it
@@ -214,71 +219,79 @@ def download_ctc_dataset(ds_name: str, data_dir: Path) -> None:
 
 
 def convert_4d_arr_to_zarr(
-    tiff_file: str, zarr_path: str, zarr_group: str, relabel=False
-):
-    """Convert 4D tiff file image data to zarr. Also deletes the tiffs!
+    tiff_file: Path, zarr_path: Path, zarr_group: str, relabel: bool = False
+) -> None:
+    """Convert 4D tiff file to zarr array. Deletes the tiff after conversion.
+
     Args:
-        tiff_file (str): string representing path to tif file to be converted
-        zarr_path (str): path to the zarr file to write the output to
-        zarr_group (str): group within the zarr store to write the data to
-        relabel (bool): if true, relabels the segmentations to be unique over time
+        tiff_file: Path to the 4D tiff file
+        zarr_path: Path to the zarr store to write to
+        zarr_group: Name of the array within the zarr store
+        relabel: If True, relabel segmentations to be unique across time
     """
     img = tifffile.imread(tiff_file)
     data_shape = img.shape
     data_dtype = img.dtype
 
-    # prepare zarr
-    if not os.path.exists(zarr_path):
-        os.mkdir(zarr_path)
-    store = zarr.NestedDirectoryStore(zarr_path)
-    zarr_array = zarr.open(
-        store=store,
-        mode="w",
+    setup_zarr_group(zarr_path, zarr_format=2, mode="a")
+    zarr_array = setup_zarr_array(
+        zarr_path,
+        zarr_format=2,
+        mode="a",
         path=zarr_group,
         shape=data_shape,
         dtype=data_dtype,
     )
-    # save the time points to the zarr file
+
     max_label = 0
     for t in range(img.shape[0]):
         frame = img[t]
         if relabel:
+            frame = frame.copy()
             frame[frame != 0] += max_label
             max_label = int(np.max(frame))
         zarr_array[t] = frame
-    os.remove(tiff_file)
+
+    tiff_file.unlink()
 
 
-def convert_to_zarr(tiff_path: Path, zarr_path: Path, zarr_group: str, relabel=False):
-    """Convert tiff file image data to zarr. Also deletes the tiffs!
+def convert_to_zarr(
+    tiff_path: Path, zarr_path: Path, zarr_group: str, relabel: bool = False
+) -> None:
+    """Convert a directory of tiff files to a zarr array. Deletes tiffs after conversion.
+
     Args:
-        tif_path (Path): Path to the directory containing the tiff files
-        zarr_path (Path): path to the zarr file to write the output to
-        zarr_group (Path): group within the zarr store to write the data to
+        tiff_path: Path to directory containing tiff files (one per time point)
+        zarr_path: Path to the zarr store to write to
+        zarr_group: Name of the array within the zarr store
+        relabel: If True, relabel segmentations to be unique across time
     """
-    # get data dimensions
     files = sorted(tiff_path.glob("*.tif"))
     logger.info("%s time points found.", len(files))
-    example_image = tifffile.imread(files[0])
-    data_shape = (len(files), *example_image.shape)
-    data_dtype = example_image.dtype
-    # prepare zarr
-    zarr_path.mkdir(parents=True, exist_ok=True)
-    store = zarr.NestedDirectoryStore(zarr_path)
-    zarr_array = zarr.open(
-        store=store,
-        mode="w",
+
+    # Read first frame to get shape and dtype
+    first_frame = tifffile.imread(files[0])
+    shape = (len(files), *first_frame.shape)
+
+    setup_zarr_group(zarr_path, zarr_format=2, mode="a")
+    zarr_array = setup_zarr_array(
+        zarr_path,
+        zarr_format=2,
+        mode="a",
         path=zarr_group,
-        shape=data_shape,
-        dtype=data_dtype,
+        shape=shape,
+        dtype=first_frame.dtype,
     )
-    # load and save data in zarr
+
+    # Write frames one at a time
     max_label = 0
     for t, file in enumerate(files):
-        frame = tifffile.imread(file)
+        frame = tifffile.imread(file) if t > 0 else first_frame
         if relabel:
+            frame = frame.copy()
             frame[frame != 0] += max_label
             max_label = int(np.max(frame))
         zarr_array[t] = frame
         file.unlink()
+
     tiff_path.rmdir()
