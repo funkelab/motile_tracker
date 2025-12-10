@@ -2,9 +2,11 @@ from typing import Any
 
 import napari
 import networkx as nx
+import numpy as np
 import pandas as pd
 import pytest
 from funtracks.data_model import EdgeAttr, NodeAttr, SolutionTracks
+from funtracks.features import Feature
 
 from motile_tracker.data_views.views.tree_view.tree_widget_utils import (
     extract_sorted_tracks,
@@ -127,10 +129,14 @@ def assign_tracklet_ids(graph: nx.DiGraph) -> tuple[nx.DiGraph, list[Any], int]:
 
 def test_track_df(graph_2d):
     tracks = SolutionTracks(graph=graph_2d, ndim=3)
-    del tracks.graph.nodes[2]["area"]
-
-    assert tracks.get_area(1) == 1245
-    assert tracks.get_area(2) is None
+    for node in tracks.graph.nodes():
+        if node != 2:
+            tracks.graph.nodes[node]["custom_attr"] = node * 10
+    tracks.features["custom_attr"] = Feature(
+        feature_type="node",
+        value_type="int",
+        num_values=1,
+    )
 
     tracks.graph, _, _ = assign_tracklet_ids(tracks.graph)
 
@@ -142,6 +148,5 @@ def test_track_df(graph_2d):
 
     track_df, _ = extract_sorted_tracks(tracks, colormap)
     assert isinstance(track_df, pd.DataFrame)
-    assert track_df.loc[track_df["node_id"] == 1, "area"].values[0] == 1245
-    assert track_df.loc[track_df["node_id"] == 2, "area"].values[0] == 0
-    assert track_df["area"].notna().all()
+    assert track_df.loc[track_df["node_id"] == 1, "custom_attr"].values[0] == 10
+    assert np.isnan(track_df.loc[track_df["node_id"] == 2, "custom_attr"].values[0])
