@@ -35,6 +35,7 @@ def clear_layout(layout: QLayout) -> None:
         widget = item.widget()
         if widget is not None:
             widget.setParent(None)
+            widget.deleteLater()
         # If the item is a layout itself, clear it recursively
         elif item.layout() is not None:
             clear_layout(item.layout())
