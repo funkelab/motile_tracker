@@ -333,7 +333,10 @@ class TrackLabels(ContourLabels):
                     return 0.6
 
                 # visible is list
-                if not self.tracks_viewer.use_contours:
+                if (
+                    not self.tracks_viewer.use_contours
+                    or self.viewer.dims.ndisplay == 3
+                ):
                     # hide non-visible keys
                     return 0.6 if key in visible else 0
                 else:

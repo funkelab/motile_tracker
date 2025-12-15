@@ -84,6 +84,8 @@ class TracksViewer:
 
         self.set_keybinds()
 
+        self.viewer.dims.events.ndisplay.connect(self.update_selection)
+
     def set_keybinds(self):
         bind_keymap(self.viewer, KEYMAP, self)
 
