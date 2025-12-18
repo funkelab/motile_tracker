@@ -98,6 +98,11 @@ class TrackLabels(ContourLabels):
         )
 
         self.viewer = viewer
+        self.highlight_opacity = 1
+        self.foreground_opacity = 0.6
+        self.background_opacity = 0.3
+        self.highlight_contour = False
+        self.foreground_contour = False
 
         # Key bindings (should be specified both on the viewer (in tracks_viewer)
         bind_keymap(self, KEYMAP, self.tracks_viewer)
@@ -110,6 +115,9 @@ class TrackLabels(ContourLabels):
         )
         self.events.mode.connect(self._check_mode)
         self.events.selected_label.connect(self._ensure_valid_label)
+
+        # listen to changing the contours
+        self.events.contour.connect(self.tracks_viewer.mode_updated)
 
     # Connect click events to node selection
     def click(self, _, event):
@@ -296,66 +304,29 @@ class TrackLabels(ContourLabels):
         self.refresh()
 
     def update_label_colormap(self, visible: list[int] | str) -> None:
-        """Updates opacity of the label colormap to highlight the selected label
-        and optionally hide non-visible cells.
+        """Updates the opacity for the highlighted, foreground, and background labels,
+        and adds labels to the filled_labels if necessary.
         """
 
-        with self.events.selected_label.blocker():
-            highlighted = set(self.tracks_viewer.selected_nodes)
+        highlighted = set(self.tracks_viewer.selected_nodes)
+        foreground = self.colormap.color_dict.keys() if visible == "all" else visible
+        background = (
+            []
+            if visible == "all"
+            else self.colormap.color_dict.keys() - visible - highlighted
+        )
 
-            # Contour state
-            if visible == "all":
-                self.group_labels = None
-                if self.tracks_viewer.use_contours:
-                    self.contour = 0
-            else:
-                # visible is a list of nodes
-                if self.tracks_viewer.use_contours:
-                    self.group_labels = visible
-                    # make sure contours are activated.
-                    self.contour = 1 if self.contour == 0 else self.contour
-                else:
-                    self.group_labels = None  # keep current contour setting
+        self.filled_labels = []
+        if self.contour > 0 and visible != "all":
+            if not self.highlight_contour:
+                self.filled_labels.extend(highlighted)
+            if not self.foreground_contour:
+                self.filled_labels.extend(foreground)
 
-            # Alpha rules
-            def base_alpha(key):
-                """Return the base alpha for a given label key (not including
-                highlighting). Background label (0/None) should always be fully
-                transparent. Visible labels get an alpha of 0.6. Non visible labels (that
-                  are not in the 'visible' list) get 0 when tracks_viewer.use_contours is
-                  False, and 0.6 when True."""
-
-                # do not change the background, it should always be fully transparent
-                if key is None or key == 0:
-                    return None
-
-                if visible == "all":
-                    return 0.6
-
-                # visible is list
-                if (
-                    not self.tracks_viewer.use_contours
-                    or self.viewer.dims.ndisplay == 3
-                ):
-                    # hide non-visible keys
-                    return 0.6 if key in visible else 0
-                else:
-                    # contour groups: same alpha as `visible=="all"`
-                    return 0.6
-
-            # Apply alpha updates
-            for key, color in self.colormap.color_dict.items():
-                alpha = base_alpha(key)
-                if alpha is not None:
-                    color[-1] = alpha
-
-            # Highlighting of selected labaels
-            for key in highlighted:
-                if key in self.colormap.color_dict:
-                    self.colormap.color_dict[key][-1] = 1.0
-
-            # Set the new colormap (to trigger refresh)
-            self.colormap = DirectLabelColormap(color_dict=self.colormap.color_dict)
+        self.set_opacity(background, self.background_opacity)
+        self.set_opacity(foreground, self.foreground_opacity)
+        self.set_opacity(highlighted, self.highlight_opacity)
+        self.refresh_colormap()
 
     def new_colormap(self):
         """Override existing function to generate new colormap on tracks_viewer and

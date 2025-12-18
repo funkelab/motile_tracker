@@ -14,7 +14,7 @@ def get_contours(
     labels: np.ndarray,
     thickness: int,
     background_label: int,
-    group_labels: list[int] | None = None,
+    filled_labels: list[int] | None = None,
 ):
     """Computes the contours of a 2D label image.
 
@@ -44,8 +44,8 @@ def get_contours(
     contours[not_boundaries] = background_label
 
     # instead of filling with background label, fill the group label with their normal color
-    if group_labels is not None and len(group_labels) > 0:
-        group_mask = np.isin(labels, group_labels)
+    if filled_labels is not None and len(filled_labels) > 0:
+        group_mask = np.isin(labels, filled_labels)
         combined_mask = not_boundaries & group_mask
         contours = np.where(combined_mask, labels, contours)
 
@@ -75,18 +75,18 @@ class ContourLabels(napari.layers.Labels):
             colormap=colormap,
         )
 
-        self._group_labels = None
-        self.events.add(group_labels=Event)
+        self._filled_labels = []
+        self.events.add(filled_labels=Event)
 
     @property
-    def group_labels(self) -> list[int] | None:
+    def filled_labels(self) -> list[int] | None:
         """List of labels in a group"""
-        return self._group_labels
+        return self._filled_labels
 
-    @group_labels.setter
-    def group_labels(self, group_labels: list[int] | None = None) -> None:
-        self._group_labels = group_labels
-        self.events.group_labels()
+    @filled_labels.setter
+    def filled_labels(self, filled_labels: list[int] | None = None) -> None:
+        self._filled_labels = filled_labels
+        self.events.filled_labels()
 
     def _calculate_contour(
         self, labels: np.ndarray, data_slice: tuple[slice, ...]
@@ -118,7 +118,7 @@ class ContourLabels(napari.layers.Labels):
             labels[expanded_slice],
             self.contour,
             self.colormap.background_value,
-            self.group_labels,
+            self.filled_labels,
         )
 
         # Remove the latest one-pixel border from the result
@@ -127,3 +127,27 @@ class ContourLabels(napari.layers.Labels):
             for s1, s2 in zip(data_slice, expanded_slice, strict=False)
         )
         return sliced_labels[delta_slice]
+
+    def set_opacity(
+        self,
+        labels: list[int],
+        value: float,
+    ) -> None:
+        """Helper function to set the opacity of multiple labels to the same value.
+        Args:
+            labels (list[int]): list of labels to set the value for.
+            value (float): float alpha value to set.
+        """
+
+        color_dict = self.colormap.color_dict
+        for label in labels:
+            if label is None or label == 0:
+                continue
+            color = color_dict.get(label)
+            if color is not None:
+                color[3] = value
+
+    def refresh_colormap(self):
+        """Refresh the label colormap by setting its dictionary"""
+
+        self.colormap = DirectLabelColormap(color_dict=self.colormap.color_dict)

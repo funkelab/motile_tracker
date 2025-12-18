@@ -40,6 +40,7 @@ class TracksViewer:
 
     tracks_updated = Signal(Optional[bool])  # noqa: UP007 UP045
     update_track_id = Signal()
+    mode_updated = Signal()
 
     @classmethod
     def get_instance(cls, viewer=None):
@@ -66,7 +67,6 @@ class TracksViewer:
             NodeType.SPLIT: "triangle_up",
         }
         self.mode = "all"
-        self.use_contours = False
         self.tracks: SolutionTracks | None = None
         self.visible: list | str = []
         self.tracking_layers = TracksLayerGroup(self.viewer, self.tracks, "", self)
@@ -186,6 +186,7 @@ class TracksViewer:
             self.set_display_mode("all")
         else:
             self.set_display_mode("lineage")
+        self.mode_updated.emit()
 
     def set_display_mode(self, mode: str) -> None:
         """Update the display mode and call to update colormaps for points, labels, and tracks"""
@@ -241,10 +242,11 @@ class TracksViewer:
         else:
             self.visible = "all"
 
-    def update_selection(self) -> None:
+    def update_selection(self, set_view: bool = True) -> None:
         """Sets the view and triggers visualization updates in other components"""
 
-        self.set_napari_view()
+        if set_view:
+            self.set_napari_view()
         self.filter_visible_nodes()
         self.tracking_layers.update_visible(self.visible)
 
