@@ -247,8 +247,8 @@ class TracksViewer:
     def update_selection(self, set_view: bool = True) -> None:
         """Sets the view and triggers visualization updates in other components"""
 
-        if set_view:
-            self.set_napari_view()
+        if len(self.selected_nodes) == 1 and set_view:
+            self.tracking_layers.center_view(self.selected_nodes[0])
         self.filter_visible_nodes()
         self.tracking_layers.update_visible(self.visible)
 
