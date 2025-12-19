@@ -64,7 +64,8 @@ def _new_label(layer: TrackLabels, new_track_id=True):
         )
         # to refresh, otherwise you paint with a transparent label until you
         # release the mouse
-        layer.colormap = DirectLabelColormap(color_dict=layer.colormap.color_dict)
+        with layer.events.selected_label.blocker():
+            layer.colormap = DirectLabelColormap(color_dict=layer.colormap.color_dict)
     else:
         show_info("Calculating empty label on non-numpy array is not supported")
 
@@ -408,9 +409,6 @@ class TrackLabels(ContourLabels):
                     if not edit:
                         # use a new label, but the same track id
                         _new_label(self, new_track_id=False)
-                        self.colormap = DirectLabelColormap(
-                            color_dict=self.colormap.color_dict
-                        )
 
             # the current node does not exist in the graph.
             # Use the current selected_track as the track id (will be a new track if a
