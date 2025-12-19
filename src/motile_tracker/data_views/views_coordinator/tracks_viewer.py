@@ -29,6 +29,8 @@ from motile_tracker.data_views.views_coordinator.user_dialogs import (
     confirm_force_operation,
 )
 
+BASE_TEXT = "Click: select node\nShift+Click: append to selection\nCtrl+Click: center node\n[Q]: toggle display\nCurrent display mode: "
+
 
 class TracksViewer:
     """Purposes of the TracksViewer:
@@ -191,18 +193,18 @@ class TracksViewer:
     def set_display_mode(self, mode: str) -> None:
         """Update the display mode and call to update colormaps for points, labels, and tracks"""
 
-        # toggle between 'all' and 'lineage'
         if mode == "lineage":
             self.mode = "lineage"
-            self.viewer.text_overlay.text = "Toggle Display [Q]\n Lineage"
+            self.viewer.text_overlay.text = BASE_TEXT + "Lineage"
         elif mode == "group":
             self.mode = "group"
-            self.viewer.text_overlay.text = "Toggle Display [Q]\n Group"
+            self.viewer.text_overlay.text = BASE_TEXT + "Group"
         else:
             self.mode = "all"
-            self.viewer.text_overlay.text = "Toggle Display [Q]\n All"
+            self.viewer.text_overlay.text = BASE_TEXT + "All"
 
         self.viewer.text_overlay.visible = True
+        self.viewer.text_overlay.font_size = 8
         self.filter_visible_nodes()
         self.tracking_layers.update_visible(self.visible)
 
@@ -257,14 +259,6 @@ class TracksViewer:
 
         self.set_track_id_color(self.selected_track)
         self.update_track_id.emit()
-
-    def set_napari_view(self) -> None:
-        """Adjust the current_step of the viewer to jump to the last item of the
-        selected_nodes list
-        """
-        if len(self.selected_nodes) > 0:
-            node = self.selected_nodes[-1]
-            self.tracking_layers.center_view(node)
 
     def delete_node(self, event=None):
         """Calls the tracks controller to delete currently selected nodes"""

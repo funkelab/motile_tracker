@@ -130,7 +130,11 @@ class TrackPoints(napari.layers.Points):
         else:
             node_id = self.nodes[point_index]
             append = "Shift" in event.modifiers
-            self.tracks_viewer.selected_nodes.add(node_id, append)
+            jump = "Control" in event.modifiers
+            if jump:
+                self.tracks_viewer.tracking_layers.center_view(node_id)
+            else:
+                self.tracks_viewer.selected_nodes.add(node_id, append)
 
     def set_point_size(self, size: int) -> None:
         """Sets a new default point size.

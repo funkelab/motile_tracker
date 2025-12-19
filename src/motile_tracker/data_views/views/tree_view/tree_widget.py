@@ -91,6 +91,7 @@ class CustomViewBox(pg.ViewBox):
 
 class TreePlot(pg.PlotWidget):
     node_clicked = Signal(Any, bool)  # node_id, append
+    jump_to_node = Signal(int)  # node to jump to
     nodes_selected = Signal(list, bool)
 
     def __init__(self) -> pg.PlotWidget:
@@ -230,8 +231,12 @@ class TreePlot(pg.PlotWidget):
         modifiers = ev.modifiers()
         node_id = points[0].data()
         append = Qt.ShiftModifier == modifiers
-        self.node_clicked.emit(node_id, append)
-        self.setFocus()
+        jump = Qt.ControlModifier == modifiers
+        if jump:
+            self.jump_to_node.emit(node_id)
+        else:
+            self.node_clicked.emit(node_id, append)
+            self.setFocus()
 
     def set_data(self, track_df: pd.DataFrame, plot_type: str, feature: str) -> None:
         """Updates the stored pyqtgraph content based on the given dataframe.
@@ -445,6 +450,9 @@ class TreeWidget(QWidget):
 
         self.tree_widget: TreePlot = TreePlot()
         self.tree_widget.node_clicked.connect(self.selected_nodes.add)
+        self.tree_widget.jump_to_node.connect(
+            lambda node: self.tracks_viewer.tracking_layers.center_view(node)
+        )
         self.tree_widget.nodes_selected.connect(self.selected_nodes.add_list)
 
         # Add radiobuttons for switching between different display modes
