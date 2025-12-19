@@ -249,6 +249,7 @@ class CollectionWidget(QWidget):
 
         # first clear the entire list
         self.collection_list.clear()
+        self.selected_collection = None  # set back to None
 
         # find existing group features on Tracks
         group_features = [
