@@ -1,3 +1,5 @@
+from collections.abc import Callable
+
 from psygnal import Signal
 from qtpy.QtWidgets import (
     QButtonGroup,
@@ -10,15 +12,31 @@ from qtpy.QtWidgets import (
 )
 
 
+class RefreshingComboBox(QComboBox):
+    """A QComboBox that calls a refresh function before showing its popup."""
+
+    def __init__(self, refresh_func: Callable[[], None] | None = None):
+        super().__init__()
+        self.refresh_func = refresh_func
+
+    def showPopup(self):
+        if self.refresh_func is not None:
+            self.refresh_func()
+        super().showPopup()
+
+
 class TreeViewFeatureWidget(QWidget):
     """Widget to switch between viewing all nodes versus nodes of one or more lineages in the tree widget"""
 
     change_plot_type = Signal(str)
 
-    def __init__(self, features: list[str]):
+    def __init__(
+        self, features: list[str], get_features: Callable[[], list[str]] | None = None
+    ):
         super().__init__()
 
         self.plot_type = "tree"
+        self.get_features = get_features
 
         display_box = QGroupBox("Plot [W]")
         display_layout = QHBoxLayout()
@@ -33,7 +51,7 @@ class TreeViewFeatureWidget(QWidget):
         display_layout.addWidget(self.show_tree_radio)
         display_layout.addWidget(self.show_area_radio)
 
-        self.feature_dropdown = QComboBox()
+        self.feature_dropdown = RefreshingComboBox(self._refresh_features)
         for feature in features:
             self.feature_dropdown.addItem(feature)
         self.feature_dropdown.currentIndexChanged.connect(self._update_feature)
@@ -105,3 +123,9 @@ class TreeViewFeatureWidget(QWidget):
             )
 
         self.feature_dropdown.currentIndexChanged.connect(self._update_feature)
+
+    def _refresh_features(self) -> None:
+        """Refresh the feature dropdown from the get_features callable."""
+        if self.get_features is not None:
+            feature_list = self.get_features()
+            self.update_feature_dropdown(feature_list)
