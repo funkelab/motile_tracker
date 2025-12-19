@@ -150,19 +150,16 @@ class TracksLayerGroup:
             )
 
             step = list(self.viewer.dims.current_step)
-            # Convert world coordinates to step indices using the viewer's dims range
-            # Each dim has a range (min, max, step_size) in world coordinates
             for dim in self.viewer.dims.not_displayed:
-                dim_range = self.viewer.dims.range[dim]
-                step_size = dim_range.step if dim_range.step != 0 else 1.0
-                step[dim] = int((location[dim] - dim_range.start) / step_size + 0.5)
+                step[dim] = int(
+                    location[dim] + 0.5
+                )  # use the world location, since the 'step' in viewer.dims.range
+                # already in world units
 
             # Also update the step for the dims that are displayed, in order to sync with
             # the orthogonal views
             for dim in self.viewer.dims.displayed:
-                dim_range = self.viewer.dims.range[dim]
-                step_size = dim_range.step if dim_range.step != 0 else 1.0
-                step[dim] = int((location[dim] - dim_range.start) / step_size + 0.5)
+                step[dim] = int(location[dim] + 0.5)
             self.viewer.dims.current_step = step
 
             # check whether the new coordinates are inside or outside the field of view,
