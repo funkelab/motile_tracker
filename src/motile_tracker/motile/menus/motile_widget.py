@@ -168,17 +168,14 @@ class MotileWidget(QWidget):
         self.new_run(run, run.run_name)
 
     def _title_widget(self) -> QWidget:
-        """Create the title and intro paragraph widget, with links to docs
+        """Create the intro paragraph widget, with links to motile docs.
 
         Returns:
-            QWidget: A widget introducing the motile tracker and linking to docs
+            QWidget: A widget describing the tracking tab and linking to motile docs
         """
-        richtext = r"""<h3>Tracking with Motile</h3>
-        <p>This tracker uses the
+        richtext = r"""<p>This tab uses the
         <a href="https://funkelab.github.io/motile/"><font color=yellow>motile</font></a> library to
-        track objects with global optimization. See the
-        <a href="https://funkelab.github.io/motile_tracker/"><font color=yellow>user guide</font></a>
-        for a tutorial to the tracker functionality."""  # noqa
+        track objects with global optimization.</p>"""
         label = QLabel(richtext)
         label.setWordWrap(True)
         label.setOpenExternalLinks(True)
