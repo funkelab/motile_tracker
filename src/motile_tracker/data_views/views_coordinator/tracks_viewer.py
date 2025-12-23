@@ -120,6 +120,8 @@ class TracksViewer:
         updated. Restore the selected_nodes, if possible
         """
 
+        self.collection_widget._refresh()
+
         if len(self.selected_nodes) > 0 and any(
             not self.tracks.graph.has_node(node) for node in self.selected_nodes
         ):
@@ -128,7 +130,6 @@ class TracksViewer:
         self.tracking_layers._refresh()
 
         self.tracks_updated.emit(refresh_view)
-        self.collection_widget._refresh()
 
         # if a new node was added, we would like to select this one now (call this after
         # emitting the signal, because if the node is a new node, we have to update the
@@ -234,13 +235,9 @@ class TracksViewer:
                     self.visible += extract_lineage_tree(self.tracks.graph, node)
         elif self.mode == "group":
             if self.collection_widget.selected_collection is not None:
-                self.visible = [
-                    node
-                    for node in list(
-                        self.collection_widget.selected_collection.collection
-                    )
-                    if self.tracks.graph.has_node(node)
-                ]
+                self.visible = list(
+                    self.collection_widget.selected_collection.collection
+                )
             else:
                 self.visible = []
         else:
