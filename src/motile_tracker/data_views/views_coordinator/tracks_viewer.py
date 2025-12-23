@@ -234,9 +234,13 @@ class TracksViewer:
                     self.visible += extract_lineage_tree(self.tracks.graph, node)
         elif self.mode == "group":
             if self.collection_widget.selected_collection is not None:
-                self.visible = list(
-                    self.collection_widget.selected_collection.collection
-                )
+                self.visible = [
+                    node
+                    for node in list(
+                        self.collection_widget.selected_collection.collection
+                    )
+                    if self.tracks.graph.has_node(node)
+                ]
             else:
                 self.visible = []
         else:
