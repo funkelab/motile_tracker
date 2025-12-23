@@ -117,6 +117,8 @@ class TracksViewer:
         updated. Restore the selected_nodes, if possible
         """
 
+        self.collection_widget._refresh()
+
         if len(self.selected_nodes) > 0 and any(
             not self.tracks.graph.has_node(node) for node in self.selected_nodes
         ):
@@ -125,7 +127,6 @@ class TracksViewer:
         self.tracking_layers._refresh()
 
         self.tracks_updated.emit(refresh_view)
-        self.collection_widget._refresh()
 
         # if a new node was added, we would like to select this one now (call this after
         # emitting the signal, because if the node is a new node, we have to update the
