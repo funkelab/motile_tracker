@@ -226,7 +226,7 @@ class CollectionWidget(QWidget):
 
         node = self.tracks_viewer.selected_nodes.next_node(forward)
         if node:
-            self.tracks_viewer.tracking_layers.center_view(node)
+            self.tracks_viewer.center_on_node(node)
 
     def _invert_selection(self) -> None:
         """Invert the current selection"""
