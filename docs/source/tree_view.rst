@@ -10,7 +10,11 @@ through the motile widget in the tree view, you can open the tree widget from th
 via ``Plugins`` > ``Motile`` > ``Lineage View``.
 
 Clicking on individual nodes in the tree widget or in the napari Points or Labels layer will select that node,
-highlighting it both in the tree view and in the napari layers, and centering the view if necessary.
+highlighting it both in the tree view and in the napari layers. The view is centered on the selected node
+only when a single node is selected. Use ``SHIFT + click`` to add nodes to the selection without centering,
+or ``CTRL + click`` to center the view on a node without changing the selection.
+When multiple nodes are selected, you can cycle through them using the "Next selected node" and
+"Previous selected node" buttons in the Groups widget.
 You can navigate and select nodes in the tree view using the arrow keys (make sure to click on the tree widget first).
 Optionally, you can display only selected lineages in the tree view and/or napari layers (press ``Q`` in the tree widget and/or in the napari viewer).
 If you used a Labels layer as input for tracking, you will also have the option to plot the object sizes (area or volume) in calibrated units
