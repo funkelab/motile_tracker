@@ -132,7 +132,7 @@ class TrackPoints(napari.layers.Points):
             append = "Shift" in event.modifiers
             jump = "Control" in event.modifiers
             if jump:
-                self.tracks_viewer.tracking_layers.center_view(node_id)
+                self.tracks_viewer.center_on_node(node_id)
             else:
                 self.tracks_viewer.selected_nodes.add(node_id, append)
 

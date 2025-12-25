@@ -139,7 +139,7 @@ class TrackLabels(napari.layers.Labels):
             append = "Shift" in event.modifiers
             jump = "Control" in event.modifiers
             if jump:
-                self.tracks_viewer.tracking_layers.center_view(label)
+                self.tracks_viewer.center_on_node(label)
             else:
                 self.tracks_viewer.selected_nodes.add(label, append)
 
