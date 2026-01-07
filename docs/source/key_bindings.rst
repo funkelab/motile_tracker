@@ -11,9 +11,11 @@ Napari viewer and layer key bindings and mouse functions
    * - Mouse / Key binding
      - Action
    * - Click on a point or label
-     - Select this node (center view if necessary)
+     - Select this node (centers view if only one node selected)
    * - SHIFT + click on point or label
-     - Add this node to selection
+     - Add this node to selection (does not center view)
+   * - CTRL + click on point or label
+     - Center view on this node (does not change selection)
    * - Mouse drag with point layer selection tool active
      - Select multiple nodes at once
    * - Q
@@ -30,9 +32,11 @@ Tree view key and mouse functions
    * - Mouse / Key binding
      - Action
    * - Click on a node
-     - Select this node (center view if necessary)
+     - Select this node (centers view if only one node selected)
    * - SHIFT + click on a node
-     - Add this node to selection
+     - Add this node to selection (does not center view)
+   * - CTRL + click on a node
+     - Center view on this node (does not change selection)
    * - Scroll
      - Zoom in or out
    * - Scroll + X / Right mouse click + drag horizontally

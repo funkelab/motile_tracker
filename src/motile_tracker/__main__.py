@@ -9,7 +9,7 @@ def main() -> None:
     # Auto-load the motile tracker
     viewer = napari.Viewer()
     main_app = MainApp(viewer)
-    viewer.window.add_dock_widget(main_app)
+    viewer.window.add_dock_widget(main_app, name="Motile Tracker")
 
     # Start napari event loop
     napari.run()
