@@ -18,7 +18,7 @@ for more details on the concepts and method.
 Users can download and install an executable application from the github release, or
 install from `pypi` in the environment of their choice (e.g. `venv`, `conda`) with the command
 `pip install motile-tracker`.
-Currently, the motile_tracker requires python >=3.10.
+Currently, the motile_tracker requires python >=3.11.
 
 ### Recommended extras
 
@@ -51,9 +51,12 @@ pip install motile-tracker[gurobi13]  # For Gurobi 13.x licenses
 Developers can clone the GitHub repository and then  use `uv` to install and run the code.
 See the developer guide in `DEVELOPER.md` for more information.
 
-## Running Motile Tracker
+## Usage
 
-Start the executable application, or run `motile_tracker` from the command line.
+Start napari and call the main widget via Plugins > Motile > Motile Main Widget.
+2D+time and 3D+time sample data can be loaded via File > Open Sample > Motile. You can
+track objects in napari Labels or Points layers. For details, please read the
+[documentation](https://funkelab.github.io/motile_tracker/).
 
 ## Package the application into an executable and create the installer
 
