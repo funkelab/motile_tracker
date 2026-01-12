@@ -93,8 +93,19 @@ def extract_sorted_tracks(
                 "symbol": symbol,
             }
 
-            if tracks.get_area(node) is not None:
-                track_dict["area"] = tracks.get_area(node)
+            for feature_key, feature in tracks.features.items():
+                if feature_key not in track_dict:
+                    name = feature.get("display_name", feature_key)
+                    val = tracks.get_node_attr(node, feature_key)
+                    if isinstance(val, list | tuple):
+                        for i, v in enumerate(val):
+                            if isinstance(name, list | tuple):
+                                display_name = name[i]
+                            else:
+                                display_name = f"{name}_{i}"
+                            track_dict[display_name] = v
+                    else:
+                        track_dict[name] = val
 
             if len(pos) == 3:
                 track_dict["z"] = pos[0]
@@ -130,9 +141,6 @@ def extract_sorted_tracks(
         node["x_axis_pos"] = x_axis_order.index(node["track_id"])
 
     df = pd.DataFrame(track_list)
-    if "area" in df.columns:
-        df["area"] = df["area"].fillna(0)
-
     return df, x_axis_order
 
 
@@ -248,3 +256,38 @@ def extract_lineage_tree(graph: nx.DiGraph, node_id: str) -> list[str]:
     nodes.add(root_node)
 
     return list(nodes)
+
+
+def get_features_from_tracks(tracks: Tracks | None = None) -> list[str]:
+    """Extract the regionprops feature display names currently activated on Tracks.
+
+    Args:
+        tracks (Tracks | None): the Tracks instance to extract features from
+
+    Returns:
+        features_to_plot (list[str]): list of the feature names to plot, or an empty list
+        if tracks is None
+    """
+
+    features_to_ignore = ["Time", "Tracklet ID"]
+    features_to_plot = []
+    if tracks is not None:
+        for feature in tracks.features.values():
+            # Skip edge features - only show node features in dropdown
+            if feature["feature_type"] == "edge":
+                continue
+            if feature["value_type"] in ("float", "int"):
+                if feature["num_values"] > 1:
+                    for i in range(feature["num_values"]):
+                        name = feature["display_name"]
+                        if isinstance(name, list | tuple):
+                            features_to_plot.append(name[i])
+                        else:
+                            features_to_plot.append(f"{feature['display_name']}_{i}")
+                else:
+                    features_to_plot.append(feature["display_name"])
+
+    features_to_plot = [
+        feature for feature in features_to_plot if feature not in features_to_ignore
+    ]
+    return features_to_plot

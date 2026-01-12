@@ -3,6 +3,7 @@ from __future__ import annotations
 from functools import partial
 from typing import TYPE_CHECKING, Any
 
+from fonticon_fa6 import FA6S
 from funtracks.features._feature import Feature
 from napari._qt.qt_resources import QColoredSVGIcon
 from qtpy.QtCore import Signal
@@ -18,6 +19,7 @@ from qtpy.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from superqt.fonticon import icon as qticon
 
 if TYPE_CHECKING:
     from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
@@ -25,6 +27,7 @@ if TYPE_CHECKING:
 from motile_tracker.data_views.views.tree_view.tree_widget_utils import (
     extract_lineage_tree,
 )
+from motile_tracker.import_export.menus.export_dialog import ExportDialog
 
 
 class CollectionButton(QWidget):
@@ -39,12 +42,18 @@ class CollectionButton(QWidget):
         delete_icon = QColoredSVGIcon.from_resources("delete").colored("white")
         self.node_count = QLabel(f"{len(self.collection)} nodes")
 
+        export_icon = qticon(FA6S.file_export, color="white")
+        self.export = QPushButton(icon=export_icon)
+        self.export.setFixedSize(20, 20)
+        self.export.setToolTip("Export nodes in this group to CSV or geff")
+
         self.delete = QPushButton(icon=delete_icon)
         self.delete.setFixedSize(20, 20)
         layout = QHBoxLayout()
         layout.setSpacing(1)
         layout.addWidget(self.name)
         layout.addWidget(self.node_count)
+        layout.addWidget(self.export)
         layout.addWidget(self.delete)
         layout.setSpacing(10)
 
@@ -240,6 +249,7 @@ class CollectionWidget(QWidget):
 
         # first clear the entire list
         self.collection_list.clear()
+        self.selected_collection = None  # set back to None
 
         # find existing group features on Tracks
         group_features = [
@@ -399,6 +409,7 @@ class CollectionWidget(QWidget):
         item.setSizeHint(group_row.minimumSizeHint())
         self.collection_list.addItem(item)
         group_row.delete.clicked.connect(partial(self._remove_group, item))
+        group_row.export.clicked.connect(partial(self._show_export_dialog, item))
 
         if select:
             self.collection_list.setCurrentRow(len(self.collection_list) - 1)
@@ -433,3 +444,25 @@ class CollectionWidget(QWidget):
 
         # remove from the features on Tracks
         del self.tracks_viewer.tracks.features[group_name]
+
+    def _show_export_dialog(self, item: QListWidgetItem) -> None:
+        """Prompt user to choose export format (csv or geff), then export the nodes
+         belonging to this group.
+        You must pass the list item that represents the group.
+
+        Args:
+            item (QListWidgetItem):  The list item containing the CollectionButton that
+                represents a group of nodes.
+
+        """
+
+        group_name = self.collection_list.itemWidget(item).name.text()
+        nodes_to_keep = self.collection_list.itemWidget(item).collection
+
+        # Keep nodes that belong to the selected group and export
+        ExportDialog.show_export_dialog(
+            self,
+            tracks=self.tracks_viewer.tracks,
+            name=group_name,
+            nodes_to_keep=nodes_to_keep,
+        )

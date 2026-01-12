@@ -149,18 +149,9 @@ class TracksLayerGroup:
                 f"{self.viewer.dims.ndim}"
             )
 
-            step = list(self.viewer.dims.current_step)
-            for dim in self.viewer.dims.not_displayed:
-                step[dim] = int(
-                    location[dim] + 0.5
-                )  # use the world location, since the 'step' in viewer.dims.range
-                # already in world units
-
-            # Also update the step for the dims that are displayed, in order to sync with
-            # the orthogonal views
-            for dim in self.viewer.dims.displayed:
-                step[dim] = int(location[dim] + 0.5)
-            self.viewer.dims.current_step = step
+            # Set dims.point directly with world coordinates - napari will
+            # automatically convert to the correct step indices
+            self.viewer.dims.point = location
 
             # check whether the new coordinates are inside or outside the field of view,
             # then adjust the camera if needed
