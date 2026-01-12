@@ -58,6 +58,8 @@ Start napari and call the main widget via Plugins > Motile > Motile Main Widget.
 track objects in napari Labels or Points layers. For details, please read the
 [documentation](https://funkelab.github.io/motile_tracker/).
 
+![motile_tracker_quick_demo](https://github.com/user-attachments/assets/07a4a954-3d2d-4d67-8f75-aec11ee14697)
+
 ## Package the application into an executable and create the installer
 
 Tagging any branch will automatically trigger the deploy.yml workflow,
