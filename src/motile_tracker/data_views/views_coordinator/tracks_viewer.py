@@ -290,15 +290,15 @@ class TracksViewer:
             self.tracks_controller.delete_edges(edges=np.array([[node1, node2]]))
 
     def swap_nodes(self, event=None):
-        """Calls the tracks controller to add an edge between the two currently selected
-        nodes
+        """Calls the tracks controller to swap the predecessors of the two currently
+        selected nodes
         """
 
         if len(self.selected_nodes) == 2:
             node1 = self.selected_nodes[0]
             node2 = self.selected_nodes[1]
 
-            self.tracks_controller.swap_nodes(nodes=np.array([node1, node2]))
+            self.tracks_controller.swap_predecessors(nodes=(node1, node2))
 
     def create_edge(self, event=None):
         """Calls the tracks controller to add an edge between the two currently selected
