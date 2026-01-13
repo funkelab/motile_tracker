@@ -42,6 +42,7 @@ class TracksViewer:
 
     tracks_updated = Signal(Optional[bool])  # noqa: UP007 UP045
     update_track_id = Signal()
+    mode_updated = Signal()
     center_node = Signal(int)  # emitted when any component wants to center on a node
 
     @classmethod
@@ -86,6 +87,8 @@ class TracksViewer:
         self.collection_widget.group_changed.connect(self.update_selection)
 
         self.set_keybinds()
+
+        self.viewer.dims.events.ndisplay.connect(self.update_selection)
 
     def set_keybinds(self):
         bind_keymap(self.viewer, KEYMAP, self)
@@ -188,6 +191,7 @@ class TracksViewer:
             self.set_display_mode("all")
         else:
             self.set_display_mode("lineage")
+        self.mode_updated.emit()
 
     def set_display_mode(self, mode: str) -> None:
         """Update the display mode and call to update colormaps for points, labels, and tracks"""
@@ -254,10 +258,10 @@ class TracksViewer:
         """
         self.center_node.emit(node)
 
-    def update_selection(self) -> None:
+    def update_selection(self, set_view: bool = True) -> None:
         """Sets the view and triggers visualization updates in other components"""
 
-        if len(self.selected_nodes) == 1:
+        if set_view and len(self.selected_nodes) > 0:
             self.center_on_node(self.selected_nodes[0])
 
         self.filter_visible_nodes()
