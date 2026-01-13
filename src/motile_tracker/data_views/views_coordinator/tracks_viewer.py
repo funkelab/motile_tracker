@@ -261,7 +261,7 @@ class TracksViewer:
     def update_selection(self, set_view: bool = True) -> None:
         """Sets the view and triggers visualization updates in other components"""
 
-        if set_view and len(self.selected_nodes) > 0:
+        if set_view and len(self.selected_nodes) == 1:
             self.center_on_node(self.selected_nodes[0])
 
         self.filter_visible_nodes()
