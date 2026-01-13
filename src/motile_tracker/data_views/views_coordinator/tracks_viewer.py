@@ -29,7 +29,7 @@ from motile_tracker.data_views.views_coordinator.user_dialogs import (
     confirm_force_operation,
 )
 
-BASE_TEXT = "Click: select node\nShift+Click: append to selection\nCtrl+Click: center node\n[Q]: toggle display\nCurrent display mode: "
+BASE_TEXT = "Click: select node\nShift+Click: append to selection\nCtrl/Cmd+Click: center node\n[Q]: toggle display\nCurrent display mode: "
 
 
 class TracksViewer:
