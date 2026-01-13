@@ -16,6 +16,7 @@ from motile_tracker.data_views.views.layers.click_utils import (
     detect_click,
     get_click_value,
 )
+from motile_tracker.data_views.views.layers.contour_labels import ContourLabels
 from motile_tracker.data_views.views_coordinator.key_binds import (
     KEYMAP,
     bind_keymap,
@@ -63,12 +64,13 @@ def _new_label(layer: TrackLabels, new_track_id=True):
         )
         # to refresh, otherwise you paint with a transparent label until you
         # release the mouse
-        layer.colormap = DirectLabelColormap(color_dict=layer.colormap.color_dict)
+        with layer.events.selected_label.blocker():
+            layer.colormap = DirectLabelColormap(color_dict=layer.colormap.color_dict)
     else:
         show_info("Calculating empty label on non-numpy array is not supported")
 
 
-class TrackLabels(napari.layers.Labels):
+class TrackLabels(ContourLabels):
     """Extended labels layer that holds the track information and emits
     and responds to dynamics visualization signals"""
 
@@ -97,6 +99,11 @@ class TrackLabels(napari.layers.Labels):
         )
 
         self.viewer = viewer
+        self.highlight_opacity = 1
+        self.foreground_opacity = 0.6
+        self.background_opacity = 0.3
+        self.highlight_contour = False
+        self.foreground_contour = False
 
         # Key bindings (should be specified both on the viewer (in tracks_viewer)
         bind_keymap(self, KEYMAP, self.tracks_viewer)
@@ -109,6 +116,9 @@ class TrackLabels(napari.layers.Labels):
         )
         self.events.mode.connect(self._check_mode)
         self.events.selected_label.connect(self._ensure_valid_label)
+
+        # listen to changing the contours
+        self.events.contour.connect(self.tracks_viewer.mode_updated)
 
     # Connect click events to node selection
     def click(self, _, event):
@@ -299,41 +309,29 @@ class TrackLabels(napari.layers.Labels):
         self.refresh()
 
     def update_label_colormap(self, visible: list[int] | str) -> None:
-        """Updates the opacity of the label colormap to highlight the selected label
-        and optionally hide cells not belonging to the current lineage
-
-        Visible is a list of visible node id
+        """Updates the opacity for the highlighted, foreground, and background labels,
+        and adds labels to the filled_labels if necessary.
         """
-        with self.events.selected_label.blocker():
-            highlighted = self.tracks_viewer.selected_nodes
 
-            # update the opacity of the cyclic label colormap values according to
-            # whether nodes are visible/invisible/highlighted
-            if visible == "all":
-                self.colormap.color_dict = {
-                    key: np.array(
-                        [
-                            *value[:-1],
-                            0.6 if key is not None and key != 0 else value[-1],
-                        ],
-                        dtype=np.float32,
-                    )
-                    for key, value in self.colormap.color_dict.items()
-                }
+        highlighted = set(self.tracks_viewer.selected_nodes)
+        foreground = self.colormap.color_dict.keys() if visible == "all" else visible
+        background = (
+            []
+            if visible == "all"
+            else self.colormap.color_dict.keys() - visible - highlighted
+        )
 
-            else:
-                self.colormap.color_dict = {
-                    key: np.array([*value[:-1], 0], dtype=np.float32)
-                    for key, value in self.colormap.color_dict.items()
-                }
-                for node in visible:
-                    # find the index in the colormap
-                    self.colormap.color_dict[node][-1] = 0.6
+        self.filled_labels = []
+        if self.contour > 0 and visible != "all":
+            if not self.highlight_contour:
+                self.filled_labels.extend(highlighted)
+            if not self.foreground_contour:
+                self.filled_labels.extend(foreground)
 
-            for node in highlighted:
-                self.colormap.color_dict[node][-1] = 1  # full opacity
-            # create a new colormap from the updated colors (to ensure refresh)
-            self.colormap = DirectLabelColormap(color_dict=self.colormap.color_dict)
+        self.set_opacity(background, self.background_opacity)
+        self.set_opacity(foreground, self.foreground_opacity)
+        self.set_opacity(highlighted, self.highlight_opacity)
+        self.refresh_colormap()
 
     def new_colormap(self):
         """Override existing function to generate new colormap on tracks_viewer and
@@ -415,9 +413,6 @@ class TrackLabels(napari.layers.Labels):
                     if not edit:
                         # use a new label, but the same track id
                         _new_label(self, new_track_id=False)
-                        self.colormap = DirectLabelColormap(
-                            color_dict=self.colormap.color_dict
-                        )
 
             # the current node does not exist in the graph.
             # Use the current selected_track as the track id (will be a new track if a
