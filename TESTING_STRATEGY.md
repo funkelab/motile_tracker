@@ -1,6 +1,6 @@
 # Testing Strategy for Motile Tracker
 
-**Current Coverage:** ~40%
+**Current Coverage:** 64% (Updated: 2026-01-13)
 **Target Coverage:** 75-85%
 **Generated:** 2026-01-13
 
@@ -8,96 +8,187 @@
 
 ## Executive Summary
 
-The motile_tracker repository has significant testing gaps, particularly in UI components and core coordination logic. This document outlines a comprehensive strategy to improve test coverage from ~40% to 75-85% while focusing on high-value, maintainable tests.
+After consolidating all tests into `/tests` directory and eliminating duplicate fixtures, coverage improved from ~40% to **64%**. This document outlines the remaining gaps and strategy to reach 75-85% coverage, focusing on UI widgets and tree view components.
 
-### Current State Analysis
+### Current State Analysis (Updated)
 
-**Test Files Inventory:**
+**Test Organization:**
+- ✅ **All tests consolidated** in `/tests` directory
+- ✅ **Single conftest.py** with all fixtures
+- ✅ **No duplicate fixtures** across test files
+- 📊 **15 test files**, ~2,500 lines of tests
+- 📊 **62 tests passing**, 1 xfailed
 
-**Existing Tests (15 files, 2,912 total lines):**
+**Coverage by Category:**
 
-| Location | File | Lines | Coverage | Status |
-|----------|------|-------|----------|--------|
-| tests/ | conftest.py | 174 | N/A | Shared fixtures |
-| tests/motile/backend/ | test_solver.py | 77 | Good | Covers solve(), chunked solving |
-| tests/motile/backend/ | test_motile_run.py | 29 | Good | Basic save/load test |
-| tests/motile/menus/ | test_run_editor.py | 9 | Minimal | Only 1 test! |
-| tests/import_export/ | test_import_dialog.py | 490 | Good | Comprehensive |
-| tests/import_export/ | test_export_dialog.py | 154 | Good | Export scenarios |
-| tests/import_export/ | test_export_solution_to_csv.py | 176 | Good | CSV export |
-| tests/import_export/ | test_geff_scale_widget.py | 103 | Good | GEFF import |
-| data_views/_tests/ | conftest.py | 73 | N/A | TracksViewer fixtures |
-| data_views/_tests/ | test_track_labels.py | 211 | Good | Paint/erase events |
-| data_views/_tests/ | test_center_view.py | 437 | Good | View centering |
-| data_views/_tests/ | test_force_operations.py | 422 | Good | Force mode operations |
-| data_views/_tests/ | test_link_clipping_planes.py | 117 | Good | 3D clipping |
-| data_views/_tests/ | test_ortho_views.py | 100 | Good | Orthogonal views |
-| data_views/_tests/ | test_tree_widget_utils.py | 152 | Minimal | Only 1 test! |
-| data_views/_tests/ | test_visualization_widget.py | 188 | Good | Label visualization |
+| Category | Coverage | Status |
+|----------|----------|--------|
+| **Overall** | **64%** | 🟡 Good progress |
+| Import/Export | 63-100% | ✅ Excellent |
+| Motile Backend | 70-93% | ✅ Good |
+| Visualization Layers | 76-95% | ✅ Good |
+| Coordination Logic | 49-70% | 🟡 Decent |
+| UI Menus/Widgets | 9-30% | ❌ Critical Gap |
+| Tree View Components | 8-32% | ❌ Critical Gap |
 
 **Well-Tested Modules (>70% coverage):**
-- ✅ Import/Export (63-100%) - 917 lines of tests
-- ✅ Motile Backend solve.py (71%) - 77 lines of tests
-- ✅ MotileRun (70%) - 29 lines of tests
-- ✅ SolverParams (93%) - covered by other tests
-- ✅ Scale widgets (100%) - part of import tests
+- ✅ **visualization_widget.py** (94%) - Label visualization
+- ✅ **contour_labels.py** (95%) - Contour rendering
+- ✅ **track_graph.py** (94%) - Edge visualization
+- ✅ **track_labels.py** (82%) - Paint/erase events
+- ✅ **tracks_layer_group.py** (79%) - Layer management
+- ✅ **ortho_views.py** (76%) - Orthogonal views
+- ✅ **tracks_viewer.py** (70%) - Core coordinator ⬆️ from 16%!
+- ✅ **Import/Export modules** (85-100%)
+- ✅ **solve.py** (71%), **motile_run.py** (70%), **solver_params.py** (93%)
 
-**Under-Tested Modules (<20% coverage):**
+**Critical Gaps (<40% coverage - FOCUS HERE):**
 
-| Module | Coverage | Missing Lines (examples) | Status |
-|--------|----------|--------------------------|--------|
-| **editing_menu.py** | 9% | Lines 16-76, 81-85, 96-112 | ❌ CRITICAL |
-| **tracks_viewer.py** | 16% | Most methods untested | ❌ CRITICAL |
-| **track_graph.py** | 14% | Lines 39-72, 84-100, 107-142 | ❌ HIGH |
-| **track_points.py** | 18% | Lines 61-116, 147-259 | ❌ HIGH |
-| **track_labels.py** | 16% | Lines 57-121, 223-303 | ⚠️ Has tests but gaps |
-| **tracks_layer_group.py** | 13% | Lines 25-139, 145-194 | ❌ HIGH |
-| **tree_widget.py** | 12% | Almost completely untested | ❌ HIGH |
-| **tree_widget_utils.py** | 7% | Only 1 test exists | ❌ HIGH |
-| **groups.py** | 12% | Collections functionality | ❌ MEDIUM |
-| **navigation_widget.py** | 8% | Lines 35-187 | ❌ MEDIUM |
-| **run_editor.py** | Only 9 lines tested | Most functionality untested | ❌ HIGH |
+| Module | Coverage | Lines | Status |
+|--------|----------|-------|--------|
+| **editing_menu.py** | 9% | 72 | ❌ CRITICAL - UI widget |
+| **navigation_widget.py** | 8% | 86 | ❌ CRITICAL - Tree navigation |
+| **tree_widget.py** | 12% | 375 | ❌ CRITICAL - 375 lines! |
+| **tree_view_feature_widget.py** | 16% | 77 | ❌ HIGH - Feature coloring |
+| **tree_view_mode_widget.py** | 19% | 34 | ❌ HIGH - Display modes |
+| **params_editor.py** | 15% | 146 | ❌ HIGH - Solver params UI |
+| **run_editor.py** | 23% | 132 | ❌ HIGH - Run configuration |
+| **motile_widget.py** | 24% | 85 | 🟡 MEDIUM - Main widget |
+| **run_viewer.py** | 24% | 81 | 🟡 MEDIUM - Run display |
+| **params_viewer.py** | 21% | 49 | 🟡 MEDIUM - Param display |
+| **tracks_list.py** | 34% | 125 | 🟡 MEDIUM - Track list UI |
+| **param_values.py** | 30% | 32 | 🟡 MEDIUM - Value handling |
+| **click_utils.py** | 30% | 16 | 🟡 MEDIUM - Click helpers |
+| **flip_axes_widget.py** | 32% | 19 | 🟡 MEDIUM - Axis flipping |
 
-**Key Observations:**
-1. **Import/Export is well-tested** (490+ lines for import_dialog alone)
-2. **data_views has good fixture setup** but limited test coverage
-3. **Many files have 0 dedicated tests** (TracksViewer, TrackGraph, TrackPoints, Groups, etc.)
-4. **Existing tests are high quality** - good patterns to follow
-5. **test_run_editor.py has only 9 lines** - barely scratches the surface
+**Medium Coverage (40-70% - Secondary Focus):**
+
+| Module | Coverage | Lines | Notes |
+|--------|----------|-------|-------|
+| **track_points.py** | 47% | 143 | Needs interaction tests |
+| **groups.py** | 49% | 254 | Group management logic |
+| **node_selection_list.py** | 58% | 57 | Selection UI |
+| **csv_import_widget.py** | 63% | 54 | CSV import UI |
+| **geff_import_widget.py** | 64% | 68 | GEFF import UI |
+| **tree_widget_utils.py** | 67% | 131 | Tree utilities |
+| **segmentation_widgets.py** | 73% | 221 | Seg import UI |
+
+**Key Achievements:**
+1. ✅ **TracksViewer jumped from 16% to 70%** - excellent progress!
+2. ✅ **All visualization layers now >75%** coverage
+3. ✅ **Test consolidation successful** - single source of fixtures
+4. ✅ **Import/export remains strong** (85-100%)
+
+**Remaining Gaps:**
+1. ❌ **UI widgets mostly untested** - editing_menu (9%), tree widgets (8-32%)
+2. ❌ **Motile menu widgets** - run_editor (23%), params_editor (15%)
+3. 🟡 **Some interaction logic** - track_points (47%), groups (49%)
 
 ---
 
-## Testing Priorities (High to Low)
+## Testing Priorities (Revised Based on 64% Coverage)
 
-### Priority 1: CRITICAL - Core Coordination Layer
+### Priority 1: CRITICAL - UI Widgets (Biggest Impact)
 
-**Target: TracksViewer (currently 16%)**
+**Target: Get to 75% overall by fixing lowest-hanging fruit**
+
+These modules have **very low coverage** and are **user-facing**, making them high-impact:
+
+#### 1A. editing_menu.py (9% → Target: 70%)
+**Lines:** 72 | **Gap:** ~65 untested lines | **Est. Tests:** 12-15
 
 **Why Critical:**
-- Singleton coordinator - central to entire application
-- Manages all state and signal routing
-- Currently has only 16% coverage despite being ~600 lines
+- Primary UI for track editing
+- Users interact with this constantly
+- Only 9% coverage despite being central feature
 
 **What to Test:**
-1. **Singleton behavior**
-   - Multiple `get_instance()` calls return same instance
-   - Cleanup between tests
+- Button click handlers (delete, add edge, swap label, break edge)
+- Force mode checkbox behavior
+- Button enable/disable based on selection
+- Track ID label updates
+- Error dialogs
 
-2. **Track management**
-   - `update_tracks()` with different modes (all, selected, track)
-   - Track visibility toggling
-   - Track loading from MotileRun
+#### 1B. navigation_widget.py (8% → Target: 70%)
+**Lines:** 86 | **Gap:** ~76 untested lines | **Est. Tests:** 10-12
 
-3. **Node selection**
-   - Single node selection
-   - Multi-node selection (shift-click behavior)
-   - Selection clearing
-   - Selection persistence across mode changes
+**Why Critical:**
+- Tree view navigation controls
+- Only 8% coverage - almost untested!
 
-4. **Graph editing operations**
-   - `delete_node()` with and without force
-   - `add_edge()` between valid/invalid nodes
-   - `swap_node_label()`
+**What to Test:**
+- Previous/next track navigation
+- Center on selection
+- Zoom controls
+- Time navigation
+- Signal emissions
+
+#### 1C. tree_widget.py (12% → Target: 70%)
+**Lines:** 375 (LARGEST file!) | **Gap:** ~317 untested lines | **Est. Tests:** 20-25
+
+**Why Critical:**
+- 375 lines with only 12% coverage
+- Core lineage tree visualization
+- Complex pyqtgraph integration
+
+**What to Test:**
+- Tree layout computation
+- Node positioning and rendering
+- Click selection
+- Rectangle selection
+- Feature-based coloring
+- Zoom/pan controls
+- Signal coordination with tracks_viewer
+
+### Priority 2: HIGH - Motile Menu Widgets
+
+#### 2A. params_editor.py (15% → Target: 70%)
+**Lines:** 146 | **Gap:** ~118 untested lines | **Est. Tests:** 15-18
+
+**What to Test:**
+- Parameter input widgets
+- Validation and constraints
+- Save/load parameter sets
+- UI updates on value changes
+- Pydantic validation integration
+
+#### 2B. run_editor.py (23% → Target: 70%)
+**Lines:** 132 | **Gap:** ~95 untested lines | **Est. Tests:** 15-20
+
+**What to Test:**
+- Run name input
+- Layer selection dropdown
+- Start tracking button
+- Progress indication
+- Validation (duplicate IDs, dataset size)
+- Error handling
+- MotileRun creation
+
+#### 2C. Tree View Widgets (16-19% → Target: 70%)
+- **tree_view_feature_widget.py** (16%) - Feature coloring controls
+- **tree_view_mode_widget.py** (19%) - Display mode selection
+
+**Est. Tests:** 8-10 each
+
+### Priority 3: MEDIUM - Complete Medium Coverage Modules
+
+#### 3A. track_points.py (47% → Target: 75%)
+**Lines:** 143 | **Gap:** ~64 untested lines | **Est. Tests:** 8-10
+
+**What's Missing:**
+- Click interaction handlers
+- Shift/Ctrl-click modifiers
+- Symbol shape updates
+- Size scaling based on area
+
+#### 3B. groups.py (49% → Target: 75%)
+**Lines:** 254 | **Gap:** ~119 untested lines | **Est. Tests:** 15-18
+
+**What's Missing:**
+- Group creation and management
+- Track grouping/ungrouping
+- Group persistence
+- Color assignment to groups
    - Edge validation (e.g., no edges within same timepoint)
 
 5. **Signal emissions**
@@ -1746,4 +1837,310 @@ def test_both_dimensions(graph_fixture, ndim, request, make_napari_viewer):
     # Test with both 2D and 3D
 ```
 
-**Total timeline:** 6-7 weeks for comprehensive test suite achieving 75%+ coverage
+---
+
+## Action Plan: 64% → 75%+ Coverage
+
+### Phase 1: Critical UI Widgets (Target: +6-8% coverage)
+
+**Goal:** Test the three lowest-coverage, highest-impact modules
+**Timeline:** 2-3 weeks
+**Coverage Impact:** 64% → 70-72%
+
+#### Week 1: editing_menu.py (9% → 70%)
+**File:** `tests/application_menus/test_editing_menu.py`
+
+**Tests to Add (12-15 tests):**
+```python
+class TestButtonInteractions:
+    def test_delete_node_button_enabled_with_selection()
+    def test_delete_node_button_disabled_no_selection()
+    def test_delete_node_calls_tracks_viewer_delete()
+    def test_add_edge_button_enabled_two_nodes_selected()
+    def test_add_edge_button_disabled_one_node_selected()
+    def test_add_edge_calls_tracks_viewer_create_edge()
+    def test_swap_label_button_enabled_with_selection()
+    def test_swap_label_calls_swap_node_label()
+    def test_break_edge_button_behavior()
+    def test_start_new_track_button()
+
+class TestForceMode:
+    def test_force_checkbox_toggles_force_flag()
+    def test_force_mode_shows_confirmation_dialog()
+    def test_force_mode_always_skips_dialog()
+
+class TestTrackIDDisplay:
+    def test_track_id_label_updates_on_selection()
+    def test_track_id_label_clears_no_selection()
+```
+
+**Commands:**
+```bash
+# Create test file
+touch tests/application_menus/test_editing_menu.py
+
+# Implement tests
+pytest tests/application_menus/test_editing_menu.py -v --cov=src/motile_tracker/application_menus/editing_menu.py --cov-report=term-missing
+
+# Expected: 9% → 70% (+5 lines to overall coverage)
+```
+
+#### Week 2: tree_widget.py (12% → 65%)
+**File:** `tests/data_views/views/tree_view/test_tree_widget.py`
+
+**Tests to Add (20-25 tests):**
+```python
+class TestTreeRendering:
+    def test_tree_created_from_tracks()
+    def test_nodes_positioned_by_time()
+    def test_tracks_positioned_by_track_id()
+    def test_division_nodes_branched()
+    def test_tree_updates_on_track_change()
+
+class TestNodeSelection:
+    def test_click_selects_node()
+    def test_shift_click_rectangle_select()
+    def test_selection_syncs_to_tracks_viewer()
+    def test_clear_selection()
+
+class TestFeatureVisualization:
+    def test_nodes_colored_by_feature()
+    def test_colormap_applied()
+    def test_feature_value_range()
+    def test_feature_legend()
+
+class TestInteractions:
+    def test_zoom_in_out()
+    def test_pan_tree()
+    def test_center_on_node()
+    def test_hover_shows_info()
+
+class TestSignals:
+    def test_node_selected_signal()
+    def test_center_node_signal()
+    def test_time_changed_signal()
+```
+
+**Commands:**
+```bash
+touch tests/data_views/views/tree_view/test_tree_widget.py
+pytest tests/data_views/views/tree_view/test_tree_widget.py -v --cov=src/motile_tracker/data_views/views/tree_view/tree_widget.py --cov-report=term-missing
+
+# Expected: 12% → 65% (+15 lines to overall)
+```
+
+#### Week 3: navigation_widget.py (8% → 70%)
+**File:** `tests/data_views/views/tree_view/test_navigation_widget.py`
+
+**Tests to Add (10-12 tests):**
+```python
+class TestNavigationControls:
+    def test_previous_track_button()
+    def test_next_track_button()
+    def test_first_track_button()
+    def test_last_track_button()
+    def test_navigation_wraps_around()
+
+class TestCenterControls:
+    def test_center_on_selected_node()
+    def test_center_disabled_no_selection()
+
+class TestZoomControls:
+    def test_zoom_to_fit_tree()
+    def test_zoom_to_selection()
+
+class TestTimeControls:
+    def test_time_slider_updates_view()
+    def test_time_input_field()
+```
+
+**Commands:**
+```bash
+touch tests/data_views/views/tree_view/test_navigation_widget.py
+pytest tests/data_views/views/tree_view/test_navigation_widget.py -v --cov=src/motile_tracker/data_views/views/tree_view/navigation_widget.py --cov-report=term-missing
+
+# Expected: 8% → 70% (+5 lines to overall)
+```
+
+**Phase 1 Result:** 64% → 70-72% overall coverage
+
+---
+
+### Phase 2: Motile Widgets (Target: +3-4% coverage)
+
+**Goal:** Test solver parameter and run configuration UIs
+**Timeline:** 2 weeks
+**Coverage Impact:** 70-72% → 73-76%
+
+#### Week 4: run_editor.py (23% → 70%)
+**File:** Expand `tests/motile/menus/test_run_editor.py` (currently only 7 lines!)
+
+**Tests to Add (15-20 tests):**
+```python
+class TestUIComponents:
+    def test_run_name_field_editable()
+    def test_layer_dropdown_populated()
+    def test_params_editor_displayed()
+    def test_run_button_enabled_with_layer()
+
+class TestRunExecution:
+    def test_run_button_calls_solve()
+    def test_progress_shown_during_solve()
+    def test_success_emits_start_run_signal()
+    def test_motile_run_created_correctly()
+
+class TestValidation:
+    def test_no_layer_shows_error()
+    def test_duplicate_ids_warning()
+    def test_large_dataset_warning()
+    def test_invalid_params_prevented()
+
+class TestErrorHandling:
+    def test_solve_failure_shows_error()
+    def test_exception_handled_gracefully()
+```
+
+**Commands:**
+```bash
+pytest tests/motile/menus/test_run_editor.py -v --cov=src/motile_tracker/motile/menus/run_editor.py --cov-report=term-missing
+
+# Expected: 23% → 70% (+6 lines to overall)
+```
+
+#### Week 5: params_editor.py (15% → 65%)
+**File:** `tests/motile/menus/test_params_editor.py`
+
+**Tests to Add (15-18 tests):**
+```python
+class TestParameterWidgets:
+    def test_float_parameter_widget()
+    def test_int_parameter_widget()
+    def test_bool_parameter_widget()
+    def test_enum_parameter_widget()
+
+class TestValidation:
+    def test_min_max_constraints()
+    def test_invalid_input_rejected()
+    def test_pydantic_validation()
+
+class TestParameterSets:
+    def test_load_parameter_set()
+    def test_save_parameter_set()
+    def test_reset_to_defaults()
+
+class TestUIUpdates:
+    def test_param_change_updates_ui()
+    def test_dependent_params_update()
+```
+
+**Commands:**
+```bash
+touch tests/motile/menus/test_params_editor.py
+pytest tests/motile/menus/test_params_editor.py -v --cov=src/motile_tracker/motile/menus/params_editor.py --cov-report=term-missing
+
+# Expected: 15% → 65% (+7 lines to overall)
+```
+
+**Phase 2 Result:** 70-72% → 76-78% overall coverage
+
+---
+
+### Phase 3: Polish & Fill Gaps (Target: +2-3% coverage)
+
+**Goal:** Complete medium-coverage modules to >70%
+**Timeline:** 1-2 weeks
+**Coverage Impact:** 76-78% → 78-80%
+
+#### Week 6-7: Quick Wins
+
+**3A. track_points.py (47% → 75%)**
+- Add click handler tests
+- Test shift/ctrl modifiers
+- Test symbol shapes and sizing
+
+**3B. Tree view widgets (16-32% → 70%)**
+- tree_view_feature_widget.py
+- tree_view_mode_widget.py
+- flip_axes_widget.py
+
+**3C. groups.py (49% → 70%)**
+- Group creation/deletion
+- Track grouping operations
+- Color management
+
+**Commands:**
+```bash
+# Expand existing test_track_points.py
+pytest tests/data_views/views/layers/test_track_points.py -v
+
+# Create tree view widget tests
+touch tests/data_views/views/tree_view/test_tree_view_widgets.py
+pytest tests/data_views/views/tree_view/test_tree_view_widgets.py -v
+
+# Expand groups tests
+touch tests/data_views/views_coordinator/test_groups.py
+pytest tests/data_views/views_coordinator/test_groups.py -v
+```
+
+**Phase 3 Result:** 76-78% → 78-80% overall coverage
+
+---
+
+## Summary: Reaching 75%+ Coverage
+
+### Coverage Trajectory
+
+| Phase | Modules Tested | Coverage Target | Timeline |
+|-------|----------------|-----------------|----------|
+| **Current** | Base consolidation done | 64% | ✅ Complete |
+| **Phase 1** | editing_menu, tree_widget, navigation_widget | 70-72% | 3 weeks |
+| **Phase 2** | run_editor, params_editor | 76-78% | 2 weeks |
+| **Phase 3** | track_points, groups, tree widgets | 78-80% | 2 weeks |
+| **TOTAL** | 9-12 new test files | **78-80%** | **7 weeks** |
+
+### Expected Line Coverage Gains
+
+| Module | Current | Target | Lines Gained | Overall Impact |
+|--------|---------|--------|--------------|----------------|
+| editing_menu.py | 9% | 70% | ~44 lines | +0.9% |
+| tree_widget.py | 12% | 65% | ~199 lines | +3.9% |
+| navigation_widget.py | 8% | 70% | ~53 lines | +1.0% |
+| run_editor.py | 23% | 70% | ~62 lines | +1.2% |
+| params_editor.py | 15% | 65% | ~73 lines | +1.4% |
+| track_points.py | 47% | 75% | ~40 lines | +0.8% |
+| groups.py | 49% | 70% | ~53 lines | +1.0% |
+| Tree widgets (3) | 16-32% | 70% | ~80 lines | +1.5% |
+| **TOTAL** | | | **~604 lines** | **+11.7%** |
+
+**Final Coverage:** 64% + 11.7% = **75.7%** ✅ TARGET MET!
+
+### Quick Start Commands
+
+```bash
+# Check current coverage
+pytest tests/ --cov=src/motile_tracker --cov-report=term-missing
+
+# Start with Phase 1 - editing_menu
+touch tests/application_menus/test_editing_menu.py
+# Implement tests following patterns from existing tests
+pytest tests/application_menus/test_editing_menu.py -v
+
+# Continue with tree_widget (biggest impact)
+touch tests/data_views/views/tree_view/test_tree_widget.py
+pytest tests/data_views/views/tree_view/test_tree_widget.py -v
+
+# Monitor progress
+pytest tests/ --cov=src/motile_tracker --cov-report=html
+open htmlcov/index.html
+```
+
+### Success Criteria
+
+- ✅ Overall coverage >75%
+- ✅ No modules <40% coverage
+- ✅ All UI widgets >60% coverage
+- ✅ All visualization layers >70% coverage
+- ✅ All tests passing
+- ✅ No duplicate fixtures
+
+**Timeline:** 7 weeks to reach 75-80% coverage
