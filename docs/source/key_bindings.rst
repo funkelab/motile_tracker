@@ -35,7 +35,7 @@ Tree view key and mouse functions
      - Select this node (centers view if only one node selected)
    * - SHIFT + click on a node
      - Add this node to selection (does not center view)
-   * - CTRL + click on a node
+   * - CTRL/CMD + click on a node
      - Center view on this node (does not change selection)
    * - Scroll
      - Zoom in or out
