@@ -29,6 +29,8 @@ from motile_tracker.data_views.views_coordinator.user_dialogs import (
     confirm_force_operation,
 )
 
+BASE_TEXT = "Click: select node\nShift+Click: append to selection\nCtrl/Cmd+Click: center node\n[Q]: toggle display\nCurrent display mode: "
+
 
 class TracksViewer:
     """Purposes of the TracksViewer:
@@ -41,6 +43,7 @@ class TracksViewer:
     tracks_updated = Signal(Optional[bool])  # noqa: UP007 UP045
     update_track_id = Signal()
     mode_updated = Signal()
+    center_node = Signal(int)  # emitted when any component wants to center on a node
 
     @classmethod
     def get_instance(cls, viewer=None):
@@ -70,6 +73,7 @@ class TracksViewer:
         self.tracks: SolutionTracks | None = None
         self.visible: list | str = []
         self.tracking_layers = TracksLayerGroup(self.viewer, self.tracks, "", self)
+        self.center_node.connect(self.tracking_layers.center_view)
         self.selected_nodes = NodeSelectionList()
         self.selected_nodes.list_updated.connect(self.update_selection)
 
@@ -192,18 +196,18 @@ class TracksViewer:
     def set_display_mode(self, mode: str) -> None:
         """Update the display mode and call to update colormaps for points, labels, and tracks"""
 
-        # toggle between 'all' and 'lineage'
         if mode == "lineage":
             self.mode = "lineage"
-            self.viewer.text_overlay.text = "Toggle Display [Q]\n Lineage"
+            self.viewer.text_overlay.text = BASE_TEXT + "Lineage"
         elif mode == "group":
             self.mode = "group"
-            self.viewer.text_overlay.text = "Toggle Display [Q]\n Group"
+            self.viewer.text_overlay.text = BASE_TEXT + "Group"
         else:
             self.mode = "all"
-            self.viewer.text_overlay.text = "Toggle Display [Q]\n All"
+            self.viewer.text_overlay.text = BASE_TEXT + "All"
 
         self.viewer.text_overlay.visible = True
+        self.viewer.text_overlay.font_size = 8
         self.filter_visible_nodes()
         self.tracking_layers.update_visible(self.visible)
 
@@ -243,11 +247,23 @@ class TracksViewer:
         else:
             self.visible = "all"
 
+    def center_on_node(self, node: int) -> None:
+        """Request all views to center on the given node.
+
+        Emits the center_node signal which is listened to by the tracking layers
+        and tree view to synchronize centering.
+
+        Args:
+            node: The node ID to center on.
+        """
+        self.center_node.emit(node)
+
     def update_selection(self, set_view: bool = True) -> None:
         """Sets the view and triggers visualization updates in other components"""
 
-        if set_view:
-            self.set_napari_view()
+        if set_view and len(self.selected_nodes) == 1:
+            self.center_on_node(self.selected_nodes[0])
+
         self.filter_visible_nodes()
         self.tracking_layers.update_visible(self.visible)
 
@@ -259,17 +275,11 @@ class TracksViewer:
         self.set_track_id_color(self.selected_track)
         self.update_track_id.emit()
 
-    def set_napari_view(self) -> None:
-        """Adjust the current_step of the viewer to jump to the last item of the
-        selected_nodes list
-        """
-        if len(self.selected_nodes) > 0:
-            node = self.selected_nodes[-1]
-            self.tracking_layers.center_view(node)
-
     def delete_node(self, event=None):
         """Calls the tracks controller to delete currently selected nodes"""
 
+        if self.tracks is None:
+            return
         self.tracks_controller.delete_nodes(self.selected_nodes.as_list)
 
     def delete_edge(self, event=None):
@@ -277,6 +287,8 @@ class TracksViewer:
         selected nodes
         """
 
+        if self.tracks is None:
+            return
         if len(self.selected_nodes) == 2:
             node1 = self.selected_nodes[0]
             node2 = self.selected_nodes[1]
@@ -305,6 +317,8 @@ class TracksViewer:
         nodes
         """
 
+        if self.tracks is None:
+            return
         if len(self.selected_nodes) == 2:
             node1 = self.selected_nodes[0]
             node2 = self.selected_nodes[1]
@@ -333,7 +347,11 @@ class TracksViewer:
                     raise
 
     def undo(self, event=None):
+        if self.tracks is None:
+            return
         self.tracks_controller.undo()
 
     def redo(self, event=None):
+        if self.tracks is None:
+            return
         self.tracks_controller.redo()

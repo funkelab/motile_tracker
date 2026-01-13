@@ -1,5 +1,12 @@
 import napari
-from qtpy.QtWidgets import QScrollArea, QTabWidget, QVBoxLayout
+from qtpy.QtWidgets import (
+    QHBoxLayout,
+    QLabel,
+    QScrollArea,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
+)
 
 from motile_tracker.application_menus.editing_menu import EditingMenu
 from motile_tracker.application_menus.visualization_widget import (
@@ -7,6 +14,9 @@ from motile_tracker.application_menus.visualization_widget import (
 )
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 from motile_tracker.motile.menus.motile_widget import MotileWidget
+
+DOCS_URL = "https://funkelab.github.io/motile_tracker"
+KEYBINDINGS_URL = f"{DOCS_URL}/key_bindings.html"
 
 
 class MenuWidget(QScrollArea):
@@ -25,18 +35,34 @@ class MenuWidget(QScrollArea):
 
         self.tabwidget = QTabWidget()
 
-        self.tabwidget.addTab(motile_widget, "Track with Motile")
+        self.tabwidget.addTab(motile_widget, "Tracking")
         self.tabwidget.addTab(self.tracks_viewer.tracks_list, "Tracks List")
         self.tabwidget.addTab(editing_widget, "Edit Tracks")
         self.tabwidget.addTab(self.tracks_viewer.collection_widget, "Groups")
 
-        layout = QVBoxLayout()
-        layout.addWidget(self.tabwidget)
+        # Header with title and help links
+        header_layout = QHBoxLayout()
+        header_layout.setContentsMargins(5, 5, 5, 0)
+        header_label = QLabel(
+            f"<b>Motile Tracker</b> · "
+            f'<a href="{DOCS_URL}"><font color=yellow>Docs</font></a> · '
+            f'<a href="{KEYBINDINGS_URL}"><font color=yellow>Keybindings</font></a>'
+        )
+        header_label.setOpenExternalLinks(True)
+        header_layout.addWidget(header_label)
+        header_layout.addStretch()
 
-        self.setWidget(self.tabwidget)
+        # Container widget with header + tabs
+        container = QWidget()
+        container_layout = QVBoxLayout()
+        container_layout.setContentsMargins(0, 0, 0, 0)
+        container_layout.setSpacing(2)
+        container_layout.addLayout(header_layout)
+        container_layout.addWidget(self.tabwidget)
+        container.setLayout(container_layout)
+
+        self.setWidget(container)
         self.setWidgetResizable(True)
-
-        self.setLayout(layout)
 
     def _has_visualization_tab(self):
         return self.tabwidget.indexOf(self.visualization_widget) != -1

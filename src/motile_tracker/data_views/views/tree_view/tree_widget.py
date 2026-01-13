@@ -91,6 +91,7 @@ class CustomViewBox(pg.ViewBox):
 
 class TreePlot(pg.PlotWidget):
     node_clicked = Signal(Any, bool)  # node_id, append
+    jump_to_node = Signal(int)  # node to jump to
     nodes_selected = Signal(list, bool)
 
     def __init__(self) -> pg.PlotWidget:
@@ -230,8 +231,12 @@ class TreePlot(pg.PlotWidget):
         modifiers = ev.modifiers()
         node_id = points[0].data()
         append = Qt.ShiftModifier == modifiers
-        self.node_clicked.emit(node_id, append)
-        self.setFocus()
+        jump = Qt.ControlModifier == modifiers
+        if jump:
+            self.jump_to_node.emit(node_id)
+        else:
+            self.node_clicked.emit(node_id, append)
+            self.setFocus()
 
     def set_data(self, track_df: pd.DataFrame, plot_type: str, feature: str) -> None:
         """Updates the stored pyqtgraph content based on the given dataframe.
@@ -323,12 +328,14 @@ class TreePlot(pg.PlotWidget):
 
     def set_selection(self, selected_nodes: list[Any], plot_type: str) -> None:
         """Set the provided list of nodes to be selected. Increases the size
-        and highlights the outline with blue. Also centers the view
-        if the first selected node is not visible in the current canvas.
+        and highlights the outline with blue.
+
+        Note: Single-node centering is handled separately via the center_node signal
+        from TracksViewer. Multi-node range centering is handled here.
 
         Args:
             selected_nodes (list[Any]): A list of node ids to be selected.
-            feature (str): the feature that is being plotted, either 'tree' or 'area'
+            plot_type (str): the plot type being displayed, either 'tree' or 'feature'
         """
 
         # reset to default size and color to avoid problems with the array lengths
@@ -340,9 +347,7 @@ class TreePlot(pg.PlotWidget):
         )  # just copy the size here to keep the original self.sizes intact
 
         outlines = self.outline_pen.copy()
-        axis_label = (
-            self.feature if plot_type == "feature" else "x_axis_pos"
-        )  # check what is currently being shown, to know how to scale  the view
+        axis_label = self.feature if plot_type == "feature" else "x_axis_pos"
 
         if len(selected_nodes) > 0:
             x_values = []
@@ -361,11 +366,9 @@ class TreePlot(pg.PlotWidget):
                     size[index] += 5
                     outlines[index] = pg.mkPen(color="c", width=2)
 
-            # Center point if a single node is selected, center range if multiple nodes
-            # are selected
-            if len(selected_nodes) == 1:
-                self._center_view(x_axis_value, t)
-            else:
+            # Center range if multiple nodes are selected (single-node centering
+            # is handled by the center_node signal)
+            if len(x_values) > 1:
                 min_x = np.min(x_values)
                 max_x = np.max(x_values)
                 min_t = np.min(t_values)
@@ -398,8 +401,27 @@ class TreePlot(pg.PlotWidget):
         else:
             self.autoRange()
 
+    def center_on_node(self, node_id: int) -> None:
+        """Center the view on a specific node by ID.
+
+        Args:
+            node_id: The node ID to center on.
+        """
+        if not hasattr(self, "track_df") or self.track_df is None:
+            return
+        node_df = self.track_df.loc[self.track_df["node_id"] == node_id]
+        if node_df.empty:
+            return
+        axis_label = self.feature if self.plot_type == "feature" else "x_axis_pos"
+        x_axis_value = node_df[axis_label].values[0]
+        t = node_df["t"].values[0]
+        self._center_view(x_axis_value, t)
+
     def _center_view(self, center_x: int, center_y: int):
-        """Center the Viewbox on given coordinates"""
+        """Center the Viewbox on given coordinates, preserving the current zoom level.
+
+        Only pans if the point is outside the current view.
+        """
 
         if self.view_direction == "horizontal":
             center_x, center_y = (
@@ -420,7 +442,12 @@ class TreePlot(pg.PlotWidget):
         ):
             return
 
-        self.autoRange()
+        # Pan to center the point while preserving current zoom level
+        x_width = x_range[1] - x_range[0]
+        y_width = y_range[1] - y_range[0]
+        new_x_range = (center_x - x_width / 2, center_x + x_width / 2)
+        new_y_range = (center_y - y_width / 2, center_y + y_width / 2)
+        view_box.setRange(xRange=new_x_range, yRange=new_y_range, padding=0)
 
 
 class TreeWidget(QWidget):
@@ -445,7 +472,9 @@ class TreeWidget(QWidget):
 
         self.tree_widget: TreePlot = TreePlot()
         self.tree_widget.node_clicked.connect(self.selected_nodes.add)
+        self.tree_widget.jump_to_node.connect(self.tracks_viewer.center_on_node)
         self.tree_widget.nodes_selected.connect(self.selected_nodes.add_list)
+        self.tracks_viewer.center_node.connect(self.tree_widget.center_on_node)
 
         # Add radiobuttons for switching between different display modes
         self.mode_widget = TreeViewModeWidget()

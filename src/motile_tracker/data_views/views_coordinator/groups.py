@@ -94,26 +94,34 @@ class CollectionWidget(QWidget):
 
         # Select widget group
         select_widget = QGroupBox("Selection")
-        selection_layout = QVBoxLayout()
+        selection_layout = QHBoxLayout()
 
-        row1_layout = QHBoxLayout()
+        col1_layout = QVBoxLayout()
         self.select_btn = QPushButton("Select nodes in group")
         self.select_btn.clicked.connect(self._select_nodes)
         self.invert_btn = QPushButton("Invert selection")
         self.invert_btn.clicked.connect(self._invert_selection)
-        row1_layout.addWidget(self.select_btn)
-        row1_layout.addWidget(self.invert_btn)
+        self.jump_to_next_btn = QPushButton("Next selected node")
+        self.jump_to_next_btn.clicked.connect(lambda: self._jump_to_node(forward=True))
+        col1_layout.addWidget(self.select_btn)
+        col1_layout.addWidget(self.invert_btn)
+        col1_layout.addWidget(self.jump_to_next_btn)
 
-        row2_layout = QHBoxLayout()
+        col2_layout = QVBoxLayout()
         self.deselect_btn = QPushButton("Deselect")
         self.deselect_btn.clicked.connect(self.tracks_viewer.selected_nodes.reset)
         self.reselect_btn = QPushButton("Restore selection")
         self.reselect_btn.clicked.connect(self.tracks_viewer.selected_nodes.restore)
-        row2_layout.addWidget(self.deselect_btn)
-        row2_layout.addWidget(self.reselect_btn)
+        self.jump_to_previous_btn = QPushButton("Previous selected node")
+        self.jump_to_previous_btn.clicked.connect(
+            lambda: self._jump_to_node(forward=False)
+        )
+        col2_layout.addWidget(self.deselect_btn)
+        col2_layout.addWidget(self.reselect_btn)
+        col2_layout.addWidget(self.jump_to_previous_btn)
 
-        selection_layout.addLayout(row1_layout)
-        selection_layout.addLayout(row2_layout)
+        selection_layout.addLayout(col1_layout)
+        selection_layout.addLayout(col2_layout)
         select_widget.setLayout(selection_layout)
 
         # edit layout
@@ -201,13 +209,24 @@ class CollectionWidget(QWidget):
 
         if len(self.tracks_viewer.selected_nodes) > 0:
             self.deselect_btn.setEnabled(True)
+            self.jump_to_next_btn.setEnabled(True)
+            self.jump_to_previous_btn.setEnabled(True)
         else:
             self.deselect_btn.setEnabled(False)
+            self.jump_to_next_btn.setEnabled(False)
+            self.jump_to_previous_btn.setEnabled(False)
 
         if self.tracks_viewer.tracks is not None:
             self.new_group_button.setEnabled(True)
         else:
             self.new_group_button.setEnabled(False)
+
+    def _jump_to_node(self, forward: bool) -> None:
+        """Jump to the next/previous selected node in the list"""
+
+        node = self.tracks_viewer.selected_nodes.next_node(forward)
+        if node:
+            self.tracks_viewer.center_on_node(node)
 
     def _invert_selection(self) -> None:
         """Invert the current selection"""
