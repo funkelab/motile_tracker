@@ -16,7 +16,9 @@ class MockEvent:
         self.value = value
 
 
-def test_ortho_views(make_napari_viewer, qtbot, graph_3d_with_division, segmentation_3d_boxes):
+def test_ortho_views(
+    make_napari_viewer, qtbot, graph_3d_with_division, segmentation_3d_boxes
+):
     """Test if the tracks layers are correctly displayed on the orthoviews"""
 
     # Initalize orthogonal views
@@ -24,7 +26,9 @@ def test_ortho_views(make_napari_viewer, qtbot, graph_3d_with_division, segmenta
     m = initialize_ortho_views(viewer)
 
     # Create example tracks
-    tracks = SolutionTracks(graph=graph_3d_with_division, segmentation=segmentation_3d_boxes, ndim=4)
+    tracks = SolutionTracks(
+        graph=graph_3d_with_division, segmentation=segmentation_3d_boxes, ndim=4
+    )
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
 

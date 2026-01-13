@@ -4,8 +4,7 @@ import napari
 import networkx as nx
 import numpy as np
 import pandas as pd
-import pytest
-from funtracks.data_model import EdgeAttr, NodeAttr, SolutionTracks
+from funtracks.data_model import SolutionTracks
 from funtracks.features import Feature
 
 from motile_tracker.data_views.views.tree_view.tree_widget_utils import (
