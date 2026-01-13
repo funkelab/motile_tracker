@@ -192,7 +192,9 @@ def test_ensure_valid_label(make_napari_viewer, graph_3d, segmentation_3d):
     tracks_viewer.selected_track = None  # set to None first
     tracks_viewer.tracking_layers.seg_layer.selected_label = 6
     assert tracks_viewer.tracking_layers.seg_layer.selected_label == 6  # still at 6
-    assert tracks_viewer.selected_track == 4  # updated to 4, new track id (track id 4 was
+    assert (
+        tracks_viewer.selected_track == 4
+    )  # updated to 4, new track id (track id 4 was
     # reserved during initialization but never used, so it's still available)
 
     # ...otherwise the selected_track will be updated to the track associated with
