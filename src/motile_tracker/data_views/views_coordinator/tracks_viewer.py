@@ -40,6 +40,7 @@ class TracksViewer:
 
     tracks_updated = Signal(Optional[bool])  # noqa: UP007 UP045
     update_track_id = Signal()
+    mode_updated = Signal()
 
     @classmethod
     def get_instance(cls, viewer=None):
@@ -82,6 +83,8 @@ class TracksViewer:
         self.collection_widget.group_changed.connect(self.update_selection)
 
         self.set_keybinds()
+
+        self.viewer.dims.events.ndisplay.connect(self.update_selection)
 
     def set_keybinds(self):
         bind_keymap(self.viewer, KEYMAP, self)
@@ -184,6 +187,7 @@ class TracksViewer:
             self.set_display_mode("all")
         else:
             self.set_display_mode("lineage")
+        self.mode_updated.emit()
 
     def set_display_mode(self, mode: str) -> None:
         """Update the display mode and call to update colormaps for points, labels, and tracks"""
@@ -239,10 +243,11 @@ class TracksViewer:
         else:
             self.visible = "all"
 
-    def update_selection(self) -> None:
+    def update_selection(self, set_view: bool = True) -> None:
         """Sets the view and triggers visualization updates in other components"""
 
-        self.set_napari_view()
+        if set_view:
+            self.set_napari_view()
         self.filter_visible_nodes()
         self.tracking_layers.update_visible(self.visible)
 
