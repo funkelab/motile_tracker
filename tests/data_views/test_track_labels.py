@@ -50,7 +50,7 @@ def create_event_val(
     return event_val
 
 
-def test_paint_event(make_napari_viewer, graph_3d, segmentation_3d):
+def test_paint_event(make_napari_viewer, graph_3d_with_division, segmentation_3d_boxes):
     """Test paint event processing
 
     1) Paint with a new label (4), new track id (4)
@@ -71,7 +71,7 @@ def test_paint_event(make_napari_viewer, graph_3d, segmentation_3d):
     viewer = make_napari_viewer()
 
     # Create example tracks
-    tracks = SolutionTracks(graph=graph_3d, segmentation=segmentation_3d, ndim=4)
+    tracks = SolutionTracks(graph=graph_3d_with_division, segmentation=segmentation_3d_boxes, ndim=4)
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
 
@@ -155,11 +155,11 @@ def test_paint_event(make_napari_viewer, graph_3d, segmentation_3d):
     assert tracks_viewer.tracking_layers.seg_layer.data[2, 55, 45, 40] == 6  # back at 5
 
 
-def test_ensure_valid_label(make_napari_viewer, graph_3d, segmentation_3d):
+def test_ensure_valid_label(make_napari_viewer, graph_3d_with_division, segmentation_3d_boxes):
     viewer = make_napari_viewer()
 
     # Create example tracks
-    tracks = SolutionTracks(graph=graph_3d, segmentation=segmentation_3d, ndim=4)
+    tracks = SolutionTracks(graph=graph_3d_with_division, segmentation=segmentation_3d_boxes, ndim=4)
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
 
