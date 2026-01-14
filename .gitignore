@@ -89,3 +89,7 @@ venv/
 
 # written by setuptools_scm
 **/_version.py
+
+# Claude
+claude.md
+TESTING_STRATEGY.md
