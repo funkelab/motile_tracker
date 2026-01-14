@@ -6,16 +6,15 @@ from collections.abc import Callable
 
 import networkx as nx
 import numpy as np
-from motile import Solver, TrackGraph
-from motile.constraints import MaxChildren, MaxParents, Pin
-from motile.costs import Appear, EdgeDistance, EdgeSelection, Split
-from motile_toolbox.candidate_graph import (
-    EdgeAttr,
-    NodeAttr,
+from funtracks.candidate_graph import (
     compute_graph_from_points_list,
     compute_graph_from_seg,
     graph_to_nx,
 )
+from funtracks.data_model.graph_attributes import EdgeAttr, NodeAttr
+from motile import Solver, TrackGraph
+from motile.constraints import MaxChildren, MaxParents, Pin
+from motile.costs import Appear, EdgeDistance, EdgeSelection, Split
 
 from .solver_params import SolverParams
 
@@ -51,8 +50,8 @@ def solve(
 
     Returns:
         nx.DiGraph: A solution graph where the ids of the nodes correspond to
-            the time and ids of the passed in segmentation labels. See the
-            motile_toolbox for exact implementation details.
+            the time and ids of the passed in segmentation labels. See funtracks for exact
+            implementation details.
     """
     # Single window mode: slice input, solve, and return early
     if (
