@@ -6,17 +6,16 @@ mode switching, and integration with TracksViewer.
 
 from unittest.mock import MagicMock, patch
 
-import numpy as np
 import pandas as pd
+import pytest
 from funtracks.data_model import SolutionTracks
 from PyQt6.QtCore import QRectF
-from PyQt6.QtCore import Qt as QtCoreQt
 from qtpy.QtCore import Qt
 
 from motile_tracker.data_views.views.tree_view.navigation_widget import (
     NavigationWidget,
 )
-from motile_tracker.data_views.views.tree_view.tree_widget import TreePlot, TreeWidget
+from motile_tracker.data_views.views.tree_view.tree_widget import TreeWidget
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
 
@@ -376,11 +375,8 @@ class TestTreeWidgetModeSwitching:
 
         tree_widget = TreeWidget(viewer)
 
-        try:
+        with pytest.raises(ValueError, match="must be 'all' or 'lineage'"):
             tree_widget._set_mode("invalid")
-            assert False, "Should have raised ValueError"
-        except ValueError as e:
-            assert "must be 'all' or 'lineage'" in str(e)
 
 
 class TestTreeWidgetPlotTypeSwitching:
@@ -420,11 +416,8 @@ class TestTreeWidgetPlotTypeSwitching:
 
         tree_widget = TreeWidget(viewer)
 
-        try:
+        with pytest.raises(ValueError, match="must be 'tree' or 'feature'"):
             tree_widget._set_plot_type("invalid")
-            assert False, "Should have raised ValueError"
-        except ValueError as e:
-            assert "must be 'tree' or 'feature'" in str(e)
 
 
 class TestTreeWidgetIntegration:
@@ -554,7 +547,6 @@ class TestTreeWidgetToggleShortcuts:
         tracks_viewer.update_tracks(tracks=tracks, name="test")
 
         tree_widget = TreeWidget(viewer)
-        initial_mode = tree_widget.mode
 
         # Mock the toggle method
         with patch.object(
@@ -622,12 +614,9 @@ class TestTreeWidgetLineageMode:
         # Clear selection but lineage_df still has data
         tracks_viewer.selected_nodes.clear()
 
-        # This should not crash - behavior depends on graph structure
-        try:
-            tree_widget._update_lineage_df()
-            # If it completes without error, test passes
-        except Exception as e:
-            assert False, f"_update_lineage_df crashed with: {e}"
+        # This should not crash
+        tree_widget._update_lineage_df()
+        # Test passes if we reach here without exception
 
 
 class TestTreePlotUpdate:
@@ -730,7 +719,6 @@ class TestTreeWidgetUpdateTrackData:
         tracks_viewer.update_tracks(tracks=tracks, name="test")
 
         tree_widget = TreeWidget(viewer)
-        initial_axis_order = tree_widget.axis_order
 
         # Update without reset
         tree_widget._update_track_data(reset_view=False)
