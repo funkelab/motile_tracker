@@ -3,9 +3,10 @@
 [![tests](https://github.com/funkelab/motile_tracker/workflows/tests/badge.svg)](https://github.com/funkelab/motile_tracker/actions)
 [![codecov](https://codecov.io/gh/funkelab/motile_tracker/branch/main/graph/badge.svg)](https://codecov.io/gh/funkelab/motile_tracker)
 
+
+An application for interactive tracking with [motile](https://github.com/funkelab/motile).
 The full documentation of the plugin can be found [here](https://funkelab.github.io/motile_tracker/).
 
-An application for interactive tracking with [motile](https://github.com/funkelab/motile)
 Motile is a library that makes it easy to solve tracking problems using optimization
 by framing the task as an Integer Linear Program (ILP).
 See the motile [documentation](https://funkelab.github.io/motile)
@@ -59,6 +60,8 @@ track objects in napari Labels or Points layers. For details, please read the
 [documentation](https://funkelab.github.io/motile_tracker/).
 
 ![motile_tracker_quick_demo](https://github.com/user-attachments/assets/07a4a954-3d2d-4d67-8f75-aec11ee14697)
+
+If you are new to using motile-tracker, you can follow this [tutorial](./assets/motile-tracker_tutorial.pdf) to learn the basics.
 
 ## Package the application into an executable and create the installer
 
