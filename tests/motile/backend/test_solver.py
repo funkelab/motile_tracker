@@ -59,7 +59,7 @@ def test_solve_single_window(segmentation_3d):
     # Should only have nodes from frames 1, 2, 3
     assert solution.number_of_nodes() > 0
     # Verify all nodes are within the window
-    from motile_toolbox.candidate_graph import NodeAttr
+    from funtracks.data_model.graph_attributes import NodeAttr
 
     for node in solution.nodes:
         node_time = solution.nodes[node].get(NodeAttr.TIME.value)

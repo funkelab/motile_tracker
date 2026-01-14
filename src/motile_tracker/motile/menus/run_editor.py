@@ -9,7 +9,7 @@ import dask.array as da
 import napari.layers
 import networkx as nx
 import numpy as np
-from motile_toolbox.utils.relabel_segmentation import ensure_unique_labels
+from funtracks.utils import ensure_unique_labels
 from qtpy.QtCore import Signal
 from qtpy.QtWidgets import (
     QComboBox,

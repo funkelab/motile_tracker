@@ -2,7 +2,7 @@ import networkx as nx
 import numpy as np
 import pytest
 from funtracks.data_model import SolutionTracks
-from motile_toolbox.candidate_graph.graph_attributes import EdgeAttr, NodeAttr
+from funtracks.data_model.graph_attributes import EdgeAttr, NodeAttr
 from skimage.draw import disk
 
 
