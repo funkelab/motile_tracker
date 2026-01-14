@@ -31,6 +31,30 @@ class TestButtonStates:
         assert not editing_menu.delete_edge_btn.isEnabled()
         assert not editing_menu.create_edge_btn.isEnabled()
 
+    def test_update_buttons_with_empty_selection(self, make_napari_viewer, graph_2d):
+        """Verify update_buttons() disables all buttons when selection is cleared."""
+        viewer = make_napari_viewer()
+        tracks = SolutionTracks(graph=graph_2d, ndim=3)
+        tracks_viewer = TracksViewer.get_instance(viewer)
+        tracks_viewer.update_tracks(tracks=tracks, name="test")
+
+        editing_menu = EditingMenu(viewer)
+
+        # First select nodes to enable buttons
+        tracks_viewer.selected_nodes = [1, 2]
+        editing_menu.update_buttons()
+        assert editing_menu.delete_node_btn.isEnabled()
+
+        # Now clear selection and call update_buttons
+        tracks_viewer.selected_nodes = []
+        editing_menu.update_buttons()
+
+        # Verify all edit buttons are disabled
+        assert not editing_menu.delete_node_btn.isEnabled()
+        assert not editing_menu.swap_nodes_btn.isEnabled()
+        assert not editing_menu.delete_edge_btn.isEnabled()
+        assert not editing_menu.create_edge_btn.isEnabled()
+
     def test_buttons_with_single_selection(self, make_napari_viewer, graph_2d):
         """Verify only delete button enabled with single node selection."""
         viewer = make_napari_viewer()
