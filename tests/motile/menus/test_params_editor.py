@@ -4,9 +4,6 @@ Tests cover parameter widgets, optional parameter checkboxes, chunking constrain
 and validation logic.
 """
 
-from unittest.mock import MagicMock
-
-import pytest
 from qtpy.QtWidgets import QCheckBox, QLabel
 
 from motile_tracker.motile.backend.solver_params import SolverParams
@@ -24,22 +21,22 @@ class TestGetBaseType:
     def test_get_base_type_int(self):
         """Test extracting int from plain int type."""
         result = _get_base_type(int)
-        assert result == int
+        assert result is int
 
     def test_get_base_type_float(self):
         """Test extracting float from plain float type."""
         result = _get_base_type(float)
-        assert result == float
+        assert result is float
 
     def test_get_base_type_optional_int(self):
         """Test extracting int from int | None type."""
         result = _get_base_type(int | None)
-        assert result == int
+        assert result is int
 
     def test_get_base_type_optional_float(self):
         """Test extracting float from float | None type."""
         result = _get_base_type(float | None)
-        assert result == float
+        assert result is float
 
 
 class TestEditableParam:
@@ -328,9 +325,7 @@ class TestChunkingConstraints:
         assert not editor.overlap_size_row.isEnabled()
         assert not editor.single_window_start_row.isEnabled()
 
-    def test_chunking_fields_enabled_when_window_size_checked(
-        self, make_napari_viewer
-    ):
+    def test_chunking_fields_enabled_when_window_size_checked(self, make_napari_viewer):
         """Test overlap_size and single_window_start enabled when window_size checked."""
         make_napari_viewer()  # Create Qt context
 
@@ -476,10 +471,6 @@ class TestParamSignals:
         make_napari_viewer()  # Create Qt context
 
         editor = SolverParamsEditor()
-
-        # Find max_edge_distance widget and change value
-        # The widget should be connected to update solver_params
-        initial_value = editor.solver_params.max_edge_distance
 
         # We can't easily simulate user input, but we can verify the connections exist
         # by checking that solver_params has the attribute
