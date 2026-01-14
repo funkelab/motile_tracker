@@ -7,12 +7,12 @@ from typing import TYPE_CHECKING
 import napari
 import numpy as np
 from funtracks.data_model import NodeType, Tracks
+from funtracks.data_model.graph_attributes import NodeAttr
 from funtracks.exceptions import InvalidActionError
 from napari.layers.points._points_mouse_bindings import select
 from napari.utils.notifications import show_info
 from psygnal import Signal
 
-from motile_tracker.data_views.graph_attributes import NodeAttr
 from motile_tracker.data_views.views.layers.click_utils import (
     detect_click,
     get_click_value,
