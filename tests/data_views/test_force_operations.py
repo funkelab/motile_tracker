@@ -109,8 +109,8 @@ def test_confirm_force_operation_all_buttons(
 )
 def test_on_paint_invalid_action_upstream_division1_forceable(
     make_napari_viewer,
-    graph_3d,
-    segmentation_3d,
+    graph_3d_with_division,
+    segmentation_3d_boxes,
     monkeypatch,
     confirm_response,
     expect_force_retry,
@@ -138,7 +138,9 @@ def test_on_paint_invalid_action_upstream_division1_forceable(
     viewer = make_napari_viewer()
 
     # Create example tracks
-    tracks = SolutionTracks(graph=graph_3d, segmentation=segmentation_3d, ndim=4)
+    tracks = SolutionTracks(
+        graph=graph_3d_with_division, segmentation=segmentation_3d_boxes, ndim=4
+    )
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
 
@@ -227,8 +229,8 @@ def test_on_paint_invalid_action_upstream_division1_forceable(
 )
 def test_on_paint_invalid_action_upstream_division2_forceable(
     make_napari_viewer,
-    graph_3d,
-    segmentation_3d,
+    graph_3d_with_division,
+    segmentation_3d_boxes,
     monkeypatch,
     confirm_response,
     expect_force_retry,
@@ -252,7 +254,9 @@ def test_on_paint_invalid_action_upstream_division2_forceable(
     viewer = make_napari_viewer()
 
     # Create example tracks
-    tracks = SolutionTracks(graph=graph_3d, segmentation=segmentation_3d, ndim=4)
+    tracks = SolutionTracks(
+        graph=graph_3d_with_division, segmentation=segmentation_3d_boxes, ndim=4
+    )
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
 
@@ -341,8 +345,8 @@ def test_on_paint_invalid_action_upstream_division2_forceable(
 )
 def test_invalid_edge_force(
     make_napari_viewer,
-    graph_3d,
-    segmentation_3d,
+    graph_3d_with_division,
+    segmentation_3d_boxes,
     monkeypatch,
     confirm_response,
     expect_force_retry,
@@ -366,7 +370,9 @@ def test_invalid_edge_force(
     viewer = make_napari_viewer()
 
     # Create example tracks
-    tracks = SolutionTracks(graph=graph_3d, segmentation=segmentation_3d, ndim=4)
+    tracks = SolutionTracks(
+        graph=graph_3d_with_division, segmentation=segmentation_3d_boxes, ndim=4
+    )
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
 
