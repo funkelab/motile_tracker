@@ -331,11 +331,11 @@ class GeffSegmentationWidget(QWidget):
         Args:
             root (zarr.Group | None): The root group of the geff zarr store.
         """
+        self.setVisible(False)
         self.root = root
         clear_layout(self.related_objects_layout)
         self.related_object_radio_buttons = {}
         if self.root is not None:
-            self.setVisible(True)
             metadata = dict(self.root.attrs)
             related_objects = metadata.get("geff", {}).get("related_objects", None)
             if related_objects:
@@ -346,8 +346,7 @@ class GeffSegmentationWidget(QWidget):
                         self.button_group.addButton(radio)
                         self.related_object_radio_buttons[obj.get("path", None)] = radio
                         self.related_objects_layout.addWidget(radio)
-        else:
-            self.setVisible(False)
+            self.setVisible(True)
 
     def _toggle_segmentation(self, checked: bool) -> None:
         """Toggle visibility of the segmentation widget based on the radio button
