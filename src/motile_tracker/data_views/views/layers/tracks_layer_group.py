@@ -82,10 +82,19 @@ class TracksLayerGroup:
 
         if self.tracks_layer is not None:
             self.viewer.add_layer(self.tracks_layer)
-        if self.seg_layer is not None:
-            self.viewer.add_layer(self.seg_layer)
         if self.points_layer is not None:
             self.viewer.add_layer(self.points_layer)
+        if self.seg_layer is not None:
+            self.viewer.add_layer(self.seg_layer)
+            # silly fix for loading zarr on Windows: load labels only at the end and then
+            # swap layer order here to avoid error "access violation reading..."
+            self.viewer.layers.move(-1, -2)
+
+            # This is just to ensure that the layer selection makes sense, because after
+            # moving a layer, the layer tools are not updated correctly.
+            self.viewer.layers.selection.clear()
+            self.viewer.layers.selection.add(self.viewer.layers[-1])
+
         # self.link_experimental_clipping_planes()
 
     def link_experimental_clipping_planes(self):
