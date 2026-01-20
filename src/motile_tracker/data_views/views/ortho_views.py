@@ -100,13 +100,14 @@ sync_filters = {
         - {"mode", "size", "current_size"},
     },
     TrackLabels: {
+        "forward_exclude": {"colormap"},
         "reverse_exclude": set(get_property_names_from_class(Labels))
         - {
             "mode",
             "selected_label",
             "n_edit_dimensions",
             "brush_size",
-        }  # Let TrackLabels handle these properties on its own because it is listening to
+        },  # Let TrackLabels handle these properties on its own because it is listening to
         # them and we do not want to overwrite through reverse syncing.
     },
 }
@@ -217,6 +218,40 @@ def paint_event_hook(orig_layer: TrackLabels, copied_layer: Labels) -> None:
     copied_layer.events.paint.connect(paint_wrapper)
 
 
+def colormap_hook(orig_layer: TrackLabels, copied_layer: Labels) -> None:
+    """Hook to sync colormap changes from the original TrackLabels layer to the copied
+    layers. We need a hook for the special case in which one of the views is showing a 3D
+     rendering in combination with partially filled contour labels. Since contours are not
+     rendered in 3D, we want to display the non-filled labels with full opacity instead.
+
+    Args:
+        orig_layer (TrackLabels): TracksLabels layer from which the copied layer is
+            derived.
+        copied_layer (ContourLabels): ContourLabels equivalent of the TracksLabels layer.
+    """
+
+    def sync_colormap(orig_layer: TrackLabels, copied_layer: Labels, event: Event):
+        """Sync the colormap from the original TrackLabels instance to the copied
+        ContourLabels instance. Check the slice ndisplay and contour settings to adjust
+        background opacity accordingly."""
+
+        copied_layer.colormap = orig_layer.colormap
+        if copied_layer._slice.slice_input.ndisplay == 3 and orig_layer.contour > 0:
+            copied_layer.set_opacity(orig_layer.background, 0)
+        else:
+            copied_layer.set_opacity(
+                orig_layer.background, orig_layer.background_opacity
+            )
+        copied_layer.refresh_colormap()
+
+    def update_colormap_wrapper(event: Event):
+        """Wrap paint event and send to original layer."""
+
+        return sync_colormap(orig_layer, copied_layer, event)
+
+    orig_layer.events.colormap.connect(update_colormap_wrapper)
+
+
 def track_layers_hook(
     orig_layer: TrackLabels | TrackPoints, copied_layer: Labels | Points
 ) -> None:
@@ -265,6 +300,7 @@ def initialize_ortho_views(viewer: Viewer) -> OrthoViewManager:
     orth_view_manager.register_layer_hook((TrackLabels, TrackPoints), track_layers_hook)
     orth_view_manager.register_layer_hook((TrackLabels), paint_event_hook)
     orth_view_manager.register_layer_hook((TrackPoints), point_data_hook)
+    orth_view_manager.register_layer_hook((TrackLabels), colormap_hook)
     orth_view_manager.set_sync_filters(sync_filters)
     orth_view_manager.activate_checkboxes = True
 

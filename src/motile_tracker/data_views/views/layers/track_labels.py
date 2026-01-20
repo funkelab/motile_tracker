@@ -123,11 +123,7 @@ class TrackLabels(ContourLabels):
     # Connect click events to node selection
     def click(self, _, event):
         if (
-            event.type == "mouse_press"
-            and self.mode == "pan_zoom"
-            and not (
-                self.tracks_viewer.mode == "lineage" and self.viewer.dims.ndisplay == 3
-            )
+            event.type == "mouse_press" and self.mode == "pan_zoom"
         ):  # disable selecting in lineage mode in 3D
             # differentiate between click and drag
             was_click = yield from detect_click(event)
@@ -315,7 +311,7 @@ class TrackLabels(ContourLabels):
 
         highlighted = set(self.tracks_viewer.selected_nodes)
         foreground = self.colormap.color_dict.keys() if visible == "all" else visible
-        background = (
+        self.background = (
             []
             if visible == "all"
             else self.colormap.color_dict.keys() - visible - highlighted
@@ -328,7 +324,13 @@ class TrackLabels(ContourLabels):
             if not self.foreground_contour:
                 self.filled_labels.extend(foreground)
 
-        self.set_opacity(background, self.background_opacity)
+        # special case: 3D rendering + partially filled contours -> set background opacity
+        # to 0
+        if self._slice.slice_input.ndisplay == 3 and self.contour > 0:
+            self.set_opacity(self.background, 0)
+        else:
+            # set normal background opacity
+            self.set_opacity(self.background, self.background_opacity)
         self.set_opacity(foreground, self.foreground_opacity)
         self.set_opacity(highlighted, self.highlight_opacity)
         self.refresh_colormap()
