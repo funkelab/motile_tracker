@@ -163,7 +163,7 @@ class StandardFieldMapWidget(QWidget):
         self.seg = seg
         self.incl_z = incl_z
 
-        self.setVisible(True)
+        self.setVisible(False)
         self.node_attrs = list(root["nodes"]["props"].group_keys())
         self.metadata = dict(root.attrs.get("geff", {}))
 
@@ -192,6 +192,7 @@ class StandardFieldMapWidget(QWidget):
                 self.standard_fields.insert(1, "z")
 
         self.update_mapping(seg)
+        self.setVisible(True)
 
     def _update_props_left(self) -> None:
         """Update the list of columns that have not been mapped yet"""
@@ -412,6 +413,7 @@ class StandardFieldMapWidget(QWidget):
             seg (bool = False): whether a segmentation is associated with this data
         """
 
+        self.setVisible(False)
         self.mapping_labels = {}
         self.mapping_widgets = {}
         clear_layout(self.mapping_layout)  # clear layout first
@@ -458,6 +460,8 @@ class StandardFieldMapWidget(QWidget):
         self.optional_mapping_layout.addWidget(header_assign, 0, 1)
         self.optional_mapping_layout.addWidget(header_recompute, 0, 2)
         self._update_props_left()
+
+        self.setVisible(True)
         self.setMinimumHeight(350)
 
     def get_name_map(self) -> dict[str, str]:
