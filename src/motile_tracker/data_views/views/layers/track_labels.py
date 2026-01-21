@@ -136,18 +136,37 @@ class TrackLabels(ContourLabels):
 
         new_label(self)
 
-    def process_click(self, event: Event, label: int):
-        """Process the click event to update the selected nodes"""
+    def process_click(
+        self, event: Event, label: int, layer: ContourLabels | None = None
+    ):
+        """Process the click event to update the selected nodes.
 
-        if (
-            label is not None and label != 0 and self.colormap.map(label)[-1] != 0
-        ):  # check opacity (=visibility) in the colormap
-            append = "Shift" in event.modifiers
-            jump = "Control" in event.modifiers
-            if jump:
-                self.tracks_viewer.center_on_node(label)
+        Args:
+            event (Event): The click event.
+            label (int): The label value at the clicked position.
+            layer (ContourLabels | None): The (ortho view) layer from which the click originated.
+                If provided, it is used to check label visibility in that layer's colormap.
+        """
+
+        if label is not None and label != 0:
+            # check visibility in the respective colormap. If a label is not visible, it
+            # is not allowed to be selected from this view
+            if layer is not None:
+                is_visible = layer.colormap.color_dict.get(label)[3] > 0
             else:
-                self.tracks_viewer.selected_nodes.add(label, append)
+                is_visible = self.colormap.color_dict.get(label)[3] > 0
+            if is_visible:
+                append = "Shift" in event.modifiers
+                jump = "Control" in event.modifiers
+                if jump:
+                    self.tracks_viewer.center_on_node(label)
+                else:
+                    self.tracks_viewer.selected_nodes.add(label, append)
+            else:
+                warnings.warn(
+                    f"Node {label} is not visible in this view and cannot be selected.",
+                    stacklevel=2,
+                )
 
     def _get_colormap(self) -> DirectLabelColormap:
         """Get a DirectLabelColormap that maps node ids to their track ids, and then

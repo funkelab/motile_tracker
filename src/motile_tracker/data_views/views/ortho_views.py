@@ -1,3 +1,4 @@
+import copy
 import inspect
 
 import napari_orthogonal_views.ortho_view_widget as ov_widget
@@ -235,7 +236,7 @@ def colormap_hook(orig_layer: TrackLabels, copied_layer: Labels) -> None:
         ContourLabels instance. Check the slice ndisplay and contour settings to adjust
         background opacity accordingly."""
 
-        copied_layer.colormap = orig_layer.colormap
+        copied_layer.colormap = copy.deepcopy(orig_layer.colormap)
         if copied_layer._slice.slice_input.ndisplay == 3 and orig_layer.contour > 0:
             copied_layer.set_opacity(orig_layer.background, 0)
         else:
@@ -274,7 +275,7 @@ def track_layers_hook(
             was_click = yield from detect_click(event)
             if was_click:
                 value = get_click_value(layer, event)
-                orig_layer.process_click(event, value)
+                orig_layer.process_click(event, value, layer)
 
     # Wrap and attach click callback
     def click_wrapper(layer, event):

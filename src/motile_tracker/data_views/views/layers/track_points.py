@@ -122,8 +122,20 @@ class TrackPoints(napari.layers.Points):
         with self.events.current_size.blocker():
             super().add(coords)
 
-    def process_click(self, event: Event, point_index: int | None):
-        """Select the clicked point(s)"""
+    def process_click(
+        self,
+        event: Event,
+        point_index: int | None,
+        _layer: napari.layers.Points | None = None,
+    ):
+        """Select the clicked point(s)
+
+        Args:
+            event (Event): The mouse event
+            point_index (int | None): The index of the clicked point, or None if no point
+                was clicked
+            _layer (napari.layers.Points | None): Optional, unused. The (ortho view) layer on which the click occurred, which is forwarded by default.
+        """
 
         if point_index is None:
             self.tracks_viewer.selected_nodes.reset()
