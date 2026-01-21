@@ -9,12 +9,13 @@ import numpy as np
 from funtracks.candidate_graph import (
     compute_graph_from_points_list,
     compute_graph_from_seg,
-    graph_to_nx,
 )
 from funtracks.data_model.graph_attributes import EdgeAttr, NodeAttr
 from motile import Solver, TrackGraph
 from motile.constraints import MaxChildren, MaxParents, Pin
 from motile.costs import Appear, EdgeDistance, EdgeSelection, Split
+
+from motile_tracker.motile.backend.graph_to_nx import graph_to_nx
 
 from .solver_params import SolverParams
 
