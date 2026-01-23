@@ -129,11 +129,6 @@ class TestMenuWidgetInitialization:
         mock_editing_menu.return_value = QWidget()
         mock_viz_widget.return_value = QWidget()
 
-        # Make the widget constructors return actual QWidgets
-        mock_motile_widget.return_value = QWidget()
-        mock_editing_menu.return_value = QWidget()
-        mock_viz_widget.return_value = QWidget()
-
         widget = MenuWidget(viewer)
         qtbot.addWidget(widget)
 
