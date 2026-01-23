@@ -53,11 +53,6 @@ class TestMenuWidgetInitialization:
         mock_editing_menu.return_value = QWidget()
         mock_viz_widget.return_value = QWidget()
 
-        # Make the widget constructors return actual QWidgets
-        mock_motile_widget.return_value = QWidget()
-        mock_editing_menu.return_value = QWidget()
-        mock_viz_widget.return_value = QWidget()
-
         widget = MenuWidget(viewer)
         qtbot.addWidget(widget)
 
@@ -99,47 +94,11 @@ class TestMenuWidgetInitialization:
         mock_editing_menu.return_value = QWidget()
         mock_viz_widget.return_value = QWidget()
 
-        # Make the widget constructors return actual QWidgets
-        mock_motile_widget.return_value = QWidget()
-        mock_editing_menu.return_value = QWidget()
-        mock_viz_widget.return_value = QWidget()
-
         widget = MenuWidget(viewer)
         qtbot.addWidget(widget)
 
         # Should have 4 tabs initially (no visualization tab)
         assert widget.tabwidget.count() == 4
-
-    @patch("motile_tracker.application_menus.menu_widget.TracksViewer.get_instance")
-    @patch("motile_tracker.application_menus.menu_widget.MotileWidget")
-    @patch("motile_tracker.application_menus.menu_widget.EditingMenu")
-    @patch("motile_tracker.application_menus.menu_widget.LabelVisualizationWidget")
-    def test_initialization_tab_names(
-        self,
-        mock_viz_widget,
-        mock_editing_menu,
-        mock_motile_widget,
-        mock_get_instance,
-        make_napari_viewer,
-        qtbot,
-        mock_tracks_viewer,
-    ):
-        """Test MenuWidget creates tabs with correct names."""
-        viewer = make_napari_viewer()
-        mock_get_instance.return_value = mock_tracks_viewer
-
-        # Make the widget constructors return actual QWidgets
-        mock_motile_widget.return_value = QWidget()
-        mock_editing_menu.return_value = QWidget()
-        mock_viz_widget.return_value = QWidget()
-
-        # Make the widget constructors return actual QWidgets
-        mock_motile_widget.return_value = QWidget()
-        mock_editing_menu.return_value = QWidget()
-        mock_viz_widget.return_value = QWidget()
-
-        widget = MenuWidget(viewer)
-        qtbot.addWidget(widget)
 
         # Check tab names
         assert widget.tabwidget.tabText(0) == "Tracking"
