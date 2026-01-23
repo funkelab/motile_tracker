@@ -331,3 +331,7 @@ class TestTrackIDDisplay:
         assert "border:" in style
         assert "color:" in style
         assert "rgba(" in style
+
+        # check that the color of the current track ID matches with the style. 
+        color = tracks_viewer.colormap.map(tracks_viewer.selected_track)
+        assert f"rgba({color[0]*255:.0f}, {color[1]*255:.0f}, {color[2]*255:.0f}" in style
