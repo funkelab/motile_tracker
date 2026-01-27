@@ -123,11 +123,7 @@ class TrackLabels(ContourLabels):
     # Connect click events to node selection
     def click(self, _, event):
         if (
-            event.type == "mouse_press"
-            and self.mode == "pan_zoom"
-            and not (
-                self.tracks_viewer.mode == "lineage" and self.viewer.dims.ndisplay == 3
-            )
+            event.type == "mouse_press" and self.mode == "pan_zoom"
         ):  # disable selecting in lineage mode in 3D
             # differentiate between click and drag
             was_click = yield from detect_click(event)
@@ -140,18 +136,37 @@ class TrackLabels(ContourLabels):
 
         new_label(self)
 
-    def process_click(self, event: Event, label: int):
-        """Process the click event to update the selected nodes"""
+    def process_click(
+        self, event: Event, label: int, layer: ContourLabels | None = None
+    ):
+        """Process the click event to update the selected nodes.
 
-        if (
-            label is not None and label != 0 and self.colormap.map(label)[-1] != 0
-        ):  # check opacity (=visibility) in the colormap
-            append = "Shift" in event.modifiers
-            jump = "Control" in event.modifiers
-            if jump:
-                self.tracks_viewer.center_on_node(label)
+        Args:
+            event (Event): The click event.
+            label (int): The label value at the clicked position.
+            layer (ContourLabels | None): The (ortho view) layer from which the click originated.
+                If provided, it is used to check label visibility in that layer's colormap.
+        """
+
+        if label is not None and label != 0:
+            # check visibility in the respective colormap. If a label is not visible, it
+            # is not allowed to be selected from this view
+            if layer is not None:
+                is_visible = layer.colormap.color_dict.get(label)[3] > 0
             else:
-                self.tracks_viewer.selected_nodes.add(label, append)
+                is_visible = self.colormap.color_dict.get(label)[3] > 0
+            if is_visible:
+                append = "Shift" in event.modifiers
+                jump = "Control" in event.modifiers
+                if jump:
+                    self.tracks_viewer.center_on_node(label)
+                else:
+                    self.tracks_viewer.selected_nodes.add(label, append)
+            else:
+                warnings.warn(
+                    f"Node {label} is not visible in this view and cannot be selected.",
+                    stacklevel=2,
+                )
 
     def _get_colormap(self) -> DirectLabelColormap:
         """Get a DirectLabelColormap that maps node ids to their track ids, and then
@@ -315,7 +330,7 @@ class TrackLabels(ContourLabels):
 
         highlighted = set(self.tracks_viewer.selected_nodes)
         foreground = self.colormap.color_dict.keys() if visible == "all" else visible
-        background = (
+        self.background = (
             []
             if visible == "all"
             else self.colormap.color_dict.keys() - visible - highlighted
@@ -328,7 +343,13 @@ class TrackLabels(ContourLabels):
             if not self.foreground_contour:
                 self.filled_labels.extend(foreground)
 
-        self.set_opacity(background, self.background_opacity)
+        # special case: 3D rendering + partially filled contours -> set background opacity
+        # to 0
+        if self._slice.slice_input.ndisplay == 3 and self.contour > 0:
+            self.set_opacity(self.background, 0)
+        else:
+            # set normal background opacity
+            self.set_opacity(self.background, self.background_opacity)
         self.set_opacity(foreground, self.foreground_opacity)
         self.set_opacity(highlighted, self.highlight_opacity)
         self.refresh_colormap()
