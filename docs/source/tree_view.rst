@@ -50,7 +50,7 @@ should be specified in ``Tracks.pos_attr``. If a segmentation is provided but no
 The segmentation is expected to be a numpy array with time as the first dimension, followed
 by the position dimensions in the same order as the ``Tracks.pos_attr``. The segmentation
 must have unique label ids across all time points - there is a helper function in the
-motile_toolbox called ensure_unique_labels that relabels a segmentation to be unique
+funtracks called ensure_unique_labels that relabels a segmentation to be unique
 across time if needed. If a segmentation is provided, the node ids in the graph should
 match label id of the corresponding segmentation.
 
