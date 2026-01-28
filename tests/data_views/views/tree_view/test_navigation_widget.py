@@ -217,6 +217,7 @@ class TestMoveMethod:
         # Should not find anything and not call add
         # Actually, it might return None
         # Let me check the logic again...
+        mock_selected_nodes.add.assert_not_called()
 
     def test_move_right_vertical_gets_next_track(
         self, qtbot, track_df, lineage_df, mock_selected_nodes
@@ -489,7 +490,7 @@ class TestGetSuccessor:
         result = widget.get_successor("1")
 
         # Should return one of them (first in dataframe)
-        assert result in ["2", "3"]
+        assert result == "2"
 
     def test_get_successor_returns_none_for_leaf(self, qtbot, track_df, lineage_df):
         """Test get_successor returns None for leaf node."""

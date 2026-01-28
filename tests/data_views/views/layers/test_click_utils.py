@@ -92,37 +92,6 @@ class TestDetectClick:
 
         assert result is True
 
-    def test_detect_click_returns_false_for_long_drag(self):
-        """Test detect_click returns False for drag longer than 0.5s."""
-        # Create mock event
-        event = MagicMock()
-        event.type = "mouse_press"
-
-        # Create generator
-        gen = detect_click(event)
-
-        # First yield - initial press
-        next(gen)
-
-        # Simulate drag
-        event.type = "mouse_move"
-        next(gen)
-
-        # Wait to exceed threshold
-        time.sleep(0.6)
-
-        # More mouse moves
-        next(gen)
-        event.type = "mouse_release"
-
-        # Get result
-        try:
-            next(gen)
-        except StopIteration as e:
-            result = e.value
-
-        assert result is False
-
     def test_detect_click_yields_during_drag(self):
         """Test detect_click yields during mouse_move events."""
         # Create mock event

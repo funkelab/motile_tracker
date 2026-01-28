@@ -62,7 +62,7 @@ def test_paint_event(make_napari_viewer, graph_3d_with_division, segmentation_3d
     0      1                   1                   1               1              1
            |                   |                   |               |              |
     1      2       -1->        2       -2->        2     -3->      2      -4->    2
-          / \\                 / \\                   \\               \\              \
+          / \\                / \\                  \\              \\             \
     2    3   4               3   4               6   4          <6   4          6   4
                                                  |               |              |
     3                        5                   5               5              5
