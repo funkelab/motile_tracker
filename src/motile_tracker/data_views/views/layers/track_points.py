@@ -7,12 +7,12 @@ from typing import TYPE_CHECKING
 import napari
 import numpy as np
 from funtracks.data_model import NodeType, Tracks
+from funtracks.data_model.graph_attributes import NodeAttr
 from funtracks.exceptions import InvalidActionError
 from napari.layers.points._points_mouse_bindings import select
 from napari.utils.notifications import show_info
 from psygnal import Signal
 
-from motile_tracker.data_views.graph_attributes import NodeAttr
 from motile_tracker.data_views.views.layers.click_utils import (
     detect_click,
     get_click_value,
@@ -122,8 +122,20 @@ class TrackPoints(napari.layers.Points):
         with self.events.current_size.blocker():
             super().add(coords)
 
-    def process_click(self, event: Event, point_index: int | None):
-        """Select the clicked point(s)"""
+    def process_click(
+        self,
+        event: Event,
+        point_index: int | None,
+        _layer: napari.layers.Points | None = None,
+    ):
+        """Select the clicked point(s)
+
+        Args:
+            event (Event): The mouse event
+            point_index (int | None): The index of the clicked point, or None if no point
+                was clicked
+            _layer (napari.layers.Points | None): Optional, unused. The (ortho view) layer on which the click occurred, which is forwarded by default.
+        """
 
         if point_index is None:
             self.tracks_viewer.selected_nodes.reset()

@@ -120,7 +120,6 @@ class ImportDialog(QDialog):
         self.seg = (
             self.segmentation_widget.include_seg() if checked is None else not checked
         )
-        self.scale_widget.setVisible(self.seg)
 
         if self.import_type == "csv":
             self.incl_z = self.dimension_widget.incl_z
@@ -161,6 +160,8 @@ class ImportDialog(QDialog):
             self.prop_map_widget.mapping_labels["seg_id"].setVisible(self.seg)
 
         self._update_finish_button()
+        self.scale_widget.setVisible(self.seg)
+
         self._resize_dialog()
 
     def infer_dims_from_segmentation(self) -> None:
@@ -198,10 +199,9 @@ class ImportDialog(QDialog):
     def _update_segmentation_widget(self) -> None:
         """Refresh the geff segmentation widget based on the geff root group."""
 
+        self.segmentation_widget.setVisible(False)
         if self.import_widget.root is not None:
             self.segmentation_widget.update_root(self.import_widget.root)
-        else:
-            self.segmentation_widget.setVisible(False)
         self._update_finish_button()
         self._resize_dialog()
 

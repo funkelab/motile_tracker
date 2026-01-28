@@ -61,7 +61,6 @@ class ScaleWidget(QWidget):
             ndim = 4 if incl_z else 3
             self.scale = list([1.0] * ndim)
 
-        self.setVisible(True)
         clear_layout(self.scale_layout)
         self.scale_form_layout = QFormLayout()
 
@@ -78,6 +77,7 @@ class ScaleWidget(QWidget):
         self.scale_form_layout.addRow(QLabel("x"), self.x_spin_box)
 
         self.scale_layout.addLayout(self.scale_form_layout)
+        self.setVisible(True)
 
     def _scale_spin_box(self, value: float) -> QDoubleSpinBox:
         """Return a QDoubleSpinBox for scaling values"""

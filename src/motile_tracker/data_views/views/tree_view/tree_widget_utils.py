@@ -7,8 +7,7 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 from funtracks.data_model import NodeType, Tracks
-
-from motile_tracker.data_views.graph_attributes import NodeAttr
+from funtracks.data_model.graph_attributes import NodeAttr
 
 
 def extract_sorted_tracks(

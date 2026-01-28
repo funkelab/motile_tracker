@@ -5,9 +5,9 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 from funtracks.data_model import SolutionTracks
+from funtracks.data_model.graph_attributes import NodeAttr
 from funtracks.exceptions import InvalidActionError
 
-from motile_tracker.data_views.graph_attributes import NodeAttr
 from motile_tracker.data_views.views.layers.track_points import (
     TrackPoints,
     custom_select,

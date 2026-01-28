@@ -31,14 +31,13 @@ classifiers = [
 
 dependencies =[
     "napari>=0.6.2,<1",
-    "funtracks>=1.7.0-a2,<2",
+    "funtracks>=1.7.0,<2",
     "appdirs>=1,<2",
     "numpy>=2,<3",
     "magicgui>=0.10.1",
     "qtpy>=2.4,<3",
     "scikit-image>=0.25",
     "motile>=0.3",
-    "motile_toolbox == 0.4.0",
     "pydantic>=2,<3",
     "tifffile[all]>=2025.1.10",
     "tqdm>=4,<5",
