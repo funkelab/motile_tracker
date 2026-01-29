@@ -283,7 +283,7 @@ class ImportDialog(QDialog):
         ndim = seg.ndim
 
         # Build axis names and types based on dimensionality
-        # Use "time" to match NodeAttr.TIME.value used in standard_fields
+        # Use "time" to match standard_fields
         if ndim == 3:  # 2D+time
             axis_keys = ["time", "y", "x"]
             axis_types = ["time", "space", "space"]

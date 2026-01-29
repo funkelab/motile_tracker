@@ -7,7 +7,6 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 from funtracks.data_model import NodeType, Tracks
-from funtracks.data_model.graph_attributes import NodeAttr
 
 
 def extract_sorted_tracks(
@@ -119,7 +118,7 @@ def extract_sorted_tracks(
 
                 if parent_track_id is None:
                     parent_track_id = solution_nx_graph.nodes[parent_id][
-                        NodeAttr.TRACK_ID.value
+                        tracks.features.tracklet_key
                     ]
                 track_dict["parent_track_id"] = parent_track_id
 

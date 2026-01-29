@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 from funtracks.data_model import SolutionTracks
-from funtracks.data_model.graph_attributes import NodeAttr
 
 from .solver_params import SolverParams
 
@@ -33,8 +32,8 @@ class MotileRun(SolutionTracks):
         graph: nx.DiGraph,
         segmentation: np.ndarray | None,
         run_name: str,
-        time_attr: str = NodeAttr.TIME.value,
-        pos_attr: str | tuple[str] | list[str] = NodeAttr.POS.value,
+        time_attr: str = "time",
+        pos_attr: str | tuple[str] | list[str] = "pos",
         scale: list[float] | None = None,
         solver_params: SolverParams | None = None,
         input_points: np.ndarray | None = None,

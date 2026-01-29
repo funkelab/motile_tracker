@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING
 import napari
 import numpy as np
 from funtracks.data_model import NodeType, Tracks
-from funtracks.data_model.graph_attributes import NodeAttr
 from funtracks.exceptions import InvalidActionError
 from napari.layers.points._points_mouse_bindings import select
 from napari.utils.notifications import show_info
@@ -63,9 +62,9 @@ class TrackPoints(napari.layers.Points):
         self.node_index_dict = {node: idx for idx, node in enumerate(self.nodes)}
 
         points = self.tracks_viewer.tracks.get_positions(self.nodes, incl_time=True)
+
         track_ids = [
-            self.tracks_viewer.tracks.graph.nodes[node][NodeAttr.TRACK_ID.value]
-            for node in self.nodes
+            self.tracks_viewer.tracks.get_track_id(node) for node in self.nodes
         ]
         colors = [self.tracks_viewer.colormap.map(track_id) for track_id in track_ids]
         symbols = self.get_symbols(
@@ -170,8 +169,7 @@ class TrackPoints(napari.layers.Points):
         self.node_index_dict = {node: idx for idx, node in enumerate(self.nodes)}
 
         track_ids = [
-            self.tracks_viewer.tracks.graph.nodes[node][NodeAttr.TRACK_ID.value]
-            for node in self.nodes
+            self.tracks_viewer.tracks.get_track_id(node) for node in self.nodes
         ]
         self.data = self.tracks_viewer.tracks.get_positions(self.nodes, incl_time=True)
         self.data_updated.emit()  # emit update signal for the orthogonal views to connect to
@@ -202,13 +200,12 @@ class TrackPoints(napari.layers.Points):
         # take the track_id of the selected track (funtracks will check that there is no
         # node with this track_id at this time point yet, and assign a new one otherwise.)
         track_id = self.tracks_viewer.selected_track
-        area = 0
 
+        features = self.tracks_viewer.tracks.features
         attributes = {
-            NodeAttr.POS.value: np.array([new_point[1:]]),
-            NodeAttr.TIME.value: np.array([t]),
-            NodeAttr.TRACK_ID.value: np.array([track_id]),
-            NodeAttr.AREA.value: np.array([area]),
+            features.position_key: np.array([new_point[1:]]),
+            features.time_key: np.array([t]),
+            features.tracklet_key: np.array([track_id]),
         }
         return attributes
 
@@ -263,7 +260,9 @@ class TrackPoints(napari.layers.Points):
                     node_id = self.properties["node_id"][ind]
                     node_ids.append(node_id)
 
-                attributes = {NodeAttr.POS.value: positions}
+                attributes = {
+                    self.tracks_viewer.tracks.features.position_key: positions
+                }
                 self.tracks_viewer.tracks_controller.update_node_attrs(
                     node_ids, attributes
                 )
