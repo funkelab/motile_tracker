@@ -4,92 +4,12 @@ import napari
 import networkx as nx
 import numpy as np
 import pandas as pd
-import pytest
-from funtracks.data_model import EdgeAttr, NodeAttr, SolutionTracks
+from funtracks.data_model import SolutionTracks
 from funtracks.features import Feature
 
 from motile_tracker.data_views.views.tree_view.tree_widget_utils import (
     extract_sorted_tracks,
 )
-
-
-@pytest.fixture
-def graph_2d():
-    graph = nx.DiGraph()
-    nodes = [
-        (
-            1,
-            {
-                NodeAttr.POS.value: [50, 50],
-                NodeAttr.TIME.value: 0,
-                NodeAttr.AREA.value: 1245,
-                NodeAttr.TRACK_ID.value: 1,
-            },
-        ),
-        (
-            2,
-            {
-                NodeAttr.POS.value: [20, 80],
-                NodeAttr.TIME.value: 1,
-                NodeAttr.TRACK_ID.value: 2,
-                NodeAttr.AREA.value: 305,
-            },
-        ),
-        (
-            3,
-            {
-                NodeAttr.POS.value: [60, 45],
-                NodeAttr.TIME.value: 1,
-                NodeAttr.AREA.value: 697,
-                NodeAttr.TRACK_ID.value: 3,
-            },
-        ),
-        (
-            4,
-            {
-                NodeAttr.POS.value: [1.5, 1.5],
-                NodeAttr.TIME.value: 2,
-                NodeAttr.AREA.value: 16,
-                NodeAttr.TRACK_ID.value: 3,
-            },
-        ),
-        (
-            5,
-            {
-                NodeAttr.POS.value: [1.5, 1.5],
-                NodeAttr.TIME.value: 4,
-                NodeAttr.AREA.value: 16,
-                NodeAttr.TRACK_ID.value: 3,
-            },
-        ),
-        # unconnected node
-        (
-            6,
-            {
-                NodeAttr.POS.value: [97.5, 97.5],
-                NodeAttr.TIME.value: 4,
-                NodeAttr.AREA.value: 16,
-                NodeAttr.TRACK_ID.value: 5,
-            },
-        ),
-    ]
-    edges = [
-        (1, 2, {EdgeAttr.IOU.value: 0.0}),
-        (1, 3, {EdgeAttr.IOU.value: 0.395}),
-        (
-            3,
-            4,
-            {EdgeAttr.IOU.value: 0.0},
-        ),
-        (
-            4,
-            5,
-            {EdgeAttr.IOU.value: 1.0},
-        ),
-    ]
-    graph.add_nodes_from(nodes)
-    graph.add_edges_from(edges)
-    return graph
 
 
 def assign_tracklet_ids(graph: nx.DiGraph) -> tuple[nx.DiGraph, list[Any], int]:
