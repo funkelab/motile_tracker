@@ -3,9 +3,8 @@
 Tests cover node operations, edge operations, display modes, and selection management.
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-import numpy as np
 import pytest
 from funtracks.data_model import SolutionTracks
 from funtracks.exceptions import InvalidActionError
@@ -195,11 +194,11 @@ class TestEdgeOperations:
 
             # Check first call had force=False (default)
             first_call = add_mock.call_args_list[0]
-            assert first_call[1].get("force", False) == False
+            assert first_call[1].get("force", False) is False
 
             # Check second call had force=True
             second_call = add_mock.call_args_list[1]
-            assert second_call[1]["force"] == True
+            assert second_call[1]["force"] is True
 
 
 class TestDisplayModes:
@@ -259,9 +258,6 @@ class TestDisplayModes:
         node = list(tracks.graph.nodes)[0]
         tracks_viewer.selected_nodes.add(node)
         tracks_viewer.set_display_mode("lineage")
-
-        # Remember the visible nodes
-        previous_visible = tracks_viewer.visible.copy()
 
         # Clear selection
         tracks_viewer.selected_nodes.reset()
