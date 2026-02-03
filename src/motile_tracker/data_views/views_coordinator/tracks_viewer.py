@@ -3,10 +3,14 @@ from __future__ import annotations
 from typing import Optional
 
 import napari
-import numpy as np
 from funtracks.data_model import SolutionTracks
-from funtracks.data_model.tracks_controller import TracksController
 from funtracks.exceptions import InvalidActionError
+from funtracks.user_actions import (
+    UserAddEdge,
+    UserDeleteEdge,
+    UserDeleteNode,
+    UserSwapPredecessors,
+)
 from psygnal import Signal
 
 from motile_tracker.data_views.node_type import NodeType
@@ -160,7 +164,6 @@ class TracksViewer:
             self.tracks.refresh.disconnect(self._refresh)
 
         self.tracks = tracks
-        self.tracks_controller = TracksController(self.tracks)
 
         # listen to refresh signals from the tracks
         self.tracks.refresh.connect(self._refresh)
@@ -281,7 +284,8 @@ class TracksViewer:
 
         if self.tracks is None:
             return
-        self.tracks_controller.delete_nodes(self.selected_nodes.as_list)
+        for node in self.selected_nodes.as_list:
+            UserDeleteNode(self.tracks, node=node)
 
     def delete_edge(self, event=None):
         """Calls the tracks controller to delete an edge between the two currently
@@ -300,7 +304,7 @@ class TracksViewer:
             if time1 > time2:
                 node1, node2 = node2, node1
 
-            self.tracks_controller.delete_edges(edges=np.array([[node1, node2]]))
+            UserDeleteEdge(self.tracks, source=node1, target=node2)
 
     def swap_nodes(self, event=None):
         """Calls the tracks controller to swap the predecessors of the two currently
@@ -311,12 +315,10 @@ class TracksViewer:
             node1 = self.selected_nodes[0]
             node2 = self.selected_nodes[1]
 
-            self.tracks_controller.swap_predecessors(nodes=(node1, node2))
+            UserSwapPredecessors(self.tracks, nodes=(node1, node2))
 
     def create_edge(self, event=None):
-        """Calls the tracks controller to add an edge between the two currently selected
-        nodes
-        """
+        """Add an edge between the two currently selected nodes"""
 
         if self.tracks is None:
             return
@@ -331,18 +333,14 @@ class TracksViewer:
                 node1, node2 = node2, node1
 
             try:
-                self.tracks_controller.add_edges(
-                    edges=np.array([[node1, node2]]), force=self.force
-                )
+                UserAddEdge(self.tracks, source=node1, target=node2, force=self.force)
             except InvalidActionError as e:
                 if e.forceable:
                     # Ask the user if the action should be forced
                     force, always_force = confirm_force_operation(message=str(e))
                     self.force = always_force
                     if force:
-                        self.tracks_controller.add_edges(
-                            edges=np.array([[node1, node2]]), force=True
-                        )
+                        UserAddEdge(self.tracks, source=node1, target=node2, force=True)
                 else:
                     # Re-raise the exception if it is not forceable
                     raise
@@ -350,9 +348,9 @@ class TracksViewer:
     def undo(self, event=None):
         if self.tracks is None:
             return
-        self.tracks_controller.undo()
+        self.tracks.undo()
 
     def redo(self, event=None):
         if self.tracks is None:
             return
-        self.tracks_controller.redo()
+        self.tracks.redo()

@@ -5,7 +5,7 @@ when performing operations like adding nodes and edges that would normally fail 
 conflicts.
 """
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
@@ -162,7 +162,6 @@ def test_on_paint_invalid_action_upstream_division1_forceable(
     # Mock internals
     update_mock = MagicMock()
     seg_layer = tracks_viewer.tracking_layers.seg_layer
-    seg_layer.tracks_viewer.tracks_controller.update_segmentations = update_mock
 
     # First call raises InvalidActionError(forceable=True)
     update_mock.side_effect = [
@@ -183,8 +182,12 @@ def test_on_paint_invalid_action_upstream_division1_forceable(
     seg_layer._refresh = MagicMock()
     seg_layer.tracks_viewer.force = False
 
-    # Run test
-    seg_layer._on_paint(event)
+    # Run test with patched UserUpdateSegmentation
+    with patch(
+        "motile_tracker.data_views.views.layers.track_labels.UserUpdateSegmentation",
+        update_mock,
+    ):
+        seg_layer._on_paint(event)
 
     # Verify
     if expect_force_retry:
@@ -211,7 +214,11 @@ def test_on_paint_invalid_action_upstream_division1_forceable(
     # Control condition: no track selected
     tracks_viewer.selected_track = None
 
-    seg_layer._on_paint(event)
+    with patch(
+        "motile_tracker.data_views.views.layers.track_labels.UserUpdateSegmentation",
+        update_mock,
+    ):
+        seg_layer._on_paint(event)
 
     # It should have been called exactly once, no InvalidActionError branch
     assert update_mock.call_count == 1, "update_segmentations should succeed normally"
@@ -278,7 +285,6 @@ def test_on_paint_invalid_action_upstream_division2_forceable(
     # Mock internals
     update_mock = MagicMock()
     seg_layer = tracks_viewer.tracking_layers.seg_layer
-    seg_layer.tracks_viewer.tracks_controller.update_segmentations = update_mock
 
     # First call raises InvalidActionError(forceable=True)
     update_mock.side_effect = [
@@ -299,8 +305,12 @@ def test_on_paint_invalid_action_upstream_division2_forceable(
     seg_layer._refresh = MagicMock()
     seg_layer.tracks_viewer.force = False
 
-    # Run test
-    seg_layer._on_paint(event)
+    # Run test with patched UserUpdateSegmentation
+    with patch(
+        "motile_tracker.data_views.views.layers.track_labels.UserUpdateSegmentation",
+        update_mock,
+    ):
+        seg_layer._on_paint(event)
 
     # Verify
     if expect_force_retry:
@@ -327,7 +337,11 @@ def test_on_paint_invalid_action_upstream_division2_forceable(
     # Control condition: no track selected
     tracks_viewer.selected_track = None
 
-    seg_layer._on_paint(event)
+    with patch(
+        "motile_tracker.data_views.views.layers.track_labels.UserUpdateSegmentation",
+        update_mock,
+    ):
+        seg_layer._on_paint(event)
 
     # It should have been called exactly once, no InvalidActionError branch
     assert update_mock.call_count == 1, "update_segmentations should succeed normally"
@@ -397,13 +411,12 @@ def test_invalid_edge_force(
     ### 2) Add an invalid edge and verify that the dialog was called
     tracks_viewer.selected_nodes = [5, 4]
 
-    # Mock add_edges
+    # Mock UserAddEdge
     add_edges_mock = MagicMock()
     add_edges_mock.side_effect = [
         InvalidActionError("Mock invalid edge", forceable=True),  # first call fails
         None,  # second call (forced)
     ]
-    tracks_viewer.tracks_controller.add_edges = add_edges_mock
 
     # Mock dialog
     monkeypatch.setattr(
@@ -411,8 +424,12 @@ def test_invalid_edge_force(
         lambda message: confirm_response,
     )
 
-    # Run create_edge()
-    tracks_viewer.create_edge()
+    # Run create_edge() with patched UserAddEdge
+    with patch(
+        "motile_tracker.data_views.views_coordinator.tracks_viewer.UserAddEdge",
+        add_edges_mock,
+    ):
+        tracks_viewer.create_edge()
 
     if expect_force_retry:
         # Dialog triggered and retried
@@ -424,5 +441,6 @@ def test_invalid_edge_force(
         assert tracks_viewer.force is False
 
     # Check that the correct edge was attempted
-    called_edges = add_edges_mock.call_args_list[0][1]["edges"]
-    np.testing.assert_array_equal(called_edges, np.array([[5, 4]]))
+    first_call = add_edges_mock.call_args_list[0]
+    assert first_call[1]["source"] == 5
+    assert first_call[1]["target"] == 4

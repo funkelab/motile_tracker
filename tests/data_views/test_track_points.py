@@ -195,9 +195,8 @@ def test_create_node_attrs(make_napari_viewer, graph_2d, segmentation_2d):
     assert "pos" in attrs
     assert "time" in attrs
     assert "track_id" in attrs
-
-    assert attrs["time"][0] == 1
-    assert np.array_equal(attrs["pos"][0], [50, 50])
+    assert attrs["time"] == 1
+    assert np.array_equal(attrs["pos"], [50, 50])
     # Test 2: Activates new track_id if none selected
     tracks_viewer.selected_track = None
 
@@ -294,7 +293,10 @@ def test_update_data_invalid_action_forceable(make_napari_viewer, graph_2d):
     add_nodes_mock.side_effect = [error, None]  # Fail once, then succeed
 
     with (
-        patch.object(tracks_viewer.tracks_controller, "add_nodes", add_nodes_mock),
+        patch(
+            "motile_tracker.data_views.views.layers.track_points.UserAddNode",
+            add_nodes_mock,
+        ),
         patch(
             "motile_tracker.data_views.views.layers.track_points.confirm_force_operation",
             return_value=(True, False),
