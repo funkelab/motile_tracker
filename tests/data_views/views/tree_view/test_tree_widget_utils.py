@@ -4,93 +4,12 @@ import napari
 import networkx as nx
 import numpy as np
 import pandas as pd
-import pytest
-from funtracks.data_model import SolutionTracks
+from funtracks.data_model import EdgeAttr, NodeAttr, SolutionTracks
 from funtracks.features import Feature
 
 from motile_tracker.data_views.views.tree_view.tree_widget_utils import (
     extract_sorted_tracks,
 )
-
-
-@pytest.fixture
-def graph_2d():
-    graph = nx.DiGraph()
-    nodes = [
-        (
-            1,
-            {
-                "pos": [50, 50],
-                "time": 0,
-                "area": 1245,
-                "track_id": 1,
-            },
-        ),
-        (
-            2,
-            {
-                "pos": [20, 80],
-                "time": 1,
-                "track_id": 2,
-                "area": 305,
-            },
-        ),
-        (
-            3,
-            {
-                "pos": [60, 45],
-                "time": 1,
-                "area": 697,
-                "track_id": 3,
-            },
-        ),
-        (
-            4,
-            {
-                "pos": [1.5, 1.5],
-                "time": 2,
-                "area": 16,
-                "track_id": 3,
-            },
-        ),
-        (
-            5,
-            {
-                "pos": [1.5, 1.5],
-                "time": 4,
-                "area": 16,
-                "track_id": 3,
-            },
-        ),
-        # unconnected node
-        (
-            6,
-            {
-                "pos": [97.5, 97.5],
-                "time": 4,
-                "area": 16,
-                "track_id": 5,
-            },
-        ),
-    ]
-    edges = [
-        (1, 2, {"iou": 0.0}),
-        (1, 3, {"iou": 0.395}),
-        (
-            3,
-            4,
-            {"iou": 0.0},
-        ),
-        (
-            4,
-            5,
-            {"iou": 1.0},
-        ),
-    ]
-    graph.add_nodes_from(nodes)
-    graph.add_edges_from(edges)
-    return graph
-
 
 def assign_tracklet_ids(graph: nx.DiGraph) -> tuple[nx.DiGraph, list[Any], int]:
     """Add a track_id attribute to a graph by removing division edges,
