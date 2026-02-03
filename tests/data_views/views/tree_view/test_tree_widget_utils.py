@@ -4,12 +4,13 @@ import napari
 import networkx as nx
 import numpy as np
 import pandas as pd
-from funtracks.data_model import EdgeAttr, NodeAttr, SolutionTracks
+from funtracks.data_model import SolutionTracks
 from funtracks.features import Feature
 
 from motile_tracker.data_views.views.tree_view.tree_widget_utils import (
     extract_sorted_tracks,
 )
+
 
 def assign_tracklet_ids(graph: nx.DiGraph) -> tuple[nx.DiGraph, list[Any], int]:
     """Add a track_id attribute to a graph by removing division edges,

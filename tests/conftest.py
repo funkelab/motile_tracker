@@ -207,33 +207,33 @@ def graph_3d_with_division():
         (
             1,
             {
-                NodeAttr.POS.value: [50, 50, 50],
-                NodeAttr.TIME.value: 0,
-                NodeAttr.AREA.value: 1000,
+                "pos": [50, 50, 50],
+                "time": 0,
+                "area": 1000,
             },
         ),
         (
             2,
             {
-                NodeAttr.POS.value: [20, 50, 80],
-                NodeAttr.TIME.value: 1,
-                NodeAttr.AREA.value: 1000,
+                "pos": [20, 50, 80],
+                "time": 1,
+                "area": 1000,
             },
         ),
         (
             3,
             {
-                NodeAttr.POS.value: [60, 50, 45],
-                NodeAttr.TIME.value: 2,
-                NodeAttr.AREA.value: 1000,
+                "pos": [60, 50, 45],
+                "time": 2,
+                "area": 1000,
             },
         ),
         (
             4,
             {
-                NodeAttr.POS.value: [40, 70, 60],
-                NodeAttr.TIME.value: 2,
-                NodeAttr.AREA.value: 1000,
+                "pos": [40, 70, 60],
+                "time": 2,
+                "area": 1000,
             },
         ),
     ]

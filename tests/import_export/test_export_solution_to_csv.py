@@ -1,4 +1,6 @@
 from funtracks.data_model import SolutionTracks
+from funtracks.import_export import export_to_csv
+
 
 def test_export_solution_to_csv(graph_2d, graph_3d, tmp_path):
     tracks = SolutionTracks(graph_2d, ndim=3)

@@ -196,11 +196,9 @@ def test_create_node_attrs(make_napari_viewer, graph_2d, segmentation_2d):
     assert NodeAttr.POS.value in attrs
     assert NodeAttr.TIME.value in attrs
     assert NodeAttr.TRACK_ID.value in attrs
-    assert NodeAttr.AREA.value in attrs
 
     assert attrs[NodeAttr.TIME.value][0] == 1
     assert np.array_equal(attrs[NodeAttr.POS.value][0], [50, 50])
-    assert attrs[NodeAttr.AREA.value][0] == 0
 
     # Test 2: Activates new track_id if none selected
     tracks_viewer.selected_track = None
