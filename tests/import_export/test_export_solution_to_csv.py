@@ -2,6 +2,7 @@ import networkx as nx
 import numpy as np
 import pytest
 from funtracks.data_model import SolutionTracks
+from funtracks.import_export import export_to_csv
 from skimage.draw import disk
 
 
@@ -149,7 +150,7 @@ def graph_2d():
 def test_export_solution_to_csv(graph_2d, graph_3d, tmp_path):
     tracks = SolutionTracks(graph_2d, ndim=3)
     temp_file = tmp_path / "test_export_2d.csv"
-    tracks.export_tracks(temp_file)
+    export_to_csv(tracks, temp_file)
     with open(temp_file) as f:
         lines = f.readlines()
 
@@ -164,7 +165,7 @@ def test_export_solution_to_csv(graph_2d, graph_3d, tmp_path):
 
     tracks = SolutionTracks(graph_3d, ndim=4)
     temp_file = tmp_path / "test_export_3d.csv"
-    tracks.export_tracks(temp_file)
+    export_to_csv(tracks, temp_file)
     with open(temp_file) as f:
         lines = f.readlines()
 

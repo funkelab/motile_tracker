@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 from funtracks.data_model import SolutionTracks
+from funtracks.import_export.internal_format import load_tracks, save_tracks
 
 from .solver_params import SolverParams
 
@@ -103,7 +104,7 @@ class MotileRun(SolutionTracks):
         base_path = Path(base_path)
         run_dir = base_path / self._make_id()
         Path.mkdir(run_dir)
-        super().save(run_dir)
+        save_tracks(self, run_dir)
         self._save_params(run_dir)
         if self.input_points is not None:
             self._save_array(run_dir, IN_POINTS_FILENAME, self.input_points)
@@ -130,7 +131,7 @@ class MotileRun(SolutionTracks):
         time, run_name = cls._unpack_id(run_dir.stem)
         params = cls._load_params(run_dir)
         input_points = cls._load_array(run_dir, IN_POINTS_FILENAME, required=False)
-        tracks = SolutionTracks.load(run_dir, seg_required=False)
+        tracks = load_tracks(run_dir, seg_required=False)
         gaps = cls._load_list(run_dir=run_dir, filename=GAPS_FILENAME, required=False)
         return cls(
             graph=tracks.graph,
@@ -140,8 +141,8 @@ class MotileRun(SolutionTracks):
             input_points=input_points,
             time=time,
             gaps=gaps,
-            pos_attr=tracks.pos_attr,
-            time_attr=tracks.time_attr,
+            pos_attr=tracks.features.position_key,
+            time_attr=tracks.features.time_key,
             scale=tracks.scale,
         )
 
