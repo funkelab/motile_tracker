@@ -6,7 +6,9 @@ import napari.layers
 import networkx as nx
 import numpy as np
 import pandas as pd
-from funtracks.data_model import NodeType, Tracks
+from funtracks.data_model import Tracks
+
+from motile_tracker.data_views.node_type import NodeType
 
 
 def extract_sorted_tracks(

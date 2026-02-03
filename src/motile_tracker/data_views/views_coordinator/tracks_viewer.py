@@ -4,11 +4,12 @@ from typing import Optional
 
 import napari
 import numpy as np
-from funtracks.data_model import NodeType, SolutionTracks
+from funtracks.data_model import SolutionTracks
 from funtracks.data_model.tracks_controller import TracksController
 from funtracks.exceptions import InvalidActionError
 from psygnal import Signal
 
+from motile_tracker.data_views.node_type import NodeType
 from motile_tracker.data_views.views.layers.track_labels import new_label
 from motile_tracker.data_views.views.layers.tracks_layer_group import TracksLayerGroup
 from motile_tracker.data_views.views.tree_view.tree_widget_utils import (
