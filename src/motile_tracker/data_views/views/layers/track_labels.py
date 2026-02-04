@@ -359,7 +359,7 @@ class TrackLabels(ContourLabels):
         emit refresh signal to update colors in all layers/widgets"""
 
         self.tracks_viewer.colormap = napari.utils.colormaps.label_colormap(
-            49,
+            random.randint(49, 69),
             seed=random.uniform(0, 1),
             background_value=0,
         )
