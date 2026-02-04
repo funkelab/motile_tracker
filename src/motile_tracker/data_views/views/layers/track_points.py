@@ -222,10 +222,7 @@ class TrackPoints(napari.layers.Points):
                 new_point = event.value[-1]
                 attributes = self._create_node_attrs(new_point)
                 try:
-                    # TODO Teun: is this the best way to do this?
-                    new_node_id = 1
-                    while self.tracks_viewer.tracks.graph.has_node(new_node_id):
-                        new_node_id += 1
+                    new_node_id = self.tracks_viewer.tracks._get_new_node_ids(1)[0]
                     UserAddNode(
                         self.tracks_viewer.tracks,
                         node=new_node_id,
@@ -240,10 +237,9 @@ class TrackPoints(napari.layers.Points):
                         self.tracks_viewer.force = always_force
                         self._refresh()
                         if force:
-                            new_node_id = 1
-                            # TODO Teun: is this the best way to do this?
-                            while self.tracks_viewer.tracks.graph.has_node(new_node_id):
-                                new_node_id += 1
+                            new_node_id = self.tracks_viewer.tracks._get_new_node_ids(
+                                1
+                            )[0]
                             UserAddNode(
                                 self.tracks_viewer.tracks,
                                 node=new_node_id,
