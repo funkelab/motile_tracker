@@ -124,8 +124,6 @@ class MotileWidget(QWidget):
             scale=run.scale,
         )
 
-        run._initialize_track_ids()
-
         if run.graph.number_of_nodes() == 0:
             show_warning(
                 "No tracks found - try making your edge selection value more negative"
