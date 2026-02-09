@@ -3,6 +3,7 @@
 import logging
 
 from funtracks.data_model import SolutionTracks
+from funtracks.utils import ensure_unique_labels
 from napari import Viewer
 from napari.utils.notifications import show_warning
 from psygnal import Signal
@@ -117,12 +118,27 @@ class MotileWidget(QWidget):
             input_data = run.input_points
         else:
             raise ValueError("Must have one of input segmentation or points")
-        run.graph = solve(
-            run.solver_params,
-            input_data,
-            lambda event_data: self._on_solver_event(run, event_data),
-            scale=run.scale,
-        )
+
+        try:
+            run.graph = solve(
+                run.solver_params,
+                input_data,
+                lambda event_data: self._on_solver_event(run, event_data),
+                scale=run.scale,
+            )
+        except ValueError as e:
+            if "Duplicate values found among nodes" in str(e):
+                run.segmentation = ensure_unique_labels(run.segmentation)
+                input_data = run.segmentation
+                # try again
+                run.graph = solve(
+                    run.solver_params,
+                    input_data,
+                    lambda event_data: self._on_solver_event(run, event_data),
+                    scale=run.scale,
+                )
+            else:
+                raise
 
         run._initialize_track_ids()
 
