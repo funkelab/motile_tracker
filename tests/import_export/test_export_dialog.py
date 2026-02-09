@@ -23,6 +23,13 @@ def fake_parent(qtbot):
     return parent
 
 
+@pytest.fixture
+def mock_colormap():
+    cmap = MagicMock()
+    cmap.map.side_effect = lambda tid: [tid, tid, tid, 255]
+    return cmap
+
+
 def test_export_dialog_cancel(mock_tracks, fake_parent):
     """Should return False if user cancels export type selection."""
     mock_dialog = MagicMock()
@@ -32,26 +39,42 @@ def test_export_dialog_cancel(mock_tracks, fake_parent):
         return_value=mock_dialog,
     ):
         result = ExportDialog.show_export_dialog(
-            fake_parent, mock_tracks, name="TestGroup", nodes_to_keep={1, 2}
+            fake_parent,
+            mock_tracks,
+            name="TestGroup",
+            nodes_to_keep={1, 2},
+            colormap=mock_colormap,
         )
     assert result is False
     mock_tracks.export_tracks.assert_not_called()
 
 
-def test_export_dialog_csv(mock_tracks, fake_parent, tmp_path):
+def test_export_dialog_csv(mock_tracks, fake_parent, tmp_path, mock_colormap):
     """Simulate CSV export with single file dialog."""
     test_file = tmp_path / "test_export.csv"
 
-    # Mock ExportTypeDialog to return CSV and relabel=False
+    # --- Setup mock_tracks to have a graph and track IDs ---
+    mock_tracks.graph = MagicMock()
+    mock_tracks.graph.nodes.return_value = [1, 2]
+    mock_tracks.get_track_id.side_effect = lambda node: node  # identity mapping
+
+    # --- Mock ExportTypeDialog to return CSV and relabel=False ---
     mock_dialog = MagicMock()
     mock_dialog.exec_.return_value = 1  # QDialog.Accepted
     mock_dialog.export_type = "CSV"
     mock_dialog.relabel_by_tracklet_id = False
 
-    # Mock QFileDialog for CSV
+    # --- Mock QFileDialog for CSV ---
     mock_file_dialog = MagicMock()
     mock_file_dialog.exec_.return_value = True
     mock_file_dialog.selectedFiles.return_value = [str(test_file)]
+
+    expected_color_dict = {
+        1: [1, 1, 1, 255],
+        2: [2, 2, 2, 255],
+        None: [0, 0, 0, 0],
+    }
+
     with (
         patch(
             "motile_tracker.import_export.menus.export_dialog.ExportTypeDialog",
@@ -66,32 +89,43 @@ def test_export_dialog_csv(mock_tracks, fake_parent, tmp_path):
         ) as mock_export_csv,
     ):
         result = ExportDialog.show_export_dialog(
-            fake_parent, mock_tracks, name="MyGroup", nodes_to_keep={1, 2}
+            fake_parent,
+            mock_tracks,
+            name="MyGroup",
+            nodes_to_keep={1, 2},
+            colormap=mock_colormap,  # pass fixture
         )
 
+    # --- Assertions ---
     assert result is True
     mock_export_csv.assert_called_once_with(
-        mock_tracks,
-        test_file,
-        {1, 2},
+        tracks=mock_tracks,
+        outfile=test_file,
+        color_dict=expected_color_dict,
+        node_ids={1, 2},
         use_display_names=True,
         export_seg=False,
         seg_path=None,
     )
 
 
-def test_export_dialog_csv_with_seg(mock_tracks, fake_parent, tmp_path):
+def test_export_dialog_csv_with_seg(mock_tracks, fake_parent, tmp_path, mock_colormap):
     """CSV export with segmentation — both dialogs mocked."""
     csv_file = tmp_path / "test_tracks.csv"
     tif_file = tmp_path / "test_tracks.tif"
 
-    # Mock ExportTypeDialog to return CSV and relabel=True
+    # --- Setup mock_tracks to have a graph and track IDs ---
+    mock_tracks.graph = MagicMock()
+    mock_tracks.graph.nodes.return_value = [1, 2]
+    mock_tracks.get_track_id.side_effect = lambda node: node  # identity mapping
+
+    # --- Mock ExportTypeDialog to return CSV and relabel=True ---
     mock_dialog = MagicMock()
-    mock_dialog.exec_.return_value = 1  # QDialog.Accepted
+    mock_dialog.exec_.return_value = 1
     mock_dialog.export_type = "CSV"
     mock_dialog.relabel_by_tracklet_id = True
 
-    # Mock two QFileDialog instances: first CSV, then TIF
+    # --- Mock two QFileDialog instances ---
     mock_csv_dialog = MagicMock()
     mock_csv_dialog.exec_.return_value = True
     mock_csv_dialog.selectedFiles.return_value = [str(csv_file)]
@@ -102,6 +136,13 @@ def test_export_dialog_csv_with_seg(mock_tracks, fake_parent, tmp_path):
 
     # Patch QFileDialog constructor to return first CSV, then TIF dialog
     mock_file_dialog_class = MagicMock(side_effect=[mock_csv_dialog, mock_tif_dialog])
+
+    # Expected color dict
+    expected_color_dict = {
+        1: [1, 1, 1, 255],
+        2: [2, 2, 2, 255],
+        None: [0, 0, 0, 0],
+    }
 
     with (
         patch(
@@ -117,14 +158,20 @@ def test_export_dialog_csv_with_seg(mock_tracks, fake_parent, tmp_path):
         ) as mock_export_csv,
     ):
         result = ExportDialog.show_export_dialog(
-            fake_parent, mock_tracks, name="MyGroup", nodes_to_keep={1, 2}
+            fake_parent,
+            mock_tracks,
+            name="MyGroup",
+            nodes_to_keep={1, 2},
+            colormap=mock_colormap,
         )
 
+    # --- Assertions ---
     assert result is True
     mock_export_csv.assert_called_once_with(
-        mock_tracks,
-        csv_file,
-        {1, 2},
+        tracks=mock_tracks,
+        outfile=csv_file,
+        color_dict=expected_color_dict,
+        node_ids={1, 2},
         use_display_names=True,
         export_seg=True,
         seg_path=tif_file,
@@ -161,7 +208,11 @@ def test_export_dialog_geff(mock_tracks, fake_parent, tmp_path):
         ) as mock_export_geff,
     ):
         result = ExportDialog.show_export_dialog(
-            fake_parent, mock_tracks, name="MyGroup", nodes_to_keep={1, 2}
+            fake_parent,
+            mock_tracks,
+            name="MyGroup",
+            nodes_to_keep={1, 2},
+            colormap=mock_colormap,
         )
 
     assert result is True
@@ -204,7 +255,11 @@ def test_export_dialog_geff_error(mock_tracks, fake_parent, tmp_path):
         ) as mock_warning,
     ):
         result = ExportDialog.show_export_dialog(
-            fake_parent, mock_tracks, name="ErrGroup", nodes_to_keep={3}
+            fake_parent,
+            mock_tracks,
+            name="ErrGroup",
+            nodes_to_keep={3},
+            colormap=mock_colormap,
         )
 
     assert result is False
