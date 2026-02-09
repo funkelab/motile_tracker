@@ -4,10 +4,60 @@ from funtracks.data_model import Tracks
 from funtracks.import_export import export_to_csv
 from funtracks.import_export.export_to_geff import export_to_geff
 from qtpy.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
     QFileDialog,
-    QInputDialog,
+    QLabel,
     QMessageBox,
+    QVBoxLayout,
 )
+
+
+class ExportTypeDialog(QDialog):
+    def __init__(self, parent=None, label: str = ""):
+        super().__init__(parent)
+        self.setWindowTitle("Select Export Type")
+
+        layout = QVBoxLayout(self)
+
+        if label:
+            layout.addWidget(QLabel(label))
+
+        self.export_type_combo = QComboBox()
+        self.export_type_combo.addItems(["CSV", "geff"])
+        layout.addWidget(self.export_type_combo)
+
+        self.relabel_checkbox = QCheckBox(
+            "Export segmentation relabeled by Tracklet ID"
+        )
+        layout.addWidget(self.relabel_checkbox)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        layout.addWidget(buttons)
+
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+
+        # Initial visibility
+        self._update_checkbox_visibility(self.export_type_combo.currentText())
+
+        # Update visibility when export type changes
+        self.export_type_combo.currentTextChanged.connect(
+            self._update_checkbox_visibility
+        )
+
+    def _update_checkbox_visibility(self, export_type: str):
+        self.relabel_checkbox.setVisible(export_type == "CSV")
+
+    @property
+    def export_type(self) -> str:
+        return self.export_type_combo.currentText()
+
+    @property
+    def relabel_by_tracklet_id(self) -> bool:
+        return self.relabel_checkbox.isChecked()
 
 
 class ExportDialog:
@@ -41,31 +91,56 @@ class ExportDialog:
                 f"<p>Choose export format:</p>"
             )
 
-        export_type, ok = QInputDialog.getItem(
-            parent,
-            "Select Export Type",
-            label,
-            ["CSV", "geff"],
-            0,
-            False,
-        )
+        dialog = ExportTypeDialog(parent, label)
 
-        if not ok:
+        if dialog.exec_() != QDialog.Accepted:
             return False
 
-        if export_type == "CSV":
-            file_dialog = QFileDialog(parent)
-            file_dialog.setFileMode(QFileDialog.AnyFile)
-            file_dialog.setAcceptMode(QFileDialog.AcceptSave)
-            file_dialog.setNameFilter("CSV files (*.csv)")
-            file_dialog.setDefaultSuffix("csv")
-            default_file = f"{name}_tracks.csv"
-            file_dialog.selectFile(str(Path.home() / default_file))
+        export_type = dialog.export_type
+        relabel_by_tracklet_id = dialog.relabel_by_tracklet_id
 
-            if file_dialog.exec_():
-                file_path = Path(file_dialog.selectedFiles()[0])
-                export_to_csv(tracks, file_path, nodes_to_keep, use_display_names=True)
-                return True
+        if export_type == "CSV":
+            # CSV file dialog
+            csv_dialog = QFileDialog(parent, "Save to CSV")  # set title
+            csv_dialog.setFileMode(QFileDialog.AnyFile)
+            csv_dialog.setAcceptMode(QFileDialog.AcceptSave)
+            csv_dialog.setNameFilter("CSV files (*.csv)")
+            csv_dialog.setDefaultSuffix("csv")
+            default_csv_file = f"{name}_tracks.csv"
+            csv_dialog.selectFile(str(Path.home() / default_csv_file))
+
+            if not csv_dialog.exec_():
+                return False  # User canceled
+
+            file_path = Path(csv_dialog.selectedFiles()[0])
+            seg_path = None
+
+            # Optional segmentation dialog
+            if relabel_by_tracklet_id:
+                default_seg_path = file_path.with_suffix(".tif")
+                seg_dialog = QFileDialog(
+                    parent, "Save segmentation to TIF"
+                )  # set title
+                seg_dialog.setFileMode(QFileDialog.AnyFile)
+                seg_dialog.setAcceptMode(QFileDialog.AcceptSave)
+                seg_dialog.setNameFilter("TIF files (*.tif)")
+                seg_dialog.setDefaultSuffix("tif")
+                seg_dialog.selectFile(str(default_seg_path))
+
+                if not seg_dialog.exec_():
+                    return False  # User canceled
+
+                seg_path = Path(seg_dialog.selectedFiles()[0])
+
+            export_to_csv(
+                tracks,
+                file_path,
+                nodes_to_keep,
+                use_display_names=True,
+                export_seg=relabel_by_tracklet_id,
+                seg_path=seg_path,
+            )
+            return True
 
         elif export_type == "geff":
             file_dialog = QFileDialog(parent, "Save as geff file")
