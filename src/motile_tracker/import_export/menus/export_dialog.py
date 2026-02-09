@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import napari
 from funtracks.data_model import Tracks
 from funtracks.import_export import export_to_csv
 from funtracks.import_export.export_to_geff import export_to_geff
@@ -65,7 +66,11 @@ class ExportDialog:
 
     @staticmethod
     def show_export_dialog(
-        parent, tracks: Tracks, name: str, nodes_to_keep: set[int] | None = None
+        parent,
+        tracks: Tracks,
+        name: str,
+        colormap: napari.utils.Colormap,
+        nodes_to_keep: set[int] | None = None,
     ):
         """
         Export tracks to CSV or Geff, with the option to export a subset of nodes only.
@@ -132,10 +137,20 @@ class ExportDialog:
 
                 seg_path = Path(seg_dialog.selectedFiles()[0])
 
+            # Construct color_dict from colormap
+            nodes = list(tracks.graph.nodes())
+            track_ids = [tracks.get_track_id(node) for node in nodes]
+            colors = [colormap.map(tid) for tid in track_ids]
+            color_dict = {
+                **dict(zip(nodes, colors, strict=True)),
+                None: [0, 0, 0, 0],
+            }
+
             export_to_csv(
-                tracks,
-                file_path,
-                nodes_to_keep,
+                tracks=tracks,
+                outfile=file_path,
+                color_dict=color_dict,
+                node_ids=nodes_to_keep,
                 use_display_names=True,
                 export_seg=relabel_by_tracklet_id,
                 seg_path=seg_path,
