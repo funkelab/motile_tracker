@@ -180,6 +180,44 @@ def test_solve_with_motile(make_napari_viewer, segmentation_2d):
         mock_warning.assert_called_once()
         assert "No tracks found" in mock_warning.call_args[0][0]
 
+    # Test 5: Relabel segmentation when there are duplicate labels
+    segmentation_2d[1][10:10, 10:10] = 1  # duplicate value
+
+    run5 = MotileRun(
+        graph=nx.DiGraph(),
+        segmentation=segmentation_2d,
+        run_name="test_run",
+        solver_params=SolverParams(),
+    )
+
+    with (
+        patch("motile_tracker.motile.menus.motile_widget.solve") as mock_solve,
+        patch(
+            "motile_tracker.motile.menus.motile_widget.ensure_unique_labels"
+        ) as mock_relabel,
+    ):
+        mock_solve.side_effect = [
+            ValueError("Duplicate values found among nodes"),
+            nx.DiGraph(),
+        ]
+
+        relabeled = segmentation_2d.copy()
+        relabeled[1][10:10, 10:10] = 100
+        mock_relabel.return_value = relabeled
+
+        worker_fn = widget.solve_with_motile.__wrapped__
+        worker_fn(widget, run5)
+
+        # called twice
+        assert mock_solve.call_count == 2
+
+        # relabel called once
+        assert mock_relabel.call_count == 1
+
+        # second solve used relabeled segmentation
+        second_call = mock_solve.call_args_list[1]
+        assert second_call[0][1] is relabeled
+
 
 def test_on_solver_event(make_napari_viewer, segmentation_2d, qtbot):
     """Test _on_solver_event method."""
