@@ -4,8 +4,10 @@ from matplotlib.colors import to_rgba
 from napari.utils import DirectLabelColormap
 from qtpy.QtCore import (
     QEvent,
+    QItemSelection,
     QItemSelectionModel,
     QObject,
+    QSignalBlocker,
     Qt,
     QTimer,
 )
@@ -168,6 +170,15 @@ class ColoredTableWidget(QWidget):
         self._table_widget.setItemDelegate(delegate)
 
         self._table_widget.itemSelectionChanged.connect(self._on_selection_changed)
+        self.tracks_viewer.selected_nodes.list_updated.connect(self._update_selected)
+
+    def _update_selected(self):
+        selected_nodes = self.tracks_viewer.selected_nodes.as_list
+        rows = []
+        for node in selected_nodes:
+            rows.append(self._find_row(node_id=node))
+
+        self._select_rows(rows)
 
     def _on_selection_changed(self):
         rows = sorted({index.row() for index in self._table_widget.selectedIndexes()})
@@ -284,39 +295,37 @@ class ColoredTableWidget(QWidget):
 
         # self._update_label_colormap()
 
-    def _select_row(self, row: int, append: bool) -> None:
-        """Select a row visually in the table.
-        Args:
-            row (int): the to be selected row.
-            append (bool): whether to append to the selection, or start a new selection.
-        """
+    def _select_rows(self, rows: list[int]) -> None:
+        """Replace current table selection with given rows."""
 
-        if row is None:
+        if not rows:
             return
 
         model = self._table_widget.model()
-        index = model.index(row, 0)
-
         selection_model = self._table_widget.selectionModel()
 
-        if append:
-            # Add row to existing selection (Ctrl/Meta click)
+        selection = QItemSelection()
+
+        for row in rows:
+            if row is None:
+                continue
+            index = model.index(row, 0)
+            selection.select(index, index)
+
+        # Block ONLY selection signals
+        with QSignalBlocker(selection_model):
             selection_model.select(
-                index,
-                QItemSelectionModel.SelectionFlag.Select
-                | QItemSelectionModel.SelectionFlag.Rows,
-            )
-        else:
-            # Clear existing selection and select row (normal single selection)
-            selection_model.clearSelection()
-            selection_model.select(
-                index,
-                QItemSelectionModel.SelectionFlag.Select
-                | QItemSelectionModel.SelectionFlag.Rows,
+                selection,
+                QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows,
             )
 
-        # Ensure the row is visible
-        self._table_widget.scrollToItem(self._table_widget.item(row, 0))
+        # Scroll to first node in the selection
+        first_row = rows[0]
+        if first_row is not None:
+            self._table_widget.scrollTo(
+                model.index(first_row, 0),
+                QAbstractItemView.PositionAtCenter,
+            )
 
     def _find_row(self, **conditions) -> int | None:
         """
