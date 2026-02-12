@@ -344,11 +344,6 @@ class ColoredTableWidget(QWidget):
                 QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows,
             )
 
-        # Scroll to first node in the selection
-        first_row = rows[0]
-        if first_row is not None:
-            self.scroll_to_row(first_row)
-
     def scroll_to_node(self, node: int) -> None:
 
         index = self._find_row(node_id=node)
