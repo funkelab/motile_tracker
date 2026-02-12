@@ -5,7 +5,6 @@ from napari.utils import DirectLabelColormap
 from qtpy.QtCore import (
     QEvent,
     QItemSelectionModel,
-    QModelIndex,
     QObject,
     Qt,
     QTimer,
@@ -88,7 +87,6 @@ class CustomTableWidget(QTableWidget):
         if index.isValid():
             ctrl = bool(event.modifiers() & Qt.ControlModifier)
             shift = bool(event.modifiers() & Qt.ShiftModifier)
-            self.parent()._clicked_table(ctrl=ctrl, shift=shift, index=index)
 
             # Call super so selection behavior still works
             if ctrl:
@@ -114,7 +112,6 @@ class ColoredTableWidget(QWidget):
         self.special_selection = []
 
         self.set_data(df)
-
         self.ascending = False  # for choosing whether to sort ascending or descending
 
         # Connect to single click in the header to sort the table.
@@ -169,6 +166,19 @@ class ColoredTableWidget(QWidget):
 
         delegate = NoSelectionHighlightDelegate(self._table_widget)
         self._table_widget.setItemDelegate(delegate)
+
+        self._table_widget.itemSelectionChanged.connect(self._on_selection_changed)
+
+    def _on_selection_changed(self):
+        rows = sorted({index.row() for index in self._table_widget.selectedIndexes()})
+
+        if not rows:
+            return
+
+        labels = [self._table["node_id"][row] for row in rows]
+        self.tracks_viewer.selected_nodes.add_list(labels)
+
+        QTimer.singleShot(0, self._update_label_colormap)
 
     def _get_colormap(self) -> DirectLabelColormap:
         """Get a DirectLabelColormap that maps node ids to their track ids, and then
@@ -244,29 +254,6 @@ class ColoredTableWidget(QWidget):
                 item = self._table_widget.item(i, j)
                 item.setBackground(qcolor)
                 item.setForeground(text_color)
-
-    def _clicked_table(self, ctrl: bool, shift: bool, index: QModelIndex) -> None:
-        """Center the viewer to clicked label. If the left mouse button was used,
-        highlight the selected label(s) in layer. If the right mouse button was used, hide
-        all other labels entirely by modifiying the colormap.
-        The special selection behavior can be modified by the ctrl/meta key, to view
-        multiple labels simultaneously.
-
-        Args:
-            shift (bool): shift key was used.
-            ctrl (bool): ctrl/meta key was used.
-            index (QModelIndex): index of the clicked row
-        """
-        row = index.row()
-        label = self._table["node_id"][row]
-
-        print("clicked table", ctrl, shift)
-        if ctrl:
-            self.tracks_viewer.center_on_node(label)
-        else:
-            self.tracks_viewer.selected_nodes.add(label, shift)
-
-        QTimer.singleShot(0, self._update_label_colormap)
 
     def select_label(
         self, position: list[int | float], label: int, append: bool = False
