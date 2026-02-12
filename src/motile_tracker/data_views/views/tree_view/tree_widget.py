@@ -17,6 +17,9 @@ from qtpy.QtWidgets import (
 )
 from superqt import QCollapsible
 
+from motile_tracker.data_views.views.tree_view.custom_table_widget import (
+    ColoredTableWidget,
+)
 from motile_tracker.data_views.views.tree_view.flip_axes_widget import FlipTreeWidget
 from motile_tracker.data_views.views.tree_view.navigation_widget import NavigationWidget
 from motile_tracker.data_views.views.tree_view.tree_view_feature_widget import (
@@ -524,7 +527,12 @@ class TreeWidget(QWidget):
         layout.addWidget(collapsable_widget)
         layout.addWidget(self.tree_widget)
         layout.setSpacing(0)
-        self.setLayout(layout)
+
+        main_layout = QHBoxLayout()
+        main_layout.addLayout(layout)
+        self.table_widget = ColoredTableWidget(self.tracks_viewer, self.track_df)
+        main_layout.addWidget(self.table_widget)
+        self.setLayout(main_layout)
         self._update_track_data(reset_view=True)
 
     def keyPressEvent(self, event: QKeyEvent) -> None:
@@ -707,6 +715,8 @@ class TreeWidget(QWidget):
                 reset_view=reset_view,
                 allow_flip=allow_flip,
             )
+
+        self.table_widget.set_data(self.track_df)
 
     def _set_mode(self, mode: str) -> None:
         """Set the display mode to all or lineage view. Currently, linage
