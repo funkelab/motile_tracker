@@ -115,6 +115,7 @@ class ColoredTableWidget(QWidget):
 
         self.set_data(df)
         self.ascending = False  # for choosing whether to sort ascending or descending
+        self._updating_selection = False
 
         # Connect to single click in the header to sort the table.
         self._table_widget.horizontalHeader().sectionClicked.connect(self._sort_table)
@@ -173,21 +174,36 @@ class ColoredTableWidget(QWidget):
         self.tracks_viewer.selected_nodes.list_updated.connect(self._update_selected)
 
     def _update_selected(self):
-        selected_nodes = self.tracks_viewer.selected_nodes.as_list
-        rows = []
-        for node in selected_nodes:
-            rows.append(self._find_row(node_id=node))
+        if self._updating_selection:
+            return  # skip if we're already updating
 
-        self._select_rows(rows)
+        self._updating_selection = True
+        try:
+            selected_nodes = self.tracks_viewer.selected_nodes.as_list
+            rows = []
+            for node in selected_nodes:
+                rows.append(self._find_row(node_id=node))
+
+            self._select_rows(rows)
+        finally:
+            self._updating_selection = False
 
     def _on_selection_changed(self):
-        rows = sorted({index.row() for index in self._table_widget.selectedIndexes()})
+        if self._updating_selection:
+            return  # skip if selection was changed programmatically
 
+        rows = sorted({index.row() for index in self._table_widget.selectedIndexes()})
         if not rows:
             return
 
         labels = [self._table["node_id"][row] for row in rows]
-        self.tracks_viewer.selected_nodes.add_list(labels)
+
+        # Mark updating before changing selected_nodes to avoid loop
+        self._updating_selection = True
+        try:
+            self.tracks_viewer.selected_nodes.add_list(labels)
+        finally:
+            self._updating_selection = False
 
         QTimer.singleShot(0, self._update_label_colormap)
 
