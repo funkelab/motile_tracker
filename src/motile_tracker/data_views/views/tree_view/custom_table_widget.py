@@ -174,6 +174,7 @@ class ColoredTableWidget(QWidget):
 
         self._table_widget.itemSelectionChanged.connect(self._on_selection_changed)
         self.tracks_viewer.selected_nodes.list_updated.connect(self._update_selected)
+        self.tracks_viewer.center_node.connect(self.scroll_to_node)
 
     def center_node(self, index: int) -> None:
 
@@ -346,10 +347,29 @@ class ColoredTableWidget(QWidget):
         # Scroll to first node in the selection
         first_row = rows[0]
         if first_row is not None:
-            self._table_widget.scrollTo(
-                model.index(first_row, 0),
-                QAbstractItemView.PositionAtCenter,
-            )
+            self.scroll_to_row(first_row)
+
+    def scroll_to_node(self, node: int) -> None:
+
+        index = self._find_row(node_id=node)
+
+        selection_model = self._table_widget.selectionModel()
+        # Check if the row is already selected
+        model_index = self._table_widget.model().index(index, 0)
+        if (
+            selection_model.isSelected(model_index)
+            and len(selection_model.selectedRows()) == 1
+        ):
+            return  # already selected, do nothing
+
+        self.scroll_to_row(index)  # for centering only
+
+    def scroll_to_row(self, index):
+
+        self._table_widget.scrollTo(
+            self._table_widget.model().index(index, 0),
+            QAbstractItemView.PositionAtCenter,
+        )
 
     def _find_row(self, **conditions) -> int | None:
         """
