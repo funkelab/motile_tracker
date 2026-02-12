@@ -90,8 +90,9 @@ class CustomTableWidget(QTableWidget):
             ctrl = bool(event.modifiers() & Qt.ControlModifier)
             shift = bool(event.modifiers() & Qt.ShiftModifier)
 
-            # Call super so selection behavior still works
             if ctrl:
+                # notify that node should be centered
+                self.parent().center_node(index)
                 return
 
             if shift:
@@ -100,6 +101,7 @@ class CustomTableWidget(QTableWidget):
                 event.accept()
                 return
 
+            # Call super so selection behavior still works
             super().mousePressEvent(event)
 
 
@@ -172,6 +174,12 @@ class ColoredTableWidget(QWidget):
 
         self._table_widget.itemSelectionChanged.connect(self._on_selection_changed)
         self.tracks_viewer.selected_nodes.list_updated.connect(self._update_selected)
+
+    def center_node(self, index: int) -> None:
+
+        row = index.row()
+        node = self._table["node_id"][row]
+        self.tracks_viewer.center_on_node(node)
 
     def _update_selected(self):
         if self._updating_selection:
