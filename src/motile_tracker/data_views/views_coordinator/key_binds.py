@@ -17,6 +17,8 @@ KEYMAP = {
     "swap_nodes": ["s"],
     "undo": ["z"],
     "redo": ["r"],
+    "deselect": ["Escape"],
+    "restore_selection": ["e"],
 }
 
 
