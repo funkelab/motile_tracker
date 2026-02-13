@@ -12,6 +12,7 @@ from qtpy.QtCore import Qt
 from qtpy.QtGui import QColor, QKeyEvent, QMouseEvent
 from qtpy.QtWidgets import (
     QHBoxLayout,
+    QSplitter,
     QVBoxLayout,
     QWidget,
 )
@@ -524,14 +525,20 @@ class TreeWidget(QWidget):
         collapsable_widget.addWidget(panel)
         collapsable_widget.collapse(animate=False)
 
+        tree_widget = QWidget()
         layout.addWidget(collapsable_widget)
         layout.addWidget(self.tree_widget)
         layout.setSpacing(0)
+        tree_widget.setLayout(layout)
+
+        splitter = QSplitter(Qt.Horizontal)
+
+        self.table_widget = ColoredTableWidget(self.tracks_viewer, self.track_df)
+        splitter.addWidget(tree_widget)
+        splitter.addWidget(self.table_widget)
 
         main_layout = QHBoxLayout()
-        main_layout.addLayout(layout)
-        self.table_widget = ColoredTableWidget(self.tracks_viewer, self.track_df)
-        main_layout.addWidget(self.table_widget)
+        main_layout.addWidget(splitter)
         self.setLayout(main_layout)
         self._update_track_data(reset_view=True)
 
