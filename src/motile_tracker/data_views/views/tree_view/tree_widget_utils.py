@@ -61,14 +61,13 @@ def extract_sorted_tracks(
             node_set,
             key=lambda node: tracks.get_time(node),
         )
-        positions = tracks.get_positions(sorted_nodes).tolist()
 
         # track_id and color are the same for all nodes in a node_set
         parent_track_id = None
         track_id = tracks.get_track_id(sorted_nodes[0])
         color = np.concatenate((colormap.map(track_id)[:3] * 255, [255]))
 
-        for node, pos in zip(sorted_nodes, positions, strict=False):
+        for node in sorted_nodes:
             if node in parent_nodes:
                 state = NodeType.SPLIT
                 symbol = "t1"
@@ -84,8 +83,6 @@ def extract_sorted_tracks(
                 "node_id": node,
                 "track_id": track_id,
                 "color": color,
-                "x": pos[-1],
-                "y": pos[-2],
                 "parent_id": 0,
                 "parent_track_id": 0,
                 "state": state,
@@ -104,15 +101,12 @@ def extract_sorted_tracks(
                             elif isinstance(value_names, list) and len(
                                 value_names
                             ) == len(val):
-                                name = f"{value_names[i]}_{i}"
+                                name = f"{value_names[i]}"
                             else:
                                 name = f"{display_name}_{i}"
                             track_dict[name] = v
                     else:
                         track_dict[display_name] = val
-
-            if len(pos) == 3:
-                track_dict["z"] = pos[0]
 
             # Determine parent_id and parent_track_id
             predecessors = list(solution_nx_graph.predecessors(node))
