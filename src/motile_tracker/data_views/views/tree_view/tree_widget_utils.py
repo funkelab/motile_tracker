@@ -90,23 +90,22 @@ def extract_sorted_tracks(
             }
 
             for feature_key, feature in tracks.features.items():
-                if feature_key not in track_dict:
-                    display_name = feature.get("display_name", feature_key)
-                    value_names = feature.get("value_names", None)
-                    val = tracks.get_node_attr(node, feature_key)
-                    if isinstance(val, list | tuple):
-                        for i, v in enumerate(val):
-                            if isinstance(display_name, list | tuple):
-                                name = display_name[i]
-                            elif isinstance(value_names, list) and len(
-                                value_names
-                            ) == len(val):
-                                name = f"{value_names[i]}"
-                            else:
-                                name = f"{display_name}_{i}"
-                            track_dict[name] = v
-                    else:
-                        track_dict[display_name] = val
+                display_name = feature.get("display_name", feature_key)
+                value_names = feature.get("value_names", None)
+                val = tracks.get_node_attr(node, feature_key)
+                if isinstance(val, list | tuple):
+                    for i, v in enumerate(val):
+                        if isinstance(display_name, list | tuple):
+                            name = display_name[i]
+                        elif isinstance(value_names, list) and len(value_names) == len(
+                            val
+                        ):
+                            name = f"{value_names[i]}"
+                        else:
+                            name = f"{display_name}_{i}"
+                        track_dict[name] = v
+                else:
+                    track_dict[display_name] = val
 
             # Determine parent_id and parent_track_id
             predecessors = list(solution_nx_graph.predecessors(node))
@@ -256,7 +255,9 @@ def extract_lineage_tree(graph: nx.DiGraph, node_id: str) -> list[str]:
     return list(nodes)
 
 
-def get_features_from_tracks(tracks: Tracks | None = None) -> list[str]:
+def get_features_from_tracks(
+    tracks: Tracks | None = None, features_to_ignore: list[str] | None = None
+) -> list[str]:
     """Extract the regionprops feature display names currently activated on Tracks.
 
     Args:
@@ -267,7 +268,8 @@ def get_features_from_tracks(tracks: Tracks | None = None) -> list[str]:
         if tracks is None
     """
 
-    features_to_ignore = ["Time", "Tracklet ID"]
+    if features_to_ignore is None:
+        features_to_ignore = []
     features_to_plot = []
     if tracks is not None:
         for feature in tracks.features.values():

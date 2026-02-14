@@ -485,10 +485,14 @@ class TreeWidget(QWidget):
         self.mode_widget.change_mode.connect(self._set_mode)
 
         # Add buttons to change which feature to display
-        features_to_plot = get_features_from_tracks(self.tracks_viewer.tracks)
+        features_to_plot = get_features_from_tracks(
+            self.tracks_viewer.tracks, features_to_ignore=["Time", "Tracklet ID"]
+        )
         self.plot_type_widget = TreeViewFeatureWidget(
             features_to_plot,
-            get_features=lambda: get_features_from_tracks(self.tracks_viewer.tracks),
+            get_features=lambda: get_features_from_tracks(
+                self.tracks_viewer.tracks, features_to_ignore=["Time", "Tracklet ID"]
+            ),
         )
         self.plot_type_widget.change_plot_type.connect(self._set_plot_type)
 
@@ -679,7 +683,9 @@ class TreeWidget(QWidget):
 
         # check whether we have regionprop measurements and therefore should activate the
         # feature button
-        features_to_plot = get_features_from_tracks(self.tracks_viewer.tracks)
+        features_to_plot = get_features_from_tracks(
+            self.tracks_viewer.tracks, features_to_ignore=["Time", "Tracklet ID"]
+        )
         self.plot_type_widget.update_feature_dropdown(features_to_plot)
 
         # if reset_view, we got new data and want to reset display and feature before
@@ -723,7 +729,10 @@ class TreeWidget(QWidget):
                 allow_flip=allow_flip,
             )
 
-        self.table_widget.set_data(self.track_df)
+        columns_to_display = ["node_id"] + get_features_from_tracks(
+            self.tracks_viewer.tracks
+        )
+        self.table_widget.set_data(self.track_df, columns_to_display)
 
     def _set_mode(self, mode: str) -> None:
         """Set the display mode to all or lineage view. Currently, linage

@@ -179,7 +179,7 @@ class ColoredTableWidget(QWidget):
     def center_node(self, index: int) -> None:
 
         row = index.row()
-        node = self._table["node_id"][row]
+        node = self._table["ID"][row]
         self.tracks_viewer.center_on_node(node)
 
     def _update_selected(self):
@@ -191,7 +191,7 @@ class ColoredTableWidget(QWidget):
             selected_nodes = self.tracks_viewer.selected_nodes.as_list
             rows = []
             for node in selected_nodes:
-                rows.append(self._find_row(node_id=node))
+                rows.append(self._find_row(ID=node))
 
             self._select_rows(rows)
         finally:
@@ -205,7 +205,7 @@ class ColoredTableWidget(QWidget):
         if not rows:
             return
 
-        labels = [self._table["node_id"][row] for row in rows]
+        labels = [self._table["ID"][row] for row in rows]
 
         # Mark updating before changing selected_nodes to avoid loop
         self._updating_selection = True
@@ -239,9 +239,14 @@ class ColoredTableWidget(QWidget):
             }
         )
 
-    def set_data(self, df: pd.DataFrame) -> None:
+    def set_data(
+        self, df: pd.DataFrame, columns_to_display: list[str] | None = None
+    ) -> None:
         """Set the content of the table from a dictionary"""
 
+        if columns_to_display is not None and len(df.columns) > 0:
+            df = df[[col for col in columns_to_display if col in df.columns]]
+            df = df.rename(columns={"node_id": "ID"})
         table: dict[str, np.ndarray] = {col: df[col].to_numpy() for col in df.columns}
 
         self._table = table
@@ -269,7 +274,7 @@ class ColoredTableWidget(QWidget):
         """Apply the colors of the napari label image to the table"""
 
         for i in range(self._table_widget.rowCount()):
-            label = self._table["node_id"][i]
+            label = self._table["ID"][i]
             label_color = to_rgba(self.colormap.map(label))
 
             if label_color[3] == 0:
@@ -346,7 +351,7 @@ class ColoredTableWidget(QWidget):
 
     def scroll_to_node(self, node: int) -> None:
 
-        index = self._find_row(node_id=node)
+        index = self._find_row(ID=node)
 
         selection_model = self._table_widget.selectionModel()
         # Check if the row is already selected
@@ -512,7 +517,7 @@ class ColoredTableWidget(QWidget):
                 self._reset_layer_colormap()
                 return
 
-            selected_labels = [self._table["node_id"][row] for row in selected_rows]
+            selected_labels = [self._table["ID"][row] for row in selected_rows]
             for key, color in self.colormap.color_dict.items():
                 if key is not None and key != 0:
                     color[-1] = 0.6
