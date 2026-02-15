@@ -6,13 +6,14 @@ from typing import TYPE_CHECKING
 
 import napari
 import numpy as np
-from funtracks.data_model import NodeType, Tracks
-from funtracks.data_model.graph_attributes import NodeAttr
+from funtracks.data_model import Tracks
 from funtracks.exceptions import InvalidActionError
+from funtracks.user_actions import UserAddNode, UserDeleteNode, UserUpdateNodeAttrs
 from napari.layers.points._points_mouse_bindings import select
 from napari.utils.notifications import show_info
 from psygnal import Signal
 
+from motile_tracker.data_views.node_type import NodeType
 from motile_tracker.data_views.views.layers.click_utils import (
     detect_click,
     get_click_value,
@@ -63,9 +64,9 @@ class TrackPoints(napari.layers.Points):
         self.node_index_dict = {node: idx for idx, node in enumerate(self.nodes)}
 
         points = self.tracks_viewer.tracks.get_positions(self.nodes, incl_time=True)
+
         track_ids = [
-            self.tracks_viewer.tracks.graph.nodes[node][NodeAttr.TRACK_ID.value]
-            for node in self.nodes
+            self.tracks_viewer.tracks.get_track_id(node) for node in self.nodes
         ]
         colors = [self.tracks_viewer.colormap.map(track_id) for track_id in track_ids]
         symbols = self.get_symbols(
@@ -170,8 +171,7 @@ class TrackPoints(napari.layers.Points):
         self.node_index_dict = {node: idx for idx, node in enumerate(self.nodes)}
 
         track_ids = [
-            self.tracks_viewer.tracks.graph.nodes[node][NodeAttr.TRACK_ID.value]
-            for node in self.nodes
+            self.tracks_viewer.tracks.get_track_id(node) for node in self.nodes
         ]
         self.data = self.tracks_viewer.tracks.get_positions(self.nodes, incl_time=True)
         self.data_updated.emit()  # emit update signal for the orthogonal views to connect to
@@ -202,13 +202,12 @@ class TrackPoints(napari.layers.Points):
         # take the track_id of the selected track (funtracks will check that there is no
         # node with this track_id at this time point yet, and assign a new one otherwise.)
         track_id = self.tracks_viewer.selected_track
-        area = 0
 
+        features = self.tracks_viewer.tracks.features
         attributes = {
-            NodeAttr.POS.value: np.array([new_point[1:]]),
-            NodeAttr.TIME.value: np.array([t]),
-            NodeAttr.TRACK_ID.value: np.array([track_id]),
-            NodeAttr.AREA.value: np.array([area]),
+            features.position_key: new_point[1:],
+            features.time_key: t,
+            features.tracklet_key: track_id,
         }
         return attributes
 
@@ -223,9 +222,14 @@ class TrackPoints(napari.layers.Points):
                 new_point = event.value[-1]
                 attributes = self._create_node_attrs(new_point)
                 try:
-                    self.tracks_viewer.tracks_controller.add_nodes(
-                        attributes, force=self.tracks_viewer.force
+                    new_node_id = self.tracks_viewer.tracks._get_new_node_ids(1)[0]
+                    UserAddNode(
+                        self.tracks_viewer.tracks,
+                        node=new_node_id,
+                        attributes=attributes,
+                        force=self.tracks_viewer.force,
                     )
+
                 except InvalidActionError as e:
                     if e.forceable:
                         # If the action is invalid but forceable, ask the user if they want to do so
@@ -233,8 +237,14 @@ class TrackPoints(napari.layers.Points):
                         self.tracks_viewer.force = always_force
                         self._refresh()
                         if force:
-                            self.tracks_viewer.tracks_controller.add_nodes(
-                                attributes, force=True
+                            new_node_id = self.tracks_viewer.tracks._get_new_node_ids(
+                                1
+                            )[0]
+                            UserAddNode(
+                                self.tracks_viewer.tracks,
+                                node=new_node_id,
+                                attributes=attributes,
+                                force=True,
                             )
                     else:
                         warnings.warn(str(e), stacklevel=2)
@@ -247,26 +257,22 @@ class TrackPoints(napari.layers.Points):
                 self._refresh()
 
         elif event.action == "removed":
-            self.tracks_viewer.tracks_controller.delete_nodes(
-                self.tracks_viewer.selected_nodes.as_list
-            )
+            for node in self.tracks_viewer.selected_nodes.as_list:
+                UserDeleteNode(self.tracks_viewer.tracks, node=node)
 
         elif event.action == "changed":
             # we only want to allow this update if there is no seg layer
             if self.tracks_viewer.tracking_layers.seg_layer is None:
-                positions = []
-                node_ids = []
                 for ind in self.selected_data:
                     point = self.data[ind]
                     pos = point[1:]
-                    positions.append(pos)
                     node_id = self.properties["node_id"][ind]
-                    node_ids.append(node_id)
+                    UserUpdateNodeAttrs(
+                        self.tracks_viewer.tracks,
+                        node=node_id,
+                        attrs={self.tracks_viewer.tracks.features.position_key: pos},
+                    )
 
-                attributes = {NodeAttr.POS.value: positions}
-                self.tracks_viewer.tracks_controller.update_node_attrs(
-                    node_ids, attributes
-                )
             else:
                 self._refresh()  # refresh to move points back where they belong
 

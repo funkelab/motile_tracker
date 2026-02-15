@@ -1,8 +1,7 @@
 from pathlib import Path
 
 from funtracks.data_model import Tracks
-from funtracks.import_export import export_to_csv
-from funtracks.import_export.export_to_geff import export_to_geff
+from funtracks.import_export import export_to_csv, export_to_geff
 from qtpy.QtWidgets import (
     QFileDialog,
     QInputDialog,

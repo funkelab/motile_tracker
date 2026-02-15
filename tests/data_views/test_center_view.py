@@ -2,7 +2,7 @@
 
 import networkx as nx
 import numpy as np
-from funtracks.data_model import NodeAttr, SolutionTracks
+from funtracks.data_model import SolutionTracks
 
 from motile_tracker.data_views.views.ortho_views import initialize_ortho_views
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
@@ -34,9 +34,9 @@ class TestCenterViewWithScale:
             (
                 1,
                 {
-                    NodeAttr.POS.value: [25, 50, 50],  # world coords
-                    NodeAttr.TIME.value: 0,
-                    NodeAttr.AREA.value: 1000,
+                    "pos": [25, 50, 50],  # world coords
+                    "time": 0,
+                    "area": 1000,
                 },
             ),
         ]
@@ -90,9 +90,9 @@ class TestCenterViewWithScale:
             (
                 1,
                 {
-                    NodeAttr.POS.value: [50, 50, 50],  # world coords
-                    NodeAttr.TIME.value: 0,
-                    NodeAttr.AREA.value: 1000,
+                    "pos": [50, 50, 50],  # world coords
+                    "time": 0,
+                    "area": 1000,
                 },
             ),
         ]
@@ -148,9 +148,9 @@ class TestCenterViewWithScale:
             (
                 1,
                 {
-                    NodeAttr.POS.value: [25, 50, 50],
-                    NodeAttr.TIME.value: 0,
-                    NodeAttr.AREA.value: 1000,
+                    "pos": [25, 50, 50],
+                    "time": 0,
+                    "area": 1000,
                 },
             ),
         ]
@@ -196,9 +196,9 @@ class TestCenterViewWithScale:
             (
                 1,
                 {
-                    NodeAttr.POS.value: [50, 50, 50],
-                    NodeAttr.TIME.value: 0,
-                    NodeAttr.AREA.value: 1000,
+                    "pos": [50, 50, 50],
+                    "time": 0,
+                    "area": 1000,
                 },
             ),
         ]
@@ -255,9 +255,9 @@ class TestCenterViewWithScale:
             (
                 1,
                 {
-                    NodeAttr.POS.value: [25, 50, 50],  # world coords
-                    NodeAttr.TIME.value: 0,
-                    NodeAttr.AREA.value: 1000,
+                    "pos": [25, 50, 50],  # world coords
+                    "time": 0,
+                    "area": 1000,
                 },
             ),
         ]
@@ -313,9 +313,9 @@ class TestCenterViewWithScale:
             (
                 1,
                 {
-                    NodeAttr.POS.value: [25, 50, 50],  # world coords
-                    NodeAttr.TIME.value: 0,
-                    NodeAttr.AREA.value: 1000,
+                    "pos": [25, 50, 50],  # world coords
+                    "time": 0,
+                    "area": 1000,
                 },
             ),
         ]
@@ -366,9 +366,9 @@ class TestCenterViewWithScale:
             (
                 1,
                 {
-                    NodeAttr.POS.value: [25, 50, 50],  # world coords
-                    NodeAttr.TIME.value: 0,
-                    NodeAttr.AREA.value: 1000,
+                    "pos": [25, 50, 50],  # world coords
+                    "time": 0,
+                    "area": 1000,
                 },
             ),
         ]
