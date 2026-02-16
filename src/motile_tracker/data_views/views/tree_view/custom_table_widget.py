@@ -177,12 +177,21 @@ class ColoredTableWidget(QWidget):
         self.tracks_viewer.center_node.connect(self.scroll_to_node)
 
     def center_node(self, index: int) -> None:
+        """Call TracksViewer to center Viewer on the node of current index
 
+        Args:
+            index (int): the index in the table corresponding to the to be centered node.
+        """
+        self._updating_selection = True
         row = index.row()
         node = self._table["ID"][row]
         self.tracks_viewer.center_on_node(node)
+        self._updating_selection = False
 
-    def _update_selected(self):
+    def _update_selected(self) -> None:
+        """Select the rows belonging to the nodes that are in the selection list of the
+        TracksViewer
+        """
         if self._updating_selection:
             return  # skip if we're already updating
 
@@ -197,7 +206,11 @@ class ColoredTableWidget(QWidget):
         finally:
             self._updating_selection = False
 
-    def _on_selection_changed(self):
+    def _on_selection_changed(self) -> None:
+        """Update the node selection list on TracksViewer based on the rows selected in
+        the table.
+        """
+
         if self._updating_selection:
             return  # skip if selection was changed programmatically
 
@@ -207,7 +220,7 @@ class ColoredTableWidget(QWidget):
 
         labels = [self._table["ID"][row] for row in rows]
 
-        # Mark updating before changing selected_nodes to avoid loop
+        # Ensure we do not call this when it is still updating.
         self._updating_selection = True
         try:
             self.tracks_viewer.selected_nodes.add_list(labels)
@@ -242,7 +255,14 @@ class ColoredTableWidget(QWidget):
     def set_data(
         self, df: pd.DataFrame, columns_to_display: list[str] | None = None
     ) -> None:
-        """Set the content of the table from a dictionary"""
+        """Set the content of the table from a dictionary
+
+        Args:
+            df (pd.DataFrame): dataframe holding the tree widget data, one row per node.
+            columns_to_display (list[str] | None): optional list of column headers to
+                filter on (should correspond to the tracks features). Column 'node_id'
+                should always be included.
+        """
 
         if columns_to_display is not None and len(df.columns) > 0:
             df = df[[col for col in columns_to_display if col in df.columns]]
@@ -271,7 +291,9 @@ class ColoredTableWidget(QWidget):
         self._set_label_colors_to_rows()
 
     def _set_label_colors_to_rows(self) -> None:
-        """Apply the colors of the napari label image to the table"""
+        """Apply the colors of the napari label image to the table, and set the text color
+         depending on luminance (black test on light backgrounds, white text on dark
+        backgrounds)"""
 
         for i in range(self._table_widget.rowCount()):
             label = self._table["ID"][i]
@@ -296,37 +318,12 @@ class ColoredTableWidget(QWidget):
                 item.setBackground(qcolor)
                 item.setForeground(text_color)
 
-    def select_label(
-        self, position: list[int | float], label: int, append: bool = False
-    ) -> None:
-        """Select the corresponding row of the label that was clicked on, and update the colormap.
+    def _select_rows(self, rows: list[int]) -> None:
+        """Replace current table selection with given rows.
 
         Args:
-            position (list[int|float]): coordinates of the clicked location.
-            label (int): the label value that was clicked on.
-            append (bool): whether to append to selection (ctrl/meta modifier), or start
-                a new selection
+            rows (list[int]): list of indices to be selected.
         """
-
-        if label is None or label == 0:
-            self._table_widget.clearSelection()
-            self._reset_layer_colormap()
-            return
-
-        # t = None
-        # c = None
-
-        # if "time_point" in self._table:
-        #     time_dim = self._layer.metadata["dimensions"].index("T")
-        #     t = position[time_dim]
-
-        # row = self._find_row(time_point=t, channel=c, label=label)
-        # self._select_row(row, append)
-
-        # self._update_label_colormap()
-
-    def _select_rows(self, rows: list[int]) -> None:
-        """Replace current table selection with given rows."""
 
         if not rows:
             return
@@ -342,7 +339,7 @@ class ColoredTableWidget(QWidget):
             index = model.index(row, 0)
             selection.select(index, index)
 
-        # Block ONLY selection signals
+        # Block selection signals
         with QSignalBlocker(selection_model):
             selection_model.select(
                 selection,
@@ -350,6 +347,14 @@ class ColoredTableWidget(QWidget):
             )
 
     def scroll_to_node(self, node: int) -> None:
+        """Identify the index of the node that was selected, and scroll to that index.
+
+        Args:
+            node (int): the node to scroll to.
+        """
+
+        if self._updating_selection:
+            return  # skip if selection was changed programmatically
 
         index = self._find_row(ID=node)
 
@@ -364,8 +369,12 @@ class ColoredTableWidget(QWidget):
 
         self.scroll_to_row(index)  # for centering only
 
-    def scroll_to_row(self, index):
+    def scroll_to_row(self, index: int) -> None:
+        """Scroll to make sure the row is in view
 
+        Args:
+            index (int): the index to scroll to
+        """
         self._table_widget.scrollTo(
             self._table_widget.model().index(index, 0),
             QAbstractItemView.PositionAtCenter,
@@ -389,110 +398,6 @@ class ColoredTableWidget(QWidget):
                 return row
 
         return None
-
-    def _delete_labels(self) -> None:
-        """Delete the selected labels in the table and store state for undo."""
-
-        # let tracks_viewer handle this
-        # selected_rows = sorted(
-        #     {index.row() for index in self._table_widget.selectedIndexes()}
-        # )
-        # if not selected_rows:
-        #     return
-
-        # self._undo_info = []
-
-        # # Delete labels from the table itself
-        # for row in reversed(selected_rows):
-        #     row_data = {col: self._table[col][row] for col in self._table}
-        #     self._undo_info.append({"row": row, "row_data": row_data})
-        #     for col in self._table:
-        #         self._table[col] = np.delete(self._table[col], row, axis=0)
-        #     self._table_widget.removeRow(row)
-
-        # # Identify axes
-        # dims = self._layer.metadata["dimensions"]
-        # has_time = "time_point" in self._table
-        # has_channel = "channel" in self._table
-        # time_axis = dims.index("T") if has_time else None
-        # channel_axis = dims.index("C") if has_channel else None
-
-        # # Delete from layer.data
-        # for info in self._undo_info:
-        #     row_data = info["row_data"]
-        #     sl = [slice(None)] * self._layer.data.ndim
-
-        #     if has_time:
-        #         sl[time_axis] = int(row_data["time_point"])
-        #     if has_channel:
-        #         sl[channel_axis] = int(row_data["channel"])
-
-        #     # Extract the relevant slice
-        #     sliced_data = self._layer.data[tuple(sl)]
-        #     if isinstance(sliced_data, da.core.Array):
-        #         sliced_data = sliced_data.compute()
-
-        #     # store only the boolean mask positions affected by the label
-        #     label = row_data["label"]
-        #     mask = sliced_data == int(label)
-        #     prev_values = sliced_data[mask].copy()
-
-        #     info["slice"] = sl
-        #     info["mask"] = mask
-        #     info["prev_values"] = prev_values
-
-        #     # Set label to 0
-        #     sliced_data[mask] = 0
-
-        #     # Assign back to layer
-        #     self._layer.data[tuple(sl)] = sliced_data
-
-        # # Enable undo button
-        # self.undo_button.setEnabled(True)
-        # self._layer.data = self._layer.data
-
-    def _undo_delete(self) -> None:
-        """Restore previously deleted labels and table rows."""
-
-        # if not hasattr(self, "_undo_info") or not self._undo_info:
-        #     return
-
-        # # Sort by row ascending so insert indices stay correct
-        # for info in sorted(self._undo_info, key=lambda x: x["row"]):
-        #     row = info["row"]
-        #     row_data = info["row_data"]
-
-        #     # Restore table data
-        #     for col in self._table:
-        #         value_to_insert = np.array([row_data[col]])
-        #         self._table[col] = np.insert(
-        #             self._table[col], row, value_to_insert, axis=0
-        #         )
-
-        #     # Restore QTableWidget row visually
-        #     self._table_widget.insertRow(row)
-        #     for col_idx, col in enumerate(self._table):
-        #         item = QTableWidgetItem(str(row_data[col]))
-        #         self._table_widget.setItem(row, col_idx, item)
-
-        #     # Restore layer.data for this slice
-        #     sl = info.get("slice")
-        #     if sl is not None:
-        #         sliced_data = self._layer.data[tuple(sl)]
-        #         if isinstance(sliced_data, da.core.Array):
-        #             sliced_data = sliced_data.compute()
-        #         sliced_data[info["mask"]] = info["prev_values"]
-        #         self._layer.data[tuple(sl)] = sliced_data
-        #     else:
-        #         # global volume undo
-        #         self._layer.data[info["mask"]] = info["prev_values"]
-
-        # # Clear undo info and disable button
-        # self._undo_info = []
-        # self.undo_button.setEnabled(False)
-
-        # # refresh
-        # self._layer.data = self._layer.data
 
     def _update_label_colormap(self) -> None:
         """
@@ -524,19 +429,6 @@ class ColoredTableWidget(QWidget):
             for key in selected_labels:
                 if key in self.colormap.color_dict:
                     self.colormap.color_dict[key][-1] = 1
-
-    def _reset_layer_colormap(self) -> None:
-        """Set all alpha values back to 1 to reset the colormap, and empty the special
-        selection."""
-
-        # self.special_selection = []
-        # if self._layer is not None:
-        #     for key in self._layer.colormap.color_dict:
-        #         if key is not None and key != 0:
-        #             self._layer.colormap.color_dict[key][-1] = 1
-        #     self._layer.colormap = DirectLabelColormap(
-        #         color_dict=self._layer.colormap.color_dict
-        #     )
 
     def _sort_table(self, column_index: int) -> None:
         """Sorts the table in ascending or descending order
