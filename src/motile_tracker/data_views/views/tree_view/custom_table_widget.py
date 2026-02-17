@@ -234,6 +234,7 @@ class ColoredTableWidget(QWidget):
 
         self._updating_selection = True
         try:
+            self._table_widget.clearSelection()
             selected_nodes = self.tracks_viewer.selected_nodes.as_list
             rows = []
             for node in selected_nodes:
@@ -376,12 +377,14 @@ class ColoredTableWidget(QWidget):
             index = model.index(row, 0)
             selection.select(index, index)
 
-        # Block selection signals
+        # Block selection signals to not trigger loop
         with QSignalBlocker(selection_model):
             selection_model.select(
                 selection,
                 QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows,
             )
+
+        self._table_widget.viewport().update()
 
     def scroll_to_node(self, node: int) -> None:
         """Identify the index of the node that was selected, and scroll to that index.
