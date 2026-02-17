@@ -65,12 +65,14 @@ class FloatDelegate(QStyledItemDelegate):
 class CustomTableWidget(QTableWidget):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.verticalHeader().setSectionsClickable(False)
         self._drag_start_row = None
 
     def mousePressEvent(self, event: QMouseEvent):
-        """Handle mouse click events and check modifiers for different behaviors: shift
-        for appending to selection, CMD/Ctrl for centering nodes (should not affect
-        selection).
+        """Handle mouse click events and check modifiers for different behaviors:
+        - Plain click: single selection, toggle if already selected
+        - Shift: append to selection.
+        - Ctrl/CMD: center node, should not affect selection.
         """
         index = self.indexAt(event.pos())
         if not index.isValid():
@@ -82,26 +84,36 @@ class CustomTableWidget(QTableWidget):
         ctrl = modifiers & Qt.ControlModifier
         shift = modifiers & Qt.ShiftModifier
 
+        sel_model = self.selectionModel()
+        model_index = self.model().index(row, 0)
+
         if ctrl:
-            self.parent().center_node(index)
+            self.parent().center_node(model_index)
             event.accept()
             return
 
         if shift:
             # Append single row
-            self.selectionModel().select(
-                self.model().index(row, 0),
-                QItemSelectionModel.Select | QItemSelectionModel.Rows,
+            sel_model.select(
+                model_index, QItemSelectionModel.Select | QItemSelectionModel.Rows
             )
             self._drag_start_row = row
             event.accept()
             return
 
-        # Plain click: single selection
-        self.clearSelection()
-        self.selectRow(row)
+        # Plain click: single selection, toggle if already selected
+        if sel_model.isSelected(model_index):
+            sel_model.select(
+                model_index, QItemSelectionModel.Deselect | QItemSelectionModel.Rows
+            )
+            self._drag_start_row = None
+        else:
+            sel_model.clearSelection()
+            sel_model.select(
+                model_index, QItemSelectionModel.Select | QItemSelectionModel.Rows
+            )
+            self._drag_start_row = row
 
-        self._drag_start_row = row
         event.accept()
 
     def mouseMoveEvent(self, event: QMouseEvent):
