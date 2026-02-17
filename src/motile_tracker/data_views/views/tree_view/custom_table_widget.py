@@ -3,15 +3,13 @@ import pandas as pd
 from matplotlib.colors import to_rgba
 from napari.utils import DirectLabelColormap
 from qtpy.QtCore import (
-    QEvent,
     QItemSelection,
     QItemSelectionModel,
-    QObject,
     QSignalBlocker,
     Qt,
     QTimer,
 )
-from qtpy.QtGui import QColor, QPen
+from qtpy.QtGui import QColor, QMouseEvent, QPen
 from qtpy.QtWidgets import (
     QAbstractItemView,
     QLabel,
@@ -49,24 +47,6 @@ class NoSelectionHighlightDelegate(QStyledItemDelegate):
             painter.drawRect(opt.rect.adjusted(1, 1, -2, -2))
 
 
-class ClickToSingleSelectFilter(QObject):
-    """Event filter to make plain left-clicks act like single selection
-    while still allowing Ctrl/Shift clicks to behave normally (append/range)."""
-
-    def __init__(self, table_widget):
-        super().__init__(table_widget)
-        self.table = table_widget
-
-    def eventFilter(self, obj, event):
-        if event.type() == QEvent.MouseButtonPress and event.button() == Qt.LeftButton:
-            modifiers = event.modifiers()
-            if not (modifiers & Qt.ShiftModifier):
-                self.table.clearSelection()
-            return False
-
-        return False
-
-
 class FloatDelegate(QStyledItemDelegate):
     def __init__(self, decimals, parent=None):
         super().__init__(parent)
@@ -84,25 +64,85 @@ class FloatDelegate(QStyledItemDelegate):
 
 
 class CustomTableWidget(QTableWidget):
-    def mousePressEvent(self, event):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._drag_start_row = None
+
+    def mousePressEvent(self, event: QMouseEvent):
+        """Handle mouse click events and check modifiers for different behaviors: shift
+        for appending to selection, CMD/Ctrl for centering nodes (should not affect
+        selection).
+        """
         index = self.indexAt(event.pos())
-        if index.isValid():
-            ctrl = bool(event.modifiers() & Qt.ControlModifier)
-            shift = bool(event.modifiers() & Qt.ShiftModifier)
+        if not index.isValid():
+            return
 
-            if ctrl:
-                # notify that node should be centered
-                self.parent().center_node(index)
-                return
+        row = index.row()
+        modifiers = event.modifiers()
 
-            if shift:
-                row = index.row()
-                self.selectRow(row)
-                event.accept()
-                return
+        ctrl = modifiers & Qt.ControlModifier
+        shift = modifiers & Qt.ShiftModifier
 
-            # Call super so selection behavior still works
-            super().mousePressEvent(event)
+        if ctrl:
+            self.parent().center_node(index)
+            event.accept()
+            return
+
+        if shift:
+            # Append single row
+            self.selectionModel().select(
+                self.model().index(row, 0),
+                QItemSelectionModel.Select | QItemSelectionModel.Rows,
+            )
+            self._drag_start_row = row
+            event.accept()
+            return
+
+        # Plain click: single selection
+        self.clearSelection()
+        self.selectRow(row)
+
+        self._drag_start_row = row
+        event.accept()
+
+    def mouseMoveEvent(self, event: QMouseEvent):
+        """Record mouse drag events to select a range. In combination with shift, it is
+        possible to select multiple ranges.
+        """
+
+        if not (event.buttons() & Qt.LeftButton):
+            return
+
+        index = self.indexAt(event.pos())
+        if not index.isValid() or self._drag_start_row is None:
+            return
+
+        current_row = index.row()
+        start = self._drag_start_row
+        end = current_row
+
+        top = min(start, end)
+        bottom = max(start, end)
+
+        selection = QItemSelection(
+            self.model().index(top, 0),
+            self.model().index(bottom, self.columnCount() - 1),
+        )
+
+        modifiers = event.modifiers()
+
+        if modifiers & Qt.ShiftModifier:
+            # add range
+            self.selectionModel().select(selection, QItemSelectionModel.Select)
+        else:
+            # replace selection with this range
+            self.selectionModel().select(selection, QItemSelectionModel.ClearAndSelect)
+
+        event.accept()
+
+    def mouseReleaseEvent(self, event: QMouseEvent):
+        self._drag_start_row = None
+        super().mouseReleaseEvent(event)
 
 
 class ColoredTableWidget(QWidget):
@@ -124,7 +164,7 @@ class ColoredTableWidget(QWidget):
 
         # Instruction label to explain left and right mouse click.
         label = QLabel(
-            "Use left mouse click to select and center a label. Use Ctrl/Meta to center a node, Shift to append to selection."
+            "Use left mouse click to select and center a label. Use Ctrl/CMD to center a node, Shift to append to selection. Use mouse drag to select a range."
         )
         label.setWordWrap(True)
         font = label.font()
@@ -165,9 +205,6 @@ class ColoredTableWidget(QWidget):
 
         self._table_widget.setSelectionMode(QAbstractItemView.MultiSelection)
         self._table_widget.setSelectionBehavior(QAbstractItemView.SelectRows)
-
-        self._click_filter = ClickToSingleSelectFilter(self._table_widget)
-        self._table_widget.viewport().installEventFilter(self._click_filter)
 
         delegate = NoSelectionHighlightDelegate(self._table_widget)
         self._table_widget.setItemDelegate(delegate)
