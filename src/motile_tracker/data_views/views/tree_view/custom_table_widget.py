@@ -5,7 +5,6 @@ from napari.utils import DirectLabelColormap
 from qtpy.QtCore import (
     QItemSelection,
     QItemSelectionModel,
-    QSignalBlocker,
     Qt,
     QTimer,
 )
@@ -157,7 +156,7 @@ class ColoredTableWidget(QWidget):
 
         self.set_data(df)
         self.ascending = False  # for choosing whether to sort ascending or descending
-        self._updating_selection = False
+        self._syncing = False
 
         # Connect to single click in the header to sort the table.
         self._table_widget.horizontalHeader().sectionClicked.connect(self._sort_table)
@@ -213,43 +212,57 @@ class ColoredTableWidget(QWidget):
         self.tracks_viewer.selected_nodes.list_updated.connect(self._update_selected)
         self.tracks_viewer.center_node.connect(self.scroll_to_node)
 
-    def center_node(self, index: int) -> None:
-        """Call TracksViewer to center Viewer on the node of current index
-
-        Args:
-            index (int): the index in the table corresponding to the to be centered node.
-        """
-        self._updating_selection = True
-        row = index.row()
-        node = self._table["ID"][row]
-        self.tracks_viewer.center_on_node(node)
-        self._updating_selection = False
-
     def _update_selected(self) -> None:
         """Select the rows belonging to the nodes that are in the selection list of the
         TracksViewer
         """
-        if self._updating_selection:
-            return  # skip if we're already updating
+        if self._syncing:
+            return
 
-        self._updating_selection = True
+        self._syncing = True
         try:
-            self._table_widget.clearSelection()
             selected_nodes = self.tracks_viewer.selected_nodes.as_list
-            rows = []
-            for node in selected_nodes:
-                rows.append(self._find_row(ID=node))
+            rows = [
+                self._find_row(ID=node) for node in selected_nodes if node is not None
+            ]
 
+            self._table_widget.clearSelection()
             self._select_rows(rows)
+
         finally:
-            self._updating_selection = False
+            self._syncing = False
+
+    def _select_rows(self, rows: list[int]) -> None:
+        """Replace current table selection with given rows.
+
+        Args:
+            rows (list[int]): list of indices to be selected.
+        """
+
+        if not rows:
+            return
+
+        model = self._table_widget.model()
+        selection_model = self._table_widget.selectionModel()
+
+        selection = QItemSelection()
+
+        for row in rows:
+            if row is None:
+                continue
+            index = model.index(row, 0)
+            selection.select(index, index)
+
+        selection_model.select(
+            selection,
+            QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows,
+        )
 
     def _on_selection_changed(self) -> None:
         """Update the node selection list on TracksViewer based on the rows selected in
         the table.
         """
-
-        if self._updating_selection:
+        if self._syncing:
             return  # skip if selection was changed programmatically
 
         rows = sorted({index.row() for index in self._table_widget.selectedIndexes()})
@@ -259,36 +272,88 @@ class ColoredTableWidget(QWidget):
         labels = [self._table["ID"][row] for row in rows]
 
         # Ensure we do not call this when it is still updating.
-        self._updating_selection = True
+        self._syncing = True
         try:
             self.tracks_viewer.selected_nodes.add_list(labels)
         finally:
-            self._updating_selection = False
+            self._syncing = False
 
         QTimer.singleShot(0, self._update_label_colormap)
 
-    def _get_colormap(self) -> DirectLabelColormap:
-        """Get a DirectLabelColormap that maps node ids to their track ids, and then
-        uses the tracks_viewer.colormap to map from track_id to color.
+    def center_node(self, index: int) -> None:
+        """Call TracksViewer to center Viewer on the node of current index
 
-        Returns:
-            DirectLabelColormap: A map from node ids to colors based on track id
+        Args:
+            index (int): the index in the table corresponding to the to be centered node.
         """
-        tracks = self.tracks_viewer.tracks
-        if tracks is not None:
-            nodes = list(tracks.graph.nodes())
-            track_ids = [tracks.get_track_id(node) for node in nodes]
-            colors = [self.tracks_viewer.colormap.map(tid) for tid in track_ids]
-        else:
-            nodes = []
-            colors = []
+        if self._syncing:
+            return
 
-        return DirectLabelColormap(
-            color_dict={
-                **dict(zip(nodes, colors, strict=True)),
-                None: [0, 0, 0, 0],
-            }
+        self._syncing = True
+        try:
+            row = index.row()
+            node = self._table["ID"][row]
+            self.tracks_viewer.center_on_node(node)
+        finally:
+            self._syncing = False
+
+    def scroll_to_node(self, node: int) -> None:
+        """Identify the index of the node that was selected, and scroll to that index.
+
+        Args:
+            node (int): the node to scroll to.
+        """
+
+        if self._syncing:
+            return
+
+        self._syncing = True
+        try:
+            index = self._find_row(ID=node)
+            selection_model = self._table_widget.selectionModel()
+
+            model_index = self._table_widget.model().index(index, 0)
+
+            if (
+                selection_model.isSelected(model_index)
+                and len(selection_model.selectedRows()) == 1
+            ):
+                return
+
+            self.scroll_to_row(index)
+
+        finally:
+            self._syncing = False
+
+    def scroll_to_row(self, index: int) -> None:
+        """Scroll to make sure the row is in view
+
+        Args:
+            index (int): the index to scroll to
+        """
+        self._table_widget.scrollTo(
+            self._table_widget.model().index(index, 0),
+            QAbstractItemView.PositionAtCenter,
         )
+
+    def _find_row(self, **conditions) -> int | None:
+        """
+        Find the first row matching the given conditions (e.g. label=12, time_point=5)
+        Returns: row index or None
+        """
+
+        n_rows = self._table_widget.rowCount()
+
+        for row in range(n_rows):
+            # Only check conditions that are not None
+            if all(
+                float(self._table[col][row]) == float(val)
+                for col, val in conditions.items()
+                if val is not None
+            ):
+                return row
+
+        return None
 
     def set_data(
         self, df: pd.DataFrame, columns_to_display: list[str] | None = None
@@ -328,6 +393,29 @@ class ColoredTableWidget(QWidget):
 
         self._set_label_colors_to_rows()
 
+    def _get_colormap(self) -> DirectLabelColormap:
+        """Get a DirectLabelColormap that maps node ids to their track ids, and then
+        uses the tracks_viewer.colormap to map from track_id to color.
+
+        Returns:
+            DirectLabelColormap: A map from node ids to colors based on track id
+        """
+        tracks = self.tracks_viewer.tracks
+        if tracks is not None:
+            nodes = list(tracks.graph.nodes())
+            track_ids = [tracks.get_track_id(node) for node in nodes]
+            colors = [self.tracks_viewer.colormap.map(tid) for tid in track_ids]
+        else:
+            nodes = []
+            colors = []
+
+        return DirectLabelColormap(
+            color_dict={
+                **dict(zip(nodes, colors, strict=True)),
+                None: [0, 0, 0, 0],
+            }
+        )
+
     def _set_label_colors_to_rows(self) -> None:
         """Apply the colors of the napari label image to the table, and set the text color
          depending on luminance (black test on light backgrounds, white text on dark
@@ -355,89 +443,6 @@ class ColoredTableWidget(QWidget):
                 item = self._table_widget.item(i, j)
                 item.setBackground(qcolor)
                 item.setForeground(text_color)
-
-    def _select_rows(self, rows: list[int]) -> None:
-        """Replace current table selection with given rows.
-
-        Args:
-            rows (list[int]): list of indices to be selected.
-        """
-
-        if not rows:
-            return
-
-        model = self._table_widget.model()
-        selection_model = self._table_widget.selectionModel()
-
-        selection = QItemSelection()
-
-        for row in rows:
-            if row is None:
-                continue
-            index = model.index(row, 0)
-            selection.select(index, index)
-
-        # Block selection signals to not trigger loop
-        with QSignalBlocker(selection_model):
-            selection_model.select(
-                selection,
-                QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows,
-            )
-
-        self._table_widget.viewport().update()
-
-    def scroll_to_node(self, node: int) -> None:
-        """Identify the index of the node that was selected, and scroll to that index.
-
-        Args:
-            node (int): the node to scroll to.
-        """
-
-        if self._updating_selection:
-            return  # skip if selection was changed programmatically
-
-        index = self._find_row(ID=node)
-
-        selection_model = self._table_widget.selectionModel()
-        # Check if the row is already selected
-        model_index = self._table_widget.model().index(index, 0)
-        if (
-            selection_model.isSelected(model_index)
-            and len(selection_model.selectedRows()) == 1
-        ):
-            return  # already selected, do nothing
-
-        self.scroll_to_row(index)  # for centering only
-
-    def scroll_to_row(self, index: int) -> None:
-        """Scroll to make sure the row is in view
-
-        Args:
-            index (int): the index to scroll to
-        """
-        self._table_widget.scrollTo(
-            self._table_widget.model().index(index, 0),
-            QAbstractItemView.PositionAtCenter,
-        )
-
-    def _find_row(self, **conditions) -> int | None:
-        """
-        Find the first row matching the given conditions (e.g. label=12, time_point=5)
-        Returns: row index or None
-        """
-
-        n_rows = self._table_widget.rowCount()
-
-        for row in range(n_rows):
-            # Only check conditions that are not None
-            if all(
-                float(self._table[col][row]) == float(val)
-                for col, val in conditions.items()
-                if val is not None
-            ):
-                return row
-
-        return None
 
     def _update_label_colormap(self) -> None:
         """
