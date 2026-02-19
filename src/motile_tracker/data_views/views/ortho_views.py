@@ -98,7 +98,7 @@ sync_filters = {
         },  # we will sync data separately on TrackPoints as we
         # need finer control
         "reverse_exclude": set(get_property_names_from_class(Points))
-        - {"mode", "size", "current_size"},
+        - {"mode", "size", "current_size", "visible"},
     },
     TrackLabels: {
         "forward_exclude": {"colormap"},
@@ -108,6 +108,7 @@ sync_filters = {
             "selected_label",
             "n_edit_dimensions",
             "brush_size",
+            "visible",
         },  # Let TrackLabels handle these properties on its own because it is listening to
         # them and we do not want to overwrite through reverse syncing.
     },
