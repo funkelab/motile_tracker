@@ -79,6 +79,7 @@ class TracksViewer:
 
         self.tracks_list = TracksList()
         self.tracks_list.view_tracks.connect(self.update_tracks)
+        self.tracks_list.request_colormap.connect(self.set_colormap_to_trackslist)
         self.selected_track = None
         self.track_id_color = [0, 0, 0, 0]
         self.force = False
@@ -89,6 +90,10 @@ class TracksViewer:
         self.set_keybinds()
 
         self.viewer.dims.events.ndisplay.connect(self.update_selection)
+
+    def set_colormap_to_trackslist(self):
+        """Set the current colormap on the TracksList, so that it can be exported."""
+        self.tracks_list.colormap = self.colormap
 
     def set_keybinds(self):
         bind_keymap(self.viewer, KEYMAP, self)
