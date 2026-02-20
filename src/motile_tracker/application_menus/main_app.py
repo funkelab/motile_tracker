@@ -18,7 +18,9 @@ class MainApp(QWidget):
         self.menu_widget = MenuWidget(viewer)
         tree_widget = TreeWidget(viewer)
 
-        viewer.window.add_dock_widget(tree_widget, area="bottom", name="Tree View")
+        viewer.window.add_dock_widget(
+            tree_widget, area="bottom", name="Lineage View (Motile Tracker)"
+        )
 
         layout = QVBoxLayout()
         layout.addWidget(self.menu_widget)
