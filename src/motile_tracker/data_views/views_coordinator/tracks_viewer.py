@@ -355,3 +355,9 @@ class TracksViewer:
         if self.tracks is None:
             return
         self.tracks_controller.redo()
+
+    def deselect(self, event=None):
+        self.selected_nodes.reset()
+
+    def restore_selection(self, event=None):
+        self.selected_nodes.restore()
