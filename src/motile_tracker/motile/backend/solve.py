@@ -29,13 +29,14 @@ def solve(
     input_data: np.ndarray,
     on_solver_update: Callable | None = None,
     scale: list | None = None,
+    cand_graph: nx.DiGraph | None = None,
 ) -> nx.DiGraph:
     """Get a tracking solution for the given segmentation and parameters.
 
-    Constructs a candidate graph from the segmentation, a solver from
-    the parameters, and then runs solving and returns a networkx graph
-    with the solution. Most of this functionality is implemented in the
-    motile toolbox.
+    Constructs a candidate graph from the segmentation (unless one is
+    provided), a solver from the parameters, and then runs solving and
+    returns a networkx graph with the solution. Most of this functionality
+    is implemented in the motile toolbox.
 
     Args:
         solver_params (SolverParams): The solver parameters to use when
@@ -48,6 +49,9 @@ def solve(
             a dictionary of event data, and can be used to track progress of
             the solver. Defaults to None.
         scale (list, optional): The scale of the data in each dimension.
+        cand_graph (nx.DiGraph, optional): A pre-built candidate graph. If
+            provided, skips candidate graph construction (except for
+            single-window mode which always builds its own). Defaults to None.
 
     Returns:
         nx.DiGraph: A solution graph where the ids of the nodes correspond to
@@ -61,7 +65,8 @@ def solve(
     ):
         return _solve_single_window(input_data, solver_params, on_solver_update, scale)
 
-    cand_graph = _build_candidate_graph(input_data, solver_params, scale)
+    if cand_graph is None:
+        cand_graph = build_candidate_graph(input_data, solver_params, scale)
 
     if solver_params.window_size is not None:
         return _solve_chunked(cand_graph, solver_params, on_solver_update)
@@ -69,7 +74,7 @@ def solve(
     return _solve_full(cand_graph, solver_params, on_solver_update)
 
 
-def _build_candidate_graph(
+def build_candidate_graph(
     input_data: np.ndarray,
     solver_params: SolverParams,
     scale: list | None = None,
@@ -243,7 +248,7 @@ def _solve_single_window(
         time_offset + (solver_params.window_size or 0),
     )
 
-    cand_graph = _build_candidate_graph(sliced_data, solver_params, scale)
+    cand_graph = build_candidate_graph(sliced_data, solver_params, scale)
 
     start_time = time.time()
     solution = _solve_window(cand_graph, solver_params, on_solver_update)

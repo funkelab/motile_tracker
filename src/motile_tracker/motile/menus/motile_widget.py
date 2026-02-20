@@ -15,7 +15,7 @@ from qtpy.QtWidgets import (
 from superqt.utils import thread_worker
 
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
-from motile_tracker.motile.backend import MotileRun, solve
+from motile_tracker.motile.backend import MotileRun, build_candidate_graph, solve
 
 from .run_editor import RunEditor
 from .run_viewer import RunViewer
@@ -120,25 +120,24 @@ class MotileWidget(QWidget):
             raise ValueError("Must have one of input segmentation or points")
 
         try:
-            run.graph = solve(
-                run.solver_params,
-                input_data,
-                lambda event_data: self._on_solver_event(run, event_data),
-                scale=run.scale,
-            )
+            cand_graph = build_candidate_graph(input_data, run.solver_params, run.scale)
         except ValueError as e:
             if "Duplicate values found among nodes" in str(e):
                 run.segmentation = ensure_unique_labels(run.segmentation)
                 input_data = run.segmentation
-                # try again
-                run.graph = solve(
-                    run.solver_params,
-                    input_data,
-                    lambda event_data: self._on_solver_event(run, event_data),
-                    scale=run.scale,
+                cand_graph = build_candidate_graph(
+                    input_data, run.solver_params, run.scale
                 )
             else:
                 raise
+
+        run.graph = solve(
+            run.solver_params,
+            input_data,
+            lambda event_data: self._on_solver_event(run, event_data),
+            scale=run.scale,
+            cand_graph=cand_graph,
+        )
 
         run._initialize_track_ids()
 
