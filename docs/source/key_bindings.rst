@@ -26,6 +26,8 @@ Napari viewer and layer key bindings and mouse functions
      - | Toggle between viewing all nodes in the
        | points/labels or only those for the currently
        | selected lineages
+   * - /
+     - | Toggle between hiding/showing the side menu and the docked treeview
 
 Tree view key and mouse functions
 *********************************
