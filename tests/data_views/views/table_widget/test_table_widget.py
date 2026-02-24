@@ -151,3 +151,89 @@ def test_sort_preserves_functionality(colored_table_widget, qtbot):
     qtbot.wait(50)
 
     assert len(tracks_viewer.selected_nodes.as_list) >= 1
+
+
+def test_table_widget_keybinds(colored_table_widget, qtbot):
+    """Test all keyboard shortcuts in the table widget.
+
+    The table widget supports keybinds that are delegated to tracks_viewer:
+    - D / Delete: delete_node
+    - A: create_edge
+    - B: delete_edge
+    - S: swap_nodes
+    - Z: undo
+    - R: redo
+    - Escape: deselect
+    - E: restore_selection
+    """
+    from unittest.mock import MagicMock
+
+    from qtpy.QtCore import Qt
+
+    widget, tracks_viewer = colored_table_widget
+    table_widget = widget._table_widget
+
+    # Set focus to the table widget so it receives key events
+    table_widget.setFocus()
+
+    # Mock all tracks_viewer methods to verify they're called
+    delete_mock = MagicMock()
+    tracks_viewer.delete_node = delete_mock
+
+    create_edge_mock = MagicMock()
+    tracks_viewer.create_edge = create_edge_mock
+
+    delete_edge_mock = MagicMock()
+    tracks_viewer.delete_edge = delete_edge_mock
+
+    swap_mock = MagicMock()
+    tracks_viewer.swap_nodes = swap_mock
+
+    undo_mock = MagicMock()
+    tracks_viewer.undo = undo_mock
+
+    redo_mock = MagicMock()
+    tracks_viewer.redo = redo_mock
+
+    deselect_mock = MagicMock()
+    tracks_viewer.deselect = deselect_mock
+
+    restore_mock = MagicMock()
+    tracks_viewer.restore_selection = restore_mock
+
+    # Test D key calls delete_node
+    qtbot.keyPress(table_widget, Qt.Key_D)
+    delete_mock.assert_called_once()
+
+    # Test Delete key also calls delete_node
+    delete_mock.reset_mock()
+    qtbot.keyPress(table_widget, Qt.Key_Delete)
+    delete_mock.assert_called_once()
+
+    # Test A key calls create_edge
+    qtbot.keyPress(table_widget, Qt.Key_A)
+    create_edge_mock.assert_called_once()
+
+    # Test B key calls delete_edge
+    qtbot.keyPress(table_widget, Qt.Key_B)
+    delete_edge_mock.assert_called_once()
+
+    # Test S key calls swap_nodes
+    qtbot.keyPress(table_widget, Qt.Key_S)
+    swap_mock.assert_called_once()
+
+    # Test Z key calls undo
+    qtbot.keyPress(table_widget, Qt.Key_Z)
+    undo_mock.assert_called_once()
+
+    # Test R key calls redo
+    qtbot.keyPress(table_widget, Qt.Key_R)
+    redo_mock.assert_called_once()
+
+    # Test Escape key calls deselect
+    qtbot.keyPress(table_widget, Qt.Key_Escape)
+    deselect_mock.assert_called_once()
+
+    # Test E key calls restore_selection
+    qtbot.keyPress(table_widget, Qt.Key_E)
+    restore_mock.assert_called_once()

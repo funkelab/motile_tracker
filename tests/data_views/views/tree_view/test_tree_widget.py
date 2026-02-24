@@ -314,6 +314,23 @@ def test_keyboard_shortcuts_all(mock_move, make_napari_viewer, graph_2d, qtbot):
         qtbot.keyPress(tree_widget, Qt.Key_W)
         mock_toggle.assert_called_once()
 
+    # Test 13: Delete key calls delete_node (alternate key for D)
+    delete_mock.reset_mock()
+    qtbot.keyPress(tree_widget, Qt.Key_Delete)
+    delete_mock.assert_called_once()
+
+    # Test 14: Escape key calls deselect
+    deselect_mock = MagicMock()
+    tracks_viewer.deselect = deselect_mock
+    qtbot.keyPress(tree_widget, Qt.Key_Escape)
+    deselect_mock.assert_called_once()
+
+    # Test 15: E key calls restore_selection
+    restore_mock = MagicMock()
+    tracks_viewer.restore_selection = restore_mock
+    qtbot.keyPress(tree_widget, Qt.Key_E)
+    restore_mock.assert_called_once()
+
 
 def test_mode_and_plot_type_switching(make_napari_viewer, graph_2d):
     """Test mode switching, plot type switching, and their interaction."""
