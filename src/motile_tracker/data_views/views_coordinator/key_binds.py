@@ -17,7 +17,7 @@ KEYMAP = {
     "swap_nodes": ["s"],
     "undo": ["z"],
     "redo": ["r"],
-    "hide_panels": ["Space"],
+    "hide_panels": ["/"],
 }
 
 
