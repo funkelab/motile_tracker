@@ -77,6 +77,8 @@ Tree view key and mouse functions
      - | Select the child node (vertical view of all
        | lineages) or the previous adjacent lineage
        | (horizontal view of selected lineage)
+   * - /
+     - | Toggle between hiding/showing the side menu and the docked treeview
 
 Key bindings for editing the tracks
 ***********************************
