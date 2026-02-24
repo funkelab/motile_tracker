@@ -30,6 +30,8 @@ if TYPE_CHECKING:
 
     from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
+from motile_tracker.data_views.views.layers.out_of_slice_points import ZOnlyPoints
+
 
 def custom_select(layer: napari.layers.Points, event: Event):
     """Block the current_size signal when selecting points to avoid changing the point
@@ -39,7 +41,7 @@ def custom_select(layer: napari.layers.Points, event: Event):
         yield from select(layer, event)
 
 
-class TrackPoints(napari.layers.Points):
+class TrackPoints(ZOnlyPoints):
     """Extended points layer that holds the track information and emits and
     responds to dynamics visualization signals
     """
