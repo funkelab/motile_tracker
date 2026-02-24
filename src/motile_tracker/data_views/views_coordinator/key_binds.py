@@ -18,6 +18,8 @@ KEYMAP = {
     "undo": ["z"],
     "redo": ["r"],
     "hide_panels": ["/"],
+    "deselect": ["Escape"],
+    "restore_selection": ["e"],
 }
 
 

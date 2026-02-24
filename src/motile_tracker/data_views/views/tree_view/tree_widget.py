@@ -542,6 +542,8 @@ class TreeWidget(QWidget):
             Qt.Key_F: self._flip_axes,
             Qt.Key_X: lambda: self.set_mouse_enabled(x=True, y=False),
             Qt.Key_Y: lambda: self.set_mouse_enabled(x=False, y=True),
+            Qt.Key_Escape: self.deselect,
+            Qt.Key_E: self.restore_selection,
         }
 
         # Check if the key has a handler in the map
@@ -585,6 +587,14 @@ class TreeWidget(QWidget):
     def redo(self):
         """Redo action."""
         self.tracks_viewer.redo()
+
+    def deselect(self):
+        """Deselect all nodes"""
+        self.tracks_viewer.deselect()
+
+    def restore_selection(self):
+        """Restore previous selection"""
+        self.tracks_viewer.restore_selection()
 
     def toggle_display_mode(self):
         """Toggle display mode."""

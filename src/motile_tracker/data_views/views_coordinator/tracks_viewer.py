@@ -387,3 +387,9 @@ class TracksViewer:
                     tree_view.parent().close()
                 else:
                     tree_view.parent().show()
+
+    def deselect(self, event=None):
+        self.selected_nodes.reset()
+
+    def restore_selection(self, event=None):
+        self.selected_nodes.restore()

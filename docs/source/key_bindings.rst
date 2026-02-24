@@ -18,6 +18,10 @@ Napari viewer and layer key bindings and mouse functions
      - Center view on this node (does not change selection)
    * - Mouse drag with point layer selection tool active
      - Select multiple nodes at once
+   * - ESC
+     - Clear selection
+   * - E
+     - Restore selection
    * - Q
      - | Toggle between viewing all nodes in the
        | points/labels or only those for the currently
@@ -49,6 +53,10 @@ Tree view key and mouse functions
      - Pan
    * - SHIFT + Mouse drag
      - Rectangular selection of nodes
+   * - ESC
+     - Clear selection
+   * - E
+     - Restore selection
    * - Right mouse click
      - Reset view
    * - Q
