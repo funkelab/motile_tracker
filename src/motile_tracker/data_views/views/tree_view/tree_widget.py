@@ -18,16 +18,16 @@ from qtpy.QtWidgets import (
 )
 from superqt import QCollapsible
 
-from motile_tracker.data_views.views.tree_view.custom_table_widget import (
-    ColoredTableWidget,
-)
-from motile_tracker.data_views.views.tree_view.flip_axes_widget import FlipTreeWidget
-from motile_tracker.data_views.views.tree_view.keybinds import (
+from motile_tracker.data_views.keybindings_config import (
     GENERAL_KEY_ACTIONS,
     TREE_WIDGET_MODIFIER_ACTIONS,
     TREE_WIDGET_NAVIGATION_KEYS,
     TREE_WIDGET_SPECIFIC_ACTIONS,
 )
+from motile_tracker.data_views.views.tree_view.custom_table_widget import (
+    ColoredTableWidget,
+)
+from motile_tracker.data_views.views.tree_view.flip_axes_widget import FlipTreeWidget
 from motile_tracker.data_views.views.tree_view.navigation_widget import NavigationWidget
 from motile_tracker.data_views.views.tree_view.tree_view_feature_widget import (
     TreeViewFeatureWidget,
@@ -512,7 +512,7 @@ class TreeWidget(QWidget):
         )
         # Add widget to flip the axes
         self.flip_widget = FlipTreeWidget()
-        self.flip_widget.flip_tree.connect(self._flip_axes)
+        self.flip_widget.flip_tree.connect(self.flip_axes)
 
         # Construct a toolbar and set main layout
         panel_layout = QHBoxLayout()
@@ -556,24 +556,24 @@ class TreeWidget(QWidget):
         """Handle key press events.
 
         Priority order:
-        1. General keybinds (work in table widget too) - call tracks_viewer methods
-        2. Tree-widget-specific keybinds - call TreeWidget methods
+        1. Tree-widget-specific keybinds (highest priority) - call TreeWidget methods
+        2. General keybinds (work in table widget too) - call tracks_viewer methods
         3. Modifier keybinds (mouse zoom constraints)
         4. Navigation (arrow keys)
         """
-        # Try general keybinds first (these work in both tree and table)
-        action_name = GENERAL_KEY_ACTIONS.get(event.key())
+        # Handle tree-widget-specific keybinds first (higher priority)
+        action_name = TREE_WIDGET_SPECIFIC_ACTIONS.get(event.key())
         if action_name:
-            method = getattr(self.tracks_viewer, action_name, None)
+            method = getattr(self, action_name, None)
             if method:
                 method()
                 event.accept()
                 return
 
-        # Handle tree-widget-specific keybinds
-        action_name = TREE_WIDGET_SPECIFIC_ACTIONS.get(event.key())
+        # Try general keybinds (these also work in table widget)
+        action_name = GENERAL_KEY_ACTIONS.get(event.key())
         if action_name:
-            method = getattr(self, action_name, None)
+            method = getattr(self.tracks_viewer, action_name, None)
             if method:
                 method()
                 event.accept()
@@ -633,7 +633,7 @@ class TreeWidget(QWidget):
         """Toggle feature mode."""
         self.plot_type_widget._toggle_plot_type()
 
-    def _flip_axes(self):
+    def flip_axes(self):
         """Flip the axes of the plot"""
 
         if self.view_direction == "horizontal":

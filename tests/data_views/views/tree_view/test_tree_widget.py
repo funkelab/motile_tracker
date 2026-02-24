@@ -413,16 +413,16 @@ def test_tree_widget_integration(make_napari_viewer, graph_2d):
     # Verify track_df was updated
     assert not tree_widget.track_df.empty
 
-    # Test 2: _flip_axes toggles between horizontal and vertical
+    # Test 2: flip_axes toggles between horizontal and vertical
     # Start with vertical
     assert tree_widget.view_direction == "vertical"
 
     # Flip to horizontal
-    tree_widget._flip_axes()
+    tree_widget.flip_axes()
     assert tree_widget.view_direction == "horizontal"
 
     # Flip back to vertical
-    tree_widget._flip_axes()
+    tree_widget.flip_axes()
     assert tree_widget.view_direction == "vertical"
 
     # Test 3: set_mouse_enabled changes mouse behavior (should not raise error)

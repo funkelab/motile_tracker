@@ -21,9 +21,7 @@ from qtpy.QtWidgets import (
     QWidget,
 )
 
-from motile_tracker.data_views.views.tree_view.keybinds import (
-    GENERAL_KEY_ACTIONS,
-)
+from motile_tracker.data_views.keybindings_config import GENERAL_KEY_ACTIONS
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
 
