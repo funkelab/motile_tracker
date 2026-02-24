@@ -356,6 +356,38 @@ class TracksViewer:
             return
         self.tracks_controller.redo()
 
+    def hide_panels(self, event=None):
+        """Show/hide menu and tree view panels without destroying"""
+
+        if "All (Motile Tracker)" in self.viewer.window.dock_widgets:
+            main_app = self.viewer.window.dock_widgets["All (Motile Tracker)"]
+            visible = main_app.isVisible()
+
+            if visible:
+                main_app.parent().close()
+            else:
+                main_app.parent().show()
+
+        if "Menus (Motile Tracker)" in self.viewer.window.dock_widgets:
+            menus_app = self.viewer.window.dock_widgets["Menus (Motile Tracker)"]
+            visible = menus_app.isVisible()
+
+            if visible:
+                menus_app.parent().close()
+            else:
+                menus_app.parent().show()
+
+        # if the tree view is docked, also show/hide it
+        if "Lineage View (Motile Tracker)" in self.viewer.window.dock_widgets:
+            tree_view = self.viewer.window.dock_widgets["Lineage View (Motile Tracker)"]
+            if not tree_view.parent().isFloating():
+                visible = tree_view.isVisible()
+
+                if visible:
+                    tree_view.parent().close()
+                else:
+                    tree_view.parent().show()
+
     def deselect(self, event=None):
         self.selected_nodes.reset()
 
