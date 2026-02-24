@@ -8,7 +8,7 @@ from qtpy.QtCore import (
     Qt,
     QTimer,
 )
-from qtpy.QtGui import QColor, QMouseEvent, QPen
+from qtpy.QtGui import QColor, QKeyEvent, QMouseEvent, QPen
 from qtpy.QtWidgets import (
     QAbstractItemView,
     QLabel,
@@ -21,6 +21,9 @@ from qtpy.QtWidgets import (
     QWidget,
 )
 
+from motile_tracker.data_views.views.tree_view.keybinds import (
+    GENERAL_KEY_ACTIONS,
+)
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
 
@@ -154,6 +157,28 @@ class CustomTableWidget(QTableWidget):
     def mouseReleaseEvent(self, event: QMouseEvent):
         self._drag_start_row = None
         super().mouseReleaseEvent(event)
+
+    def keyPressEvent(self, event: QKeyEvent) -> None:
+        """Handle key press events for common tracksviewer actions."""
+        # Get the parent ColoredTableWidget to access tracks_viewer
+        parent = self.parent()
+        if parent is None or not hasattr(parent, "tracks_viewer"):
+            super().keyPressEvent(event)
+            return
+
+        tracks_viewer = parent.tracks_viewer
+
+        # Get the action name from the general keybind mapping
+        action_name = GENERAL_KEY_ACTIONS.get(event.key())
+        if action_name:
+            method = getattr(tracks_viewer, action_name, None)
+            if method:
+                method()
+                event.accept()
+                return
+
+        # Allow parent class to handle other events
+        super().keyPressEvent(event)
 
 
 class ColoredTableWidget(QWidget):

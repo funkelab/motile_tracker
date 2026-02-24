@@ -22,6 +22,12 @@ from motile_tracker.data_views.views.tree_view.custom_table_widget import (
     ColoredTableWidget,
 )
 from motile_tracker.data_views.views.tree_view.flip_axes_widget import FlipTreeWidget
+from motile_tracker.data_views.views.tree_view.keybinds import (
+    GENERAL_KEY_ACTIONS,
+    TREE_WIDGET_MODIFIER_ACTIONS,
+    TREE_WIDGET_NAVIGATION_KEYS,
+    TREE_WIDGET_SPECIFIC_ACTIONS,
+)
 from motile_tracker.data_views.views.tree_view.navigation_widget import NavigationWidget
 from motile_tracker.data_views.views.tree_view.tree_view_feature_widget import (
     TreeViewFeatureWidget,
@@ -547,41 +553,45 @@ class TreeWidget(QWidget):
         self._update_track_data(reset_view=True)
 
     def keyPressEvent(self, event: QKeyEvent) -> None:
-        """Handle key press events."""
-        key_map = {
-            Qt.Key_Delete: self.delete_node,
-            Qt.Key_D: self.delete_node,
-            Qt.Key_A: self.create_edge,
-            Qt.Key_B: self.delete_edge,
-            Qt.Key_S: self.swap_nodes,
-            Qt.Key_Z: self.undo,
-            Qt.Key_R: self.redo,
-            Qt.Key_Q: self.toggle_display_mode,
-            Qt.Key_W: self.toggle_feature_mode,
-            Qt.Key_F: self._flip_axes,
-            Qt.Key_X: lambda: self.set_mouse_enabled(x=True, y=False),
-            Qt.Key_Y: lambda: self.set_mouse_enabled(x=False, y=True),
-            Qt.Key_Escape: self.deselect,
-            Qt.Key_E: self.restore_selection,
-        }
+        """Handle key press events.
 
-        # Check if the key has a handler in the map
-        handler = key_map.get(event.key())
+        Priority order:
+        1. General keybinds (work in table widget too) - call tracks_viewer methods
+        2. Tree-widget-specific keybinds - call TreeWidget methods
+        3. Modifier keybinds (mouse zoom constraints)
+        4. Navigation (arrow keys)
+        """
+        # Try general keybinds first (these work in both tree and table)
+        action_name = GENERAL_KEY_ACTIONS.get(event.key())
+        if action_name:
+            method = getattr(self.tracks_viewer, action_name, None)
+            if method:
+                method()
+                event.accept()
+                return
 
-        if handler:
-            handler()  # Call the function bound to the key
-        else:
-            # Handle navigation (Arrow keys)
-            direction_map = {
-                Qt.Key_Left: "left",
-                Qt.Key_Right: "right",
-                Qt.Key_Up: "up",
-                Qt.Key_Down: "down",
-            }
-            direction = direction_map.get(event.key())
-            if direction:
-                self.navigation_widget.move(direction)
-                self.tree_widget.setFocus()
+        # Handle tree-widget-specific keybinds
+        action_name = TREE_WIDGET_SPECIFIC_ACTIONS.get(event.key())
+        if action_name:
+            method = getattr(self, action_name, None)
+            if method:
+                method()
+                event.accept()
+                return
+
+        # Handle mouse zoom constraints (X/Y axes)
+        if event.key() in TREE_WIDGET_MODIFIER_ACTIONS:
+            x_enabled, y_enabled = TREE_WIDGET_MODIFIER_ACTIONS[event.key()]
+            self.set_mouse_enabled(x=x_enabled, y=y_enabled)
+            event.accept()
+            return
+
+        # Handle navigation (Arrow keys)
+        direction = TREE_WIDGET_NAVIGATION_KEYS.get(event.key())
+        if direction:
+            self.navigation_widget.move(direction)
+            self.tree_widget.setFocus()
+            event.accept()
 
     def delete_node(self):
         """Delete a node."""
