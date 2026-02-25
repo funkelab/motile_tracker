@@ -131,7 +131,7 @@ class MotileRun(SolutionTracks):
         time, run_name = cls._unpack_id(run_dir.stem)
         params = cls._load_params(run_dir)
         input_points = cls._load_array(run_dir, IN_POINTS_FILENAME, required=False)
-        tracks = load_tracks(run_dir, seg_required=False)
+        tracks = load_tracks(run_dir, seg_required=False, solution=True)
         gaps = cls._load_list(run_dir=run_dir, filename=GAPS_FILENAME, required=False)
         return cls(
             graph=tracks.graph,
