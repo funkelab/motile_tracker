@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 class MotileWidget(QWidget):
     """A widget that controls the backend components of the motile tracker.
     Recieves user input about solver parameters, runs motile, and passes
-    results to the TrackingViewController.
+    results to the TracksViewer.
     """
 
     # A signal for passing events from the motile solver to the run view widget

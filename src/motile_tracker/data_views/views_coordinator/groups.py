@@ -109,10 +109,10 @@ class CollectionWidget(QWidget):
         col1_layout.addWidget(self.jump_to_next_btn)
 
         col2_layout = QVBoxLayout()
-        self.deselect_btn = QPushButton("Deselect")
-        self.deselect_btn.clicked.connect(self.tracks_viewer.selected_nodes.reset)
-        self.reselect_btn = QPushButton("Restore selection")
-        self.reselect_btn.clicked.connect(self.tracks_viewer.selected_nodes.restore)
+        self.deselect_btn = QPushButton("Deselect [ESC]")
+        self.deselect_btn.clicked.connect(self.tracks_viewer.deselect)
+        self.reselect_btn = QPushButton("Restore selection [E]")
+        self.reselect_btn.clicked.connect(self.tracks_viewer.restore_selection)
         self.jump_to_previous_btn = QPushButton("Previous selected node")
         self.jump_to_previous_btn.clicked.connect(
             lambda: self._jump_to_node(forward=False)

@@ -280,7 +280,7 @@ class TracksViewer:
         self.update_track_id.emit()
 
     def delete_node(self, event=None):
-        """Calls the tracks controller to delete currently selected nodes"""
+        """Calls the UserAction to delete currently selected nodes"""
 
         if self.tracks is None:
             return
@@ -288,7 +288,7 @@ class TracksViewer:
             UserDeleteNode(self.tracks, node=node)
 
     def delete_edge(self, event=None):
-        """Calls the tracks controller to delete an edge between the two currently
+        """Calls the UserAction to delete an edge between the two currently
         selected nodes
         """
 
@@ -307,7 +307,7 @@ class TracksViewer:
             UserDeleteEdge(self.tracks, (node1, node2))
 
     def swap_nodes(self, event=None):
-        """Calls the tracks controller to swap the predecessors of the two currently
+        """Calls the UserAction to swap the predecessors of the two currently
         selected nodes
         """
 
@@ -354,3 +354,41 @@ class TracksViewer:
         if self.tracks is None:
             return
         self.tracks.redo()
+
+    def hide_panels(self, event=None):
+        """Show/hide menu and tree view panels without destroying"""
+
+        if "All (Motile Tracker)" in self.viewer.window.dock_widgets:
+            main_app = self.viewer.window.dock_widgets["All (Motile Tracker)"]
+            visible = main_app.isVisible()
+
+            if visible:
+                main_app.parent().close()
+            else:
+                main_app.parent().show()
+
+        if "Menus (Motile Tracker)" in self.viewer.window.dock_widgets:
+            menus_app = self.viewer.window.dock_widgets["Menus (Motile Tracker)"]
+            visible = menus_app.isVisible()
+
+            if visible:
+                menus_app.parent().close()
+            else:
+                menus_app.parent().show()
+
+        # if the tree view is docked, also show/hide it
+        if "Lineage View (Motile Tracker)" in self.viewer.window.dock_widgets:
+            tree_view = self.viewer.window.dock_widgets["Lineage View (Motile Tracker)"]
+            if not tree_view.parent().isFloating():
+                visible = tree_view.isVisible()
+
+                if visible:
+                    tree_view.parent().close()
+                else:
+                    tree_view.parent().show()
+
+    def deselect(self, event=None):
+        self.selected_nodes.reset()
+
+    def restore_selection(self, event=None):
+        self.selected_nodes.restore()

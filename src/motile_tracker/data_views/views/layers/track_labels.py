@@ -119,7 +119,7 @@ class TrackLabels(ContourLabels):
         self.events.selected_label.connect(self._ensure_valid_label)
 
         # listen to changing the contours
-        self.events.contour.connect(self.tracks_viewer.mode_updated)
+        self.events.contour.connect(self.tracks_viewer.mode_updated.emit)
 
     # Connect click events to node selection
     def click(self, _, event):
@@ -357,7 +357,7 @@ class TrackLabels(ContourLabels):
         emit refresh signal to update colors in all layers/widgets"""
 
         self.tracks_viewer.colormap = napari.utils.colormaps.label_colormap(
-            49,
+            random.randint(49, 69),
             seed=random.uniform(0, 1),
             background_value=0,
         )

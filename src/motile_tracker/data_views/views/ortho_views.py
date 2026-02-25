@@ -16,6 +16,7 @@ from motile_tracker.data_views.views.layers.click_utils import (
     get_click_value,
 )
 from motile_tracker.data_views.views.layers.contour_labels import ContourLabels
+from motile_tracker.data_views.views.layers.out_of_slice_points import ZOnlyPoints
 from motile_tracker.data_views.views.layers.track_graph import TrackGraph
 from motile_tracker.data_views.views.layers.track_labels import TrackLabels
 from motile_tracker.data_views.views.layers.track_points import TrackPoints
@@ -50,7 +51,7 @@ def copy_layer(layer: Layer, name: str = ""):
         res_layer._redo_history = layer._redo_history
 
     elif isinstance(layer, TrackPoints):
-        res_layer = Points(
+        res_layer = ZOnlyPoints(
             data=layer.data,
             name=layer.name,
         )
@@ -98,7 +99,7 @@ sync_filters = {
         },  # we will sync data separately on TrackPoints as we
         # need finer control
         "reverse_exclude": set(get_property_names_from_class(Points))
-        - {"mode", "size", "current_size"},
+        - {"mode", "size", "current_size", "visible"},
     },
     TrackLabels: {
         "forward_exclude": {"colormap"},
@@ -108,6 +109,7 @@ sync_filters = {
             "selected_label",
             "n_edit_dimensions",
             "brush_size",
+            "visible",
         },  # Let TrackLabels handle these properties on its own because it is listening to
         # them and we do not want to overwrite through reverse syncing.
     },
@@ -117,20 +119,20 @@ sync_filters = {
 # Define special functions to allow specific behavior on special layer types (TrackLabels,
 # and TrackPoints)
 #
-def point_data_hook(orig_layer: TrackPoints, copied_layer: Points) -> None:
+def point_data_hook(orig_layer: TrackPoints, copied_layer: ZOnlyPoints) -> None:
     """Hook to connect to sync points data and visualization between original and copied
     Points layers.
 
     Args:
         orig_layer (TrackPoints): TracksLabels layer from which the copied layer is
             derived.
-        copied_layer (Points): Points equivalent of the TracksPoints layer.
+        copied_layer (ZOnlyPoints): ZOnlyPoints equivalent of the TracksPoints layer.
     """
 
     # Sync the shown points and their size, as it is not synced by default. We bind to the
     # border_color event as this this is emitted when we modify shown points and point
     # size on the TrackPoints layer.
-    def sync_shown_points(orig_layer: TrackPoints, copied_layer: Points) -> None:
+    def sync_shown_points(orig_layer: TrackPoints, copied_layer: ZOnlyPoints) -> None:
         """Sync the visible points between original TrackPoints layer and Points layers
         in ViewerModel instances (this is not a synced property)"""
 
@@ -146,7 +148,7 @@ def point_data_hook(orig_layer: TrackPoints, copied_layer: Points) -> None:
     orig_layer.events.border_color.connect(shown_points_wrapper)
 
     # Receive data updates from the original layer
-    def receive_data(orig_layer: TrackPoints, copied_layer: Points) -> None:
+    def receive_data(orig_layer: TrackPoints, copied_layer: ZOnlyPoints) -> None:
         """Respond to signal from the original layer, to update the data"""
 
         copied_layer.events.data.disconnect(copied_layer._sync_data_wrapper)
@@ -160,9 +162,9 @@ def point_data_hook(orig_layer: TrackPoints, copied_layer: Points) -> None:
 
     # Sync the event that is emitted when a point is moved or deleted. We need to capture
     # it on the original layer to process it there, and potentially undo it if it was an
-    # invalid action (we have no way to judge that on a normal Points layer).
+    # invalid action (we have no way to judge that on a normal ZOnlyPoints layer).
     def sync_data_event(
-        orig_layer: TrackPoints, copied_layer: Points, event: Event
+        orig_layer: TrackPoints, copied_layer: ZOnlyPoints, event: Event
     ) -> None:
         """Send the event that is emitted when a point is moved or deleted to the original
         layer"""
@@ -254,22 +256,22 @@ def colormap_hook(orig_layer: TrackLabels, copied_layer: Labels) -> None:
 
 
 def track_layers_hook(
-    orig_layer: TrackLabels | TrackPoints, copied_layer: Labels | Points
+    orig_layer: TrackLabels | TrackPoints, copied_layer: Labels | ZOnlyPoints
 ) -> None:
     """Hook to capture click events on TrackLabels and TrackPoints derived Labels and
-    Points layers, and forward them to their original layer. Also, register key binds
+    ZOnlyPoints layers, and forward them to their original layer. Also, register key binds
     for view mode, undo & redo to copied layer, that call functions on the original layer.
 
     Args:
         orig_layer (TrackLabels | TrackPoints): TracksLabels or TrackPoints layer from
             which the copied layer is derived.
-        copied_layer (Labels | Points): Labels or Points equivalent of the TracksLabels
+        copied_layer (Labels | ZOnlyPoints): Labels or ZOnlyPoints equivalent of the TracksLabels
             or TrackPoints layer.
     """
 
     # define the click behavior the layer should respond to
     def click(
-        orig_layer: TrackLabels | TrackPoints, layer: Labels | Points, event: Event
+        orig_layer: TrackLabels | TrackPoints, layer: Labels | ZOnlyPoints, event: Event
     ):
         if layer.mode == "pan_zoom":
             was_click = yield from detect_click(event)
