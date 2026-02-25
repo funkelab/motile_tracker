@@ -484,4 +484,5 @@ class CollectionWidget(QWidget):
             tracks=self.tracks_viewer.tracks,
             name=group_name,
             nodes_to_keep=nodes_to_keep,
+            colormap=self.tracks_viewer.colormap,
         )
