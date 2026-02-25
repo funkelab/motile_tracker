@@ -31,9 +31,7 @@ classifiers = [
 
 dependencies =[
     "napari>=0.6.2,<1",
-    # "funtracks>=1.7.0,<2",
-    #TODO Teun: pin to specific commit until next release
-    "funtracks @ git+https://github.com/funkelab/funtracks.git@5fb44c0df95ad20b687e64d5404df93f89d78cc5",
+    "funtracks==1.8.0-a3",
     "appdirs>=1,<2",
     "numpy>=2,<3",
     "magicgui>=0.10.1",
