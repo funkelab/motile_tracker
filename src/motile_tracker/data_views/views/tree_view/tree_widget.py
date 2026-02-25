@@ -12,11 +12,21 @@ from qtpy.QtCore import Qt
 from qtpy.QtGui import QColor, QKeyEvent, QMouseEvent
 from qtpy.QtWidgets import (
     QHBoxLayout,
+    QSplitter,
     QVBoxLayout,
     QWidget,
 )
 from superqt import QCollapsible
 
+from motile_tracker.data_views.keybindings_config import (
+    GENERAL_KEY_ACTIONS,
+    TREE_WIDGET_MODIFIER_ACTIONS,
+    TREE_WIDGET_NAVIGATION_KEYS,
+    TREE_WIDGET_SPECIFIC_ACTIONS,
+)
+from motile_tracker.data_views.views.tree_view.custom_table_widget import (
+    ColoredTableWidget,
+)
 from motile_tracker.data_views.views.tree_view.flip_axes_widget import FlipTreeWidget
 from motile_tracker.data_views.views.tree_view.navigation_widget import NavigationWidget
 from motile_tracker.data_views.views.tree_view.tree_view_feature_widget import (
@@ -481,10 +491,14 @@ class TreeWidget(QWidget):
         self.mode_widget.change_mode.connect(self._set_mode)
 
         # Add buttons to change which feature to display
-        features_to_plot = get_features_from_tracks(self.tracks_viewer.tracks)
+        features_to_plot = get_features_from_tracks(
+            self.tracks_viewer.tracks, features_to_ignore=["Time", "Tracklet ID"]
+        )
         self.plot_type_widget = TreeViewFeatureWidget(
             features_to_plot,
-            get_features=lambda: get_features_from_tracks(self.tracks_viewer.tracks),
+            get_features=lambda: get_features_from_tracks(
+                self.tracks_viewer.tracks, features_to_ignore=["Time", "Tracklet ID"]
+            ),
         )
         self.plot_type_widget.change_plot_type.connect(self._set_plot_type)
 
@@ -498,7 +512,7 @@ class TreeWidget(QWidget):
         )
         # Add widget to flip the axes
         self.flip_widget = FlipTreeWidget()
-        self.flip_widget.flip_tree.connect(self._flip_axes)
+        self.flip_widget.flip_tree.connect(self.flip_axes)
 
         # Construct a toolbar and set main layout
         panel_layout = QHBoxLayout()
@@ -521,48 +535,65 @@ class TreeWidget(QWidget):
         collapsable_widget.addWidget(panel)
         collapsable_widget.collapse(animate=False)
 
+        tree_widget = QWidget()
         layout.addWidget(collapsable_widget)
         layout.addWidget(self.tree_widget)
         layout.setSpacing(0)
-        self.setLayout(layout)
+        tree_widget.setLayout(layout)
+
+        splitter = QSplitter(Qt.Horizontal)
+
+        self.table_widget = ColoredTableWidget(self.tracks_viewer, self.track_df)
+        splitter.addWidget(tree_widget)
+        splitter.addWidget(self.table_widget)
+        splitter.setStretchFactor(0, 7)
+        splitter.setStretchFactor(1, 1)
+
+        main_layout = QHBoxLayout()
+        main_layout.addWidget(splitter)
+        self.setLayout(main_layout)
         self._update_track_data(reset_view=True)
 
     def keyPressEvent(self, event: QKeyEvent) -> None:
-        """Handle key press events."""
-        key_map = {
-            Qt.Key_Delete: self.delete_node,
-            Qt.Key_D: self.delete_node,
-            Qt.Key_A: self.create_edge,
-            Qt.Key_B: self.delete_edge,
-            Qt.Key_S: self.swap_nodes,
-            Qt.Key_Z: self.undo,
-            Qt.Key_R: self.redo,
-            Qt.Key_Q: self.toggle_display_mode,
-            Qt.Key_W: self.toggle_feature_mode,
-            Qt.Key_F: self._flip_axes,
-            Qt.Key_X: lambda: self.set_mouse_enabled(x=True, y=False),
-            Qt.Key_Y: lambda: self.set_mouse_enabled(x=False, y=True),
-            Qt.Key_Escape: self.deselect,
-            Qt.Key_E: self.restore_selection,
-        }
+        """Handle key press events.
 
-        # Check if the key has a handler in the map
-        handler = key_map.get(event.key())
+        Priority order:
+        1. Tree-widget-specific keybinds (highest priority) - call TreeWidget methods
+        2. General keybinds (work in table widget too) - call tracks_viewer methods
+        3. Modifier keybinds (mouse zoom constraints)
+        4. Navigation (arrow keys)
+        """
+        # Handle tree-widget-specific keybinds first (higher priority)
+        action_name = TREE_WIDGET_SPECIFIC_ACTIONS.get(event.key())
+        if action_name:
+            method = getattr(self, action_name, None)
+            if method:
+                method()
+                event.accept()
+                return
 
-        if handler:
-            handler()  # Call the function bound to the key
-        else:
-            # Handle navigation (Arrow keys)
-            direction_map = {
-                Qt.Key_Left: "left",
-                Qt.Key_Right: "right",
-                Qt.Key_Up: "up",
-                Qt.Key_Down: "down",
-            }
-            direction = direction_map.get(event.key())
-            if direction:
-                self.navigation_widget.move(direction)
-                self.tree_widget.setFocus()
+        # Try general keybinds (these also work in table widget)
+        action_name = GENERAL_KEY_ACTIONS.get(event.key())
+        if action_name:
+            method = getattr(self.tracks_viewer, action_name, None)
+            if method:
+                method()
+                event.accept()
+                return
+
+        # Handle mouse zoom constraints (X/Y axes)
+        if event.key() in TREE_WIDGET_MODIFIER_ACTIONS:
+            x_enabled, y_enabled = TREE_WIDGET_MODIFIER_ACTIONS[event.key()]
+            self.set_mouse_enabled(x=x_enabled, y=y_enabled)
+            event.accept()
+            return
+
+        # Handle navigation (Arrow keys)
+        direction = TREE_WIDGET_NAVIGATION_KEYS.get(event.key())
+        if direction:
+            self.navigation_widget.move(direction)
+            self.tree_widget.setFocus()
+            event.accept()
 
     def delete_node(self):
         """Delete a node."""
@@ -604,7 +635,7 @@ class TreeWidget(QWidget):
         """Toggle feature mode."""
         self.plot_type_widget._toggle_plot_type()
 
-    def _flip_axes(self):
+    def flip_axes(self):
         """Flip the axes of the plot"""
 
         if self.view_direction == "horizontal":
@@ -674,7 +705,9 @@ class TreeWidget(QWidget):
 
         # check whether we have regionprop measurements and therefore should activate the
         # feature button
-        features_to_plot = get_features_from_tracks(self.tracks_viewer.tracks)
+        features_to_plot = get_features_from_tracks(
+            self.tracks_viewer.tracks, features_to_ignore=["Time", "Tracklet ID"]
+        )
         self.plot_type_widget.update_feature_dropdown(features_to_plot)
 
         # if reset_view, we got new data and want to reset display and feature before
@@ -717,6 +750,11 @@ class TreeWidget(QWidget):
                 reset_view=reset_view,
                 allow_flip=allow_flip,
             )
+
+        columns_to_display = ["node_id"] + get_features_from_tracks(
+            self.tracks_viewer.tracks
+        )
+        self.table_widget.set_data(self.track_df, columns_to_display)
 
     def _set_mode(self, mode: str) -> None:
         """Set the display mode to all or lineage view. Currently, linage

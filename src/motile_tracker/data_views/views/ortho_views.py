@@ -11,6 +11,7 @@ from napari_orthogonal_views.ortho_view_manager import (  # noqa
     _get_manager,
 )
 
+from motile_tracker.data_views.keybindings_config import KEYMAP, bind_keymap
 from motile_tracker.data_views.views.layers.click_utils import (
     detect_click,
     get_click_value,
@@ -20,10 +21,6 @@ from motile_tracker.data_views.views.layers.out_of_slice_points import ZOnlyPoin
 from motile_tracker.data_views.views.layers.track_graph import TrackGraph
 from motile_tracker.data_views.views.layers.track_labels import TrackLabels
 from motile_tracker.data_views.views.layers.track_points import TrackPoints
-from motile_tracker.data_views.views_coordinator.key_binds import (
-    KEYMAP,
-    bind_keymap,
-)
 
 
 # redefinition of copy_layer function

@@ -61,14 +61,13 @@ def extract_sorted_tracks(
             node_set,
             key=lambda node: tracks.get_time(node),
         )
-        positions = tracks.get_positions(sorted_nodes).tolist()
 
         # track_id and color are the same for all nodes in a node_set
         parent_track_id = None
         track_id = tracks.get_track_id(sorted_nodes[0])
         color = np.concatenate((colormap.map(track_id)[:3] * 255, [255]))
 
-        for node, pos in zip(sorted_nodes, positions, strict=False):
+        for node in sorted_nodes:
             if node in parent_nodes:
                 state = NodeType.SPLIT
                 symbol = "t1"
@@ -84,8 +83,6 @@ def extract_sorted_tracks(
                 "node_id": node,
                 "track_id": track_id,
                 "color": color,
-                "x": pos[-1],
-                "y": pos[-2],
                 "parent_id": 0,
                 "parent_track_id": 0,
                 "state": state,
@@ -93,21 +90,22 @@ def extract_sorted_tracks(
             }
 
             for feature_key, feature in tracks.features.items():
-                if feature_key not in track_dict:
-                    name = feature.get("display_name", feature_key)
-                    val = tracks.get_node_attr(node, feature_key)
-                    if isinstance(val, list | tuple):
-                        for i, v in enumerate(val):
-                            if isinstance(name, list | tuple):
-                                display_name = name[i]
-                            else:
-                                display_name = f"{name}_{i}"
-                            track_dict[display_name] = v
-                    else:
-                        track_dict[name] = val
-
-            if len(pos) == 3:
-                track_dict["z"] = pos[0]
+                display_name = feature.get("display_name", feature_key)
+                value_names = feature.get("value_names", None)
+                val = tracks.get_node_attr(node, feature_key)
+                if isinstance(val, list | tuple):
+                    for i, v in enumerate(val):
+                        if isinstance(display_name, list | tuple):
+                            name = display_name[i]
+                        elif isinstance(value_names, list) and len(value_names) == len(
+                            val
+                        ):
+                            name = f"{value_names[i]}"
+                        else:
+                            name = f"{display_name}_{i}"
+                        track_dict[name] = v
+                else:
+                    track_dict[display_name] = val
 
             # Determine parent_id and parent_track_id
             predecessors = list(solution_nx_graph.predecessors(node))
@@ -257,7 +255,9 @@ def extract_lineage_tree(graph: nx.DiGraph, node_id: str) -> list[str]:
     return list(nodes)
 
 
-def get_features_from_tracks(tracks: Tracks | None = None) -> list[str]:
+def get_features_from_tracks(
+    tracks: Tracks | None = None, features_to_ignore: list[str] | None = None
+) -> list[str]:
     """Extract the regionprops feature display names currently activated on Tracks.
 
     Args:
@@ -268,23 +268,30 @@ def get_features_from_tracks(tracks: Tracks | None = None) -> list[str]:
         if tracks is None
     """
 
-    features_to_ignore = ["Time", "Tracklet ID"]
+    if features_to_ignore is None:
+        features_to_ignore = []
     features_to_plot = []
     if tracks is not None:
         for feature in tracks.features.values():
             # Skip edge features - only show node features in dropdown
             if feature["feature_type"] == "edge":
                 continue
+            name = feature["display_name"]
             if feature["value_type"] in ("float", "int"):
                 if feature["num_values"] > 1:
+                    value_names = feature.get("value_names", None)
                     for i in range(feature["num_values"]):
-                        name = feature["display_name"]
                         if isinstance(name, list | tuple):
                             features_to_plot.append(name[i])
+                        elif (
+                            value_names is not None
+                            and len(value_names) == feature["num_values"]
+                        ):
+                            features_to_plot.append(value_names[i])
                         else:
-                            features_to_plot.append(f"{feature['display_name']}_{i}")
+                            features_to_plot.append(f"{name}_{i}")
                 else:
-                    features_to_plot.append(feature["display_name"])
+                    features_to_plot.append(name)
 
     features_to_plot = [
         feature for feature in features_to_plot if feature not in features_to_ignore

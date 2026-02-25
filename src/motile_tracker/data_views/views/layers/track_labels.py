@@ -12,15 +12,15 @@ from napari.utils import DirectLabelColormap
 from napari.utils.action_manager import action_manager
 from napari.utils.notifications import show_info
 
+from motile_tracker.data_views.keybindings_config import (
+    KEYMAP,
+    bind_keymap,
+)
 from motile_tracker.data_views.views.layers.click_utils import (
     detect_click,
     get_click_value,
 )
 from motile_tracker.data_views.views.layers.contour_labels import ContourLabels
-from motile_tracker.data_views.views_coordinator.key_binds import (
-    KEYMAP,
-    bind_keymap,
-)
 from motile_tracker.data_views.views_coordinator.user_dialogs import (
     confirm_force_operation,
 )
