@@ -546,6 +546,8 @@ class TreeWidget(QWidget):
         self.table_widget = ColoredTableWidget(self.tracks_viewer, self.track_df)
         splitter.addWidget(tree_widget)
         splitter.addWidget(self.table_widget)
+        splitter.setStretchFactor(0, 7)
+        splitter.setStretchFactor(1, 1)
 
         main_layout = QHBoxLayout()
         main_layout.addWidget(splitter)
