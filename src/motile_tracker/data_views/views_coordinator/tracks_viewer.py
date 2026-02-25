@@ -304,7 +304,7 @@ class TracksViewer:
             if time1 > time2:
                 node1, node2 = node2, node1
 
-            UserDeleteEdge(self.tracks, source=node1, target=node2)
+            UserDeleteEdge(self.tracks, (node1, node2))
 
     def swap_nodes(self, event=None):
         """Calls the tracks controller to swap the predecessors of the two currently
@@ -333,14 +333,14 @@ class TracksViewer:
                 node1, node2 = node2, node1
 
             try:
-                UserAddEdge(self.tracks, source=node1, target=node2, force=self.force)
+                UserAddEdge(self.tracks, (node1, node2), force=self.force)
             except InvalidActionError as e:
                 if e.forceable:
                     # Ask the user if the action should be forced
                     force, always_force = confirm_force_operation(message=str(e))
                     self.force = always_force
                     if force:
-                        UserAddEdge(self.tracks, source=node1, target=node2, force=True)
+                        UserAddEdge(self.tracks, (node1, node2), force=True)
                 else:
                     # Re-raise the exception if it is not forceable
                     raise

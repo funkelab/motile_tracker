@@ -5,9 +5,9 @@ Tests cover node operations, edge operations, display modes, and selection manag
 
 from unittest.mock import patch
 
+import networkx as nx
 import pytest
 from funtracks.data_model import SolutionTracks
-from funtracks.exceptions import InvalidActionError
 
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
@@ -28,38 +28,30 @@ def tracks_viewer_setup(make_napari_viewer, graph_2d):
 class TestNodeOperations:
     """Tests for node manipulation operations."""
 
-    def test_delete_node(self, tracks_viewer_setup):
-        """Test deleting single and multiple nodes."""
+    def test_delete_single_node(self, tracks_viewer_setup):
+        """Test deleting a single node actually removes it from the graph."""
         viewer, tracks_viewer, tracks = tracks_viewer_setup
 
-        # Test 1: Delete a single node
-        node_to_delete = list(tracks.graph.nodes)[0]
+        node_to_delete = 6  # unconnected node in graph_2d
         tracks_viewer.selected_nodes.add(node_to_delete)
 
-        with patch(
-            "motile_tracker.data_views.views_coordinator.tracks_viewer.UserDeleteNode"
-        ) as delete_mock:
-            tracks_viewer.delete_node()
+        tracks_viewer.delete_node()
 
-            # Verify UserDeleteNode was called with the selected node
-            delete_mock.assert_called_once()
-            call_args = delete_mock.call_args
-            assert call_args[0][0] == tracks  # First arg is tracks
-            assert call_args[1]["node"] == node_to_delete
+        assert node_to_delete not in tracks.graph.nodes
 
-        # Test 2: Delete multiple nodes
-        tracks_viewer.selected_nodes.reset()
-        nodes_to_delete = list(tracks.graph.nodes)[:2]
+    def test_delete_multiple_nodes(self, tracks_viewer_setup):
+        """Test deleting multiple selected nodes removes all of them."""
+        viewer, tracks_viewer, tracks = tracks_viewer_setup
+
+        # nodes 5 (terminal) and 6 (unconnected) are safe to delete independently
+        nodes_to_delete = [5, 6]
         for node in nodes_to_delete:
             tracks_viewer.selected_nodes.add(node, append=True)
 
-        with patch(
-            "motile_tracker.data_views.views_coordinator.tracks_viewer.UserDeleteNode"
-        ) as delete_mock:
-            tracks_viewer.delete_node()
+        tracks_viewer.delete_node()
 
-            # Should be called once for each selected node
-            assert delete_mock.call_count == len(nodes_to_delete)
+        for node in nodes_to_delete:
+            assert node not in tracks.graph.nodes
 
     def test_delete_node_with_no_tracks(self, make_napari_viewer):
         """Test delete_node does nothing when no tracks are loaded."""
@@ -86,119 +78,88 @@ class TestEdgeOperations:
         tracks_viewer.selected_nodes.add(source)
         tracks_viewer.selected_nodes.add(target, append=True)
 
-        with patch(
-            "motile_tracker.data_views.views_coordinator.tracks_viewer.UserDeleteEdge"
-        ) as delete_mock:
-            tracks_viewer.delete_edge()
+        tracks_viewer.delete_edge()
 
-            # Verify edge deletion was attempted
-            delete_mock.assert_called_once()
-            call_args = delete_mock.call_args
-            assert call_args[0][0] == tracks
-            # Check source/target (order may be swapped by time)
-            called_source = call_args[1]["source"]
-            called_target = call_args[1]["target"]
-            assert {called_source, called_target} == {source, target}
+        # Verify the edge was actually deleted from the graph
+        assert not tracks.graph.has_edge(source, target)
 
         # Test 2: Delete edge with wrong number of selections
         tracks_viewer.selected_nodes.reset()
         tracks_viewer.selected_nodes.add(list(tracks.graph.nodes)[0])
 
-        with patch(
-            "motile_tracker.data_views.views_coordinator.tracks_viewer.UserDeleteEdge"
-        ) as delete_mock:
-            tracks_viewer.delete_edge()
+        edge_count_before = tracks.graph.number_of_edges()
+        tracks_viewer.delete_edge()
 
-            # Should not be called
-            delete_mock.assert_not_called()
+        # Should not have deleted anything
+        assert tracks.graph.number_of_edges() == edge_count_before
 
-    def test_swap_nodes(self, tracks_viewer_setup):
-        """Test swapping predecessors of two nodes."""
-        viewer, tracks_viewer, tracks = tracks_viewer_setup
+    def test_swap_nodes(self, make_napari_viewer):
+        """Test swapping predecessors of two nodes updates the graph correctly."""
+        # graph_2d has no valid swap scenario (all branches share a predecessor),
+        # so create a minimal graph: A(t0)->C(t1) and B(t0)->D(t1)
+        g = nx.DiGraph()
+        g.add_nodes_from(
+            [
+                (1, {"pos": [0, 0], "time": 0, "area": 100, "track_id": 1}),
+                (2, {"pos": [5, 0], "time": 0, "area": 100, "track_id": 2}),
+                (3, {"pos": [0, 0], "time": 1, "area": 100, "track_id": 1}),
+                (4, {"pos": [5, 0], "time": 1, "area": 100, "track_id": 2}),
+            ]
+        )
+        g.add_edges_from([(1, 3), (2, 4)])
+        tracks = SolutionTracks(graph=g, ndim=3)
 
-        # Select two nodes
-        nodes = list(tracks.graph.nodes)[:2]
-        for i, node in enumerate(nodes):
-            tracks_viewer.selected_nodes.add(node, append=(i > 0))
+        viewer = make_napari_viewer()
+        tracks_viewer = TracksViewer.get_instance(viewer)
+        tracks_viewer.update_tracks(tracks=tracks, name="test")
 
-        # Swap nodes
-        with patch(
-            "motile_tracker.data_views.views_coordinator.tracks_viewer.UserSwapPredecessors"
-        ) as swap_mock:
-            tracks_viewer.swap_nodes()
+        # Select nodes 3 and 4 (different predecessors: 1 and 2)
+        tracks_viewer.selected_nodes.add(3)
+        tracks_viewer.selected_nodes.add(4, append=True)
 
-            # Verify swap was called
-            swap_mock.assert_called_once()
-            call_args = swap_mock.call_args
-            assert call_args[0][0] == tracks
-            # Check both nodes are in the call
-            called_nodes = call_args[1]["nodes"]
-            assert set(called_nodes) == set(nodes)
+        tracks_viewer.swap_nodes()
+
+        # After swap: predecessors are exchanged
+        assert tracks.graph.has_edge(1, 4)
+        assert tracks.graph.has_edge(2, 3)
+        assert not tracks.graph.has_edge(1, 3)
+        assert not tracks.graph.has_edge(2, 4)
 
     def test_create_edge_sorts_by_time(self, tracks_viewer_setup):
         """Test create_edge orders nodes by time (earlier -> later)."""
         viewer, tracks_viewer, tracks = tracks_viewer_setup
 
-        # Find two nodes at different times
-        nodes_with_time = [(n, tracks.get_time(n)) for n in tracks.graph.nodes]
-        nodes_with_time.sort(key=lambda x: x[1])
+        # Node 2 (t1, no successors) and node 6 (t4, no predecessors): valid free edge
+        # Select in reverse time order to verify sorting
+        tracks_viewer.selected_nodes.add(6)  # t4, selected first
+        tracks_viewer.selected_nodes.add(2, append=True)  # t1, selected second
 
-        if len(nodes_with_time) < 2:
-            pytest.skip("Need at least 2 nodes at different times")
+        tracks_viewer.create_edge()
 
-        # Select in reverse time order
-        later_node = nodes_with_time[-1][0]
-        earlier_node = nodes_with_time[0][0]
-        tracks_viewer.selected_nodes.add(later_node)
-        tracks_viewer.selected_nodes.add(earlier_node, append=True)
-
-        # Create edge
-        with patch(
-            "motile_tracker.data_views.views_coordinator.tracks_viewer.UserAddEdge"
-        ) as add_mock:
-            tracks_viewer.create_edge()
-
-            # Verify source is earlier, target is later
-            call_args = add_mock.call_args
-            assert call_args[1]["source"] == earlier_node
-            assert call_args[1]["target"] == later_node
+        # Edge must go from earlier (2) to later (6), regardless of selection order
+        assert tracks.graph.has_edge(2, 6)
 
     def test_create_edge_with_force(self, tracks_viewer_setup, monkeypatch):
-        """Test create_edge handles forceable errors."""
+        """Test create_edge handles forceable errors by retrying with force=True."""
         viewer, tracks_viewer, tracks = tracks_viewer_setup
 
-        # Select two nodes
-        nodes = list(tracks.graph.nodes)[:2]
-        for i, node in enumerate(nodes):
-            tracks_viewer.selected_nodes.add(node, append=(i > 0))
+        # Node 4 (t2) already has incoming edge from node 3.
+        # Adding edge 2(t1)->4 raises InvalidActionError(forceable=True).
+        tracks_viewer.selected_nodes.add(2)
+        tracks_viewer.selected_nodes.add(4, append=True)
 
-        # Mock UserAddEdge to raise forceable error on first call
-        with patch(
-            "motile_tracker.data_views.views_coordinator.tracks_viewer.UserAddEdge"
-        ) as add_mock:
-            add_mock.side_effect = [
-                InvalidActionError("Test conflict", forceable=True),
-                None,  # second call succeeds
-            ]
+        # Approve the force dialog automatically
+        monkeypatch.setattr(
+            "motile_tracker.data_views.views_coordinator.tracks_viewer.confirm_force_operation",
+            lambda message: (True, False),
+        )
 
-            # Mock the dialog to return (force=True, always_force=False)
-            monkeypatch.setattr(
-                "motile_tracker.data_views.views_coordinator.tracks_viewer.confirm_force_operation",
-                lambda message: (True, False),
-            )
+        tracks_viewer.create_edge()
 
-            tracks_viewer.create_edge()
-
-            # Should be called twice - once without force, once with
-            assert add_mock.call_count == 2
-
-            # Check first call had force=False (default)
-            first_call = add_mock.call_args_list[0]
-            assert first_call[1].get("force", False) is False
-
-            # Check second call had force=True
-            second_call = add_mock.call_args_list[1]
-            assert second_call[1]["force"] is True
+        # New edge should be in the graph
+        assert tracks.graph.has_edge(2, 4)
+        # Conflicting edge should have been removed by force
+        assert not tracks.graph.has_edge(3, 4)
 
 
 class TestDisplayModes:
@@ -319,18 +280,21 @@ class TestUndoRedo:
     """Tests for undo/redo functionality."""
 
     def test_undo_redo_operations(self, tracks_viewer_setup):
-        """Test undo and redo delegate to tracks correctly."""
+        """Test undo restores deleted node and redo removes it again."""
         viewer, tracks_viewer, tracks = tracks_viewer_setup
 
-        # Test undo
-        with patch.object(tracks, "undo") as undo_mock:
-            tracks_viewer.undo()
-            undo_mock.assert_called_once()
+        # Do a real action: delete unconnected node 6
+        tracks_viewer.selected_nodes.add(6)
+        tracks_viewer.delete_node()
+        assert 6 not in tracks.graph.nodes
 
-        # Test redo
-        with patch.object(tracks, "redo") as redo_mock:
-            tracks_viewer.redo()
-            redo_mock.assert_called_once()
+        # Undo: node 6 should be restored
+        tracks_viewer.undo()
+        assert 6 in tracks.graph.nodes
+
+        # Redo: node 6 should be gone again
+        tracks_viewer.redo()
+        assert 6 not in tracks.graph.nodes
 
     def test_undo_redo_with_no_tracks(self, make_napari_viewer):
         """Test undo/redo do nothing when no tracks are loaded."""
