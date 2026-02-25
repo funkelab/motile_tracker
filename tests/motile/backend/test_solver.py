@@ -59,10 +59,8 @@ def test_solve_single_window(segmentation_3d):
     # Should only have nodes from frames 1, 2, 3
     assert solution.number_of_nodes() > 0
     # Verify all nodes are within the window
-    from funtracks.data_model.graph_attributes import NodeAttr
-
     for node in solution.nodes:
-        node_time = solution.nodes[node].get(NodeAttr.TIME.value)
+        node_time = solution.nodes[node].get("time")
         assert 1 <= node_time < 4, f"Node {node} has time {node_time}, expected 1-3"
 
 

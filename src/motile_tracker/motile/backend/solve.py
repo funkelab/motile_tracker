@@ -10,7 +10,6 @@ from funtracks.candidate_graph import (
     compute_graph_from_points_list,
     compute_graph_from_seg,
 )
-from funtracks.data_model.graph_attributes import EdgeAttr, NodeAttr
 from motile import Solver, TrackGraph
 from motile.constraints import MaxChildren, MaxParents, Pin
 from motile.costs import Appear, EdgeDistance, EdgeSelection, Split
@@ -256,7 +255,7 @@ def _solve_single_window(
     # Add time_offset back to node times to restore original time values
     if time_offset > 0:
         for node in solution.nodes:
-            solution.nodes[node][NodeAttr.TIME.value] += time_offset
+            solution.nodes[node]["time"] += time_offset
 
     logger.debug(
         "Single window solution has %d nodes, %d edges",
@@ -297,7 +296,7 @@ def _solve_chunked(
         )
 
     # Get the frame range from the candidate graph
-    times = [cand_graph.nodes[n][NodeAttr.TIME.value] for n in cand_graph.nodes]
+    times = [cand_graph.nodes[n]["time"] for n in cand_graph.nodes]
     if not times:
         return nx.DiGraph()
 
@@ -343,7 +342,7 @@ def _solve_chunked(
         nodes_in_window = [
             n
             for n in cand_graph.nodes
-            if window_start <= cand_graph.nodes[n][NodeAttr.TIME.value] < window_end
+            if window_start <= cand_graph.nodes[n]["time"] < window_end
         ]
         window_subgraph = cand_graph.subgraph(nodes_in_window).copy()
 
@@ -425,14 +424,14 @@ def _set_pinning_on_graph(
 
     # Pin nodes in the overlap region
     for node in cand_graph.nodes:
-        node_time = cand_graph.nodes[node][NodeAttr.TIME.value]
+        node_time = cand_graph.nodes[node]["time"]
         if overlap_start <= node_time < overlap_end:
             cand_graph.nodes[node][PIN_ATTR] = node in solution_nodes
 
     # Pin edges where both endpoints are in the overlap region
     for u, v in cand_graph.edges:
-        u_time = cand_graph.nodes[u][NodeAttr.TIME.value]
-        v_time = cand_graph.nodes[v][NodeAttr.TIME.value]
+        u_time = cand_graph.nodes[u]["time"]
+        v_time = cand_graph.nodes[v]["time"]
         if (
             overlap_start <= u_time < overlap_end
             and overlap_start <= v_time < overlap_end
@@ -454,7 +453,7 @@ def _add_to_combined_solution(
     """
     for node, data in window_solution.nodes(data=True):
         if from_frame is not None:
-            node_time = data.get(NodeAttr.TIME.value)
+            node_time = data.get("time")
             if node_time is not None and node_time < from_frame:
                 continue
         if node not in combined:
@@ -479,7 +478,7 @@ def construct_solver(cand_graph: nx.DiGraph, solver_params: SolverParams) -> Sol
         Solver: A motile solver with the specified graph, costs, and
             constraints.
     """
-    solver = Solver(TrackGraph(cand_graph, frame_attribute=NodeAttr.TIME.value))
+    solver = Solver(TrackGraph(cand_graph, frame_attribute="time"))
     solver.add_constraint(MaxChildren(solver_params.max_children))
     solver.add_constraint(MaxParents(1))
     solver.add_constraint(Pin(PIN_ATTR))
@@ -490,7 +489,7 @@ def construct_solver(cand_graph: nx.DiGraph, solver_params: SolverParams) -> Sol
         solver.add_cost(
             EdgeDistance(
                 weight=0,
-                position_attribute=NodeAttr.POS.value,
+                position_attribute="pos",
                 constant=solver_params.edge_selection_cost,
             ),
             name="edge_const",
@@ -503,7 +502,7 @@ def construct_solver(cand_graph: nx.DiGraph, solver_params: SolverParams) -> Sol
     if solver_params.distance_cost is not None:
         solver.add_cost(
             EdgeDistance(
-                position_attribute=NodeAttr.POS.value,
+                position_attribute="pos",
                 weight=solver_params.distance_cost,
             ),
             name="distance",
@@ -512,7 +511,7 @@ def construct_solver(cand_graph: nx.DiGraph, solver_params: SolverParams) -> Sol
         solver.add_cost(
             EdgeSelection(
                 weight=solver_params.iou_cost,
-                attribute=EdgeAttr.IOU.value,
+                attribute="iou",
             ),
             name="iou",
         )

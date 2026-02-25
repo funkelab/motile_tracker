@@ -1,7 +1,6 @@
 import networkx as nx
 import numpy as np
 import pytest
-from funtracks.data_model.graph_attributes import EdgeAttr, NodeAttr
 from skimage.draw import disk
 
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
@@ -41,71 +40,71 @@ def graph_2d():
         (
             1,
             {
-                NodeAttr.POS.value: [50, 50],
-                NodeAttr.TIME.value: 0,
-                NodeAttr.AREA.value: 1245,
-                NodeAttr.TRACK_ID.value: 1,
+                "pos": [50, 50],
+                "time": 0,
+                "area": 1245,
+                "track_id": 1,
             },
         ),
         (
             2,
             {
-                NodeAttr.POS.value: [20, 80],
-                NodeAttr.TIME.value: 1,
-                NodeAttr.TRACK_ID.value: 2,
-                NodeAttr.AREA.value: 305,
+                "pos": [20, 80],
+                "time": 1,
+                "track_id": 2,
+                "area": 305,
             },
         ),
         (
             3,
             {
-                NodeAttr.POS.value: [60, 45],
-                NodeAttr.TIME.value: 1,
-                NodeAttr.AREA.value: 697,
-                NodeAttr.TRACK_ID.value: 3,
+                "pos": [60, 45],
+                "time": 1,
+                "area": 697,
+                "track_id": 3,
             },
         ),
         (
             4,
             {
-                NodeAttr.POS.value: [1.5, 1.5],
-                NodeAttr.TIME.value: 2,
-                NodeAttr.AREA.value: 16,
-                NodeAttr.TRACK_ID.value: 3,
+                "pos": [1.5, 1.5],
+                "time": 2,
+                "area": 16,
+                "track_id": 3,
             },
         ),
         (
             5,
             {
-                NodeAttr.POS.value: [1.5, 1.5],
-                NodeAttr.TIME.value: 4,
-                NodeAttr.AREA.value: 16,
-                NodeAttr.TRACK_ID.value: 3,
+                "pos": [1.5, 1.5],
+                "time": 4,
+                "area": 16,
+                "track_id": 3,
             },
         ),
         # unconnected node
         (
             6,
             {
-                NodeAttr.POS.value: [97.5, 97.5],
-                NodeAttr.TIME.value: 4,
-                NodeAttr.AREA.value: 16,
-                NodeAttr.TRACK_ID.value: 5,
+                "pos": [97.5, 97.5],
+                "time": 4,
+                "area": 16,
+                "track_id": 5,
             },
         ),
     ]
     edges = [
-        (1, 2, {EdgeAttr.IOU.value: 0.0}),
-        (1, 3, {EdgeAttr.IOU.value: 0.395}),
+        (1, 2, {"iou": 0.0}),
+        (1, 3, {"iou": 0.395}),
         (
             3,
             4,
-            {EdgeAttr.IOU.value: 0.0},
+            {"iou": 0.0},
         ),
         (
             4,
             5,
-            {EdgeAttr.IOU.value: 1.0},
+            {"iou": 1.0},
         ),
     ]
     graph.add_nodes_from(nodes)
@@ -148,22 +147,22 @@ def graph_3d():
         (
             1,
             {
-                NodeAttr.POS.value: [50, 50, 50],
-                NodeAttr.TIME.value: 0,
+                "pos": [50, 50, 50],
+                "time": 0,
             },
         ),
         (
             2,
             {
-                NodeAttr.POS.value: [20, 50, 80],
-                NodeAttr.TIME.value: 1,
+                "pos": [20, 50, 80],
+                "time": 1,
             },
         ),
         (
             3,
             {
-                NodeAttr.POS.value: [60, 50, 45],
-                NodeAttr.TIME.value: 1,
+                "pos": [60, 50, 45],
+                "time": 1,
             },
         ),
     ]
@@ -208,33 +207,33 @@ def graph_3d_with_division():
         (
             1,
             {
-                NodeAttr.POS.value: [50, 50, 50],
-                NodeAttr.TIME.value: 0,
-                NodeAttr.AREA.value: 1000,
+                "pos": [50, 50, 50],
+                "time": 0,
+                "area": 1000,
             },
         ),
         (
             2,
             {
-                NodeAttr.POS.value: [20, 50, 80],
-                NodeAttr.TIME.value: 1,
-                NodeAttr.AREA.value: 1000,
+                "pos": [20, 50, 80],
+                "time": 1,
+                "area": 1000,
             },
         ),
         (
             3,
             {
-                NodeAttr.POS.value: [60, 50, 45],
-                NodeAttr.TIME.value: 2,
-                NodeAttr.AREA.value: 1000,
+                "pos": [60, 50, 45],
+                "time": 2,
+                "area": 1000,
             },
         ),
         (
             4,
             {
-                NodeAttr.POS.value: [40, 70, 60],
-                NodeAttr.TIME.value: 2,
-                NodeAttr.AREA.value: 1000,
+                "pos": [40, 70, 60],
+                "time": 2,
+                "area": 1000,
             },
         ),
     ]

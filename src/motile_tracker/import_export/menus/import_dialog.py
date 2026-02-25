@@ -1,7 +1,6 @@
 from pathlib import Path
 
-from funtracks.import_export import tracks_from_df
-from funtracks.import_export.import_from_geff import import_from_geff
+from funtracks.import_export import import_from_geff, tracks_from_df
 from funtracks.import_export.magic_imread import magic_imread
 from geff_spec.utils import axes_from_lists
 from qtpy.QtCore import Qt
@@ -283,7 +282,7 @@ class ImportDialog(QDialog):
         ndim = seg.ndim
 
         # Build axis names and types based on dimensionality
-        # Use "time" to match NodeAttr.TIME.value used in standard_fields
+        # Use "time" to match standard_fields
         if ndim == 3:  # 2D+time
             axis_keys = ["time", "y", "x"]
             axis_types = ["time", "space", "space"]
@@ -363,9 +362,9 @@ class ImportDialog(QDialog):
                         return  # error loading segmentation already shown
                 else:
                     segmentation = None
-                name_map = self.prop_map_widget.get_name_map()
+                node_name_map = self.prop_map_widget.get_name_map()
                 # Remove entries with "None" value - funtracks doesn't accept None mappings
-                name_map = {k: v for k, v in name_map.items() if v != "None"}
+                node_name_map = {k: v for k, v in node_name_map.items() if v != "None"}
                 features = self.prop_map_widget.get_features()
 
                 try:
@@ -374,7 +373,7 @@ class ImportDialog(QDialog):
                         segmentation=segmentation,
                         scale=scale,
                         features=features,
-                        name_map=name_map,
+                        node_name_map=node_name_map,
                     )
                 except (ValueError, OSError, FileNotFoundError, AssertionError) as e:
                     QMessageBox.critical(self, "Error", f"Failed to load tracks: {e}")

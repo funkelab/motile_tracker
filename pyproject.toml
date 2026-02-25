@@ -31,7 +31,7 @@ classifiers = [
 
 dependencies =[
     "napari>=0.6.2,<1",
-    "funtracks>=1.7.0,<2",
+    "funtracks==1.8.0-a3",
     "appdirs>=1,<2",
     "numpy>=2,<3",
     "magicgui>=0.10.1",
@@ -98,6 +98,11 @@ conflicts = [
         {extra = "gurobi12"},
         {extra = "gurobi13"},
     ],
+]
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "error::DeprecationWarning:funtracks",
 ]
 
 [tool.setuptools_scm]

@@ -13,7 +13,7 @@ import pytest
 import tifffile
 import zarr
 from funtracks.data_model import SolutionTracks, Tracks
-from funtracks.import_export.export_to_geff import export_to_geff
+from funtracks.import_export import export_to_csv, export_to_geff
 
 from motile_tracker.import_export.menus.import_dialog import ImportDialog
 
@@ -119,7 +119,7 @@ def test_csv_import_2d_with_segmentation(
     # Create tracks and export to CSV (as motile_tracker does in tracks_list.py:208)
     tracks = SolutionTracks(graph_2d, segmentation=segmentation_2d, ndim=3)
     csv_path = tmp_path / "test_tracks.csv"
-    tracks.export_tracks(csv_path)
+    export_to_csv(tracks, csv_path)
 
     # Also save the segmentation
     tifffile.imwrite(tmp_path / "segmentation.tif", segmentation_2d)
@@ -180,7 +180,7 @@ def test_csv_import_3d_with_segmentation(
     # Create tracks and export to CSV (as motile_tracker does in tracks_list.py:208)
     tracks = SolutionTracks(graph_3d, segmentation=segmentation_3d, ndim=4)
     csv_path = tmp_path / "test_tracks.csv"
-    tracks.export_tracks(csv_path)
+    export_to_csv(tracks, csv_path)
 
     # Also save the segmentation
     tifffile.imwrite(tmp_path / "segmentation.tif", segmentation_3d)
@@ -241,7 +241,7 @@ def test_csv_import_without_segmentation(qtbot, tmp_path, graph_2d, monkeypatch)
     # Create tracks and export to CSV (as motile_tracker does in tracks_list.py:208)
     tracks = SolutionTracks(graph_2d, segmentation=None, ndim=3)
     csv_path = tmp_path / "test_tracks.csv"
-    tracks.export_tracks(csv_path)
+    export_to_csv(tracks, csv_path)
 
     # Create import dialog and load the GEFF file
     dialog = ImportDialog(import_type="csv")

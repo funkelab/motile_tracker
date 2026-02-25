@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any
 
 from fonticon_fa6 import FA6S
 from funtracks.features._feature import Feature
+from funtracks.user_actions import UserUpdateNodeAttrs
 from napari._qt.qt_resources import QColoredSVGIcon
 from qtpy.QtCore import Signal
 from qtpy.QtWidgets import (
@@ -316,8 +317,12 @@ class CollectionWidget(QWidget):
 
             # Use UpdateNodeAttrs to set the feature value to True
             feature_key = self.selected_collection.name.text()
-            attrs = {feature_key: [True for _ in nodes]}
-            self.tracks_viewer.tracks_controller.update_node_attrs(nodes, attrs)
+            for node in nodes:
+                UserUpdateNodeAttrs(
+                    tracks=self.tracks_viewer.tracks,
+                    node=node,
+                    attrs={feature_key: True},
+                )
 
             self.group_changed.emit()
 
@@ -393,8 +398,13 @@ class CollectionWidget(QWidget):
             }
 
             feature_key = self.selected_collection.name.text()
-            attrs = {feature_key: [False for _ in nodes]}
-            self.tracks_viewer.tracks_controller.update_node_attrs(nodes, attrs)
+            # attrs = {feature_key: [False for _ in nodes]}
+            for node in nodes:
+                UserUpdateNodeAttrs(
+                    tracks=self.tracks_viewer.tracks,
+                    node=node,
+                    attrs={feature_key: False},
+                )
 
             self.group_changed.emit()
 
