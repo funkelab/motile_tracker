@@ -9,6 +9,10 @@ from funtracks.data_model.tracks_controller import TracksController
 from funtracks.exceptions import InvalidActionError
 from psygnal import Signal
 
+from motile_tracker.data_views.keybindings_config import (
+    KEYMAP,
+    bind_keymap,
+)
 from motile_tracker.data_views.views.layers.track_labels import new_label
 from motile_tracker.data_views.views.layers.tracks_layer_group import TracksLayerGroup
 from motile_tracker.data_views.views.tree_view.tree_widget_utils import (
@@ -16,10 +20,6 @@ from motile_tracker.data_views.views.tree_view.tree_widget_utils import (
 )
 from motile_tracker.data_views.views_coordinator.groups import (
     CollectionWidget,
-)
-from motile_tracker.data_views.views_coordinator.key_binds import (
-    KEYMAP,
-    bind_keymap,
 )
 from motile_tracker.data_views.views_coordinator.node_selection_list import (
     NodeSelectionList,
