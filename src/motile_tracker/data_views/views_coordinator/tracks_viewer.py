@@ -8,7 +8,7 @@ from funtracks.exceptions import InvalidActionError
 from funtracks.user_actions import (
     UserAddEdge,
     UserDeleteEdge,
-    UserDeleteNode,
+    UserDeleteNodes,
     UserSwapPredecessors,
 )
 from psygnal import Signal
@@ -289,8 +289,7 @@ class TracksViewer:
 
         if self.tracks is None:
             return
-        for node in self.selected_nodes.as_list:
-            UserDeleteNode(self.tracks, node=node)
+        UserDeleteNodes(self.tracks, nodes=self.selected_nodes.as_list)
 
     def delete_edge(self, event=None):
         """Calls the UserAction to delete an edge between the two currently
