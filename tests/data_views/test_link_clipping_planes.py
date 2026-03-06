@@ -7,8 +7,15 @@ from napari.layers.utils.plane import ClippingPlane
 from motile_tracker.data_views.views.layers.tracks_layer_group import TracksLayerGroup
 
 
+@pytest.fixture(autouse=True)
+def clear_viewer_layers(viewer):
+    """Clear viewer layers between tests."""
+    yield
+    viewer.layers.clear()
+
+
 @pytest.mark.xfail(reason="Open issue on linking clipping planes in napari")
-def test_link_experimental_clipping_planes(make_napari_viewer):
+def test_link_experimental_clipping_planes(viewer):
     """Test if the clipping planes in the TracksLayersGroup are correctly linked by changing the position and emitting events"""
 
     layer1 = Image(np.random.rand(10, 15, 20))
@@ -18,7 +25,6 @@ def test_link_experimental_clipping_planes(make_napari_viewer):
     layer3 = Points(data=np.array([[1, 2, 3], [4, 5, 6]]))
 
     # Step 2: Create a TracksLayerGroup and set the layers
-    viewer = make_napari_viewer()
     tracks_layer_group = TracksLayerGroup(viewer, None, "test", None)
     tracks_layer_group.tracks_layer = layer1
     tracks_layer_group.seg_layer = layer2

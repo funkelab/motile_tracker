@@ -189,9 +189,12 @@ def reset_tracks_viewer():
     if hasattr(TracksViewer, "_instance"):
         del TracksViewer._instance
 
-    # after test, close all viewers and clear again
+    # after test, clear keymap and delete singleton
     yield
     if hasattr(TracksViewer, "_instance"):
+        instance = TracksViewer._instance
+        if hasattr(instance, "viewer") and instance.viewer is not None:
+            instance.viewer.keymap.clear()
         del TracksViewer._instance
 
 

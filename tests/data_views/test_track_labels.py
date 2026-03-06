@@ -1,8 +1,16 @@
 import numpy as np
+import pytest
 from funtracks.data_model import SolutionTracks
 
 from motile_tracker.data_views.views.layers.track_labels import new_label
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
+
+
+@pytest.fixture(autouse=True)
+def clear_viewer_layers(viewer):
+    """Clear viewer layers between tests."""
+    yield
+    viewer.layers.clear()
 
 
 class MockEvent:
@@ -50,7 +58,7 @@ def create_event_val(
     return event_val
 
 
-def test_paint_event(make_napari_viewer, graph_3d_with_division, segmentation_3d_boxes):
+def test_paint_event(viewer, graph_3d_with_division, segmentation_3d_boxes):
     """Test paint event processing
 
     1) Paint with a new label (4), new track id (4)
@@ -67,8 +75,6 @@ def test_paint_event(make_napari_viewer, graph_3d_with_division, segmentation_3d
                                                  |               |              |
     3                        5                   5               5              5
     """
-
-    viewer = make_napari_viewer()
 
     # Create example tracks
     tracks = SolutionTracks(
@@ -157,10 +163,7 @@ def test_paint_event(make_napari_viewer, graph_3d_with_division, segmentation_3d
     assert tracks_viewer.tracking_layers.seg_layer.data[2, 55, 45, 40] == 6  # back at 5
 
 
-def test_ensure_valid_label(
-    make_napari_viewer, graph_3d_with_division, segmentation_3d_boxes
-):
-    viewer = make_napari_viewer()
+def test_ensure_valid_label(viewer, graph_3d_with_division, segmentation_3d_boxes):
 
     # Create example tracks
     tracks = SolutionTracks(

@@ -7,9 +7,15 @@ from motile_tracker.application_menus.visualization_widget import (
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
 
+@pytest.fixture(autouse=True)
+def clear_viewer_layers(viewer):
+    """Clear viewer layers between tests."""
+    yield
+    viewer.layers.clear()
+
+
 @pytest.fixture
-def visualization_widget(make_napari_viewer, graph_3d, segmentation_3d, qtbot):
-    viewer = make_napari_viewer()
+def visualization_widget(viewer, graph_3d, segmentation_3d, qtbot):
     tracks = SolutionTracks(graph=graph_3d, segmentation=segmentation_3d, ndim=4)
 
     tracks_viewer = TracksViewer.get_instance(viewer)
@@ -103,13 +109,12 @@ def test_contour_checkbox_updates_layer(visualization_widget):
     "mode", ["all", "visible_no_contours", "visible_with_contours"]
 )
 def test_update_label_colormap_when_selecting(
-    make_napari_viewer,
+    viewer,
     graph_3d,
     segmentation_3d,
     mode,
 ):
     """Test the actual values on the label colormap"""
-    viewer = make_napari_viewer()
     tracks = SolutionTracks(
         graph=graph_3d,
         segmentation=segmentation_3d,
