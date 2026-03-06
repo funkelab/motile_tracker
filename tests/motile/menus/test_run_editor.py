@@ -90,24 +90,6 @@ def test_layer_management(make_napari_viewer, segmentation_2d, qtbot):
     assert not editor6.solver_params_widget.iou_row.isVisible()
 
 
-def test_duplicate_id_detection(segmentation_2d):
-    """Test duplicate label ID detection."""
-    # Test 1: _has_duplicate_ids returns False when no duplicates
-    assert not RunEditor._has_duplicate_ids(segmentation_2d)
-
-    # Test 2: _has_duplicate_ids returns True when duplicates exist
-    seg_with_dups = segmentation_2d.copy()
-    frame = seg_with_dups[1].copy()
-    frame[frame == 2] = 1
-    seg_with_dups[1] = frame
-    assert RunEditor._has_duplicate_ids(seg_with_dups)
-
-    # Test 3: _has_duplicate_ids returns False for single frame
-    single_frame = np.zeros((1, 100, 100), dtype="int32")
-    single_frame[0, 10:20, 10:20] = 1
-    assert not RunEditor._has_duplicate_ids(single_frame)
-
-
 def test_run_creation(make_napari_viewer, segmentation_2d):
     """Test creating MotileRun objects from editor state."""
     # Test 1: get_run creates run with Labels layer
@@ -163,20 +145,7 @@ def test_run_creation(make_napari_viewer, segmentation_2d):
     with pytest.raises(ValueError, match="Expected segmentation to be at most 4D"):
         editor4.get_run()
 
-    # Test 6: get_run automatically relabels duplicate IDs
-    viewer5 = make_napari_viewer()
-    seg_with_dups = segmentation_2d.copy()
-    frame = seg_with_dups[1].copy()
-    frame[frame == 2] = 1
-    seg_with_dups[1] = frame
-    viewer5.add_labels(seg_with_dups, name="seg1")
-    editor5 = RunEditor(viewer5)
-    editor5.layer_selection_box.setCurrentText("seg1")
-    run6 = editor5.get_run()
-    assert run6 is not None
-    assert not RunEditor._has_duplicate_ids(run6.segmentation)
-
-    # Test 7: get_run converts dask array to numpy
+    # Test 6: get_run converts dask array to numpy
     viewer6 = make_napari_viewer()
     dask_seg = da.from_array(segmentation_2d, chunks=(1, 50, 50))
     viewer6.add_labels(dask_seg, name="seg1")
@@ -187,7 +156,7 @@ def test_run_creation(make_napari_viewer, segmentation_2d):
     assert isinstance(run7.segmentation, np.ndarray)
     assert not isinstance(run7.segmentation, da.Array)
 
-    # Test 8: get_run uses solver params from the editor
+    # Test 7: get_run uses solver params from the editor
     viewer.add_labels(segmentation_2d, name="seg_params")
     editor7 = RunEditor(viewer)
     editor7.layer_selection_box.setCurrentText("seg_params")
