@@ -92,4 +92,5 @@ venv/
 
 # Claude
 claude.md
+.claude
 TESTING_STRATEGY.md

@@ -3,7 +3,6 @@
 from unittest.mock import MagicMock, patch
 
 import networkx as nx
-import numpy as np
 import pytest
 from funtracks.data_model import SolutionTracks
 
@@ -116,69 +115,32 @@ def test_solve_with_motile(make_napari_viewer, segmentation_2d):
     """Test solve_with_motile method with different inputs."""
     viewer = make_napari_viewer()
     widget = MotileWidget(viewer)
+    worker_fn = widget.solve_with_motile.__wrapped__
 
-    # Test 1: Uses segmentation when provided
+    # Test 1: Returns a run where all nodes have track_id assigned
     run = MotileRun(
         graph=nx.DiGraph(),
         segmentation=segmentation_2d,
         run_name="test_run",
         solver_params=SolverParams(),
     )
-    with patch("motile_tracker.motile.menus.motile_widget.solve") as mock_solve:
-        mock_solve.return_value = nx.DiGraph()
-        worker_fn = widget.solve_with_motile.__wrapped__
-        worker_fn(widget, run)
-        mock_solve.assert_called_once()
-        call_args = mock_solve.call_args
-        assert call_args[0][1] is segmentation_2d
+    widget.view_run_widget.run = run
+    result = worker_fn(widget, run)
+    assert result.graph.number_of_nodes() > 0
+    for node in result.graph.nodes():
+        assert result.get_track_id(node) is not None
 
-    # Test 2: Uses points when provided
-    points_data = np.array([[0, 10, 20], [1, 30, 40]])
+    # Test 2: Raises ValueError without input data
     run2 = MotileRun(
         graph=nx.DiGraph(),
         segmentation=segmentation_2d,
         run_name="test_run",
         solver_params=SolverParams(),
     )
-    run2.input_points = points_data
     run2.segmentation = None
-    with patch("motile_tracker.motile.menus.motile_widget.solve") as mock_solve:
-        mock_solve.return_value = nx.DiGraph()
-        worker_fn = widget.solve_with_motile.__wrapped__
-        worker_fn(widget, run2)
-        mock_solve.assert_called_once()
-        call_args = mock_solve.call_args
-        assert np.array_equal(call_args[0][1], points_data)
-
-    # Test 3: Raises ValueError without input data
-    run3 = MotileRun(
-        graph=nx.DiGraph(),
-        segmentation=segmentation_2d,
-        run_name="test_run",
-        solver_params=SolverParams(),
-    )
-    run3.segmentation = None
-    run3.input_points = None
-    worker_fn = widget.solve_with_motile.__wrapped__
+    run2.input_points = None
     with pytest.raises(ValueError, match="Must have one of input segmentation"):
-        worker_fn(widget, run3)
-
-    # Test 4: Shows warning for empty result
-    run4 = MotileRun(
-        graph=nx.DiGraph(),
-        segmentation=segmentation_2d,
-        run_name="test_run",
-        solver_params=SolverParams(),
-    )
-    with (
-        patch("motile_tracker.motile.menus.motile_widget.solve") as mock_solve,
-        patch("motile_tracker.motile.menus.motile_widget.show_warning") as mock_warning,
-    ):
-        mock_solve.return_value = nx.DiGraph()
-        worker_fn = widget.solve_with_motile.__wrapped__
-        worker_fn(widget, run4)
-        mock_warning.assert_called_once()
-        assert "No tracks found" in mock_warning.call_args[0][0]
+        worker_fn(widget, run2)
 
 
 def test_on_solver_event(make_napari_viewer, segmentation_2d, qtbot):

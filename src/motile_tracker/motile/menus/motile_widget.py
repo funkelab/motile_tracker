@@ -123,6 +123,11 @@ class MotileWidget(QWidget):
             lambda event_data: self._on_solver_event(run, event_data),
             scale=run.scale,
         )
+        # run was initialized with an empty graph, so SolutionTracks.__init__ never
+        # assigned track IDs. Now that run.graph has been replaced with the solution,
+        # we explicitly recompute them. Ideally solve() would return a SolutionTracks
+        # so track IDs are assigned at init time and this would not be needed.
+        run.enable_features([run.features.tracklet_key, run.features.lineage_key])
 
         if run.graph.number_of_nodes() == 0:
             show_warning(
