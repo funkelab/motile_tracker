@@ -5,8 +5,6 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 from funtracks.data_model import SolutionTracks
-from funtracks.data_model.graph_attributes import NodeAttr
-from funtracks.exceptions import InvalidActionError
 
 from motile_tracker.data_views.views.layers.track_points import (
     TrackPoints,
@@ -193,15 +191,11 @@ def test_create_node_attrs(make_napari_viewer, graph_2d, segmentation_2d):
     attrs = points_layer._create_node_attrs(new_point)
 
     # Verify attributes
-    assert NodeAttr.POS.value in attrs
-    assert NodeAttr.TIME.value in attrs
-    assert NodeAttr.TRACK_ID.value in attrs
-    assert NodeAttr.AREA.value in attrs
-
-    assert attrs[NodeAttr.TIME.value][0] == 1
-    assert np.array_equal(attrs[NodeAttr.POS.value][0], [50, 50])
-    assert attrs[NodeAttr.AREA.value][0] == 0
-
+    assert "pos" in attrs
+    assert "time" in attrs
+    assert "track_id" in attrs
+    assert attrs["time"] == 1
+    assert np.array_equal(attrs["pos"], [50, 50])
     # Test 2: Activates new track_id if none selected
     tracks_viewer.selected_track = None
 
@@ -242,12 +236,12 @@ def test_update_data_without_seg_layer(make_napari_viewer, graph_2d):
     # Test 3: Changed action updates node position
     points_layer.selected_data.add(0)
     first_node = points_layer.nodes[0]
-    original_pos = tracks.graph.nodes[first_node][NodeAttr.POS.value]
+    original_pos = tracks.graph.nodes[first_node]["pos"]
     new_pos = np.array([1, 100, 100])
     points_layer.data[0] = new_pos
     event = MockEvent(action="changed")
     points_layer._update_data(event)
-    updated_pos = tracks_viewer.tracks.graph.nodes[first_node][NodeAttr.POS.value]
+    updated_pos = tracks_viewer.tracks.graph.nodes[first_node]["pos"]
     assert not np.array_equal(updated_pos, original_pos)
 
 
@@ -274,17 +268,19 @@ def test_update_data_with_seg_layer(make_napari_viewer, graph_2d, segmentation_2
     # Test 2: Changed action refreshes instead of updating
     points_layer.selected_data.add(0)
     first_node = points_layer.nodes[0]
-    original_pos = tracks.graph.nodes[first_node][NodeAttr.POS.value].copy()
+    original_pos = tracks.graph.nodes[first_node]["pos"].copy()
     new_pos = np.array([1, 100, 100])
     points_layer.data[0] = new_pos
     event = MockEvent(action="changed")
     points_layer._update_data(event)
-    updated_pos = tracks_viewer.tracks.graph.nodes[first_node][NodeAttr.POS.value]
+    updated_pos = tracks_viewer.tracks.graph.nodes[first_node]["pos"]
     assert np.array_equal(updated_pos, original_pos)
 
 
-def test_update_data_invalid_action_forceable(make_napari_viewer, graph_2d):
-    """Test _update_data handles forceable InvalidActionError."""
+def test_update_data_invalid_action_forceable(
+    make_napari_viewer, graph_2d, monkeypatch
+):
+    """Test _update_data handles forceable InvalidActionError by retrying with force=True."""
     viewer = make_napari_viewer()
     tracks = SolutionTracks(graph=graph_2d, ndim=3)
     tracks_viewer = TracksViewer.get_instance(viewer)
@@ -292,27 +288,23 @@ def test_update_data_invalid_action_forceable(make_napari_viewer, graph_2d):
 
     points_layer = tracks_viewer.tracking_layers.points_layer
 
-    # Mock add_nodes to raise InvalidActionError first time, then succeed
-    error = InvalidActionError("Test error", forceable=True)
-    add_nodes_mock = MagicMock()
-    add_nodes_mock.side_effect = [error, None]  # Fail once, then succeed
+    # track_id=1 has node 1 at t=0 with out_degree=2 (a division into nodes 2 and 3).
+    # Adding a node to track_id=1 at t=2 raises InvalidActionError(forceable=True).
+    tracks_viewer.selected_track = 1
 
-    with (
-        patch.object(tracks_viewer.tracks_controller, "add_nodes", add_nodes_mock),
-        patch(
-            "motile_tracker.data_views.views.layers.track_points.confirm_force_operation",
-            return_value=(True, False),
-        ),
-    ):
-        # Create added event
-        new_point = np.array([[1, 50, 50]])
-        event = MockEvent(action="added", value=new_point)
+    # Approve the force dialog automatically (avoids Qt dialog popup)
+    monkeypatch.setattr(
+        "motile_tracker.data_views.views.layers.track_points.confirm_force_operation",
+        lambda message: (True, False),
+    )
 
-        # This should handle the error and retry with force=True
-        points_layer._update_data(event)
+    initial_node_count = len(tracks.graph.nodes)
+    new_point = np.array([[2, 50, 50]])
+    event = MockEvent(action="added", value=new_point)
+    points_layer._update_data(event)
 
-        # Verify add_nodes was called twice (once without force, once with)
-        assert add_nodes_mock.call_count == 2
+    # Node should have been added despite the initial forceable error
+    assert len(tracks.graph.nodes) == initial_node_count + 1
 
 
 def test_update_selection_in_select_mode(make_napari_viewer, graph_2d, segmentation_2d):

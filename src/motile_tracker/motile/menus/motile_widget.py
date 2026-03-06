@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 class MotileWidget(QWidget):
     """A widget that controls the backend components of the motile tracker.
     Recieves user input about solver parameters, runs motile, and passes
-    results to the TrackingViewController.
+    results to the TracksViewer.
     """
 
     # A signal for passing events from the motile solver to the run view widget
@@ -138,8 +138,11 @@ class MotileWidget(QWidget):
             scale=run.scale,
             cand_graph=cand_graph,
         )
-
-        run._initialize_track_ids()
+        # run was initialized with an empty graph, so SolutionTracks.__init__ never
+        # assigned track IDs. Now that run.graph has been replaced with the solution,
+        # we explicitly recompute them. Ideally solve() would return a SolutionTracks
+        # so track IDs are assigned at init time and this would not be needed.
+        run.enable_features([run.features.tracklet_key, run.features.lineage_key])
 
         if run.graph.number_of_nodes() == 0:
             show_warning(

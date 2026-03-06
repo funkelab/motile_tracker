@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import napari
 import numpy as np
 from funtracks.exceptions import InvalidActionError
+from funtracks.user_actions import UserUpdateSegmentation
 from napari.layers import Labels
 from napari.utils import DirectLabelColormap
 from napari.utils.action_manager import action_manager
@@ -204,14 +205,14 @@ class TrackLabels(ContourLabels):
 
     def redo(self):
         """Overwrite the redo functionality of the labels layer and invoke redo action on
-        the tracks_viewer.tracks_controller first
+        the tracks_viewer.tracks first
         """
 
         self.tracks_viewer.redo()
 
     def undo(self):
         """Overwrite undo function and invoke undo action on the
-        tracks_viewer.tracks_controller
+        tracks_viewer.tracks first
         """
 
         self.tracks_viewer.undo()
@@ -283,15 +284,12 @@ class TrackLabels(ContourLabels):
 
         with self.events.selected_label.blocker():
             try:
-                current_timepoint = self.viewer.dims.current_step[
-                    0
-                ]  # also pass on the current time point to know which node to select later
                 _, updated_pixels = self._parse_paint_event(event.value)
-                self.tracks_viewer.tracks_controller.update_segmentations(
-                    target_value,
-                    updated_pixels,
-                    current_timepoint,
-                    self.tracks_viewer.selected_track,
+                UserUpdateSegmentation(
+                    tracks=self.tracks_viewer.tracks,
+                    new_value=target_value,
+                    updated_pixels=updated_pixels,
+                    current_track_id=self.tracks_viewer.selected_track,
                     force=self.tracks_viewer.force,
                 )  # paint with the updated self.selected_label, not with the value from the
                 # event, to ensure it is a valid label.
@@ -305,11 +303,11 @@ class TrackLabels(ContourLabels):
                         self._refresh()  # to trigger refresh on orthoviews, if present
                     else:
                         # try again with force enabled
-                        self.tracks_viewer.tracks_controller.update_segmentations(
-                            target_value,
-                            updated_pixels,
-                            current_timepoint,
-                            self.tracks_viewer.selected_track,
+                        UserUpdateSegmentation(
+                            tracks=self.tracks_viewer.tracks,
+                            new_value=target_value,
+                            updated_pixels=updated_pixels,
+                            current_track_id=self.tracks_viewer.selected_track,
                             force=True,
                         )
                 else:
