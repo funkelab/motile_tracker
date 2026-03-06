@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 import networkx as nx
+import numpy as np
 import pytest
 from funtracks.data_model import SolutionTracks
 
@@ -141,6 +142,97 @@ def test_solve_with_motile(make_napari_viewer, segmentation_2d):
     run2.input_points = None
     with pytest.raises(ValueError, match="Must have one of input segmentation"):
         worker_fn(widget, run2)
+
+    # Test 3: Uses points when provided
+    points_data = np.array([[0, 10, 20], [1, 30, 40]])
+    run3 = MotileRun(
+        graph=nx.DiGraph(),
+        segmentation=segmentation_2d,
+        run_name="test_run",
+        solver_params=SolverParams(),
+    )
+    run3.input_points = points_data
+    run3.segmentation = None
+    with (
+        patch(
+            "motile_tracker.motile.menus.motile_widget.build_candidate_graph"
+        ) as mock_build,
+        patch("motile_tracker.motile.menus.motile_widget.solve") as mock_solve,
+    ):
+        mock_build.return_value = nx.DiGraph()
+        mock_solve.return_value = nx.DiGraph()
+        worker_fn = widget.solve_with_motile.__wrapped__
+        worker_fn(widget, run3)
+        mock_build.assert_called_once()
+        assert np.array_equal(mock_build.call_args[0][0], points_data)
+        mock_solve.assert_called_once()
+
+    # Test 4: Shows warning for empty result
+    run4 = MotileRun(
+        graph=nx.DiGraph(),
+        segmentation=segmentation_2d,
+        run_name="test_run",
+        solver_params=SolverParams(),
+    )
+    with (
+        patch(
+            "motile_tracker.motile.menus.motile_widget.build_candidate_graph"
+        ) as mock_build,
+        patch("motile_tracker.motile.menus.motile_widget.solve") as mock_solve,
+        patch("motile_tracker.motile.menus.motile_widget.show_warning") as mock_warning,
+    ):
+        mock_build.return_value = nx.DiGraph()
+        mock_solve.return_value = nx.DiGraph()
+        worker_fn = widget.solve_with_motile.__wrapped__
+        worker_fn(widget, run4)
+        mock_warning.assert_called_once()
+        assert "No tracks found" in mock_warning.call_args[0][0]
+
+    # Test 5: Relabel segmentation when there are duplicate labels
+    segmentation_2d[1][10:10, 10:10] = 1  # duplicate value
+
+    run5 = MotileRun(
+        graph=nx.DiGraph(),
+        segmentation=segmentation_2d,
+        run_name="test_run",
+        solver_params=SolverParams(),
+    )
+
+    with (
+        patch(
+            "motile_tracker.motile.menus.motile_widget.build_candidate_graph"
+        ) as mock_build,
+        patch("motile_tracker.motile.menus.motile_widget.solve") as mock_solve,
+        patch(
+            "motile_tracker.motile.menus.motile_widget.ensure_unique_labels"
+        ) as mock_relabel,
+    ):
+        mock_build.side_effect = [
+            ValueError("Duplicate values found among nodes"),
+            nx.DiGraph(),
+        ]
+        mock_solve.return_value = nx.DiGraph()
+
+        relabeled = segmentation_2d.copy()
+        relabeled[1][10:10, 10:10] = 100
+        mock_relabel.return_value = relabeled
+
+        worker_fn = widget.solve_with_motile.__wrapped__
+        worker_fn(widget, run5)
+
+        # build_candidate_graph called twice (once failed, once after relabel)
+        assert mock_build.call_count == 2
+
+        # relabel called once
+        assert mock_relabel.call_count == 1
+
+        # solve called once with the pre-built graph
+        assert mock_solve.call_count == 1
+        call_kwargs = mock_solve.call_args[1]
+        assert call_kwargs["cand_graph"] is not None
+
+        # solve received the relabeled segmentation
+        assert mock_solve.call_args[0][1] is relabeled
 
 
 def test_on_solver_event(make_napari_viewer, segmentation_2d, qtbot):

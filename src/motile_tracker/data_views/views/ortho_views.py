@@ -1,9 +1,9 @@
-import copy
 import inspect
 
 import napari_orthogonal_views.ortho_view_widget as ov_widget
 from napari import Viewer
 from napari.layers import Labels, Layer, Points, Shapes
+from napari.utils.colormaps import DirectLabelColormap
 from napari.utils.events import Event
 from napari.utils.notifications import show_info
 from napari_orthogonal_views.ortho_view_manager import (  # noqa
@@ -11,6 +11,7 @@ from napari_orthogonal_views.ortho_view_manager import (  # noqa
     _get_manager,
 )
 
+from motile_tracker.data_views.keybindings_config import KEYMAP, bind_keymap
 from motile_tracker.data_views.views.layers.click_utils import (
     detect_click,
     get_click_value,
@@ -20,10 +21,6 @@ from motile_tracker.data_views.views.layers.out_of_slice_points import ZOnlyPoin
 from motile_tracker.data_views.views.layers.track_graph import TrackGraph
 from motile_tracker.data_views.views.layers.track_labels import TrackLabels
 from motile_tracker.data_views.views.layers.track_points import TrackPoints
-from motile_tracker.data_views.views_coordinator.key_binds import (
-    KEYMAP,
-    bind_keymap,
-)
 
 
 # redefinition of copy_layer function
@@ -238,7 +235,9 @@ def colormap_hook(orig_layer: TrackLabels, copied_layer: Labels) -> None:
         ContourLabels instance. Check the slice ndisplay and contour settings to adjust
         background opacity accordingly."""
 
-        copied_layer.colormap = copy.deepcopy(orig_layer.colormap)
+        copied_layer.colormap = DirectLabelColormap(
+            color_dict=orig_layer.colormap.color_dict
+        )
         if copied_layer._slice.slice_input.ndisplay == 3 and orig_layer.contour > 0:
             copied_layer.set_opacity(orig_layer.background, 0)
         else:

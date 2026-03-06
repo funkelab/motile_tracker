@@ -13,6 +13,10 @@ from funtracks.user_actions import (
 )
 from psygnal import Signal
 
+from motile_tracker.data_views.keybindings_config import (
+    KEYMAP,
+    bind_keymap,
+)
 from motile_tracker.data_views.node_type import NodeType
 from motile_tracker.data_views.views.layers.track_labels import new_label
 from motile_tracker.data_views.views.layers.tracks_layer_group import TracksLayerGroup
@@ -21,10 +25,6 @@ from motile_tracker.data_views.views.tree_view.tree_widget_utils import (
 )
 from motile_tracker.data_views.views_coordinator.groups import (
     CollectionWidget,
-)
-from motile_tracker.data_views.views_coordinator.key_binds import (
-    KEYMAP,
-    bind_keymap,
 )
 from motile_tracker.data_views.views_coordinator.node_selection_list import (
     NodeSelectionList,
@@ -84,6 +84,7 @@ class TracksViewer:
 
         self.tracks_list = TracksList()
         self.tracks_list.view_tracks.connect(self.update_tracks)
+        self.tracks_list.request_colormap.connect(self.set_colormap_to_trackslist)
         self.selected_track = None
         self.track_id_color = [0, 0, 0, 0]
         self.force = False
@@ -94,6 +95,10 @@ class TracksViewer:
         self.set_keybinds()
 
         self.viewer.dims.events.ndisplay.connect(self.update_selection)
+
+    def set_colormap_to_trackslist(self):
+        """Set the current colormap on the TracksList, so that it can be exported."""
+        self.tracks_list.colormap = self.colormap
 
     def set_keybinds(self):
         bind_keymap(self.viewer, KEYMAP, self)

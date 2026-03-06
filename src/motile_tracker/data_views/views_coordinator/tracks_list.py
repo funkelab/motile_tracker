@@ -92,9 +92,12 @@ class TracksList(QGroupBox):
     """
 
     view_tracks = Signal(Tracks, str)
+    request_colormap = Signal()
 
     def __init__(self):
         super().__init__(title="Results List")
+
+        self.colormap = None
         self.file_dialog = QFileDialog()
         self.file_dialog.setFileMode(QFileDialog.Directory)
         self.file_dialog.setOption(QFileDialog.ShowDirsOnly, True)
@@ -178,11 +181,11 @@ class TracksList(QGroupBox):
         widget: TracksButton = self.tracks_list.itemWidget(item)
         tracks: Tracks = widget.tracks
         name: str = widget.name.text()
+        self.request_colormap.emit()
+        colormap = self.colormap
 
         ExportDialog.show_export_dialog(
-            self,
-            tracks=tracks,
-            name=name,
+            self, tracks=tracks, name=name, colormap=colormap
         )
 
     def save_tracks(self, item: QListWidgetItem):
