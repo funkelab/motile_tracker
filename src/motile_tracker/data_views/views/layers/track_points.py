@@ -8,7 +8,7 @@ import napari
 import numpy as np
 from funtracks.data_model import Tracks
 from funtracks.exceptions import InvalidActionError
-from funtracks.user_actions import UserAddNode, UserDeleteNode, UserUpdateNodeAttrs
+from funtracks.user_actions import UserAddNode, UserDeleteNodes, UserUpdateNodeAttrs
 from napari.layers.points._points_mouse_bindings import select
 from napari.utils.notifications import show_info
 from psygnal import Signal
@@ -259,8 +259,10 @@ class TrackPoints(ZOnlyPoints):
                 self._refresh()
 
         elif event.action == "removed":
-            for node in self.tracks_viewer.selected_nodes.as_list:
-                UserDeleteNode(self.tracks_viewer.tracks, node=node)
+            UserDeleteNodes(
+                self.tracks_viewer.tracks,
+                nodes=self.tracks_viewer.selected_nodes.as_list,
+            )
 
         elif event.action == "changed":
             # we only want to allow this update if there is no seg layer
