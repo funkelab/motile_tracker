@@ -19,10 +19,16 @@ from motile_tracker.data_views.views.tree_view.tree_widget import TreeWidget
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
 
-def test_tree_plot_initialization_and_update(make_napari_viewer, graph_2d):
+@pytest.fixture(autouse=True)
+def clear_viewer_layers(viewer):
+    """Clear viewer layers between tests."""
+    yield
+    viewer.layers.clear()
+
+
+def test_tree_plot_initialization_and_update(viewer, graph_2d):
     """Test TreePlot initialization, signals, and update method."""
     # Need napari viewer context for Qt initialization
-    viewer = make_napari_viewer()
     tracks = SolutionTracks(graph=graph_2d, ndim=3)
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
@@ -55,9 +61,8 @@ def test_tree_plot_initialization_and_update(make_napari_viewer, graph_2d):
     assert tree_widget.tree_widget.view_direction == "horizontal"
 
 
-def test_tree_plot_data_display(make_napari_viewer, graph_2d):
+def test_tree_plot_data_display(viewer, graph_2d):
     """Test TreePlot data display with empty data, track data, and view directions."""
-    viewer = make_napari_viewer()
     tree_widget = TreeWidget(viewer)
     tree_plot = tree_widget.tree_widget
 
@@ -90,9 +95,8 @@ def test_tree_plot_data_display(make_napari_viewer, graph_2d):
     assert tree_plot.view_direction == "horizontal"
 
 
-def test_tree_plot_selection(make_napari_viewer, qtbot):
+def test_tree_plot_selection(viewer, qtbot):
     """Test selection with empty list and rectangle selection signal."""
-    viewer = make_napari_viewer()
     tree_widget = TreeWidget(viewer)
     tree_plot = tree_widget.tree_widget
 
@@ -113,9 +117,8 @@ def test_tree_plot_selection(make_napari_viewer, qtbot):
     assert blocker.signal_triggered
 
 
-def test_centering(make_napari_viewer, graph_2d):
+def test_centering(viewer, graph_2d):
     """Test centering on nodes with various scenarios."""
-    viewer = make_napari_viewer()
     tracks = SolutionTracks(graph=graph_2d, ndim=3)
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
@@ -202,9 +205,8 @@ def test_centering(make_napari_viewer, graph_2d):
     # Should have updated sizes and outlines without error
 
 
-def test_tree_widget_initialization(make_napari_viewer, graph_2d):
+def test_tree_widget_initialization(viewer, graph_2d):
     """Test TreeWidget initialization without and with tracks."""
-    viewer = make_napari_viewer()
 
     # Test 1: Basic initialization
     tree_widget = TreeWidget(viewer)
@@ -231,9 +233,8 @@ def test_tree_widget_initialization(make_napari_viewer, graph_2d):
 
 
 @patch.object(NavigationWidget, "move")
-def test_keyboard_shortcuts_all(mock_move, make_napari_viewer, graph_2d, qtbot):
+def test_keyboard_shortcuts_all(mock_move, viewer, graph_2d, qtbot):
     """Test all keyboard shortcuts including standard keys, releases, arrows, and toggles."""
-    viewer = make_napari_viewer()
     tracks = SolutionTracks(graph=graph_2d, ndim=3)
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
@@ -332,9 +333,8 @@ def test_keyboard_shortcuts_all(mock_move, make_napari_viewer, graph_2d, qtbot):
     restore_mock.assert_called_once()
 
 
-def test_mode_and_plot_type_switching(make_napari_viewer, graph_2d):
+def test_mode_and_plot_type_switching(viewer, graph_2d):
     """Test mode switching, plot type switching, and their interaction."""
-    viewer = make_napari_viewer()
     tracks = SolutionTracks(graph=graph_2d, ndim=3)
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
@@ -381,9 +381,8 @@ def test_mode_and_plot_type_switching(make_napari_viewer, graph_2d):
     assert tree_widget.view_direction == "horizontal"
 
 
-def test_lineage_mode_edge_cases(make_napari_viewer, graph_2d):
+def test_lineage_mode_edge_cases(viewer, graph_2d):
     """Test lineage mode edge cases with selection changes."""
-    viewer = make_napari_viewer()
     tracks = SolutionTracks(graph=graph_2d, ndim=3)
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
@@ -414,9 +413,8 @@ def test_lineage_mode_edge_cases(make_napari_viewer, graph_2d):
     # Test passes if we reach here without exception
 
 
-def test_tree_widget_integration(make_napari_viewer, graph_2d):
+def test_tree_widget_integration(viewer, graph_2d):
     """Test TreeWidget signal response, axis flipping, and mouse controls."""
-    viewer = make_napari_viewer()
     tracks_viewer = TracksViewer.get_instance(viewer)
 
     # Test 1: TreeWidget responds to tracks_updated signal
@@ -448,9 +446,8 @@ def test_tree_widget_integration(make_napari_viewer, graph_2d):
     tree_widget.set_mouse_enabled(x=True, y=True)
 
 
-def test_update_track_data_without_reset(make_napari_viewer, graph_2d):
+def test_update_track_data_without_reset(viewer, graph_2d):
     """Test _update_track_data preserves axis_order when reset_view=False."""
-    viewer = make_napari_viewer()
     tracks = SolutionTracks(graph=graph_2d, ndim=3)
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
@@ -464,9 +461,8 @@ def test_update_track_data_without_reset(make_napari_viewer, graph_2d):
     assert hasattr(tree_widget, "axis_order")
 
 
-def test_update_track_data_with_none_tracks(make_napari_viewer):
+def test_update_track_data_with_none_tracks(viewer):
     """Test _update_track_data handles None tracks."""
-    viewer = make_napari_viewer()
     tree_widget = TreeWidget(viewer)
 
     # Update with no tracks

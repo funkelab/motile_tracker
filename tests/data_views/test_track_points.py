@@ -4,6 +4,7 @@ import math
 from unittest.mock import MagicMock, patch
 
 import numpy as np
+import pytest
 from funtracks.data_model import SolutionTracks
 
 from motile_tracker.data_views.views.layers.track_points import (
@@ -11,6 +12,13 @@ from motile_tracker.data_views.views.layers.track_points import (
     custom_select,
 )
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
+
+
+@pytest.fixture(autouse=True)
+def clear_viewer_layers(viewer):
+    """Clear viewer layers between tests."""
+    yield
+    viewer.layers.clear()
 
 
 class MockEvent:
@@ -25,9 +33,8 @@ class MockEvent:
         self.type = event_type
 
 
-def test_initialization(make_napari_viewer, graph_2d, segmentation_2d):
+def test_initialization(viewer, graph_2d, segmentation_2d):
     """Test TrackPoints layer initialization."""
-    viewer = make_napari_viewer()
     tracks = SolutionTracks(graph=graph_2d, segmentation=segmentation_2d, ndim=3)
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
@@ -59,11 +66,8 @@ def test_initialization(make_napari_viewer, graph_2d, segmentation_2d):
     assert points_layer._type_string == "points"
 
 
-def test_custom_select_blocks_current_size(
-    make_napari_viewer, graph_2d, segmentation_2d
-):
+def test_custom_select_blocks_current_size(viewer, graph_2d, segmentation_2d):
     """Test custom_select function blocks current_size signal."""
-    viewer = make_napari_viewer()
     tracks = SolutionTracks(graph=graph_2d, segmentation=segmentation_2d, ndim=3)
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
@@ -79,9 +83,8 @@ def test_custom_select_blocks_current_size(
     assert hasattr(generator, "__iter__")
 
 
-def test_add_blocks_current_size_event(make_napari_viewer, graph_2d, segmentation_2d):
+def test_add_blocks_current_size_event(viewer, graph_2d, segmentation_2d):
     """Test add method blocks current_size event."""
-    viewer = make_napari_viewer()
     tracks = SolutionTracks(graph=graph_2d, segmentation=segmentation_2d, ndim=3)
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
@@ -101,9 +104,8 @@ def test_add_blocks_current_size_event(make_napari_viewer, graph_2d, segmentatio
         mock_blocker.assert_called_once()
 
 
-def test_process_click(make_napari_viewer, graph_2d, segmentation_2d):
+def test_process_click(viewer, graph_2d, segmentation_2d):
     """Test process_click with different click types."""
-    viewer = make_napari_viewer()
     tracks = SolutionTracks(graph=graph_2d, segmentation=segmentation_2d, ndim=3)
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
@@ -135,11 +137,8 @@ def test_process_click(make_napari_viewer, graph_2d, segmentation_2d):
         mock_center.assert_called_once_with(points_layer.nodes[0])
 
 
-def test_set_point_size_updates_default_size(
-    make_napari_viewer, graph_2d, segmentation_2d
-):
+def test_set_point_size_updates_default_size(viewer, graph_2d, segmentation_2d):
     """Test set_point_size updates default_size."""
-    viewer = make_napari_viewer()
     tracks = SolutionTracks(graph=graph_2d, segmentation=segmentation_2d, ndim=3)
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
@@ -156,9 +155,8 @@ def test_set_point_size_updates_default_size(
     assert points_layer.default_size == 10
 
 
-def test_refresh_updates_data(make_napari_viewer, graph_2d, segmentation_2d, qtbot):
+def test_refresh_updates_data(viewer, graph_2d, segmentation_2d, qtbot):
     """Test _refresh updates layer data."""
-    viewer = make_napari_viewer()
     tracks = SolutionTracks(graph=graph_2d, segmentation=segmentation_2d, ndim=3)
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
@@ -175,9 +173,8 @@ def test_refresh_updates_data(make_napari_viewer, graph_2d, segmentation_2d, qtb
     assert len(points_layer.data) == initial_data_len
 
 
-def test_create_node_attrs(make_napari_viewer, graph_2d, segmentation_2d):
+def test_create_node_attrs(viewer, graph_2d, segmentation_2d):
     """Test _create_node_attrs creates correct attributes and activates track_id if needed."""
-    viewer = make_napari_viewer()
     tracks = SolutionTracks(graph=graph_2d, segmentation=segmentation_2d, ndim=3)
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
@@ -206,9 +203,8 @@ def test_create_node_attrs(make_napari_viewer, graph_2d, segmentation_2d):
     assert tracks_viewer.selected_track is not None
 
 
-def test_update_data_without_seg_layer(make_napari_viewer, graph_2d):
+def test_update_data_without_seg_layer(viewer, graph_2d):
     """Test _update_data handles added, removed, and changed actions without seg layer."""
-    viewer = make_napari_viewer()
     tracks = SolutionTracks(graph=graph_2d, ndim=3)
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
@@ -245,9 +241,8 @@ def test_update_data_without_seg_layer(make_napari_viewer, graph_2d):
     assert not np.array_equal(updated_pos, original_pos)
 
 
-def test_update_data_with_seg_layer(make_napari_viewer, graph_2d, segmentation_2d):
+def test_update_data_with_seg_layer(viewer, graph_2d, segmentation_2d):
     """Test _update_data with seg layer shows info for add and refreshes for change."""
-    viewer = make_napari_viewer()
     tracks = SolutionTracks(graph=graph_2d, segmentation=segmentation_2d, ndim=3)
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
@@ -277,11 +272,8 @@ def test_update_data_with_seg_layer(make_napari_viewer, graph_2d, segmentation_2
     assert np.array_equal(updated_pos, original_pos)
 
 
-def test_update_data_invalid_action_forceable(
-    make_napari_viewer, graph_2d, monkeypatch
-):
+def test_update_data_invalid_action_forceable(viewer, graph_2d, monkeypatch):
     """Test _update_data handles forceable InvalidActionError by retrying with force=True."""
-    viewer = make_napari_viewer()
     tracks = SolutionTracks(graph=graph_2d, ndim=3)
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
@@ -307,9 +299,8 @@ def test_update_data_invalid_action_forceable(
     assert len(tracks.graph.nodes) == initial_node_count + 1
 
 
-def test_update_selection_in_select_mode(make_napari_viewer, graph_2d, segmentation_2d):
+def test_update_selection_in_select_mode(viewer, graph_2d, segmentation_2d):
     """Test _update_selection updates selected_nodes in select mode."""
-    viewer = make_napari_viewer()
     tracks = SolutionTracks(graph=graph_2d, segmentation=segmentation_2d, ndim=3)
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
@@ -338,10 +329,9 @@ def test_update_selection_in_select_mode(make_napari_viewer, graph_2d, segmentat
 
 
 def test_update_selection_not_in_select_mode_does_nothing(
-    make_napari_viewer, graph_2d, segmentation_2d
+    viewer, graph_2d, segmentation_2d
 ):
     """Test _update_selection does nothing when not in select mode."""
-    viewer = make_napari_viewer()
     tracks = SolutionTracks(graph=graph_2d, segmentation=segmentation_2d, ndim=3)
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
@@ -359,11 +349,8 @@ def test_update_selection_not_in_select_mode_does_nothing(
     assert len(tracks_viewer.selected_nodes) == initial_selection_count
 
 
-def test_get_symbols_returns_correct_symbols(
-    make_napari_viewer, graph_2d, segmentation_2d
-):
+def test_get_symbols_returns_correct_symbols(viewer, graph_2d, segmentation_2d):
     """Test get_symbols returns correct symbols for node types."""
-    viewer = make_napari_viewer()
     tracks = SolutionTracks(graph=graph_2d, segmentation=segmentation_2d, ndim=3)
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
@@ -381,9 +368,8 @@ def test_get_symbols_returns_correct_symbols(
         assert symbol in tracks_viewer.symbolmap.values()
 
 
-def test_update_point_outline(make_napari_viewer, graph_2d, segmentation_2d):
+def test_update_point_outline(viewer, graph_2d, segmentation_2d):
     """Test update_point_outline with different modes and visibility."""
-    viewer = make_napari_viewer()
     tracks = SolutionTracks(graph=graph_2d, segmentation=segmentation_2d, ndim=3)
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")

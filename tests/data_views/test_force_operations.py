@@ -18,6 +18,13 @@ from motile_tracker.data_views.views_coordinator.user_dialogs import (
 )
 
 
+@pytest.fixture(autouse=True)
+def clear_viewer_layers(viewer):
+    """Clear viewer layers between tests."""
+    yield
+    viewer.layers.clear()
+
+
 class MockEvent:
     def __init__(self, value):
         self.value = value
@@ -107,7 +114,7 @@ def test_confirm_force_operation_all_buttons(
     ],
 )
 def test_on_paint_invalid_action_upstream_division1_forceable(
-    make_napari_viewer,
+    viewer,
     graph_3d_with_division,
     segmentation_3d_boxes,
     monkeypatch,
@@ -133,8 +140,6 @@ def test_on_paint_invalid_action_upstream_division1_forceable(
     2    3   4               3     4                      3   4            3   4
 
     """
-
-    viewer = make_napari_viewer()
 
     # Create example tracks
     tracks = SolutionTracks(
@@ -220,7 +225,7 @@ def test_on_paint_invalid_action_upstream_division1_forceable(
     ],
 )
 def test_on_paint_invalid_action_upstream_division2_forceable(
-    make_napari_viewer,
+    viewer,
     graph_3d_with_division,
     segmentation_3d_boxes,
     monkeypatch,
@@ -242,8 +247,6 @@ def test_on_paint_invalid_action_upstream_division2_forceable(
     2    3   4              3  5  4                       3   4            3   4  5
 
     """
-
-    viewer = make_napari_viewer()
 
     # Create example tracks
     tracks = SolutionTracks(
@@ -329,7 +332,7 @@ def test_on_paint_invalid_action_upstream_division2_forceable(
     ],
 )
 def test_invalid_edge_force(
-    make_napari_viewer,
+    viewer,
     graph_3d_with_division,
     segmentation_3d_boxes,
     monkeypatch,
@@ -351,8 +354,6 @@ def test_invalid_edge_force(
 
 
     """
-
-    viewer = make_napari_viewer()
 
     # Create example tracks
     tracks = SolutionTracks(

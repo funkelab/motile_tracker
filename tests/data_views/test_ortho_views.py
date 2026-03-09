@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 from funtracks.data_model import SolutionTracks
 from napari.layers import Labels, Points
 from napari_orthogonal_views.ortho_view_widget import OrthoViewWidget
@@ -11,18 +12,22 @@ from motile_tracker.data_views.views.ortho_views import (
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
 
+@pytest.fixture(autouse=True)
+def clear_viewer_layers(viewer):
+    """Clear viewer layers between tests."""
+    yield
+    viewer.layers.clear()
+
+
 class MockEvent:
     def __init__(self, value):
         self.value = value
 
 
-def test_ortho_views(
-    make_napari_viewer, qtbot, graph_3d_with_division, segmentation_3d_boxes
-):
+def test_ortho_views(viewer, qtbot, graph_3d_with_division, segmentation_3d_boxes):
     """Test if the tracks layers are correctly displayed on the orthoviews"""
 
     # Initalize orthogonal views
-    viewer = make_napari_viewer()
     m = initialize_ortho_views(viewer)
 
     # Create example tracks

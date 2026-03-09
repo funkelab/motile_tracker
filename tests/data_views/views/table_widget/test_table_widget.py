@@ -9,10 +9,16 @@ from motile_tracker.data_views.views.tree_view.custom_table_widget import (
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
 
+@pytest.fixture(autouse=True)
+def clear_viewer_layers(viewer):
+    """Clear viewer layers between tests."""
+    yield
+    viewer.layers.clear()
+
+
 @pytest.fixture
-def setup_tracks_viewer(make_napari_viewer, graph_2d):
+def setup_tracks_viewer(viewer, graph_2d):
     """Create a TracksViewer with tracks loaded."""
-    viewer = make_napari_viewer()
     tracks = SolutionTracks(graph=graph_2d, ndim=3)
 
     tracks_viewer = TracksViewer.get_instance(viewer)

@@ -12,13 +12,19 @@ from funtracks.data_model import SolutionTracks
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
 
+@pytest.fixture(autouse=True)
+def clear_viewer_layers(viewer):
+    """Clear viewer layers between tests."""
+    yield
+    viewer.layers.clear()
+
+
 @pytest.fixture
-def tracks_viewer_setup(make_napari_viewer, graph_2d):
-    """Fixture that creates a viewer and tracks_viewer with tracks loaded.
+def tracks_viewer_setup(viewer, graph_2d):
+    """Fixture that creates a tracks_viewer with tracks loaded.
 
     Returns tuple of (viewer, tracks_viewer, tracks) for reuse across tests.
     """
-    viewer = make_napari_viewer()
     tracks = SolutionTracks(graph=graph_2d, ndim=3)
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
@@ -53,9 +59,8 @@ class TestNodeOperations:
         for node in nodes_to_delete:
             assert node not in tracks.graph.nodes
 
-    def test_delete_node_with_no_tracks(self, make_napari_viewer):
+    def test_delete_node_with_no_tracks(self, viewer):
         """Test delete_node does nothing when no tracks are loaded."""
-        viewer = make_napari_viewer()
         tracks_viewer = TracksViewer.get_instance(viewer)
 
         # Should not raise an error
@@ -93,7 +98,7 @@ class TestEdgeOperations:
         # Should not have deleted anything
         assert tracks.graph.number_of_edges() == edge_count_before
 
-    def test_swap_nodes(self, make_napari_viewer):
+    def test_swap_nodes(self, viewer):
         """Test swapping predecessors of two nodes updates the graph correctly."""
         # graph_2d has no valid swap scenario (all branches share a predecessor),
         # so create a minimal graph: A(t0)->C(t1) and B(t0)->D(t1)
@@ -109,7 +114,6 @@ class TestEdgeOperations:
         g.add_edges_from([(1, 3), (2, 4)])
         tracks = SolutionTracks(graph=g, ndim=3)
 
-        viewer = make_napari_viewer()
         tracks_viewer = TracksViewer.get_instance(viewer)
         tracks_viewer.update_tracks(tracks=tracks, name="test")
 
@@ -296,9 +300,8 @@ class TestUndoRedo:
         tracks_viewer.redo()
         assert 6 not in tracks.graph.nodes
 
-    def test_undo_redo_with_no_tracks(self, make_napari_viewer):
+    def test_undo_redo_with_no_tracks(self, viewer):
         """Test undo/redo do nothing when no tracks are loaded."""
-        viewer = make_napari_viewer()
         tracks_viewer = TracksViewer.get_instance(viewer)
 
         # Should not raise errors
