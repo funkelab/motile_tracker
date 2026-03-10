@@ -19,7 +19,7 @@ def clear_viewer_layers(viewer):
 @pytest.fixture
 def setup_tracks_viewer(viewer, graph_2d):
     """Create a TracksViewer with tracks loaded."""
-    tracks = SolutionTracks(graph=graph_2d, ndim=3)
+    tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
 
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
@@ -32,7 +32,7 @@ def colored_table_widget(qtbot, setup_tracks_viewer):
     _, tracks_viewer = setup_tracks_viewer
 
     # Build dataframe from tracks
-    nodes = list(tracks_viewer.tracks.graph.nodes())
+    nodes = tracks_viewer.tracks.graph.node_ids()
 
     df = pd.DataFrame(
         {

@@ -55,7 +55,7 @@ def test_export_dialog_csv(mock_tracks, fake_parent, tmp_path, mock_colormap):
 
     # --- Setup mock_tracks to have a graph and track IDs ---
     mock_tracks.graph = MagicMock()
-    mock_tracks.graph.nodes.return_value = [1, 2]
+    mock_tracks.graph.node_ids.return_value = [1, 2]
     mock_tracks.get_track_id.side_effect = lambda node: node  # identity mapping
 
     # --- Mock ExportTypeDialog to return CSV and relabel=False ---
@@ -116,7 +116,7 @@ def test_export_dialog_csv_with_seg(mock_tracks, fake_parent, tmp_path, mock_col
 
     # --- Setup mock_tracks to have a graph and track IDs ---
     mock_tracks.graph = MagicMock()
-    mock_tracks.graph.nodes.return_value = [1, 2]
+    mock_tracks.graph.node_ids.return_value = [1, 2]
     mock_tracks.get_track_id.side_effect = lambda node: node  # identity mapping
 
     # --- Mock ExportTypeDialog to return CSV and relabel=True ---

@@ -62,7 +62,7 @@ class TrackPoints(ZOnlyPoints):
         tracks_viewer: TracksViewer,
     ):
         self.tracks_viewer = tracks_viewer
-        self.nodes = list(tracks_viewer.tracks.graph.nodes)
+        self.nodes = tracks_viewer.tracks.graph.node_ids()
         self.node_index_dict = {node: idx for idx, node in enumerate(self.nodes)}
 
         points = self.tracks_viewer.tracks.get_positions(self.nodes, incl_time=True)
@@ -168,7 +168,7 @@ class TrackPoints(ZOnlyPoints):
         self.events.data.disconnect(
             self._update_data
         )  # do not listen to new events until updates are complete
-        self.nodes = list(self.tracks_viewer.tracks.graph.nodes)
+        self.nodes = self.tracks_viewer.tracks.graph.node_ids()
 
         self.node_index_dict = {node: idx for idx, node in enumerate(self.nodes)}
 
@@ -270,7 +270,7 @@ class TrackPoints(ZOnlyPoints):
                 for ind in self.selected_data:
                     point = self.data[ind]
                     pos = point[1:]
-                    node_id = self.properties["node_id"][ind]
+                    node_id = int(self.properties["node_id"][ind])
                     UserUpdateNodeAttrs(
                         self.tracks_viewer.tracks,
                         node=node_id,
@@ -296,7 +296,7 @@ class TrackPoints(ZOnlyPoints):
             1: NodeType.CONTINUE,
             2: NodeType.SPLIT,
         }
-        symbols = [symbolmap[statemap[degree]] for _, degree in tracks.graph.out_degree]
+        symbols = [symbolmap[statemap[degree]] for degree in tracks.graph.out_degree()]
         return symbols
 
     def update_point_outline(self, visible_nodes: list[int] | str) -> None:

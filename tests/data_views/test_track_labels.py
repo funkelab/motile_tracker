@@ -58,7 +58,7 @@ def create_event_val(
     return event_val
 
 
-def test_paint_event(viewer, graph_3d_with_division, segmentation_3d_boxes):
+def test_paint_event(viewer, graph_3d_with_division):
     """Test paint event processing
 
     1) Paint with a new label (4), new track id (4)
@@ -77,9 +77,7 @@ def test_paint_event(viewer, graph_3d_with_division, segmentation_3d_boxes):
     """
 
     # Create example tracks
-    tracks = SolutionTracks(
-        graph=graph_3d_with_division, segmentation=segmentation_3d_boxes, ndim=4
-    )
+    tracks = SolutionTracks(graph=graph_3d_with_division, ndim=4, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
 
@@ -101,23 +99,23 @@ def test_paint_event(viewer, graph_3d_with_division, segmentation_3d_boxes):
         tp=3, z=(15, 20), y=(45, 50), x=(75, 80), old_val=0, target_val=60
     )
     event = MockEvent(event_val)
-    assert len(tracks_viewer.tracks.graph.nodes) == 4  # 4 nodes before the paint event
+    assert tracks_viewer.tracks.graph.num_nodes() == 4  # 4 nodes before the paint event
     tracks_viewer.tracking_layers.seg_layer._on_paint(event)
 
     # verify the new selected label is now at painted pixels.
-    assert tracks_viewer.tracking_layers.seg_layer.data[3, 15, 45, 75] == 5
+    assert (
+        int(np.asarray(tracks_viewer.tracking_layers.seg_layer.data[3, 15, 45, 75]))
+        == 5
+    )
     # verfiy that the node is present and has the correct track id.
     assert tracks_viewer.tracks.get_track_id(5) == 4
-    assert len(tracks_viewer.tracks.graph.nodes) == 5  # 5 nodes after paint event
-    assert len(tracks_viewer.tracks.graph.edges) == 3  # no new edges
+    assert tracks_viewer.tracks.graph.num_nodes() == 5  # 5 nodes after paint event
+    assert tracks_viewer.tracks.graph.num_edges() == 3  # no new edges
 
     ### 2) Simulate paint event that overwrites an existing node with a new track id. Below
     # event aims to completely replace node 3 with a new label, that has track id 4, since
     # this is currently still the selected_track.
 
-    # first remove the current values (with a true paint event this has happened already
-    # but since we are testing and simulating one here, we have to set it ourselves).
-    tracks_viewer.tracking_layers.seg_layer.data[2, 55:65, 45:55, 40:50] = 0
     event_val = create_event_val(
         tp=2, z=(55, 65), y=(45, 55), x=(40, 50), old_val=3, target_val=60
     )
@@ -129,16 +127,21 @@ def test_paint_event(viewer, graph_3d_with_division, segmentation_3d_boxes):
     viewer.dims.current_step = step
 
     # Run event and evaluate
-    assert len(tracks_viewer.tracks.graph.nodes) == 5  # 5 nodes before paint event
+    assert tracks_viewer.tracks.graph.num_nodes() == 5  # 5 nodes before paint event
     tracks_viewer.tracking_layers.seg_layer._on_paint(event)
-    assert len(tracks_viewer.tracks.graph.nodes) == 5  # still 5 nodes after paint event
+    assert (
+        tracks_viewer.tracks.graph.num_nodes() == 5
+    )  # still 5 nodes after paint event
     # (node 3 has been replaced entirely)
-    assert 3 not in tracks_viewer.tracks.graph.nodes  # node 3 is removed
-    assert tracks_viewer.tracking_layers.seg_layer.data[2, 55, 45, 40] == 6  # next
+    assert 3 not in tracks_viewer.tracks.graph.node_ids()  # node 3 is removed
+    assert (
+        int(np.asarray(tracks_viewer.tracking_layers.seg_layer.data[2, 55, 45, 40]))
+        == 6
+    )  # next
     # available value
     assert tracks_viewer.tracks.get_track_id(6) == 4  # the selected track id
-    assert (2, 3) not in tracks_viewer.tracks.graph.edges
-    assert (6, 5) in tracks_viewer.tracks.graph.edges
+    assert not tracks_viewer.tracks.graph.has_edge(2, 3)
+    assert tracks_viewer.tracks.graph.has_edge(6, 5)
 
     ### 3) simulate an erase event (paint event with label 0) that removes part of label 6
     event_val = create_event_val(
@@ -147,28 +150,34 @@ def test_paint_event(viewer, graph_3d_with_division, segmentation_3d_boxes):
     event = MockEvent(event_val)
 
     # Run event and evaluate
-    assert len(tracks_viewer.tracks.graph.nodes) == 5  # 5 nodes before paint event
+    assert tracks_viewer.tracks.graph.num_nodes() == 5  # 5 nodes before paint event
     tracks_viewer.tracking_layers.seg_layer.mode = "erase"  # to correctly interpret
     # painting with 0
 
     tracks_viewer.tracking_layers.seg_layer._on_paint(event)
-    assert len(tracks_viewer.tracks.graph.nodes) == 5  # still 5 nodes after paint event
+    assert (
+        tracks_viewer.tracks.graph.num_nodes() == 5
+    )  # still 5 nodes after paint event
     # (node 6 is now smaller)
     assert tracks_viewer.tracks.graph.nodes[6]["area"] < 1000
-    assert tracks_viewer.tracking_layers.seg_layer.data[2, 55, 45, 40] == 0  # erased
+    assert (
+        int(np.asarray(tracks_viewer.tracking_layers.seg_layer.data[2, 55, 45, 40]))
+        == 0
+    )  # erased
 
     ### 4) Test undoing the last paint event
     tracks_viewer.tracking_layers.seg_layer.undo()
     assert tracks_viewer.tracks.graph.nodes[6]["area"] == 1000
-    assert tracks_viewer.tracking_layers.seg_layer.data[2, 55, 45, 40] == 6  # back at 5
+    assert (
+        int(np.asarray(tracks_viewer.tracking_layers.seg_layer.data[2, 55, 45, 40]))
+        == 6
+    )  # back at 5
 
 
-def test_ensure_valid_label(viewer, graph_3d_with_division, segmentation_3d_boxes):
+def test_ensure_valid_label(viewer, graph_3d_with_division):
 
     # Create example tracks
-    tracks = SolutionTracks(
-        graph=graph_3d_with_division, segmentation=segmentation_3d_boxes, ndim=4
-    )
+    tracks = SolutionTracks(graph=graph_3d_with_division, ndim=4, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
 

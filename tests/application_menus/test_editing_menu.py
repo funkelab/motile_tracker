@@ -15,7 +15,8 @@ from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksView
 def test_button_states(make_napari_viewer, graph_2d):
     """Test button enable/disable states based on selection."""
     viewer = make_napari_viewer()
-    tracks = SolutionTracks(graph=graph_2d, ndim=3)
+    # TODO Teun: can we define this somewhere globally, that time_attr="t"
+    tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
 
@@ -75,7 +76,7 @@ def test_button_states(make_napari_viewer, graph_2d):
 def test_button_interactions(make_napari_viewer, graph_2d, qtbot):
     """Test button click handlers."""
     viewer = make_napari_viewer()
-    tracks = SolutionTracks(graph=graph_2d, ndim=3)
+    tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
 
@@ -139,7 +140,7 @@ def test_button_interactions(make_napari_viewer, graph_2d, qtbot):
 def test_track_id_display(make_napari_viewer, graph_2d):
     """Test track ID label updates."""
     viewer = make_napari_viewer()
-    tracks = SolutionTracks(graph=graph_2d, ndim=3)
+    tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
 

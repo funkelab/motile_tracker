@@ -15,8 +15,8 @@ def clear_viewer_layers(viewer):
 
 
 @pytest.fixture
-def visualization_widget(viewer, graph_3d, segmentation_3d, qtbot):
-    tracks = SolutionTracks(graph=graph_3d, segmentation=segmentation_3d, ndim=4)
+def visualization_widget(viewer, graph_3d, qtbot):
+    tracks = SolutionTracks(graph=graph_3d, ndim=4, time_attr="t")
 
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
@@ -111,14 +111,13 @@ def test_contour_checkbox_updates_layer(visualization_widget):
 def test_update_label_colormap_when_selecting(
     viewer,
     graph_3d,
-    segmentation_3d,
     mode,
 ):
     """Test the actual values on the label colormap"""
     tracks = SolutionTracks(
         graph=graph_3d,
-        segmentation=segmentation_3d,
         ndim=4,
+        time_attr="t",
     )
 
     tracks_viewer = TracksViewer.get_instance(viewer)

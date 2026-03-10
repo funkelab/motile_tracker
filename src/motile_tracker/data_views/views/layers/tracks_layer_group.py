@@ -50,7 +50,7 @@ class TracksLayerGroup:
         if (
             self.tracks is not None
             and self.tracks.graph is not None
-            and self.tracks.graph.number_of_nodes() != 0
+            and self.tracks.graph.num_nodes() != 0
         ):
             self.tracks_layer = TrackGraph(
                 name=self.name + "_tracks",

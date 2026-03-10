@@ -24,16 +24,14 @@ class MockEvent:
         self.value = value
 
 
-def test_ortho_views(viewer, qtbot, graph_3d_with_division, segmentation_3d_boxes):
+def test_ortho_views(viewer, qtbot, graph_3d_with_division):
     """Test if the tracks layers are correctly displayed on the orthoviews"""
 
     # Initalize orthogonal views
     m = initialize_ortho_views(viewer)
 
     # Create example tracks
-    tracks = SolutionTracks(
-        graph=graph_3d_with_division, segmentation=segmentation_3d_boxes, ndim=4
-    )
+    tracks = SolutionTracks(graph=graph_3d_with_division, ndim=4, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
 
@@ -83,20 +81,21 @@ def test_ortho_views(viewer, qtbot, graph_3d_with_division, segmentation_3d_boxe
     viewer.dims.current_step = step
     viewer.layers[-2]._on_paint(event)
 
-    assert viewer.layers[-2].data[1, 15, 45, 75] == 5
+    assert int(np.asarray(viewer.layers[-2].data[1, 15, 45, 75])) == 5
     assert np.array_equal(
-        viewer.layers[-2].data, m.right_widget.vm_container.viewer_model.layers[-2].data
+        np.asarray(viewer.layers[-2].data),
+        np.asarray(m.right_widget.vm_container.viewer_model.layers[-2].data),
     )
 
     # test paint event on one of the ortho views and see if a new node is added
-    assert len(tracks_viewer.tracks.graph.nodes) == 5
+    assert tracks_viewer.tracks.graph.num_nodes() == 5
     step = list(viewer.dims.current_step)
     step[0] = 2
     viewer.dims.current_step = step
     m.right_widget.vm_container.viewer_model.layers[-2].paint(
         coord=(2, 63, 20, 30), new_label=6, refresh=True
     )
-    assert len(tracks_viewer.tracks.graph.nodes) == 6
+    assert tracks_viewer.tracks.graph.num_nodes() == 6
 
     # test syncing of properties
     viewer.layers[-2].selected_label = 7  # forward sync only

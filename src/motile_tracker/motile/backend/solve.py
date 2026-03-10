@@ -90,7 +90,7 @@ def build_candidate_graph(
             iou=solver_params.iou_cost is not None,
             scale=scale,
         )
-    logger.debug("Cand graph has %d nodes", cand_graph.number_of_nodes())
+    logger.debug("Cand graph has %d nodes", cand_graph.num_nodes())
     return cand_graph
 
 
@@ -107,7 +107,7 @@ def _solve_full(
 
     solution_graph = solver.get_selected_subgraph(solution=solution)
     solution_nx_graph = graph_to_nx(solution_graph)
-    logger.debug("Solution graph has %d nodes", solution_nx_graph.number_of_nodes())
+    logger.debug("Solution graph has %d nodes", solution_nx_graph.num_nodes())
     return solution_nx_graph
 
 
@@ -130,17 +130,17 @@ def _solve_window(
     Returns:
         The solution graph for this window, or None if the window has no nodes.
     """
-    if window_subgraph.number_of_nodes() == 0:
+    if window_subgraph.num_nodes() == 0:
         return None
 
     # Handle edge case: if no edges, we can't solve (motile requires edges)
     # Just return all nodes directly
-    if window_subgraph.number_of_edges() == 0:
+    if window_subgraph.num_edges() == 0:
         logger.info(
             "Window has no edges (%d nodes), returning nodes directly",
-            window_subgraph.number_of_nodes(),
+            window_subgraph.num_nodes(),
         )
-        return window_subgraph.copy()
+        return window_subgraph.detach().filter().subgraph()
 
     # Construct and solve
     solver = construct_solver(window_subgraph, solver_params)
@@ -264,8 +264,8 @@ def _solve_single_window(
 
     logger.debug(
         "Single window solution has %d nodes, %d edges",
-        solution.number_of_nodes(),
-        solution.number_of_edges(),
+        solution.num_nodes(),
+        solution.num_edges(),
     )
     return solution
 
@@ -301,7 +301,7 @@ def _solve_chunked(
         )
 
     # Get the frame range from the candidate graph
-    times = [cand_graph.nodes[n]["time"] for n in cand_graph.nodes]
+    times = [cand_graph.nodes[n]["time"] for n in cand_graph.node_ids()]
     if not times:
         return nx.DiGraph()
 
@@ -346,7 +346,7 @@ def _solve_chunked(
         # Extract subgraph for this window (includes PIN_ATTR if set on cand_graph)
         nodes_in_window = [
             n
-            for n in cand_graph.nodes
+            for n in cand_graph.node_ids()
             if window_start <= cand_graph.nodes[n]["time"] < window_end
         ]
         window_subgraph = cand_graph.subgraph(nodes_in_window).copy()
@@ -366,8 +366,8 @@ def _solve_chunked(
         logger.debug(
             "Window %d solution has %d nodes, %d edges",
             window_num,
-            window_solution_nx.number_of_nodes(),
-            window_solution_nx.number_of_edges(),
+            window_solution_nx.num_nodes(),
+            window_solution_nx.num_edges(),
         )
 
         # Determine which part of this window to add to the combined solution
@@ -400,8 +400,8 @@ def _solve_chunked(
     )
     logger.debug(
         "Combined solution has %d nodes, %d edges",
-        combined_solution.number_of_nodes(),
-        combined_solution.number_of_edges(),
+        combined_solution.num_nodes(),
+        combined_solution.num_edges(),
     )
 
     return combined_solution
@@ -424,17 +424,17 @@ def _set_pinning_on_graph(
         overlap_start: Start frame of overlap region (inclusive).
         overlap_end: End frame of overlap region (exclusive).
     """
-    solution_nodes = set(solution_graph.nodes)
-    solution_edges = set(solution_graph.edges)
+    solution_nodes = set(solution_graph.node_ids())
+    solution_edges = set(solution_graph.edge_list())
 
     # Pin nodes in the overlap region
-    for node in cand_graph.nodes:
+    for node in cand_graph.node_ids():
         node_time = cand_graph.nodes[node]["time"]
         if overlap_start <= node_time < overlap_end:
             cand_graph.nodes[node][PIN_ATTR] = node in solution_nodes
 
     # Pin edges where both endpoints are in the overlap region
-    for u, v in cand_graph.edges:
+    for u, v in cand_graph.edge_list():
         u_time = cand_graph.nodes[u]["time"]
         v_time = cand_graph.nodes[v]["time"]
         if (

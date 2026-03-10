@@ -12,7 +12,7 @@ def graph_to_nx(graph: TrackGraph) -> nx.DiGraph:
         nx.DiGraph: Directed networkx graph with same nodes, edges, and attributes.
     """
     nx_graph = nx.DiGraph()
-    nodes_list = list(graph.nodes.items())
+    nodes_list = graph.node_ids()
     nx_graph.add_nodes_from(nodes_list)
     edges_list = [
         (edge_id[0], edge_id[1], data) for edge_id, data in graph.edges.items()

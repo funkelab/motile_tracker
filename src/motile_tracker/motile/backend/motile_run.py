@@ -6,18 +6,20 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
+import tracksdata as td
 from funtracks.data_model import SolutionTracks
-from funtracks.import_export.internal_format import load_tracks, save_tracks
+from funtracks.import_export import export_to_geff, import_from_geff
 
 from .solver_params import SolverParams
 
 if TYPE_CHECKING:
-    import networkx as nx
+    pass
 
 STAMP_FORMAT = "%m%d%Y_%H%M%S"
 PARAMS_FILENAME = "solver_params.json"
 IN_POINTS_FILENAME = "input_points.npy"
 GAPS_FILENAME = "gaps.txt"
+ATTRS_FILENAME = "attrs.json"
 
 
 class MotileRun(SolutionTracks):
@@ -30,12 +32,12 @@ class MotileRun(SolutionTracks):
 
     def __init__(
         self,
-        graph: nx.DiGraph,
-        segmentation: np.ndarray | None,
+        graph: td.graph.GraphView,
         run_name: str,
-        time_attr: str = "time",
+        time_attr: str = "t",
         pos_attr: str | tuple[str] | list[str] = "pos",
         scale: list[float] | None = None,
+        ndim: int | None = None,
         solver_params: SolverParams | None = None,
         input_points: np.ndarray | None = None,
         time: datetime | None = None,
@@ -44,10 +46,10 @@ class MotileRun(SolutionTracks):
     ):
         super().__init__(
             graph,
-            segmentation=segmentation,
             time_attr=time_attr,
             pos_attr=pos_attr,
             scale=scale,
+            ndim=ndim,
         )
         self.run_name = run_name
         self.solver_params = solver_params
@@ -104,8 +106,9 @@ class MotileRun(SolutionTracks):
         base_path = Path(base_path)
         run_dir = base_path / self._make_id()
         Path.mkdir(run_dir)
-        save_tracks(self, run_dir)
+        export_to_geff(self, run_dir)
         self._save_params(run_dir)
+        self._save_attrs(run_dir)
         if self.input_points is not None:
             self._save_array(run_dir, IN_POINTS_FILENAME, self.input_points)
         self._save_list(list_to_save=self.gaps, run_dir=run_dir, filename=GAPS_FILENAME)
@@ -131,11 +134,18 @@ class MotileRun(SolutionTracks):
         time, run_name = cls._unpack_id(run_dir.stem)
         params = cls._load_params(run_dir)
         input_points = cls._load_array(run_dir, IN_POINTS_FILENAME, required=False)
-        tracks = load_tracks(run_dir, seg_required=False, solution=True)
+        attrs = cls._load_attrs(run_dir)
+        tracks = import_from_geff(run_dir / "tracks")
+        if attrs is not None:
+            seg_shape = attrs.get("segmentation_shape")
+            if seg_shape is not None:
+                tracks.graph.update_metadata(segmentation_shape=tuple(seg_shape))
+            scale = attrs.get("scale") or tracks.scale
+        else:
+            scale = tracks.scale
         gaps = cls._load_list(run_dir=run_dir, filename=GAPS_FILENAME, required=False)
         return cls(
             graph=tracks.graph,
-            segmentation=tracks.segmentation,
             run_name=run_name,
             solver_params=params,
             input_points=input_points,
@@ -143,7 +153,8 @@ class MotileRun(SolutionTracks):
             gaps=gaps,
             pos_attr=tracks.features.position_key,
             time_attr=tracks.features.time_key,
-            scale=tracks.scale,
+            scale=scale,
+            ndim=tracks.ndim,
         )
 
     def _save_params(self, run_dir: Path):
@@ -222,25 +233,40 @@ class MotileRun(SolutionTracks):
             return None
 
     def _save_attrs(self, directory: Path):
-        """Save the time_attr, pos_attr, and scale in a json file in the given directory.
+        """Save the time_attr, pos_attr, scale, and segmentation_shape in a json file.
 
         Args:
             directory (Path):  The directory in which to save the attributes
         """
-        out_path = directory / self.ATTRS_FILE
-        attrs_dict = {
-            "time_attr": self.time_attr
-            if not isinstance(self.time_attr, np.ndarray)
-            else self.time_attr.tolist(),
-            "pos_attr": self.pos_attr
-            if not isinstance(self.pos_attr, np.ndarray)
-            else self.pos_attr.tolist(),
-            "scale": self.scale
+        out_path = directory / ATTRS_FILENAME
+        seg_shape = self.graph.metadata().get("segmentation_shape")
+        scale = (
+            self.scale
             if not isinstance(self.scale, np.ndarray)
-            else self.scale.tolist(),
+            else self.scale.tolist()
+        )
+        attrs_dict = {
+            "segmentation_shape": list(seg_shape) if seg_shape is not None else None,
+            "scale": scale,
         }
         with open(out_path, "w") as f:
             json.dump(attrs_dict, f)
+
+    @staticmethod
+    def _load_attrs(run_dir: Path) -> dict | None:
+        """Load attrs from the attrs json file in the provided directory, if present.
+
+        Args:
+            run_dir (Path): The directory in which to find the attrs file.
+
+        Returns:
+            dict | None: The attrs dict, or None if the file was not found.
+        """
+        attrs_file = run_dir / ATTRS_FILENAME
+        if not attrs_file.is_file():
+            return None
+        with open(attrs_file) as f:
+            return json.load(f)
 
     def _save_list(self, list_to_save: list | None, run_dir: Path, filename: str):
         if list_to_save is None:

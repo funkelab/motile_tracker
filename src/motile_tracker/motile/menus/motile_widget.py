@@ -144,7 +144,7 @@ class MotileWidget(QWidget):
         # so track IDs are assigned at init time and this would not be needed.
         run.enable_features([run.features.tracklet_key, run.features.lineage_key])
 
-        if run.graph.number_of_nodes() == 0:
+        if run.graph.num_nodes() == 0:
             show_warning(
                 "No tracks found - try making your edge selection value more negative"
             )

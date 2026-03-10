@@ -33,9 +33,9 @@ class MockEvent:
         self.type = event_type
 
 
-def test_initialization(viewer, graph_2d, segmentation_2d):
+def test_initialization(viewer, graph_2d):
     """Test TrackPoints layer initialization."""
-    tracks = SolutionTracks(graph=graph_2d, segmentation=segmentation_2d, ndim=3)
+    tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
 
@@ -47,7 +47,7 @@ def test_initialization(viewer, graph_2d, segmentation_2d):
     assert points_layer.name == "test_points"
 
     # Verify nodes were extracted
-    assert len(points_layer.nodes) == len(tracks.graph.nodes)
+    assert len(points_layer.nodes) == tracks.graph.num_nodes()
 
     # Verify node_index_dict was created
     assert len(points_layer.node_index_dict) == len(points_layer.nodes)
@@ -66,9 +66,9 @@ def test_initialization(viewer, graph_2d, segmentation_2d):
     assert points_layer._type_string == "points"
 
 
-def test_custom_select_blocks_current_size(viewer, graph_2d, segmentation_2d):
+def test_custom_select_blocks_current_size(viewer, graph_2d):
     """Test custom_select function blocks current_size signal."""
-    tracks = SolutionTracks(graph=graph_2d, segmentation=segmentation_2d, ndim=3)
+    tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
 
@@ -83,9 +83,9 @@ def test_custom_select_blocks_current_size(viewer, graph_2d, segmentation_2d):
     assert hasattr(generator, "__iter__")
 
 
-def test_add_blocks_current_size_event(viewer, graph_2d, segmentation_2d):
+def test_add_blocks_current_size_event(viewer, graph_2d):
     """Test add method blocks current_size event."""
-    tracks = SolutionTracks(graph=graph_2d, segmentation=segmentation_2d, ndim=3)
+    tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
 
@@ -104,9 +104,9 @@ def test_add_blocks_current_size_event(viewer, graph_2d, segmentation_2d):
         mock_blocker.assert_called_once()
 
 
-def test_process_click(viewer, graph_2d, segmentation_2d):
+def test_process_click(viewer, graph_2d):
     """Test process_click with different click types."""
-    tracks = SolutionTracks(graph=graph_2d, segmentation=segmentation_2d, ndim=3)
+    tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
 
@@ -137,9 +137,9 @@ def test_process_click(viewer, graph_2d, segmentation_2d):
         mock_center.assert_called_once_with(points_layer.nodes[0])
 
 
-def test_set_point_size_updates_default_size(viewer, graph_2d, segmentation_2d):
+def test_set_point_size_updates_default_size(viewer, graph_2d):
     """Test set_point_size updates default_size."""
-    tracks = SolutionTracks(graph=graph_2d, segmentation=segmentation_2d, ndim=3)
+    tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
 
@@ -155,9 +155,9 @@ def test_set_point_size_updates_default_size(viewer, graph_2d, segmentation_2d):
     assert points_layer.default_size == 10
 
 
-def test_refresh_updates_data(viewer, graph_2d, segmentation_2d, qtbot):
+def test_refresh_updates_data(viewer, graph_2d, qtbot):
     """Test _refresh updates layer data."""
-    tracks = SolutionTracks(graph=graph_2d, segmentation=segmentation_2d, ndim=3)
+    tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
 
@@ -173,9 +173,9 @@ def test_refresh_updates_data(viewer, graph_2d, segmentation_2d, qtbot):
     assert len(points_layer.data) == initial_data_len
 
 
-def test_create_node_attrs(viewer, graph_2d, segmentation_2d):
+def test_create_node_attrs(viewer, graph_2d):
     """Test _create_node_attrs creates correct attributes and activates track_id if needed."""
-    tracks = SolutionTracks(graph=graph_2d, segmentation=segmentation_2d, ndim=3)
+    tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
 
@@ -189,9 +189,9 @@ def test_create_node_attrs(viewer, graph_2d, segmentation_2d):
 
     # Verify attributes
     assert "pos" in attrs
-    assert "time" in attrs
+    assert "t" in attrs
     assert "track_id" in attrs
-    assert attrs["time"] == 1
+    assert attrs["t"] == 1
     assert np.array_equal(attrs["pos"], [50, 50])
     # Test 2: Activates new track_id if none selected
     tracks_viewer.selected_track = None
@@ -203,9 +203,10 @@ def test_create_node_attrs(viewer, graph_2d, segmentation_2d):
     assert tracks_viewer.selected_track is not None
 
 
-def test_update_data_without_seg_layer(viewer, graph_2d):
+def test_update_data_without_seg_layer(viewer, graph_2d_without_segmentation):
     """Test _update_data handles added, removed, and changed actions without seg layer."""
-    tracks = SolutionTracks(graph=graph_2d, ndim=3)
+
+    tracks = SolutionTracks(graph=graph_2d_without_segmentation, ndim=3, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
 
@@ -215,19 +216,19 @@ def test_update_data_without_seg_layer(viewer, graph_2d):
     assert tracks_viewer.tracking_layers.seg_layer is None
 
     # Test 1: Added action adds node
-    initial_node_count = len(tracks.graph.nodes)
+    initial_node_count = tracks.graph.num_nodes()
     new_point = np.array([[1, 50, 50]])
     event = MockEvent(action="added", value=new_point)
     points_layer._update_data(event)
-    assert len(tracks_viewer.tracks.graph.nodes) == initial_node_count + 1
+    assert tracks_viewer.tracks.graph.num_nodes() == initial_node_count + 1
 
     # Test 2: Removed action removes node
-    first_node = list(tracks.graph.nodes)[0]
+    first_node = list(tracks.graph.node_ids())[0]
     tracks_viewer.selected_nodes.add(first_node)
-    current_node_count = len(tracks.graph.nodes)
+    current_node_count = tracks.graph.num_nodes()
     event = MockEvent(action="removed")
     points_layer._update_data(event)
-    assert len(tracks_viewer.tracks.graph.nodes) == current_node_count - 1
+    assert tracks_viewer.tracks.graph.num_nodes() == current_node_count - 1
 
     # Test 3: Changed action updates node position
     points_layer.selected_data.add(0)
@@ -241,9 +242,9 @@ def test_update_data_without_seg_layer(viewer, graph_2d):
     assert not np.array_equal(updated_pos, original_pos)
 
 
-def test_update_data_with_seg_layer(viewer, graph_2d, segmentation_2d):
+def test_update_data_with_seg_layer(viewer, graph_2d):
     """Test _update_data with seg layer shows info for add and refreshes for change."""
-    tracks = SolutionTracks(graph=graph_2d, segmentation=segmentation_2d, ndim=3)
+    tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
 
@@ -253,28 +254,31 @@ def test_update_data_with_seg_layer(viewer, graph_2d, segmentation_2d):
     assert tracks_viewer.tracking_layers.seg_layer is not None
 
     # Test 1: Added action shows info and doesn't add node
-    initial_node_count = len(tracks.graph.nodes)
+    initial_node_count = tracks.graph.num_nodes()
     new_point = np.array([[1, 50, 50]])
     event = MockEvent(action="added", value=new_point)
     with patch("motile_tracker.data_views.views.layers.track_points.show_info"):
         points_layer._update_data(event)
-    assert len(tracks_viewer.tracks.graph.nodes) == initial_node_count
+    assert tracks_viewer.tracks.graph.num_nodes() == initial_node_count
 
     # Test 2: Changed action refreshes instead of updating
     points_layer.selected_data.add(0)
     first_node = points_layer.nodes[0]
-    original_pos = tracks.graph.nodes[first_node]["pos"].copy()
+    original_pos = np.asarray(tracks.graph.nodes[first_node]["pos"]).copy()
     new_pos = np.array([1, 100, 100])
     points_layer.data[0] = new_pos
     event = MockEvent(action="changed")
     points_layer._update_data(event)
-    updated_pos = tracks_viewer.tracks.graph.nodes[first_node]["pos"]
+    updated_pos = np.asarray(tracks_viewer.tracks.graph.nodes[first_node]["pos"])
     assert np.array_equal(updated_pos, original_pos)
 
 
-def test_update_data_invalid_action_forceable(viewer, graph_2d, monkeypatch):
+def test_update_data_invalid_action_forceable(
+    viewer, graph_2d_without_segmentation, monkeypatch
+):
     """Test _update_data handles forceable InvalidActionError by retrying with force=True."""
-    tracks = SolutionTracks(graph=graph_2d, ndim=3)
+
+    tracks = SolutionTracks(graph=graph_2d_without_segmentation, ndim=3, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
 
@@ -290,18 +294,18 @@ def test_update_data_invalid_action_forceable(viewer, graph_2d, monkeypatch):
         lambda message: (True, False),
     )
 
-    initial_node_count = len(tracks.graph.nodes)
+    initial_node_count = tracks.graph.num_nodes()
     new_point = np.array([[2, 50, 50]])
     event = MockEvent(action="added", value=new_point)
     points_layer._update_data(event)
 
     # Node should have been added despite the initial forceable error
-    assert len(tracks.graph.nodes) == initial_node_count + 1
+    assert tracks.graph.num_nodes() == initial_node_count + 1
 
 
-def test_update_selection_in_select_mode(viewer, graph_2d, segmentation_2d):
+def test_update_selection_in_select_mode(viewer, graph_2d):
     """Test _update_selection updates selected_nodes in select mode."""
-    tracks = SolutionTracks(graph=graph_2d, segmentation=segmentation_2d, ndim=3)
+    tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
 
@@ -328,11 +332,9 @@ def test_update_selection_in_select_mode(viewer, graph_2d, segmentation_2d):
     assert points_layer.nodes[1] in tracks_viewer.selected_nodes
 
 
-def test_update_selection_not_in_select_mode_does_nothing(
-    viewer, graph_2d, segmentation_2d
-):
+def test_update_selection_not_in_select_mode_does_nothing(viewer, graph_2d):
     """Test _update_selection does nothing when not in select mode."""
-    tracks = SolutionTracks(graph=graph_2d, segmentation=segmentation_2d, ndim=3)
+    tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
 
@@ -349,9 +351,9 @@ def test_update_selection_not_in_select_mode_does_nothing(
     assert len(tracks_viewer.selected_nodes) == initial_selection_count
 
 
-def test_get_symbols_returns_correct_symbols(viewer, graph_2d, segmentation_2d):
+def test_get_symbols_returns_correct_symbols(viewer, graph_2d):
     """Test get_symbols returns correct symbols for node types."""
-    tracks = SolutionTracks(graph=graph_2d, segmentation=segmentation_2d, ndim=3)
+    tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
 
@@ -361,16 +363,16 @@ def test_get_symbols_returns_correct_symbols(viewer, graph_2d, segmentation_2d):
     symbols = points_layer.get_symbols(tracks, tracks_viewer.symbolmap)
 
     # Verify symbols list has correct length
-    assert len(symbols) == len(tracks.graph.nodes)
+    assert len(symbols) == tracks.graph.num_nodes()
 
     # Verify symbols are from symbolmap
     for symbol in symbols:
         assert symbol in tracks_viewer.symbolmap.values()
 
 
-def test_update_point_outline(viewer, graph_2d, segmentation_2d):
+def test_update_point_outline(viewer, graph_2d):
     """Test update_point_outline with different modes and visibility."""
-    tracks = SolutionTracks(graph=graph_2d, segmentation=segmentation_2d, ndim=3)
+    tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
 

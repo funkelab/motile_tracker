@@ -38,22 +38,21 @@ def update_napari_tracks(
 
     ndim = tracks.ndim - 1
     graph = tracks.graph
-    napari_data = np.zeros((graph.number_of_nodes(), ndim + 2))
+    napari_data = np.zeros((graph.num_nodes(), ndim + 2))
     napari_edges = {}
 
-    parents = [node for node, degree in graph.out_degree() if degree >= 2]
+    parents = [node for node in graph.node_ids() if graph.out_degree(node) >= 2]
     intertrack_edges = []
 
     # Remove all intertrack edges from a copy of the original graph
-    graph_copy = graph.copy()
+    graph_copy = graph.detach().filter().subgraph()
     for parent in parents:
-        daughters = [child for _, child in graph.out_edges(parent)]
+        daughters = list(graph.successors(parent))
         for daughter in daughters:
             graph_copy.remove_edge(parent, daughter)
             intertrack_edges.append((parent, daughter))
 
-    for index, node in enumerate(graph.nodes(data=True)):
-        node_id, data = node
+    for index, node_id in enumerate(graph.node_ids()):
         location = tracks.get_position(node_id)
         napari_data[index] = [
             tracks.get_track_id(node_id),

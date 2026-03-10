@@ -5,7 +5,6 @@ Tests cover node operations, edge operations, display modes, and selection manag
 
 from unittest.mock import patch
 
-import networkx as nx
 import pytest
 from funtracks.data_model import SolutionTracks
 
@@ -20,12 +19,12 @@ def clear_viewer_layers(viewer):
 
 
 @pytest.fixture
-def tracks_viewer_setup(viewer, graph_2d):
+def tracks_viewer_setup(viewer, graph_2d_without_segmentation):
     """Fixture that creates a tracks_viewer with tracks loaded.
 
     Returns tuple of (viewer, tracks_viewer, tracks) for reuse across tests.
     """
-    tracks = SolutionTracks(graph=graph_2d, ndim=3)
+    tracks = SolutionTracks(graph=graph_2d_without_segmentation, ndim=3, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
     return viewer, tracks_viewer, tracks
@@ -43,7 +42,7 @@ class TestNodeOperations:
 
         tracks_viewer.delete_node()
 
-        assert node_to_delete not in tracks.graph.nodes
+        assert not tracks.graph.has_node(node_to_delete)
 
     def test_delete_multiple_nodes(self, tracks_viewer_setup):
         """Test deleting multiple selected nodes removes all of them."""
@@ -57,7 +56,7 @@ class TestNodeOperations:
         tracks_viewer.delete_node()
 
         for node in nodes_to_delete:
-            assert node not in tracks.graph.nodes
+            assert not tracks.graph.has_node(node)
 
     def test_delete_node_with_no_tracks(self, viewer):
         """Test delete_node does nothing when no tracks are loaded."""
@@ -75,7 +74,7 @@ class TestEdgeOperations:
         viewer, tracks_viewer, tracks = tracks_viewer_setup
 
         # Test 1: Delete edge between two connected nodes
-        edges = list(tracks.graph.edges)
+        edges = tracks.graph.edge_list()
         if not edges:
             pytest.skip("No edges in test graph")
 
@@ -90,44 +89,55 @@ class TestEdgeOperations:
 
         # Test 2: Delete edge with wrong number of selections
         tracks_viewer.selected_nodes.reset()
-        tracks_viewer.selected_nodes.add(list(tracks.graph.nodes)[0])
+        tracks_viewer.selected_nodes.add(list(tracks.graph.node_ids())[0])
 
-        edge_count_before = tracks.graph.number_of_edges()
+        edge_count_before = tracks.graph.num_edges()
         tracks_viewer.delete_edge()
 
         # Should not have deleted anything
-        assert tracks.graph.number_of_edges() == edge_count_before
+        assert tracks.graph.num_edges() == edge_count_before
 
-    def test_swap_nodes(self, viewer):
-        """Test swapping predecessors of two nodes updates the graph correctly."""
-        # graph_2d has no valid swap scenario (all branches share a predecessor),
-        # so create a minimal graph: A(t0)->C(t1) and B(t0)->D(t1)
-        g = nx.DiGraph()
-        g.add_nodes_from(
-            [
-                (1, {"pos": [0, 0], "time": 0, "area": 100, "track_id": 1}),
-                (2, {"pos": [5, 0], "time": 0, "area": 100, "track_id": 2}),
-                (3, {"pos": [0, 0], "time": 1, "area": 100, "track_id": 1}),
-                (4, {"pos": [5, 0], "time": 1, "area": 100, "track_id": 2}),
-            ]
+    def test_swap_nodes(self, viewer, graph_2d_without_segmentation):
+        """Test swapping predecessors of two nodes updates the graph correctly.
+
+        Extends graph_2d by adding node 7 (t=3) as a predecessor for node 6 (t=4).
+        Nodes 5 and 6 are then at the same timepoint with different predecessors
+        (4 and 7 respectively), creating a valid swap scenario.
+        """
+        graph_2d_without_segmentation.bulk_add_nodes(
+            nodes=[
+                {
+                    "t": 3,
+                    "pos": [95.0, 95.0],
+                    "area": 100.0,
+                    "track_id": 5,
+                    "lineage_id": 2,
+                    "solution": 1,
+                }
+            ],
+            indices=[7],
         )
-        g.add_edges_from([(1, 3), (2, 4)])
-        tracks = SolutionTracks(graph=g, ndim=3)
+        graph_2d_without_segmentation.bulk_add_edges(
+            [{"source_id": 7, "target_id": 6, "solution": 1}]
+        )
 
+        tracks = SolutionTracks(
+            graph=graph_2d_without_segmentation, ndim=3, time_attr="t"
+        )
         tracks_viewer = TracksViewer.get_instance(viewer)
         tracks_viewer.update_tracks(tracks=tracks, name="test")
 
-        # Select nodes 3 and 4 (different predecessors: 1 and 2)
-        tracks_viewer.selected_nodes.add(3)
-        tracks_viewer.selected_nodes.add(4, append=True)
+        # Select nodes 5 and 6 (both t=4, predecessors 4 and 7 respectively)
+        tracks_viewer.selected_nodes.add(5)
+        tracks_viewer.selected_nodes.add(6, append=True)
 
         tracks_viewer.swap_nodes()
 
-        # After swap: predecessors are exchanged
-        assert tracks.graph.has_edge(1, 4)
-        assert tracks.graph.has_edge(2, 3)
-        assert not tracks.graph.has_edge(1, 3)
-        assert not tracks.graph.has_edge(2, 4)
+        # After swap: predecessors are exchanged (4->6, 7->5)
+        assert tracks.graph.has_edge(4, 6)
+        assert tracks.graph.has_edge(7, 5)
+        assert not tracks.graph.has_edge(4, 5)
+        assert not tracks.graph.has_edge(7, 6)
 
     def test_create_edge_sorts_by_time(self, tracks_viewer_setup):
         """Test create_edge orders nodes by time (earlier -> later)."""
@@ -203,7 +213,7 @@ class TestDisplayModes:
         assert tracks_viewer.visible == "all"
 
         # Test 3: Lineage mode with selection
-        node = list(tracks.graph.nodes)[0]
+        node = list(tracks.graph.node_ids())[0]
         tracks_viewer.selected_nodes.add(node)
         tracks_viewer.set_display_mode("lineage")
         assert tracks_viewer.mode == "lineage"
@@ -220,7 +230,7 @@ class TestDisplayModes:
         viewer, tracks_viewer, tracks = tracks_viewer_setup
 
         # Select a node and switch to lineage mode
-        node = list(tracks.graph.nodes)[0]
+        node = list(tracks.graph.node_ids())[0]
         tracks_viewer.selected_nodes.add(node)
         tracks_viewer.set_display_mode("lineage")
 
@@ -240,7 +250,7 @@ class TestSelectionManagement:
         viewer, tracks_viewer, tracks = tracks_viewer_setup
 
         # Test 1: Center on single node
-        node = list(tracks.graph.nodes)[0]
+        node = list(tracks.graph.node_ids())[0]
         tracks_viewer.selected_nodes.add(node)
 
         with patch.object(tracks_viewer, "center_on_node") as center_mock:
@@ -250,7 +260,7 @@ class TestSelectionManagement:
 
         # Test 2: No centering with multiple nodes
         tracks_viewer.selected_nodes.reset()
-        nodes = list(tracks.graph.nodes)[:2]
+        nodes = list(tracks.graph.node_ids())[:2]
         for i, node in enumerate(nodes):
             tracks_viewer.selected_nodes.add(node, append=(i > 0))
 
@@ -264,7 +274,7 @@ class TestSelectionManagement:
         viewer, tracks_viewer, tracks = tracks_viewer_setup
 
         # Test 1: Update selected_track from selection
-        node = list(tracks.graph.nodes)[0]
+        node = list(tracks.graph.node_ids())[0]
         tracks_viewer.selected_nodes.add(node)
         tracks_viewer.update_selection()
 
@@ -290,15 +300,15 @@ class TestUndoRedo:
         # Do a real action: delete unconnected node 6
         tracks_viewer.selected_nodes.add(6)
         tracks_viewer.delete_node()
-        assert 6 not in tracks.graph.nodes
+        assert not tracks.graph.has_node(6)
 
         # Undo: node 6 should be restored
         tracks_viewer.undo()
-        assert 6 in tracks.graph.nodes
+        assert tracks.graph.has_node(6)
 
         # Redo: node 6 should be gone again
         tracks_viewer.redo()
-        assert 6 not in tracks.graph.nodes
+        assert not tracks.graph.has_node(6)
 
     def test_undo_redo_with_no_tracks(self, viewer):
         """Test undo/redo do nothing when no tracks are loaded."""

@@ -127,8 +127,8 @@ def test_solve_with_motile(make_napari_viewer, segmentation_2d):
     )
     widget.view_run_widget.run = run
     result = worker_fn(widget, run)
-    assert result.graph.number_of_nodes() > 0
-    for node in result.graph.nodes():
+    assert result.graph.num_nodes() > 0
+    for node in result.graph.node_ids():
         assert result.get_track_id(node) is not None
 
     # Test 2: Raises ValueError without input data

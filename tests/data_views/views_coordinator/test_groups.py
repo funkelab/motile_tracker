@@ -62,7 +62,7 @@ def test_collection_button(viewer):
 
 def test_collection_widget_initialization(viewer, graph_2d):
     """Test CollectionWidget initializes correctly and has correct initial button states."""
-    tracks = SolutionTracks(graph=graph_2d, ndim=3)
+    tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
 
@@ -99,7 +99,7 @@ def test_collection_widget_initialization(viewer, graph_2d):
 
 def test_group_creation_and_deletion(viewer, graph_2d, qtbot):
     """Test creating groups (including duplicates) and deleting groups."""
-    tracks = SolutionTracks(graph=graph_2d, ndim=3)
+    tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
 
@@ -159,7 +159,7 @@ def test_group_creation_and_deletion(viewer, graph_2d, qtbot):
 
 def test_button_states(viewer, graph_2d, qtbot):
     """Test button enable/disable states based on selection and group state."""
-    tracks = SolutionTracks(graph=graph_2d, ndim=3)
+    tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
 
@@ -202,7 +202,7 @@ def test_button_states(viewer, graph_2d, qtbot):
 
 def test_add_remove_nodes(viewer, graph_2d, qtbot):
     """Test adding and removing individual nodes to/from groups."""
-    tracks = SolutionTracks(graph=graph_2d, ndim=3)
+    tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
 
@@ -236,7 +236,7 @@ def test_add_remove_nodes(viewer, graph_2d, qtbot):
 
 def test_add_remove_tracks(viewer, graph_2d, qtbot):
     """Test adding and removing entire tracks to/from groups."""
-    tracks = SolutionTracks(graph=graph_2d, ndim=3)
+    tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
 
@@ -271,7 +271,7 @@ def test_add_remove_tracks(viewer, graph_2d, qtbot):
 
 def test_add_remove_lineages(viewer, graph_2d, qtbot):
     """Test adding and removing entire lineages to/from groups."""
-    tracks = SolutionTracks(graph=graph_2d, ndim=3)
+    tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
 
@@ -301,7 +301,7 @@ def test_add_remove_lineages(viewer, graph_2d, qtbot):
 
 def test_selection_operations(viewer, graph_2d, qtbot):
     """Test selection operations: select, deselect, invert, restore."""
-    tracks = SolutionTracks(graph=graph_2d, ndim=3)
+    tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
 
@@ -336,7 +336,7 @@ def test_selection_operations(viewer, graph_2d, qtbot):
     assert 3 in tracks_viewer.selected_nodes
 
     # Test 4: Invert selection
-    all_nodes = set(tracks.graph.nodes)
+    all_nodes = set(tracks.graph.node_ids())
     selected = [1, 2, 3]
 
     qtbot.mouseClick(widget.invert_btn, Qt.MouseButton.LeftButton)
@@ -349,7 +349,7 @@ def test_selection_operations(viewer, graph_2d, qtbot):
 
 def test_node_navigation(viewer, graph_2d, qtbot):
     """Test jumping to next/previous selected nodes."""
-    tracks = SolutionTracks(graph=graph_2d, ndim=3)
+    tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
 
@@ -377,17 +377,18 @@ class TestRetrieveExistingGroups:
 
     def test_retrieve_existing_groups(self, viewer, graph_2d):
         """Test retrieving groups that exist as features on tracks."""
-        tracks = SolutionTracks(graph=graph_2d, ndim=3)
+        tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
         tracks_viewer = TracksViewer.get_instance(viewer)
         tracks_viewer.update_tracks(tracks=tracks, name="test")
 
         # Add a boolean feature to tracks (simulates existing group)
         from funtracks.features import Feature
 
-        tracks.features["existing_group"] = Feature(
-            feature_type="node",
-            value_type="bool",
-            num_values=1,
+        tracks.add_feature(
+            "existing_group",
+            Feature(
+                feature_type="node", value_type="bool", num_values=1, default_value=None
+            ),
         )
 
         # Set some nodes to True for this feature
@@ -409,7 +410,7 @@ class TestRetrieveExistingGroups:
 
     def test_refresh_removes_deleted_nodes(self, viewer, graph_2d, qtbot):
         """Test refresh removes nodes that no longer exist in graph."""
-        tracks = SolutionTracks(graph=graph_2d, ndim=3)
+        tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
         tracks_viewer = TracksViewer.get_instance(viewer)
         tracks_viewer.update_tracks(tracks=tracks, name="test")
 
@@ -442,7 +443,7 @@ class TestRetrieveExistingGroups:
 @patch("motile_tracker.data_views.views_coordinator.groups.ExportDialog")
 def test_export_button_shows_dialog(mock_export_dialog, viewer, graph_2d, qtbot):
     """Test export button shows export dialog."""
-    tracks = SolutionTracks(graph=graph_2d, ndim=3)
+    tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
 

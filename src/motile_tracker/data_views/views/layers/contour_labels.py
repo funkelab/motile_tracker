@@ -151,3 +151,30 @@ class ContourLabels(napari.layers.Labels):
         """Refresh the label colormap by setting its dictionary"""
 
         self.colormap = DirectLabelColormap(color_dict=self.colormap.color_dict)
+
+    def data_setitem(self, indices, value, refresh=True):
+        """Override to handle read-only data (e.g. GraphArrayView).
+
+        When the underlying data does not support __setitem__ (read-only),
+        fire the paint event directly without writing to the array. The actual
+        update is handled by _on_paint via UserUpdateSegmentation.
+        For writable arrays (numpy), fall back to the default implementation.
+        """
+        if not hasattr(self.data, "__setitem__"):
+            old_values = self._read_old_values(indices)
+            # Fire paint event directly; undo is handled by the tracks backend
+            self.events.paint(value=[(indices, old_values, value)])
+            return
+        super().data_setitem(indices, value, refresh)
+
+    def _read_old_values(self, indices):
+        """Read current values at indices from a read-only array,
+        materializing one timepoint at a time (the only supported access pattern)."""
+        t_indices = indices[0]
+        spatial_indices = indices[1:]
+        old_values = np.zeros(len(t_indices), dtype=np.int64)
+        for t in np.unique(t_indices):
+            mask = t_indices == t
+            frame = np.asarray(self.data[int(t)])
+            old_values[mask] = frame[tuple(s[mask] for s in spatial_indices)]
+        return old_values

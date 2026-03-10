@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Any
 
 import napari.layers
-import networkx as nx
 import numpy as np
 import pandas as pd
 from funtracks.data_model import Tracks
@@ -44,18 +43,38 @@ def extract_sorted_tracks(
     parent_mapping = []
 
     # Identify parent nodes (nodes with more than one child)
-    parent_nodes = [n for (n, d) in solution_nx_graph.out_degree() if d > 1]
-    end_nodes = [n for (n, d) in solution_nx_graph.out_degree() if d == 0]
+    parent_nodes = [
+        n for n in solution_nx_graph.node_ids() if solution_nx_graph.out_degree(n) > 1
+    ]
+    end_nodes = [
+        n for n in solution_nx_graph.node_ids() if solution_nx_graph.out_degree(n) == 0
+    ]
 
-    # Make a copy of the graph and remove outgoing edges from parent nodes to isolate
-    # tracks
-    soln_copy = solution_nx_graph.copy()
-    for parent_node in parent_nodes:
-        out_edges = solution_nx_graph.out_edges(parent_node)
-        soln_copy.remove_edges_from(out_edges)
+    # BFS to collect tracklets, cutting edges at division (parent) nodes
+    parent_node_set = set(parent_nodes)
+    visited: set = set()
+    tracklets: list[set] = []
+    for start_node in solution_nx_graph.node_ids():
+        if start_node in visited:
+            continue
+        component: set = set()
+        queue = [start_node]
+        while queue:
+            node = queue.pop()
+            if node in visited:
+                continue
+            visited.add(node)
+            component.add(node)
+            for pred in solution_nx_graph.predecessors(node):
+                if pred not in visited and pred not in parent_node_set:
+                    queue.append(pred)
+            if node not in parent_node_set:
+                for succ in solution_nx_graph.successors(node):
+                    if succ not in visited:
+                        queue.append(succ)
+        tracklets.append(component)
 
-    # Process each weakly connected component as a separate track
-    for node_set in nx.weakly_connected_components(soln_copy):
+    for node_set in tracklets:
         # Sort nodes in each weakly connected component by their time attribute to
         # ensure correct order
         sorted_nodes = sorted(
@@ -94,12 +113,15 @@ def extract_sorted_tracks(
                 display_name = feature.get("display_name", feature_key)
                 value_names = feature.get("value_names", None)
                 val = tracks.get_node_attr(node, feature_key)
-                if isinstance(val, list | tuple):
-                    for i, v in enumerate(val):
+                num_values = feature.get("num_values", 1)
+                if num_values > 1:
+                    for i in range(num_values):
+                        v = val[i]
                         if isinstance(display_name, list | tuple):
                             name = display_name[i]
-                        elif isinstance(value_names, list) and len(value_names) == len(
-                            val
+                        elif (
+                            isinstance(value_names, list)
+                            and len(value_names) == num_values
                         ):
                             name = f"{value_names[i]}"
                         else:
@@ -177,7 +199,7 @@ def order_roots_by_prev(prev_axis_order: list[int], roots: list[int]) -> list[in
 
 
 def get_sorted_track_ids(
-    graph: nx.DiGraph,
+    graph,
     tracklet_id_key: str = "tracklet_id",
     prev_axis_order: list[int] | None = None,
 ) -> list[Any]:
@@ -187,23 +209,35 @@ def get_sorted_track_ids(
     parent track id.
 
     Args:
-        graph (nx.DiGraph): graph with a tracklet_id attribute on it.
+        graph: graph with a tracklet_id attribute on it.
         tracklet_id_key (str): tracklet_id key on the graph.
 
     Returns:
         list[Any] of ordered tracklet_ids.
     """
 
+    # Topological sort via Kahn's algorithm (BFS from roots)
+    in_degree = {n: graph.in_degree(n) for n in graph.node_ids()}
+    queue = [n for n, d in in_degree.items() if d == 0]
+    topo_order = []
+    while queue:
+        node = queue.pop(0)
+        topo_order.append(node)
+        for succ in graph.successors(node):
+            in_degree[succ] -= 1
+            if in_degree[succ] == 0:
+                queue.append(succ)
+
     # Create tracklet_id to parent_tracklet_id mapping (0 if tracklet has no parent)
     tracklet_to_parent_tracklet = {}
-    for node in nx.topological_sort(graph):
+    for node in topo_order:
         data = graph.nodes[node]
         tracklet = data[tracklet_id_key]
         if tracklet in tracklet_to_parent_tracklet:
             continue
-        predecessor = next(graph.predecessors(node), None)
-        if predecessor is not None:
-            parent_tracklet_id = graph.nodes[predecessor][tracklet_id_key]
+        predecessors = list(graph.predecessors(node))
+        if predecessors:
+            parent_tracklet_id = graph.nodes[predecessors[0]][tracklet_id_key]
         else:
             parent_tracklet_id = 0
         tracklet_to_parent_tracklet[tracklet] = parent_tracklet_id
@@ -236,7 +270,7 @@ def get_sorted_track_ids(
     return x_axis_order
 
 
-def extract_lineage_tree(graph: nx.DiGraph, node_id: str) -> list[str]:
+def extract_lineage_tree(graph, node_id: str) -> list[str]:
     """Extract the entire lineage tree including horizontal relations for a given node"""
 
     # go up the tree to identify the root node
@@ -247,11 +281,15 @@ def extract_lineage_tree(graph: nx.DiGraph, node_id: str) -> list[str]:
             break
         root_node = predecessors[0]
 
-    # extract all descendants to get the full tree
-    nodes = nx.descendants(graph, root_node)
-
-    # include root
-    nodes.add(root_node)
+    # BFS to collect all descendants
+    nodes = set()
+    queue = [root_node]
+    while queue:
+        node = queue.pop()
+        if node in nodes:
+            continue
+        nodes.add(node)
+        queue.extend(graph.successors(node))
 
     return list(nodes)
 

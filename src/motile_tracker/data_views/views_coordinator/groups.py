@@ -232,7 +232,7 @@ class CollectionWidget(QWidget):
     def _invert_selection(self) -> None:
         """Invert the current selection"""
 
-        all_nodes = set(self.tracks_viewer.tracks.graph.nodes)
+        all_nodes = set(self.tracks_viewer.tracks.graph.node_ids())
         inverted = list(all_nodes - set(self.tracks_viewer.selected_nodes))
         self.tracks_viewer.selected_nodes.add_list(inverted, append=False)
 
@@ -249,7 +249,7 @@ class CollectionWidget(QWidget):
         ]
         for item in items:
             nodes = item.collection
-            graph_nodes = set(self.tracks_viewer.tracks.graph.nodes)
+            graph_nodes = set(self.tracks_viewer.tracks.graph.node_ids())
             item.collection = {item for item in nodes if item in graph_nodes}
             item.update_node_count()
 
@@ -282,7 +282,7 @@ class CollectionWidget(QWidget):
             if group_name not in group_dict:
                 nodes = [
                     node
-                    for node in self.tracks_viewer.tracks.nodes()
+                    for node in self.tracks_viewer.tracks.graph.node_ids()
                     if self.tracks_viewer.tracks.get_node_attr(node, group_name)
                 ]
                 group_dict[group_name] = nodes
@@ -445,7 +445,6 @@ class CollectionWidget(QWidget):
 
         # Register group as new feature on Tracks
         if name not in self.tracks_viewer.tracks.features:
-            new_feature_key = name
             new_feature: Feature = {
                 "feature_type": "node",  # This is a node feature
                 "value_type": "bool",  # The feature is a boolean
@@ -455,8 +454,8 @@ class CollectionWidget(QWidget):
                 "default_value": False,  # Default value for nodes without this feature
             }
 
-            # Add the new feature to the FeatureDict of the Tracks instance
-            self.tracks_viewer.tracks.features[new_feature_key] = new_feature
+            # Use add_feature to update both the FeatureDict and the graph schema
+            self.tracks_viewer.tracks.add_feature(name, new_feature)
 
     def _remove_group(self, item: QListWidgetItem) -> None:
         """Remove a collection object from the list. You must pass the list item that
@@ -471,8 +470,11 @@ class CollectionWidget(QWidget):
         group_name = self.collection_list.itemWidget(item).name.text()
         self.collection_list.takeItem(row)
 
-        # remove from the features on Tracks
-        del self.tracks_viewer.tracks.features[group_name]
+        # remove from the features dict and graph schema
+        if group_name in self.tracks_viewer.tracks.features:
+            del self.tracks_viewer.tracks.features[group_name]
+        if group_name in self.tracks_viewer.tracks.graph.node_attr_keys():
+            self.tracks_viewer.tracks.graph.remove_node_attr_key(group_name)
 
     def _show_export_dialog(self, item: QListWidgetItem) -> None:
         """Prompt user to choose export format (csv or geff), then export the nodes
