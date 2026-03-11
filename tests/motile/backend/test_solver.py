@@ -1,15 +1,23 @@
 import numpy as np
 import pytest
-from funtracks.data_model import SolutionTracks
+from funtracks.data_model import SolutionTracks, Tracks
 from polars.testing import assert_frame_equal
 
 from motile_tracker.motile.backend import SolverParams, solve
 
 
+@pytest.fixture
+def segmentation_2d(graph_2d):
+    return np.asarray(Tracks(graph_2d, ndim=3, time_attr="t").segmentation)
+
+
+@pytest.fixture
+def segmentation_3d(graph_3d):
+    return np.asarray(Tracks(graph_3d, ndim=4, time_attr="t").segmentation)
+
+
 # capsys is a pytest fixture that captures stdout and stderr output streams
-def test_solve_2d(graph_2d):
-    tracks = SolutionTracks(graph_2d, ndim=3, time_attr="t")
-    segmentation_2d = np.asarray(tracks.segmentation)
+def test_solve_2d(graph_2d, segmentation_2d):
     params = SolverParams()
     params.appear_cost = None
     soln_graph = solve(params, segmentation_2d)
@@ -23,23 +31,15 @@ def test_solve_2d(graph_2d):
     assert set(soln_graph.node_ids()) == set(graph_2d.node_ids())
 
 
-def test_solve_3d(graph_3d):
-    segmentation_3d = np.asarray(
-        SolutionTracks(graph_3d, ndim=4, time_attr="t").segmentation
-    )
-
+def test_solve_3d(graph_3d, segmentation_3d):
     params = SolverParams()
     params.appear_cost = None
     soln_graph = solve(params, segmentation_3d)
     assert set(soln_graph.node_ids()) == set(graph_3d.node_ids())
 
 
-def test_solve_chunked(graph_3d):
+def test_solve_chunked(segmentation_3d):
     """Test that chunked solving produces same results as full solve."""
-    segmentation_3d = np.asarray(
-        SolutionTracks(graph_3d, ndim=4, time_attr="t").segmentation
-    )
-
     # First solve without chunking
     params = SolverParams()
     params.appear_cost = None

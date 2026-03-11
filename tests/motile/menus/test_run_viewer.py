@@ -19,9 +19,13 @@ def run_viewer(qtbot):
 
 
 @pytest.fixture
-def sample_run(graph_2d):
+def segmentation_2d(graph_2d):
+    return np.asarray(Tracks(graph_2d, ndim=3, time_attr="t").segmentation)
+
+
+@pytest.fixture
+def sample_run(segmentation_2d):
     """Fixture for creating a sample MotileRun."""
-    segmentation_2d = np.asarray(Tracks(graph_2d, ndim=3, time_attr="t").segmentation)
 
     return MotileRun(
         graph=create_empty_graphview_graph(),

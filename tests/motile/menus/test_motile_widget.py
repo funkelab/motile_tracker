@@ -11,6 +11,11 @@ from motile_tracker.motile.backend import MotileRun, SolverParams
 from motile_tracker.motile.menus.motile_widget import MotileWidget
 
 
+@pytest.fixture
+def segmentation_2d(graph_2d):
+    return np.asarray(Tracks(graph_2d, ndim=3, time_attr="t").segmentation)
+
+
 def test_motile_widget_initialization(make_napari_viewer):
     """Test MotileWidget initialization and signal connections."""
     viewer = make_napari_viewer()
@@ -112,13 +117,11 @@ def test_generate_tracks(make_napari_viewer):
         mock_view_run.assert_called_once_with(run)
 
 
-def test_solve_with_motile(make_napari_viewer, graph_2d):
-    """Test solve_with_motile method with different inputs."""
+def test_solve_with_motile(make_napari_viewer, segmentation_2d):
+    """Test solve_with_motile method with different input scenarios."""
     viewer = make_napari_viewer()
     widget = MotileWidget(viewer)
     worker_fn = widget.solve_with_motile.__wrapped__
-
-    segmentation_2d = np.asarray(Tracks(graph_2d, ndim=3, time_attr="t").segmentation)
 
     # Test 1: Returns a run where all nodes have track_id assigned
     run = MotileRun(
