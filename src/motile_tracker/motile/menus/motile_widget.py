@@ -112,8 +112,8 @@ class MotileWidget(QWidget):
         Returns:
             MotileRun: The provided run with the output graph and segmentation included.
         """
-        if run.segmentation is not None:
-            input_data = run.segmentation
+        if run.input_segmentation is not None:
+            input_data = run.input_segmentation
         elif run.input_points is not None:
             input_data = run.input_points
         else:
@@ -123,8 +123,8 @@ class MotileWidget(QWidget):
             cand_graph = build_candidate_graph(input_data, run.solver_params, run.scale)
         except ValueError as e:
             if "Duplicate values found among nodes" in str(e):
-                run.segmentation = ensure_unique_labels(run.segmentation)
-                input_data = run.segmentation
+                run.input_segmentation = ensure_unique_labels(run.input_segmentation)
+                input_data = run.input_segmentation
                 cand_graph = build_candidate_graph(
                     input_data, run.solver_params, run.scale
                 )

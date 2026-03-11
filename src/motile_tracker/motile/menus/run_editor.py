@@ -7,8 +7,8 @@ from warnings import warn
 
 import dask.array as da
 import napari.layers
-import networkx as nx
 import numpy as np
+from funtracks.utils.tracksdata_utils import create_empty_graphview_graph
 from qtpy.QtCore import Signal
 from qtpy.QtWidgets import (
     QComboBox,
@@ -192,8 +192,8 @@ class RunEditor(QGroupBox):
             input_points = input_layer.data
         params = self.solver_params_widget.solver_params.copy()
         return MotileRun(
-            graph=nx.DiGraph(),
-            segmentation=input_seg,
+            graph=create_empty_graphview_graph(),
+            input_segmentation=input_seg,
             run_name=run_name,
             solver_params=params,
             input_points=input_points,

@@ -2,10 +2,10 @@
 
 from unittest.mock import MagicMock, patch
 
-import networkx as nx
 import numpy as np
 import pytest
-from funtracks.data_model import SolutionTracks
+from funtracks.data_model import SolutionTracks, Tracks
+from funtracks.utils.tracksdata_utils import create_empty_graphview_graph
 
 from motile_tracker.motile.backend import MotileRun, SolverParams
 from motile_tracker.motile.menus.motile_widget import MotileWidget
@@ -29,7 +29,7 @@ def test_motile_widget_initialization(make_napari_viewer):
     assert hasattr(widget.view_run_widget, "edit_run")
 
 
-def test_view_run(make_napari_viewer, graph_2d, segmentation_2d, qtbot):
+def test_view_run(make_napari_viewer, graph_2d, qtbot):
     """Test view_run method with different track types."""
     viewer = make_napari_viewer()
     widget = MotileWidget(viewer)
@@ -38,22 +38,22 @@ def test_view_run(make_napari_viewer, graph_2d, segmentation_2d, qtbot):
 
     # Test 1: MotileRun shows viewer and hides editor
     run = MotileRun(
-        graph=nx.DiGraph(),
-        segmentation=segmentation_2d,
+        graph=create_empty_graphview_graph(),
         run_name="test_run",
         solver_params=SolverParams(),
+        ndim=3,
     )
     widget.view_run(run)
     assert widget.view_run_widget.isVisible()
     assert not widget.edit_run_widget.isVisible()
 
     # Test 2: SolutionTracks (non-MotileRun) hides viewer
-    tracks = SolutionTracks(graph=graph_2d, segmentation=segmentation_2d, ndim=3)
+    tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
     widget.view_run(tracks)
     assert not widget.view_run_widget.isVisible()
 
 
-def test_edit_run(make_napari_viewer, segmentation_2d, qtbot):
+def test_edit_run(make_napari_viewer, qtbot):
     """Test edit_run method."""
     viewer = make_napari_viewer()
     widget = MotileWidget(viewer)
@@ -69,10 +69,10 @@ def test_edit_run(make_napari_viewer, segmentation_2d, qtbot):
     # Test 2: edit_run with run loads parameters into editor
     custom_params = SolverParams(max_edge_distance=999.0)
     run = MotileRun(
-        graph=nx.DiGraph(),
-        segmentation=segmentation_2d,
+        graph=create_empty_graphview_graph(),
         run_name="test_run",
         solver_params=custom_params,
+        ndim=3,
     )
     with patch.object(widget.edit_run_widget, "new_run") as mock_new_run:
         widget.edit_run(run)
@@ -80,16 +80,16 @@ def test_edit_run(make_napari_viewer, segmentation_2d, qtbot):
     assert widget.edit_run_widget.isVisible()
 
 
-def test_generate_tracks(make_napari_viewer, segmentation_2d):
+def test_generate_tracks(make_napari_viewer):
     """Test _generate_tracks method."""
     viewer = make_napari_viewer()
     widget = MotileWidget(viewer)
 
     run = MotileRun(
-        graph=nx.DiGraph(),
-        segmentation=segmentation_2d,
+        graph=create_empty_graphview_graph(),
         run_name="test_run",
         solver_params=SolverParams(),
+        ndim=3,
     )
 
     with patch.object(widget, "solve_with_motile") as mock_solve:
@@ -112,18 +112,20 @@ def test_generate_tracks(make_napari_viewer, segmentation_2d):
         mock_view_run.assert_called_once_with(run)
 
 
-def test_solve_with_motile(make_napari_viewer, segmentation_2d):
+def test_solve_with_motile(make_napari_viewer, graph_2d):
     """Test solve_with_motile method with different inputs."""
     viewer = make_napari_viewer()
     widget = MotileWidget(viewer)
     worker_fn = widget.solve_with_motile.__wrapped__
 
+    segmentation_2d = np.asarray(Tracks(graph_2d, ndim=3, time_attr="t").segmentation)
+
     # Test 1: Returns a run where all nodes have track_id assigned
     run = MotileRun(
-        graph=nx.DiGraph(),
-        segmentation=segmentation_2d,
+        graph=create_empty_graphview_graph(),
         run_name="test_run",
         solver_params=SolverParams(),
+        input_segmentation=segmentation_2d,
     )
     widget.view_run_widget.run = run
     result = worker_fn(widget, run)
@@ -133,12 +135,12 @@ def test_solve_with_motile(make_napari_viewer, segmentation_2d):
 
     # Test 2: Raises ValueError without input data
     run2 = MotileRun(
-        graph=nx.DiGraph(),
-        segmentation=segmentation_2d,
+        graph=create_empty_graphview_graph(),
+        input_segmentation=None,
         run_name="test_run",
         solver_params=SolverParams(),
+        ndim=3,
     )
-    run2.segmentation = None
     run2.input_points = None
     with pytest.raises(ValueError, match="Must have one of input segmentation"):
         worker_fn(widget, run2)
@@ -146,21 +148,21 @@ def test_solve_with_motile(make_napari_viewer, segmentation_2d):
     # Test 3: Uses points when provided
     points_data = np.array([[0, 10, 20], [1, 30, 40]])
     run3 = MotileRun(
-        graph=nx.DiGraph(),
-        segmentation=segmentation_2d,
+        graph=create_empty_graphview_graph(),
+        input_segmentation=None,
+        input_points=points_data,
         run_name="test_run",
         solver_params=SolverParams(),
+        ndim=3,
     )
-    run3.input_points = points_data
-    run3.segmentation = None
     with (
         patch(
             "motile_tracker.motile.menus.motile_widget.build_candidate_graph"
         ) as mock_build,
         patch("motile_tracker.motile.menus.motile_widget.solve") as mock_solve,
     ):
-        mock_build.return_value = nx.DiGraph()
-        mock_solve.return_value = nx.DiGraph()
+        mock_build.return_value = create_empty_graphview_graph()
+        mock_solve.return_value = create_empty_graphview_graph()
         worker_fn = widget.solve_with_motile.__wrapped__
         worker_fn(widget, run3)
         mock_build.assert_called_once()
@@ -169,8 +171,8 @@ def test_solve_with_motile(make_napari_viewer, segmentation_2d):
 
     # Test 4: Shows warning for empty result
     run4 = MotileRun(
-        graph=nx.DiGraph(),
-        segmentation=segmentation_2d,
+        graph=create_empty_graphview_graph(),
+        input_segmentation=segmentation_2d,
         run_name="test_run",
         solver_params=SolverParams(),
     )
@@ -181,8 +183,8 @@ def test_solve_with_motile(make_napari_viewer, segmentation_2d):
         patch("motile_tracker.motile.menus.motile_widget.solve") as mock_solve,
         patch("motile_tracker.motile.menus.motile_widget.show_warning") as mock_warning,
     ):
-        mock_build.return_value = nx.DiGraph()
-        mock_solve.return_value = nx.DiGraph()
+        mock_build.return_value = create_empty_graphview_graph()
+        mock_solve.return_value = create_empty_graphview_graph()
         worker_fn = widget.solve_with_motile.__wrapped__
         worker_fn(widget, run4)
         mock_warning.assert_called_once()
@@ -192,8 +194,8 @@ def test_solve_with_motile(make_napari_viewer, segmentation_2d):
     segmentation_2d[1][10:10, 10:10] = 1  # duplicate value
 
     run5 = MotileRun(
-        graph=nx.DiGraph(),
-        segmentation=segmentation_2d,
+        graph=create_empty_graphview_graph(),
+        input_segmentation=segmentation_2d,
         run_name="test_run",
         solver_params=SolverParams(),
     )
@@ -209,9 +211,9 @@ def test_solve_with_motile(make_napari_viewer, segmentation_2d):
     ):
         mock_build.side_effect = [
             ValueError("Duplicate values found among nodes"),
-            nx.DiGraph(),
+            create_empty_graphview_graph(),
         ]
-        mock_solve.return_value = nx.DiGraph()
+        mock_solve.return_value = create_empty_graphview_graph()
 
         relabeled = segmentation_2d.copy()
         relabeled[1][10:10, 10:10] = 100
@@ -235,16 +237,16 @@ def test_solve_with_motile(make_napari_viewer, segmentation_2d):
         assert mock_solve.call_args[0][1] is relabeled
 
 
-def test_on_solver_event(make_napari_viewer, segmentation_2d, qtbot):
+def test_on_solver_event(make_napari_viewer, qtbot):
     """Test _on_solver_event method."""
     viewer = make_napari_viewer()
     widget = MotileWidget(viewer)
 
     run = MotileRun(
-        graph=nx.DiGraph(),
-        segmentation=segmentation_2d,
+        graph=create_empty_graphview_graph(),
         run_name="test_run",
         solver_params=SolverParams(),
+        ndim=3,
     )
     widget.view_run_widget.run = run
 
@@ -274,16 +276,16 @@ def test_on_solver_event(make_napari_viewer, segmentation_2d, qtbot):
         widget._on_solver_event(run, event_data)
 
 
-def test_on_solve_complete(make_napari_viewer, segmentation_2d, qtbot):
+def test_on_solve_complete(make_napari_viewer, qtbot):
     """Test _on_solve_complete method."""
     viewer = make_napari_viewer()
     widget = MotileWidget(viewer)
 
     run = MotileRun(
-        graph=nx.DiGraph(),
-        segmentation=segmentation_2d,
+        graph=create_empty_graphview_graph(),
         run_name="test_run",
         solver_params=SolverParams(),
+        ndim=3,
     )
     widget.view_run_widget.run = run
 

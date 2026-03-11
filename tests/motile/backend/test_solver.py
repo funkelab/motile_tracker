@@ -1,26 +1,45 @@
+import numpy as np
 import pytest
+from funtracks.data_model import SolutionTracks
+from polars.testing import assert_frame_equal
 
 from motile_tracker.motile.backend import SolverParams, solve
 
 
 # capsys is a pytest fixture that captures stdout and stderr output streams
 def test_solve_2d(graph_2d):
-    graph_2d.remove_nodes_from([4, 5, 6])
+    tracks = SolutionTracks(graph_2d, ndim=3, time_attr="t")
+    segmentation_2d = np.asarray(tracks.segmentation)
     params = SolverParams()
     params.appear_cost = None
-    soln_graph = solve(params)  # TODO Teun: provide candidate graph??
+    soln_graph = solve(params, segmentation_2d)
+
+    # remove nodes that don't make the solution
+    # node 4 is too far from node 3
+    # node 5 is two frames from node 4
+    # node 6 is isolated and has no edges
+    for node in [4, 5, 6]:
+        graph_2d.remove_node(node)
     assert set(soln_graph.node_ids()) == set(graph_2d.node_ids())
 
 
-def test_solve_3d(segmentation_3d, graph_3d):
+def test_solve_3d(graph_3d):
+    segmentation_3d = np.asarray(
+        SolutionTracks(graph_3d, ndim=4, time_attr="t").segmentation
+    )
+
     params = SolverParams()
     params.appear_cost = None
     soln_graph = solve(params, segmentation_3d)
     assert set(soln_graph.node_ids()) == set(graph_3d.node_ids())
 
 
-def test_solve_chunked(segmentation_3d, graph_3d):
+def test_solve_chunked(graph_3d):
     """Test that chunked solving produces same results as full solve."""
+    segmentation_3d = np.asarray(
+        SolutionTracks(graph_3d, ndim=4, time_attr="t").segmentation
+    )
+
     # First solve without chunking
     params = SolverParams()
     params.appear_cost = None
@@ -35,7 +54,10 @@ def test_solve_chunked(segmentation_3d, graph_3d):
 
     # Solutions should have the same nodes and edges
     assert set(full_solution.node_ids()) == set(chunked_solution.node_ids())
-    assert set(full_solution.edges) == set(chunked_solution.edges)
+    assert_frame_equal(full_solution.node_attrs(), chunked_solution.node_attrs())
+    assert {tuple(e) for e in full_solution.edge_list()} == {
+        tuple(e) for e in chunked_solution.edge_list()
+    }
 
 
 def test_solve_chunked_overlap_required():
@@ -47,25 +69,34 @@ def test_solve_chunked_overlap_required():
         params.overlap_size = 0
 
 
-def test_solve_single_window(segmentation_3d):
+def test_solve_single_window(graph_3d):
     """Test solving just a single window for interactive testing."""
     params = SolverParams()
     params.appear_cost = None
     params.window_size = 3
     params.single_window_start = 1  # Start at frame 1
 
+    segmentation_3d = np.asarray(
+        SolutionTracks(graph_3d, ndim=4, time_attr="t").segmentation
+    )
+
     solution = solve(params, segmentation_3d)
 
     # Should only have nodes from frames 1, 2, 3
     assert solution.num_nodes() > 0
     # Verify all nodes are within the window
-    for node in solution.nodes:
-        node_time = solution.nodes[node].get("time")
+    for node in solution.node_ids():
+        node_time = solution.nodes[node]["t"]
         assert 1 <= node_time < 4, f"Node {node} has time {node_time}, expected 1-3"
 
 
-def test_solve_single_window_invalid_start(segmentation_3d):
+def test_solve_single_window_invalid_start(graph_3d):
     """Test that invalid window_start raises ValueError."""
+
+    segmentation_3d = np.asarray(
+        SolutionTracks(graph_3d, ndim=4, time_attr="t").segmentation
+    )
+
     params = SolverParams()
     params.appear_cost = None
     params.window_size = 3

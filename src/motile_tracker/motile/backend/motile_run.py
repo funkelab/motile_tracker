@@ -39,11 +39,15 @@ class MotileRun(SolutionTracks):
         scale: list[float] | None = None,
         ndim: int | None = None,
         solver_params: SolverParams | None = None,
+        input_segmentation: np.ndarray | None = None,
         input_points: np.ndarray | None = None,
         time: datetime | None = None,
         gaps: list[float] | None = None,
         status: str = "done",
     ):
+        if ndim is None and input_segmentation is not None:
+            ndim = input_segmentation.ndim
+
         super().__init__(
             graph,
             time_attr=time_attr,
@@ -53,6 +57,7 @@ class MotileRun(SolutionTracks):
         )
         self.run_name = run_name
         self.solver_params = solver_params
+        self.input_segmentation = input_segmentation
         self.input_points = input_points
         self.gaps = gaps
         self.status = status

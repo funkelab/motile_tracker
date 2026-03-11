@@ -1,7 +1,9 @@
 from unittest.mock import patch
 
-import networkx as nx
+import numpy as np
 import pytest
+from funtracks.data_model import Tracks
+from funtracks.utils.tracksdata_utils import create_empty_graphview_graph
 from qtpy.QtWidgets import QPushButton
 
 from motile_tracker.motile.backend import MotileRun, SolverParams
@@ -17,11 +19,13 @@ def run_viewer(qtbot):
 
 
 @pytest.fixture
-def sample_run(segmentation_2d):
+def sample_run(graph_2d):
     """Fixture for creating a sample MotileRun."""
+    segmentation_2d = np.asarray(Tracks(graph_2d, ndim=3, time_attr="t").segmentation)
+
     return MotileRun(
-        graph=nx.DiGraph(),
-        segmentation=segmentation_2d,
+        graph=create_empty_graphview_graph(),
+        input_segmentation=segmentation_2d,
         run_name="test_run",
         solver_params=SolverParams(),
     )
@@ -55,8 +59,8 @@ def test_update_run(run_viewer, sample_run, qtbot):
 
     # Test 3: update_run emits params_widget.new_params signal
     sample_run2 = MotileRun(
-        graph=nx.DiGraph(),
-        segmentation=sample_run.segmentation,
+        graph=create_empty_graphview_graph(),
+        input_segmentation=sample_run.input_segmentation,
         run_name="test_run2",
         solver_params=SolverParams(),
     )
@@ -65,8 +69,8 @@ def test_update_run(run_viewer, sample_run, qtbot):
 
     # Test 4: update_run calls solver_event_update
     sample_run3 = MotileRun(
-        graph=nx.DiGraph(),
-        segmentation=sample_run.segmentation,
+        graph=create_empty_graphview_graph(),
+        input_segmentation=sample_run.input_segmentation,
         run_name="test_run3",
         solver_params=SolverParams(),
     )

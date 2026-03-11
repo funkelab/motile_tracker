@@ -7,7 +7,7 @@ import napari
 import numpy as np
 
 if TYPE_CHECKING:
-    from funtracks.data_model.solution_tracks import SolutionTracks
+    from funtracks.data_model import SolutionTracks
 
     from motile_tracker.data_views.views_coordinator.tracks_viewer import (
         TracksViewer,

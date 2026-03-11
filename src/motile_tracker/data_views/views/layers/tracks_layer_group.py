@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import napari
-from funtracks.data_model.tracks import Tracks
+from funtracks.data_model import Tracks
 from napari.experimental import link_layers, unlink_layers
 
 from motile_tracker.data_views.views.layers.track_graph import TrackGraph
