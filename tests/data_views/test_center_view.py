@@ -1,5 +1,6 @@
 """Tests for center_view functionality with different scale configurations."""
 
+import napari
 import networkx as nx
 import numpy as np
 import pytest
@@ -420,8 +421,16 @@ class TestCenterViewWithScale:
         # Get ortho view points layers and verify point is visible in each
         right_vm = ortho_manager.right_widget.vm_container.viewer_model
         bottom_vm = ortho_manager.bottom_widget.vm_container.viewer_model
-        right_points = right_vm.layers[-1]
-        bottom_points = bottom_vm.layers[-1]
+        right_points = next(
+            layer
+            for layer in right_vm.layers
+            if isinstance(layer, napari.layers.Points)
+        )
+        bottom_points = next(
+            layer
+            for layer in bottom_vm.layers
+            if isinstance(layer, napari.layers.Points)
+        )
 
         # The ortho views use copied Points layers (not TrackPoints), so we check
         # _indices_view on those as well
