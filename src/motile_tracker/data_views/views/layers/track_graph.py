@@ -44,12 +44,9 @@ def update_napari_tracks(
     parents = [node for node in graph.node_ids() if graph.out_degree(node) >= 2]
     intertrack_edges = []
 
-    # Remove all intertrack edges from a copy of the original graph
-    graph_copy = graph.detach().filter().subgraph()
     for parent in parents:
         daughters = list(graph.successors(parent))
         for daughter in daughters:
-            graph_copy.remove_edge(parent, daughter)
             intertrack_edges.append((parent, daughter))
 
     for index, node_id in enumerate(graph.node_ids()):

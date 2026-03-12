@@ -106,8 +106,13 @@ def _solve_full(
 
     solution_tg = solver.get_selected_subgraph(solution=solution)
     selected_nodes = list(solution_tg.nodes.keys())
+    selected_edges = set(solution_tg.edges.keys())
     logger.debug("Solution graph has %d nodes", len(selected_nodes))
-    return cand_graph.filter(node_ids=selected_nodes).subgraph()
+    result = cand_graph.filter(node_ids=selected_nodes).subgraph().detach()
+    for u, v in list(result.edge_list()):
+        if (u, v) not in selected_edges:
+            result.remove_edge(u, v)
+    return result.filter().subgraph()
 
 
 def _solve_window(
@@ -146,7 +151,12 @@ def _solve_window(
     logger.info("Window solved in %.2f seconds", time.time() - start_time)
     solution_tg = solver.get_selected_subgraph(solution=solution)
     selected_nodes = list(solution_tg.nodes.keys())
-    return window_subgraph.filter(node_ids=selected_nodes).subgraph()
+    selected_edges = set(solution_tg.edges.keys())
+    result = window_subgraph.filter(node_ids=selected_nodes).subgraph().detach()
+    for u, v in list(result.edge_list()):
+        if (u, v) not in selected_edges:
+            result.remove_edge(u, v)
+    return result.filter().subgraph()
 
 
 def _solve_single_window(
@@ -273,6 +283,7 @@ def _solve_chunked(
     )
 
     all_selected_nodes: set[int] = set()
+    all_selected_edges: set[tuple] = set()
     window_start = min_time
     window_num = 0
     start_time = time.time()
@@ -313,13 +324,17 @@ def _solve_chunked(
             window_solution.num_edges(),
         )
 
-        # Collect selected nodes from this window, excluding the pinned overlap
-        # region that was already committed from the previous window.
+        # Collect selected nodes and edges from this window, excluding the pinned
+        # overlap region that was already committed from the previous window.
         overlap_start = window_start + window_size - overlap_size
         from_frame = None if window_num == 1 else window_start + overlap_size
         for nid in window_solution.node_ids():
             if from_frame is None or window_solution.nodes[nid]["t"] >= from_frame:
                 all_selected_nodes.add(nid)
+        for u, v in window_solution.edge_list():
+            u_time = window_solution.nodes[u]["t"]
+            if from_frame is None or u_time >= from_frame:
+                all_selected_edges.add((u, v))
 
         # Set PIN_ATTR on candidate graph for the overlap region (for next window)
         if window_end <= max_time:
@@ -339,7 +354,11 @@ def _solve_chunked(
     if not all_selected_nodes:
         return create_empty_graphview_graph()
 
-    result = cand_graph.filter(node_ids=list(all_selected_nodes)).subgraph()
+    result = cand_graph.filter(node_ids=list(all_selected_nodes)).subgraph().detach()
+    for u, v in list(result.edge_list()):
+        if (u, v) not in all_selected_edges:
+            result.remove_edge(u, v)
+    result = result.filter().subgraph()
     logger.debug(
         "Combined solution has %d nodes, %d edges",
         result.num_nodes(),
