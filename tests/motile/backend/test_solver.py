@@ -54,7 +54,9 @@ def test_solve_chunked(segmentation_3d):
 
     # Solutions should have the same nodes and edges
     assert set(full_solution.node_ids()) == set(chunked_solution.node_ids())
-    assert_node_attrs_equal_with_masks(full_solution, chunked_solution, check_row_order=False)
+    assert_node_attrs_equal_with_masks(
+        full_solution, chunked_solution, check_row_order=False
+    )
     assert {tuple(e) for e in full_solution.edge_list()} == {
         tuple(e) for e in chunked_solution.edge_list()
     }

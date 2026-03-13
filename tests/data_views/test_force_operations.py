@@ -335,6 +335,7 @@ def test_invalid_edge_force(
     monkeypatch,
     confirm_response,
     expect_force_retry,
+    click_node,
 ):
     r"""Test paint event processing
 
@@ -378,7 +379,8 @@ def test_invalid_edge_force(
     ### 2) Add an invalid edge and verify that the dialog was called
     # Node 4 already has an incoming edge from node 2, so adding 5→4 raises
     # InvalidActionError(forceable=True) without any mocking needed.
-    tracks_viewer.selected_nodes = [5, 4]
+    click_node(tracks_viewer, 5)
+    click_node(tracks_viewer, 4, append=True)
     tracks_viewer.force = False
 
     monkeypatch.setattr(

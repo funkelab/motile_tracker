@@ -21,6 +21,9 @@ IN_POINTS_FILENAME = "input_points.npy"
 GAPS_FILENAME = "gaps.txt"
 ATTRS_FILENAME = "attrs.json"
 
+# Internal edge attr keys managed by tracksdata — not user-facing features
+_TRACKSDATA_INTERNAL_EDGE_KEYS = frozenset({"edge_id", "source_id", "target_id"})
+
 
 class MotileRun(SolutionTracks):
     """An object representing a motile tracking run. Contains a name,
@@ -55,6 +58,7 @@ class MotileRun(SolutionTracks):
             scale=scale,
             ndim=ndim,
         )
+        self._register_edge_features()
         self.run_name = run_name
         self.solver_params = solver_params
         self.input_segmentation = input_segmentation
@@ -62,6 +66,28 @@ class MotileRun(SolutionTracks):
         self.gaps = gaps
         self.status = status
         self.time = datetime.now() if time is None else time
+
+    def _register_edge_features(self) -> None:
+        """Register custom edge attributes from the graph schema in self.features.
+
+        Workaround for a funtracks limitation: funtracks' AddEdge action looks up
+        default values for edge attributes via tracks.features, but only standard
+        node features (t, pos, track_id, lineage_id) are auto-registered there.
+        Custom edge attributes like 'iou' (added by the motile solver) are never
+        registered, causing a KeyError when adding new edges.
+        """
+        _type_map = {bool: "bool", int: "int", float: "float", str: "str"}
+        for attr, schema in self.graph._edge_attr_schemas().items():
+            if attr in self.features or attr in _TRACKSDATA_INTERNAL_EDGE_KEYS:
+                continue
+            value_type = _type_map.get(type(schema.default_value), "float")
+            self.features[attr] = {
+                "feature_type": "edge",
+                "value_type": value_type,
+                "num_values": 1,
+                "required": False,
+                "default_value": schema.default_value,
+            }
 
     def _make_id(self) -> str:
         """Combine the time and run name into a unique id for the run

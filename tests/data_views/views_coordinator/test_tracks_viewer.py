@@ -12,8 +12,8 @@ from funtracks.data_model import SolutionTracks, Tracks
 from motile_tracker.data_views.views.layers.track_graph import TrackGraph
 from motile_tracker.data_views.views.layers.track_labels import TrackLabels
 from motile_tracker.data_views.views.layers.track_points import TrackPoints
-
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
+from motile_tracker.motile.backend.motile_run import MotileRun
 
 
 @pytest.fixture(autouse=True)
@@ -24,12 +24,12 @@ def clear_viewer_layers(viewer):
 
 
 @pytest.fixture
-def tracks_viewer_setup(viewer, graph_2d_without_segmentation):
+def tracks_viewer_setup(viewer, graph_2d):
     """Fixture that creates a tracks_viewer with tracks loaded.
 
     Returns tuple of (viewer, tracks_viewer, tracks) for reuse across tests.
     """
-    tracks = SolutionTracks(graph=graph_2d_without_segmentation, ndim=3, time_attr="t")
+    tracks = MotileRun(graph=graph_2d, run_name="test", ndim=3, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
     return viewer, tracks_viewer, tracks
@@ -38,25 +38,26 @@ def tracks_viewer_setup(viewer, graph_2d_without_segmentation):
 class TestNodeOperations:
     """Tests for node manipulation operations."""
 
-    def test_delete_single_node(self, tracks_viewer_setup):
+    def test_delete_single_node(self, tracks_viewer_setup, click_node):
         """Test deleting a single node actually removes it from the graph."""
         viewer, tracks_viewer, tracks = tracks_viewer_setup
 
         node_to_delete = 6  # unconnected node in graph_2d
-        tracks_viewer.selected_nodes.add(node_to_delete)
+        click_node(tracks_viewer, node_to_delete)
 
         tracks_viewer.delete_node()
 
         assert not tracks.graph.has_node(node_to_delete)
 
-    def test_delete_multiple_nodes(self, tracks_viewer_setup):
+    def test_delete_multiple_nodes(self, tracks_viewer_setup, click_node):
         """Test deleting multiple selected nodes removes all of them."""
         viewer, tracks_viewer, tracks = tracks_viewer_setup
 
         # nodes 5 (terminal) and 6 (unconnected) are safe to delete independently
         nodes_to_delete = [5, 6]
-        for node in nodes_to_delete:
-            tracks_viewer.selected_nodes.add(node, append=True)
+        click_node(tracks_viewer, nodes_to_delete[0])
+        for node in nodes_to_delete[1:]:
+            click_node(tracks_viewer, node, append=True)
 
         tracks_viewer.delete_node()
 
@@ -74,7 +75,7 @@ class TestNodeOperations:
 class TestEdgeOperations:
     """Tests for edge manipulation operations."""
 
-    def test_delete_edge(self, tracks_viewer_setup):
+    def test_delete_edge(self, tracks_viewer_setup, click_node):
         """Test deleting edges with various selection scenarios."""
         viewer, tracks_viewer, tracks = tracks_viewer_setup
 
@@ -84,8 +85,8 @@ class TestEdgeOperations:
             pytest.skip("No edges in test graph")
 
         source, target = edges[0]
-        tracks_viewer.selected_nodes.add(source)
-        tracks_viewer.selected_nodes.add(target, append=True)
+        click_node(tracks_viewer, source)
+        click_node(tracks_viewer, target, append=True)
 
         tracks_viewer.delete_edge()
 
@@ -93,8 +94,8 @@ class TestEdgeOperations:
         assert not tracks.graph.has_edge(source, target)
 
         # Test 2: Delete edge with wrong number of selections
-        tracks_viewer.selected_nodes.reset()
-        tracks_viewer.selected_nodes.add(list(tracks.graph.node_ids())[0])
+        single_node = list(tracks.graph.node_ids())[0]
+        click_node(tracks_viewer, single_node)
 
         edge_count_before = tracks.graph.num_edges()
         tracks_viewer.delete_edge()
@@ -102,7 +103,7 @@ class TestEdgeOperations:
         # Should not have deleted anything
         assert tracks.graph.num_edges() == edge_count_before
 
-    def test_swap_nodes(self, viewer, graph_2d_without_segmentation):
+    def test_swap_nodes(self, viewer, graph_2d_without_segmentation, click_node):
         """Test swapping predecessors of two nodes updates the graph correctly.
 
         Extends graph_2d by adding node 7 (t=3) as a predecessor for node 6 (t=4).
@@ -133,8 +134,8 @@ class TestEdgeOperations:
         tracks_viewer.update_tracks(tracks=tracks, name="test")
 
         # Select nodes 5 and 6 (both t=4, predecessors 4 and 7 respectively)
-        tracks_viewer.selected_nodes.add(5)
-        tracks_viewer.selected_nodes.add(6, append=True)
+        click_node(tracks_viewer, 5)
+        click_node(tracks_viewer, 6, append=True)
 
         tracks_viewer.swap_nodes()
 
@@ -144,28 +145,42 @@ class TestEdgeOperations:
         assert not tracks.graph.has_edge(4, 5)
         assert not tracks.graph.has_edge(7, 6)
 
-    def test_create_edge_sorts_by_time(self, tracks_viewer_setup):
-        """Test create_edge orders nodes by time (earlier -> later)."""
-        viewer, tracks_viewer, tracks = tracks_viewer_setup
+    def test_create_edge_sorts_by_time(self, viewer, graph_2d, click_node):
+        """Test create_edge orders nodes by time (earlier -> later).
+
+        Uses graph_2d (with segmentation) so click_node goes through TrackLabels,
+        which returns np.int64 node IDs — matching the real UI path.
+        Uses MotileRun so edge attributes like 'iou' are registered in features.
+        """
+        tracks = MotileRun(graph=graph_2d, run_name="test", ndim=3, time_attr="t")
+        tracks_viewer = TracksViewer.get_instance(viewer)
+        tracks_viewer.update_tracks(tracks=tracks, name="test")
 
         # Node 2 (t1, no successors) and node 6 (t4, no predecessors): valid free edge
         # Select in reverse time order to verify sorting
-        tracks_viewer.selected_nodes.add(6)  # t4, selected first
-        tracks_viewer.selected_nodes.add(2, append=True)  # t1, selected second
+        click_node(tracks_viewer, 6)  # t4, clicked first
+        click_node(tracks_viewer, 2, append=True)  # t1, shift-clicked second
 
         tracks_viewer.create_edge()
 
         # Edge must go from earlier (2) to later (6), regardless of selection order
         assert tracks.graph.has_edge(2, 6)
 
-    def test_create_edge_with_force(self, tracks_viewer_setup, monkeypatch):
-        """Test create_edge handles forceable errors by retrying with force=True."""
-        viewer, tracks_viewer, tracks = tracks_viewer_setup
+    def test_create_edge_with_force(self, viewer, graph_2d, monkeypatch, click_node):
+        """Test create_edge handles forceable errors by retrying with force=True.
+
+        Uses graph_2d (with segmentation) so click_node goes through TrackLabels,
+        which returns np.int64 node IDs — matching the real UI path.
+        Uses MotileRun so edge attributes like 'iou' are registered in features.
+        """
+        tracks = MotileRun(graph=graph_2d, run_name="test", ndim=3, time_attr="t")
+        tracks_viewer = TracksViewer.get_instance(viewer)
+        tracks_viewer.update_tracks(tracks=tracks, name="test")
 
         # Node 4 (t2) already has incoming edge from node 3.
         # Adding edge 2(t1)->4 raises InvalidActionError(forceable=True).
-        tracks_viewer.selected_nodes.add(2)
-        tracks_viewer.selected_nodes.add(4, append=True)
+        click_node(tracks_viewer, 2)
+        click_node(tracks_viewer, 4, append=True)
 
         # Approve the force dialog automatically
         monkeypatch.setattr(
@@ -298,12 +313,12 @@ class TestSelectionManagement:
 class TestUndoRedo:
     """Tests for undo/redo functionality."""
 
-    def test_undo_redo_operations(self, tracks_viewer_setup):
+    def test_undo_redo_operations(self, tracks_viewer_setup, click_node):
         """Test undo restores deleted node and redo removes it again."""
         viewer, tracks_viewer, tracks = tracks_viewer_setup
 
         # Do a real action: delete unconnected node 6
-        tracks_viewer.selected_nodes.add(6)
+        click_node(tracks_viewer, 6)
         tracks_viewer.delete_node()
         assert not tracks.graph.has_node(6)
 

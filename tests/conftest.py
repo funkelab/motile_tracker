@@ -7,6 +7,41 @@ from tracksdata.nodes._mask import Mask
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
 
+@pytest.fixture
+def click_node():
+    """Return a helper that selects a node by simulating a layer click.
+
+    Prefers the TrackLabels path when a seg layer exists, because that is
+    the realistic path that produces np.int64 node IDs (via layer.get_value()
+    on a numpy image array). When no seg layer is present, falls back to
+    adding np.int64 directly so the type is still realistic.
+
+    This ensures operations like create_edge() are tested with the same types
+    they receive in the real UI, catching bugs like tracksdata's in_degree()
+    failing on np.int64.
+
+    Usage::
+
+        click_node(tracks_viewer, node_id)               # select only this node
+        click_node(tracks_viewer, node_id, append=True)  # shift-click (append)
+    """
+
+    class _Event:
+        def __init__(self, append):
+            self.modifiers = ["Shift"] if append else []
+
+    def _click(tracks_viewer, node_id, append=False):
+        seg_layer = tracks_viewer.tracking_layers.seg_layer
+        if seg_layer is not None:
+            # Realistic path: Labels layer returns np.int64 from image pixel values
+            seg_layer.process_click(_Event(append), np.int64(node_id))
+        else:
+            # No seg layer: cast to np.int64 to still match the real type
+            tracks_viewer.selected_nodes.add(np.int64(node_id), append)
+
+    return _click
+
+
 @pytest.fixture(autouse=True)
 def reset_tracks_viewer():
     """Reset TracksViewer singleton before and after each test.
