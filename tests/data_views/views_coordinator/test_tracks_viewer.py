@@ -5,8 +5,13 @@ Tests cover node operations, edge operations, display modes, and selection manag
 
 from unittest.mock import patch
 
+import numpy as np
 import pytest
-from funtracks.data_model import SolutionTracks
+from funtracks.data_model import SolutionTracks, Tracks
+
+from motile_tracker.data_views.views.layers.track_graph import TrackGraph
+from motile_tracker.data_views.views.layers.track_labels import TrackLabels
+from motile_tracker.data_views.views.layers.track_points import TrackPoints
 
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
@@ -317,3 +322,55 @@ class TestUndoRedo:
         # Should not raise errors
         tracks_viewer.undo()
         tracks_viewer.redo()
+
+
+class TestLayerCreation:
+    """Tests that the correct napari layers are created after loading tracks."""
+
+    def test_layers_present_after_update_tracks(self, viewer, graph_2d):
+        """Test that points, tracks graph, and seg layers are added to the viewer
+        after calling update_tracks with a SolutionTracks that has segmentation."""
+        tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
+        tracks_viewer = TracksViewer.get_instance(viewer)
+        tracks_viewer.update_tracks(tracks=tracks, name="test")
+
+        layer_names = [layer.name for layer in viewer.layers]
+        assert "test_points" in layer_names
+        assert "test_tracks" in layer_names
+        assert "test_seg" in layer_names
+
+    def test_layer_types_after_update_tracks(self, viewer, graph_2d):
+        """Test that the created layers have the correct types."""
+        tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
+        tracks_viewer = TracksViewer.get_instance(viewer)
+        tracks_viewer.update_tracks(tracks=tracks, name="test")
+
+        layers_by_name = {layer.name: layer for layer in viewer.layers}
+        assert isinstance(layers_by_name["test_points"], TrackPoints)
+        assert isinstance(layers_by_name["test_tracks"], TrackGraph)
+        assert isinstance(layers_by_name["test_seg"], TrackLabels)
+
+    def test_layers_present_after_solve(self, viewer, graph_2d):
+        """End-to-end test: solve on a segmentation, wrap result in MotileRun,
+        load into TracksViewer, and verify all three layer types are present."""
+        from motile_tracker.motile.backend import MotileRun, SolverParams, solve
+
+        segmentation = np.asarray(Tracks(graph_2d, ndim=3, time_attr="t").segmentation)
+        params = SolverParams()
+        params.appear_cost = None
+        solution_graph = solve(params, segmentation)
+
+        run = MotileRun(
+            graph=solution_graph,
+            run_name="solve_test",
+            input_segmentation=segmentation,
+            ndim=3,
+        )
+
+        tracks_viewer = TracksViewer.get_instance(viewer)
+        tracks_viewer.update_tracks(tracks=run, name="solve_test")
+
+        layer_names = [layer.name for layer in viewer.layers]
+        assert "solve_test_points" in layer_names
+        assert "solve_test_tracks" in layer_names
+        assert "solve_test_seg" in layer_names

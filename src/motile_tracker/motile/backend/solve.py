@@ -61,15 +61,20 @@ def solve(
         solver_params.window_size is not None
         and solver_params.single_window_start is not None
     ):
-        return _solve_single_window(input_data, solver_params, on_solver_update, scale)
+        result = _solve_single_window(input_data, solver_params, on_solver_update, scale)
+    else:
+        if cand_graph is None:
+            cand_graph = build_candidate_graph(input_data, solver_params, scale)
 
-    if cand_graph is None:
-        cand_graph = build_candidate_graph(input_data, solver_params, scale)
+        if solver_params.window_size is not None:
+            result = _solve_chunked(cand_graph, solver_params, on_solver_update)
+        else:
+            result = _solve_full(cand_graph, solver_params, on_solver_update)
 
-    if solver_params.window_size is not None:
-        return _solve_chunked(cand_graph, solver_params, on_solver_update)
+    if input_data.ndim != 2:
+        result.update_metadata(segmentation_shape=input_data.shape)
 
-    return _solve_full(cand_graph, solver_params, on_solver_update)
+    return result
 
 
 def build_candidate_graph(
