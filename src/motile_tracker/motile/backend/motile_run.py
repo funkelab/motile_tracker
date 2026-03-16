@@ -172,10 +172,10 @@ class MotileRun(SolutionTracks):
             if seg_shape is not None:
                 tracks.graph.update_metadata(segmentation_shape=tuple(seg_shape))
             scale = attrs.get("scale") or tracks.scale
-            time_attr = attrs.get("time_attr") or tracks.features.time_key
+            time_attr = attrs.get("time_attr") or td.DEFAULT_ATTR_KEYS.T
         else:
             scale = tracks.scale
-            time_attr = tracks.features.time_key
+            time_attr = td.DEFAULT_ATTR_KEYS.T
         gaps = cls._load_list(run_dir=run_dir, filename=GAPS_FILENAME, required=False)
         return cls(
             graph=tracks.graph,
