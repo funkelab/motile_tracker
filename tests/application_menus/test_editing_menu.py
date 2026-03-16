@@ -12,7 +12,7 @@ from motile_tracker.application_menus.editing_menu import EditingMenu
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
 
-def test_button_states(make_napari_viewer, graph_2d):
+def test_button_states(make_napari_viewer, graph_2d, click_node):
     """Test button enable/disable states based on selection."""
     viewer = make_napari_viewer()
     # TODO Teun: can we define this somewhere globally, that time_attr="t"
@@ -30,12 +30,13 @@ def test_button_states(make_napari_viewer, graph_2d):
 
     # Test 2: Verify update_buttons() disables all buttons when selection is cleared
     # First select nodes to enable buttons
-    tracks_viewer.selected_nodes = [1, 2]
+    click_node(tracks_viewer, 1)
+    click_node(tracks_viewer, 2, append=True)
     editing_menu.update_buttons()
     assert editing_menu.delete_node_btn.isEnabled()
 
     # Now clear selection and call update_buttons
-    tracks_viewer.selected_nodes = []
+    tracks_viewer.selected_nodes.reset()
     editing_menu.update_buttons()
 
     # Verify all edit buttons are disabled
@@ -45,7 +46,7 @@ def test_button_states(make_napari_viewer, graph_2d):
     assert not editing_menu.create_edge_btn.isEnabled()
 
     # Test 3: Verify only delete button enabled with single node selection
-    tracks_viewer.selected_nodes = [1]
+    click_node(tracks_viewer, 1)
     editing_menu.update_buttons()
 
     # Verify only delete is enabled, others disabled
@@ -54,7 +55,8 @@ def test_button_states(make_napari_viewer, graph_2d):
     assert not editing_menu.create_edge_btn.isEnabled()
 
     # Test 4: Verify all buttons enabled when two nodes selected
-    tracks_viewer.selected_nodes = [1, 2]
+    click_node(tracks_viewer, 1)
+    click_node(tracks_viewer, 2, append=True)
     editing_menu.update_buttons()
 
     # Verify all edit buttons are enabled
@@ -64,7 +66,9 @@ def test_button_states(make_napari_viewer, graph_2d):
     assert editing_menu.create_edge_btn.isEnabled()
 
     # Test 5: Verify only delete button enabled with 3+ nodes selected
-    tracks_viewer.selected_nodes = [1, 2, 3]
+    click_node(tracks_viewer, 1)
+    click_node(tracks_viewer, 2, append=True)
+    click_node(tracks_viewer, 3, append=True)
     editing_menu.update_buttons()
 
     # Verify only delete is enabled, others disabled
@@ -73,7 +77,7 @@ def test_button_states(make_napari_viewer, graph_2d):
     assert not editing_menu.create_edge_btn.isEnabled()
 
 
-def test_button_interactions(make_napari_viewer, graph_2d, qtbot):
+def test_button_interactions(make_napari_viewer, graph_2d, qtbot, click_node):
     """Test button click handlers."""
     viewer = make_napari_viewer()
     tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
@@ -99,13 +103,14 @@ def test_button_interactions(make_napari_viewer, graph_2d, qtbot):
     editing_menu = EditingMenu(viewer)
 
     # Test 1: Delete Node button calls tracks_viewer.delete_node()
-    tracks_viewer.selected_nodes = [1]
+    click_node(tracks_viewer, 1)
     editing_menu.update_buttons()
     qtbot.mouseClick(editing_menu.delete_node_btn, Qt.MouseButton.LeftButton)
     delete_mock.assert_called_once()
 
     # Test 2: Add Edge button calls tracks_viewer.create_edge()
-    tracks_viewer.selected_nodes = [1, 2]
+    click_node(tracks_viewer, 1)
+    click_node(tracks_viewer, 2, append=True)
     editing_menu.update_buttons()
     qtbot.mouseClick(editing_menu.create_edge_btn, Qt.MouseButton.LeftButton)
     create_edge_mock.assert_called_once()
@@ -137,7 +142,7 @@ def test_button_interactions(make_napari_viewer, graph_2d, qtbot):
     redo_mock.assert_called_once()
 
 
-def test_track_id_display(make_napari_viewer, graph_2d):
+def test_track_id_display(make_napari_viewer, graph_2d, click_node):
     """Test track ID label updates."""
     viewer = make_napari_viewer()
     tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
@@ -150,7 +155,7 @@ def test_track_id_display(make_napari_viewer, graph_2d):
     assert "Current Track ID:" in editing_menu.label.text()
 
     # Test 2: Verify label updates when update_track_id signal is emitted
-    tracks_viewer.selected_nodes.add(2)
+    click_node(tracks_viewer, 2)
     assert "Current Track ID: 2" in editing_menu.label.text()
 
     # Test 3: Verify label gets border styling when signal emitted

@@ -172,8 +172,10 @@ class MotileRun(SolutionTracks):
             if seg_shape is not None:
                 tracks.graph.update_metadata(segmentation_shape=tuple(seg_shape))
             scale = attrs.get("scale") or tracks.scale
+            time_attr = attrs.get("time_attr") or tracks.features.time_key
         else:
             scale = tracks.scale
+            time_attr = tracks.features.time_key
         gaps = cls._load_list(run_dir=run_dir, filename=GAPS_FILENAME, required=False)
         return cls(
             graph=tracks.graph,
@@ -183,7 +185,7 @@ class MotileRun(SolutionTracks):
             time=time,
             gaps=gaps,
             pos_attr=tracks.features.position_key,
-            time_attr=tracks.features.time_key,
+            time_attr=time_attr,
             scale=scale,
             ndim=tracks.ndim,
         )
@@ -279,6 +281,7 @@ class MotileRun(SolutionTracks):
         attrs_dict = {
             "segmentation_shape": list(seg_shape) if seg_shape is not None else None,
             "scale": scale,
+            "time_attr": self.features.time_key,
         }
         with open(out_path, "w") as f:
             json.dump(attrs_dict, f)

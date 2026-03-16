@@ -143,6 +143,10 @@ class MotileWidget(QWidget):
         # replaced with the solution, we explicitly recompute them. Ideally solve()
         # would return a SolutionTracks so this would not be needed.
         run.enable_features([run.features.tracklet_key, run.features.lineage_key])
+        # TODO Teun: this is a bit hacky, we should ideally be registering these features
+        # as part of the graph construction in build_candidate_graph or solve, but for
+        # now this ensures the features are present for the run viewer
+        run._register_edge_features()
         if "mask" in run.graph.node_attr_keys():
             from tracksdata.array import GraphArrayView
 

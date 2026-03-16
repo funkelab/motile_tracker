@@ -104,7 +104,7 @@ def test_add_blocks_current_size_event(viewer, graph_2d):
         mock_blocker.assert_called_once()
 
 
-def test_process_click(viewer, graph_2d):
+def test_process_click(viewer, graph_2d, click_node):
     """Test process_click with different click types."""
     tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
@@ -113,7 +113,7 @@ def test_process_click(viewer, graph_2d):
     points_layer = tracks_viewer.tracking_layers.points_layer
 
     # Test 1: Clicking empty space resets selection
-    tracks_viewer.selected_nodes.add(1)
+    click_node(tracks_viewer, 1)
     assert len(tracks_viewer.selected_nodes) == 1
     event = MockEvent()
     points_layer.process_click(event, None)
@@ -203,7 +203,9 @@ def test_create_node_attrs(viewer, graph_2d):
     assert tracks_viewer.selected_track is not None
 
 
-def test_update_data_without_seg_layer(viewer, graph_2d_without_segmentation):
+def test_update_data_without_seg_layer(
+    viewer, graph_2d_without_segmentation, click_node
+):
     """Test _update_data handles added, removed, and changed actions without seg layer."""
 
     tracks = SolutionTracks(graph=graph_2d_without_segmentation, ndim=3, time_attr="t")
@@ -224,7 +226,7 @@ def test_update_data_without_seg_layer(viewer, graph_2d_without_segmentation):
 
     # Test 2: Removed action removes node
     first_node = list(tracks.graph.node_ids())[0]
-    tracks_viewer.selected_nodes.add(first_node)
+    click_node(tracks_viewer, first_node)
     current_node_count = tracks.graph.num_nodes()
     event = MockEvent(action="removed")
     points_layer._update_data(event)
@@ -370,7 +372,7 @@ def test_get_symbols_returns_correct_symbols(viewer, graph_2d):
         assert symbol in tracks_viewer.symbolmap.values()
 
 
-def test_update_point_outline(viewer, graph_2d):
+def test_update_point_outline(viewer, graph_2d, click_node):
     """Test update_point_outline with different modes and visibility."""
     tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
@@ -389,7 +391,7 @@ def test_update_point_outline(viewer, graph_2d):
     assert not np.all(points_layer.shown)
 
     # Test 3: Select a node and verify it gets highlighted with cyan border and increased size
-    tracks_viewer.selected_nodes.add(first_node)
+    click_node(tracks_viewer, first_node)
     points_layer.update_point_outline("all")
 
     # Verify selected node has cyan border
@@ -410,7 +412,7 @@ def test_update_point_outline(viewer, graph_2d):
     tracks_viewer.mode = "group"
     second_node = points_layer.nodes[1]
     tracks_viewer.selected_nodes.reset()
-    tracks_viewer.selected_nodes.add(first_node)
+    click_node(tracks_viewer, first_node)
 
     # Update outline with only second node visible
     points_layer.update_point_outline([second_node])

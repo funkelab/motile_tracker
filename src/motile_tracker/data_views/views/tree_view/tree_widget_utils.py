@@ -110,6 +110,8 @@ def extract_sorted_tracks(
             }
 
             for feature_key, feature in tracks.features.items():
+                if feature.get("feature_type") == "edge":
+                    continue
                 display_name = feature.get("display_name", feature_key)
                 value_names = feature.get("value_names", None)
                 val = tracks.get_node_attr(node, feature_key)
@@ -274,12 +276,12 @@ def extract_lineage_tree(graph, node_id: str) -> list[str]:
     """Extract the entire lineage tree including horizontal relations for a given node"""
 
     # go up the tree to identify the root node
-    root_node = node_id
+    root_node = int(node_id)
     while True:
         predecessors = list(graph.predecessors(root_node))
         if not predecessors:
             break
-        root_node = predecessors[0]
+        root_node = int(predecessors[0])
 
     # BFS to collect all descendants
     nodes = set()
@@ -289,7 +291,7 @@ def extract_lineage_tree(graph, node_id: str) -> list[str]:
         if node in nodes:
             continue
         nodes.add(node)
-        queue.extend(graph.successors(node))
+        queue.extend(int(n) for n in graph.successors(node))
 
     return list(nodes)
 

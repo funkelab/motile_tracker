@@ -219,7 +219,7 @@ class TestDisplayModes:
         tracks_viewer.toggle_display_mode()
         assert tracks_viewer.mode == "all"
 
-    def test_display_modes(self, tracks_viewer_setup):
+    def test_display_modes(self, tracks_viewer_setup, click_node):
         """Test all display modes and filtering behavior."""
         viewer, tracks_viewer, tracks = tracks_viewer_setup
 
@@ -234,7 +234,7 @@ class TestDisplayModes:
 
         # Test 3: Lineage mode with selection
         node = list(tracks.graph.node_ids())[0]
-        tracks_viewer.selected_nodes.add(node)
+        click_node(tracks_viewer, node)
         tracks_viewer.set_display_mode("lineage")
         assert tracks_viewer.mode == "lineage"
         assert isinstance(tracks_viewer.visible, list)
@@ -245,13 +245,15 @@ class TestDisplayModes:
         assert tracks_viewer.mode == "group"
         assert tracks_viewer.visible == []
 
-    def test_filter_visible_nodes_preserves_previous_lineage(self, tracks_viewer_setup):
+    def test_filter_visible_nodes_preserves_previous_lineage(
+        self, tracks_viewer_setup, click_node
+    ):
         """Test lineage mode preserves previous visible nodes when selection cleared."""
         viewer, tracks_viewer, tracks = tracks_viewer_setup
 
         # Select a node and switch to lineage mode
         node = list(tracks.graph.node_ids())[0]
-        tracks_viewer.selected_nodes.add(node)
+        click_node(tracks_viewer, node)
         tracks_viewer.set_display_mode("lineage")
 
         # Clear selection
@@ -265,13 +267,13 @@ class TestDisplayModes:
 class TestSelectionManagement:
     """Tests for selection tracking and updates."""
 
-    def test_update_selection_centering(self, tracks_viewer_setup):
+    def test_update_selection_centering(self, tracks_viewer_setup, click_node):
         """Test update_selection centering behavior with different selections."""
         viewer, tracks_viewer, tracks = tracks_viewer_setup
 
         # Test 1: Center on single node
         node = list(tracks.graph.node_ids())[0]
-        tracks_viewer.selected_nodes.add(node)
+        click_node(tracks_viewer, node)
 
         with patch.object(tracks_viewer, "center_on_node") as center_mock:
             tracks_viewer.update_selection(set_view=True)
@@ -282,20 +284,20 @@ class TestSelectionManagement:
         tracks_viewer.selected_nodes.reset()
         nodes = list(tracks.graph.node_ids())[:2]
         for i, node in enumerate(nodes):
-            tracks_viewer.selected_nodes.add(node, append=(i > 0))
+            click_node(tracks_viewer, node, append=(i > 0))
 
         with patch.object(tracks_viewer, "center_on_node") as center_mock:
             tracks_viewer.update_selection(set_view=True)
             # Should NOT center
             center_mock.assert_not_called()
 
-    def test_selected_track_management(self, tracks_viewer_setup):
+    def test_selected_track_management(self, tracks_viewer_setup, click_node):
         """Test selected_track updates and clearing."""
         viewer, tracks_viewer, tracks = tracks_viewer_setup
 
         # Test 1: Update selected_track from selection
         node = list(tracks.graph.node_ids())[0]
-        tracks_viewer.selected_nodes.add(node)
+        click_node(tracks_viewer, node)
         tracks_viewer.update_selection()
 
         # selected_track should be set to the track ID of the selected node
@@ -317,18 +319,21 @@ class TestUndoRedo:
         """Test undo restores deleted node and redo removes it again."""
         viewer, tracks_viewer, tracks = tracks_viewer_setup
 
-        # Do a real action: delete unconnected node 6
-        click_node(tracks_viewer, 6)
+        # Do a real action: delete unconnected node 3
+        click_node(tracks_viewer, 3)
         tracks_viewer.delete_node()
-        assert not tracks.graph.has_node(6)
+        assert not tracks.graph.has_node(3)
 
-        # Undo: node 6 should be restored
+        # Undo: node 3 should be restored
         tracks_viewer.undo()
-        assert tracks.graph.has_node(6)
+        assert tracks.graph.has_node(3)
 
-        # Redo: node 6 should be gone again
+        # Redo: node 3 should be gone again
         tracks_viewer.redo()
-        assert not tracks.graph.has_node(6)
+        assert not tracks.graph.has_node(3)
+
+        tracks_viewer.undo()
+        assert tracks.graph.has_node(3)
 
     def test_undo_redo_with_no_tracks(self, viewer):
         """Test undo/redo do nothing when no tracks are loaded."""

@@ -333,7 +333,7 @@ def test_keyboard_shortcuts_all(mock_move, viewer, graph_2d, qtbot):
     restore_mock.assert_called_once()
 
 
-def test_mode_and_plot_type_switching(viewer, graph_2d):
+def test_mode_and_plot_type_switching(viewer, graph_2d, click_node):
     """Test mode switching, plot type switching, and their interaction."""
     tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
@@ -346,8 +346,8 @@ def test_mode_and_plot_type_switching(viewer, graph_2d):
     assert tree_widget.mode == "all"
 
     # Test 2: Setting mode to 'lineage'
-    # Select a node first
-    tracks_viewer.selected_nodes = [1]
+    # Select a node first (use click_node so the ID is np.int64, matching the real UI)
+    click_node(tracks_viewer, 1)
     tree_widget._set_mode("lineage")
     assert tree_widget.mode == "lineage"
     assert tree_widget.view_direction == "horizontal"
@@ -381,7 +381,7 @@ def test_mode_and_plot_type_switching(viewer, graph_2d):
     assert tree_widget.view_direction == "horizontal"
 
 
-def test_lineage_mode_edge_cases(viewer, graph_2d):
+def test_lineage_mode_edge_cases(viewer, graph_2d, click_node):
     """Test lineage mode edge cases with selection changes."""
     tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
@@ -390,23 +390,24 @@ def test_lineage_mode_edge_cases(viewer, graph_2d):
     tree_widget = TreeWidget(viewer)
 
     # Test 1: _update_selected in lineage mode doesn't crash
-    # Switch to lineage mode with a selection
-    tracks_viewer.selected_nodes.add_list([1], append=False)
+    # Switch to lineage mode with a selection (use click_node so the ID is np.int64,
+    # matching the real UI path that produces np.int64 from layer.get_value())
+    click_node(tracks_viewer, 1)
     tree_widget._set_mode("lineage")
 
     # Change selection to a node not in current lineage
-    tracks_viewer.selected_nodes.add_list([2], append=False)
+    click_node(tracks_viewer, 2)
 
     # _update_selected should handle this without crashing
     tree_widget._update_selected()
 
     # Test 2: _update_lineage_df doesn't crash with empty selection
     # Select node and switch to lineage mode
-    tracks_viewer.selected_nodes = [1]
+    click_node(tracks_viewer, 1)
     tree_widget._set_mode("lineage")
 
     # Clear selection but lineage_df still has data
-    tracks_viewer.selected_nodes.clear()
+    tracks_viewer.selected_nodes.reset()
 
     # This should not crash
     tree_widget._update_lineage_df()

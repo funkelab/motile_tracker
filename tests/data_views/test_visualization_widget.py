@@ -142,7 +142,7 @@ def test_update_label_colormap_when_selecting(
     assert seg_layer.highlight_opacity == 1.0
 
     # Make the viewer highlight one label
-    tracks_viewer.selected_nodes = [k2]
+    tracks_viewer.selected_nodes.add_list([k2], append=False)
 
     # Call update_label_colormap in each test mode
     if mode == "all":

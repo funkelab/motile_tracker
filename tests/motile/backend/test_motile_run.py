@@ -24,3 +24,11 @@ def test_save_load(tmp_path, graph_2d):
     assert run.gaps == newrun.gaps
     assert run.scale == newrun.scale
     assert run.solver_params == newrun.solver_params
+    # Verify core accessor methods work on the loaded run
+    # (regression: time_attr mismatch after load caused KeyError in get_time)
+    node_ids = list(newrun.graph.node_ids())
+    for node_id in node_ids:
+        newrun.get_time(node_id)
+        newrun.get_position(node_id)
+        newrun.get_track_id(node_id)
+    newrun.get_positions(node_ids, incl_time=True)
