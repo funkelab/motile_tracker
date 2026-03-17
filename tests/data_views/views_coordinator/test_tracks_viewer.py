@@ -5,9 +5,8 @@ Tests cover node operations, edge operations, display modes, and selection manag
 
 from unittest.mock import patch
 
-import numpy as np
 import pytest
-from funtracks.data_model import SolutionTracks, Tracks
+from funtracks.data_model import SolutionTracks
 
 from motile_tracker.data_views.views.layers.track_graph import TrackGraph
 from motile_tracker.data_views.views.layers.track_labels import TrackLabels

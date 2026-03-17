@@ -58,7 +58,6 @@ class MotileRun(SolutionTracks):
             scale=scale,
             ndim=ndim,
         )
-        self._register_edge_features()
         self.run_name = run_name
         self.solver_params = solver_params
         self.input_segmentation = input_segmentation
