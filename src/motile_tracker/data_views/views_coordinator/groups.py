@@ -450,7 +450,6 @@ class CollectionWidget(QWidget):
                 "value_type": "bool",  # The feature is a boolean
                 "num_values": 1,  # Each node has one value for this feature
                 "display_name": name,
-                "required": False,  # The feature is not required
                 "default_value": False,  # Default value for nodes without this feature
             }
 
