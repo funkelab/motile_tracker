@@ -7,15 +7,13 @@ load_motile_run bug fix (must call MotileRun.load, not Tracks.load).
 import warnings
 from unittest.mock import MagicMock, patch
 
-import napari
 import pytest
-from funtracks.data_model import SolutionTracks
 from qtpy.QtWidgets import QDialog
 
 from motile_tracker.data_views.views_coordinator.tracks_list import (
     TrackListWidget,
-    TracksList,
     TracksButton,
+    TracksList,
 )
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 from motile_tracker.motile.backend.motile_run import MotileRun, SolverParams
@@ -106,9 +104,7 @@ class TestTracksListSave:
             tracks_list.save_tracks(item)
             mock_save.assert_called_once_with(tmp_path)
 
-    def test_save_tracks_does_nothing_when_dialog_rejected(
-        self, tracks_list, tracks
-    ):
+    def test_save_tracks_does_nothing_when_dialog_rejected(self, tracks_list, tracks):
         tracks_list.add_tracks(tracks, "run1", select=False)
         item = tracks_list.tracks_list.item(0)
 
@@ -129,9 +125,7 @@ class TestTracksListLoadMotileRun:
         save_dir = tracks.save(tmp_path)
 
         tracks_list.file_dialog.exec_ = MagicMock(return_value=True)
-        tracks_list.file_dialog.selectedFiles = MagicMock(
-            return_value=[str(save_dir)]
-        )
+        tracks_list.file_dialog.selectedFiles = MagicMock(return_value=[str(save_dir)])
 
         tracks_list.load_motile_run()
 
@@ -140,9 +134,7 @@ class TestTracksListLoadMotileRun:
     def test_load_motile_run_bad_path_warns(self, tracks_list, tmp_path):
         bad_path = tmp_path / "nonexistent_run"
         tracks_list.file_dialog.exec_ = MagicMock(return_value=True)
-        tracks_list.file_dialog.selectedFiles = MagicMock(
-            return_value=[str(bad_path)]
-        )
+        tracks_list.file_dialog.selectedFiles = MagicMock(return_value=[str(bad_path)])
 
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")

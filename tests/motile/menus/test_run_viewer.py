@@ -1,8 +1,6 @@
 from unittest.mock import patch
 
-import numpy as np
 import pytest
-from funtracks.data_model import Tracks
 from funtracks.utils.tracksdata_utils import create_empty_graphview_graph
 from qtpy.QtWidgets import QPushButton
 
@@ -16,11 +14,6 @@ def run_viewer(qtbot):
     widget = RunViewer()
     qtbot.addWidget(widget)
     return widget
-
-
-@pytest.fixture
-def segmentation_2d(graph_2d):
-    return np.asarray(Tracks(graph_2d, ndim=3, time_attr="t").segmentation)
 
 
 @pytest.fixture

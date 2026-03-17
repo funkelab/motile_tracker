@@ -1,6 +1,5 @@
 import numpy as np
 import pytest
-from funtracks.data_model import SolutionTracks
 
 from motile_tracker.data_views.views.layers.track_labels import new_label
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
@@ -58,7 +57,7 @@ def create_event_val(
     return event_val
 
 
-def test_paint_event(viewer, graph_3d_with_division):
+def test_paint_event(viewer, solution_tracks_3d_with_division):
     """Test paint event processing
 
     1) Paint with a new label (4), new track id (4)
@@ -77,9 +76,8 @@ def test_paint_event(viewer, graph_3d_with_division):
     """
 
     # Create example tracks
-    tracks = SolutionTracks(graph=graph_3d_with_division, ndim=4, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
-    tracks_viewer.update_tracks(tracks=tracks, name="test")
+    tracks_viewer.update_tracks(tracks=solution_tracks_3d_with_division, name="test")
 
     # Test selecting a new label
     new_label(tracks_viewer.tracking_layers.seg_layer)
@@ -174,12 +172,11 @@ def test_paint_event(viewer, graph_3d_with_division):
     )  # back at 5
 
 
-def test_ensure_valid_label(viewer, graph_3d_with_division):
+def test_ensure_valid_label(viewer, solution_tracks_3d_with_division):
 
     # Create example tracks
-    tracks = SolutionTracks(graph=graph_3d_with_division, ndim=4, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
-    tracks_viewer.update_tracks(tracks=tracks, name="test")
+    tracks_viewer.update_tracks(tracks=solution_tracks_3d_with_division, name="test")
 
     # Assert a valid selected_track is selected from the start
     assert tracks_viewer.tracking_layers.seg_layer.selected_label == 5

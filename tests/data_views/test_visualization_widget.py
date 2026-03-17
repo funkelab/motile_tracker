@@ -1,5 +1,4 @@
 import pytest
-from funtracks.data_model import SolutionTracks
 
 from motile_tracker.application_menus.visualization_widget import (
     LabelVisualizationWidget,
@@ -15,11 +14,9 @@ def clear_viewer_layers(viewer):
 
 
 @pytest.fixture
-def visualization_widget(viewer, graph_3d, qtbot):
-    tracks = SolutionTracks(graph=graph_3d, ndim=4, time_attr="t")
-
+def visualization_widget(viewer, solution_tracks_3d, qtbot):
     tracks_viewer = TracksViewer.get_instance(viewer)
-    tracks_viewer.update_tracks(tracks=tracks, name="test")
+    tracks_viewer.update_tracks(tracks=solution_tracks_3d, name="test")
 
     widget = LabelVisualizationWidget(viewer)
     qtbot.addWidget(widget)
@@ -110,18 +107,12 @@ def test_contour_checkbox_updates_layer(visualization_widget):
 )
 def test_update_label_colormap_when_selecting(
     viewer,
-    graph_3d,
+    solution_tracks_3d,
     mode,
 ):
     """Test the actual values on the label colormap"""
-    tracks = SolutionTracks(
-        graph=graph_3d,
-        ndim=4,
-        time_attr="t",
-    )
-
     tracks_viewer = TracksViewer.get_instance(viewer)
-    tracks_viewer.update_tracks(tracks=tracks, name="test")
+    tracks_viewer.update_tracks(tracks=solution_tracks_3d, name="test")
 
     seg_layer = tracks_viewer.tracking_layers.seg_layer
     assert hasattr(seg_layer, "update_label_colormap")

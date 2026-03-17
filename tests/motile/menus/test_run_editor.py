@@ -4,21 +4,10 @@ import dask.array as da
 import numpy as np
 import pytest
 import tracksdata as td
-from funtracks.data_model import Tracks
 from funtracks.utils.tracksdata_utils import create_empty_graphview_graph
 
 from motile_tracker.motile.backend import MotileRun, SolverParams
 from motile_tracker.motile.menus.run_editor import RunEditor
-
-
-@pytest.fixture
-def segmentation_2d(graph_2d):
-    return np.asarray(Tracks(graph_2d, ndim=3, time_attr="t").segmentation)
-
-
-@pytest.fixture
-def segmentation_3d(graph_3d):
-    return np.asarray(Tracks(graph_3d, ndim=4, time_attr="t").segmentation)
 
 
 def test_run_editor_initialization(make_napari_viewer, segmentation_2d):

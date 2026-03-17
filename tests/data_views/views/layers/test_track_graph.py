@@ -1,16 +1,9 @@
 """Tests for update_napari_tracks with the graph returned by solve()."""
 
-import numpy as np
-import pytest
-from funtracks.data_model import SolutionTracks, Tracks
+from funtracks.data_model import SolutionTracks
 
 from motile_tracker.data_views.views.layers.track_graph import update_napari_tracks
 from motile_tracker.motile.backend import SolverParams, solve
-
-
-@pytest.fixture
-def segmentation_2d(graph_2d):
-    return np.asarray(Tracks(graph_2d, ndim=3, time_attr="t").segmentation)
 
 
 def test_update_napari_tracks_with_solve_output(segmentation_2d):

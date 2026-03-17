@@ -1,6 +1,5 @@
 import pandas as pd
 import pytest
-from funtracks.data_model import SolutionTracks
 from qtpy.QtWidgets import QApplication
 
 from motile_tracker.data_views.views.tree_view.custom_table_widget import (
@@ -17,12 +16,10 @@ def clear_viewer_layers(viewer):
 
 
 @pytest.fixture
-def setup_tracks_viewer(viewer, graph_2d):
+def setup_tracks_viewer(viewer, solution_tracks_2d):
     """Create a TracksViewer with tracks loaded."""
-    tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
-
     tracks_viewer = TracksViewer.get_instance(viewer)
-    tracks_viewer.update_tracks(tracks=tracks, name="test")
+    tracks_viewer.update_tracks(tracks=solution_tracks_2d, name="test")
 
     return viewer, tracks_viewer
 

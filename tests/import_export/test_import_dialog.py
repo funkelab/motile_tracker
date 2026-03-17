@@ -13,7 +13,7 @@ import pandas as pd
 import pytest
 import tifffile
 import zarr
-from funtracks.data_model import SolutionTracks, Tracks
+from funtracks.data_model import Tracks
 from funtracks.import_export import export_to_csv, export_to_geff
 
 from motile_tracker.import_export.menus.import_dialog import ImportDialog
@@ -108,7 +108,9 @@ def test_import_dialog_csv(qtbot, small_csv, dim_3d, include_seg):
             assert optional["area"]["recompute"].isEnabled() is False
 
 
-def test_csv_import_2d_with_segmentation(qtbot, tmp_path, graph_2d, monkeypatch):
+def test_csv_import_2d_with_segmentation(
+    qtbot, tmp_path, solution_tracks_2d, monkeypatch
+):
     """Test exporting and re-importing 2D tracks with segmentation.
     This tests whether the full workflow works end-to-end.
     """
@@ -116,7 +118,7 @@ def test_csv_import_2d_with_segmentation(qtbot, tmp_path, graph_2d, monkeypatch)
     monkeypatch.setattr(ImportDialog, "_resize_dialog", lambda self: None)
 
     # Create tracks and export to CSV (as motile_tracker does in tracks_list.py:208)
-    tracks = SolutionTracks(graph_2d, ndim=3, time_attr="t")
+    tracks = solution_tracks_2d
     csv_path = tmp_path / "test_tracks.csv"
     export_to_csv(tracks, csv_path)
 
@@ -162,12 +164,14 @@ def test_csv_import_2d_with_segmentation(qtbot, tmp_path, graph_2d, monkeypatch)
     # Verify tracks were imported successfully
     assert hasattr(dialog, "tracks"), "Dialog should have tracks attribute after import"
     assert dialog.tracks is not None, "Tracks should not be None"
-    assert dialog.tracks.graph.num_nodes() == graph_2d.num_nodes()
-    assert dialog.tracks.graph.num_edges() == graph_2d.num_edges()
+    assert dialog.tracks.graph.num_nodes() == solution_tracks_2d.graph.num_nodes()
+    assert dialog.tracks.graph.num_edges() == solution_tracks_2d.graph.num_edges()
     assert dialog.tracks.ndim == 3
 
 
-def test_csv_import_3d_with_segmentation(qtbot, tmp_path, graph_3d, monkeypatch):
+def test_csv_import_3d_with_segmentation(
+    qtbot, tmp_path, solution_tracks_3d, monkeypatch
+):
     """Test exporting and re-importing 3D tracks with segmentation.
     This tests whether the full workflow works end-to-end.
     """
@@ -175,7 +179,7 @@ def test_csv_import_3d_with_segmentation(qtbot, tmp_path, graph_3d, monkeypatch)
     monkeypatch.setattr(ImportDialog, "_resize_dialog", lambda self: None)
 
     # Create tracks and export to CSV (as motile_tracker does in tracks_list.py:208)
-    tracks = SolutionTracks(graph_3d, ndim=4, time_attr="t")
+    tracks = solution_tracks_3d
     csv_path = tmp_path / "test_tracks.csv"
     export_to_csv(tracks, csv_path)
 
@@ -225,20 +229,20 @@ def test_csv_import_3d_with_segmentation(qtbot, tmp_path, graph_3d, monkeypatch)
     # Verify tracks were imported successfully
     assert hasattr(dialog, "tracks"), "Dialog should have tracks attribute after import"
     assert dialog.tracks is not None, "Tracks should not be None"
-    assert dialog.tracks.graph.num_nodes() == graph_3d.num_nodes()
-    assert dialog.tracks.graph.num_edges() == graph_3d.num_edges()
+    assert dialog.tracks.graph.num_nodes() == solution_tracks_3d.graph.num_nodes()
+    assert dialog.tracks.graph.num_edges() == solution_tracks_3d.graph.num_edges()
     assert dialog.tracks.ndim == 4
 
 
 def test_csv_import_without_segmentation(
-    qtbot, tmp_path, graph_2d_without_segmentation, monkeypatch
+    qtbot, tmp_path, solution_tracks_2d_without_segmentation, monkeypatch
 ):
     """Test importing without segmentation."""
     # Mock _resize_dialog to avoid screen access in headless CI
     monkeypatch.setattr(ImportDialog, "_resize_dialog", lambda self: None)
 
     # Create tracks and export to CSV (as motile_tracker does in tracks_list.py:208)
-    tracks = SolutionTracks(graph_2d_without_segmentation, ndim=3, time_attr="t")
+    tracks = solution_tracks_2d_without_segmentation
     csv_path = tmp_path / "test_tracks.csv"
     export_to_csv(tracks, csv_path)
 
@@ -269,8 +273,14 @@ def test_csv_import_without_segmentation(
     # Verify tracks were imported successfully
     assert hasattr(dialog, "tracks"), "Dialog should have tracks attribute after import"
     assert dialog.tracks is not None, "Tracks should not be None"
-    assert dialog.tracks.graph.num_nodes() == graph_2d_without_segmentation.num_nodes()
-    assert dialog.tracks.graph.num_edges() == graph_2d_without_segmentation.num_edges()
+    assert (
+        dialog.tracks.graph.num_nodes()
+        == solution_tracks_2d_without_segmentation.graph.num_nodes()
+    )
+    assert (
+        dialog.tracks.graph.num_edges()
+        == solution_tracks_2d_without_segmentation.graph.num_edges()
+    )
     assert dialog.tracks.ndim == 3
 
 
@@ -327,13 +337,15 @@ def test_geff_import_2d_with_segmentation(qtbot, tmp_path, graph_2d, monkeypatch
     assert dialog.tracks.ndim == 3
 
 
-def test_geff_import_3d_with_segmentation(qtbot, tmp_path, graph_3d, monkeypatch):
+def test_geff_import_3d_with_segmentation(
+    qtbot, tmp_path, solution_tracks_3d, monkeypatch
+):
     """Test exporting and re-importing 3D tracks with segmentation."""
     # Mock _resize_dialog to avoid screen access in headless CI
     monkeypatch.setattr(ImportDialog, "_resize_dialog", lambda self: None)
 
     # Create tracks and export to GEFF
-    tracks = Tracks(graph_3d, ndim=4, time_attr="t")
+    tracks = solution_tracks_3d
     geff_path = tmp_path / "test_tracks_3d.zarr"
     export_to_geff(tracks, geff_path)
 
@@ -371,20 +383,20 @@ def test_geff_import_3d_with_segmentation(qtbot, tmp_path, graph_3d, monkeypatch
     # Verify tracks were imported successfully
     assert hasattr(dialog, "tracks"), "Dialog should have tracks attribute after import"
     assert dialog.tracks is not None, "Tracks should not be None"
-    assert dialog.tracks.graph.num_nodes() == graph_3d.num_nodes()
-    assert dialog.tracks.graph.num_edges() == graph_3d.num_edges()
+    assert dialog.tracks.graph.num_nodes() == solution_tracks_3d.graph.num_nodes()
+    assert dialog.tracks.graph.num_edges() == solution_tracks_3d.graph.num_edges()
     assert dialog.tracks.ndim == 4
 
 
 def test_geff_import_without_segmentation(
-    qtbot, tmp_path, graph_2d_without_segmentation, monkeypatch
+    qtbot, tmp_path, solution_tracks_2d_without_segmentation, monkeypatch
 ):
     """Test importing without segmentation."""
     # Mock _resize_dialog to avoid screen access in headless CI
     monkeypatch.setattr(ImportDialog, "_resize_dialog", lambda self: None)
 
     # Create tracks and export to GEFF (no segmentation)
-    tracks = Tracks(graph_2d_without_segmentation, ndim=3, time_attr="t")
+    tracks = solution_tracks_2d_without_segmentation
     geff_path = tmp_path / "test_tracks_no_seg.zarr"
     export_to_geff(tracks, geff_path)
 
@@ -416,7 +428,8 @@ def test_geff_import_without_segmentation(
     # Verify tracks were imported successfully
     assert hasattr(dialog, "tracks"), "Dialog should have tracks attribute after import"
     assert dialog.tracks is not None, "Tracks should not be None"
-    assert dialog.tracks.graph.num_nodes() == graph_2d_without_segmentation.num_nodes()
+    assert dialog.tracks.graph.num_nodes() == tracks.graph.num_nodes()
+    assert dialog.tracks.graph.num_edges() == tracks.graph.num_edges()
 
 
 def test_geff_import_without_axes_metadata(qtbot, tmp_path, graph_2d, monkeypatch):

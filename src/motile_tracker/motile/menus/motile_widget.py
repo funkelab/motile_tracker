@@ -147,6 +147,8 @@ class MotileWidget(QWidget):
         # as part of the graph construction in build_candidate_graph or solve, but for
         # now this ensures the features are present for the run viewer
         run._register_edge_features()
+        # TODO Teun: this should work! because run.features should have the annotator
+        # maybe make a new run
         if "mask" in run.graph.node_attr_keys():
             from tracksdata.array import GraphArrayView
 

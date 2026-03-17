@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 import tracksdata as td
+from funtracks.data_model import SolutionTracks, Tracks
 from funtracks.utils.tracksdata_utils import create_empty_graphview_graph
 from tracksdata.nodes._mask import Mask
 
@@ -278,3 +279,39 @@ def graph_3d_with_division() -> td.graph.GraphView:
     )
     graph.update_metadata(segmentation_shape=(5, 100, 100, 100))
     return graph
+
+
+@pytest.fixture
+def solution_tracks_2d(graph_2d) -> SolutionTracks:
+    """Return a SolutionTracks object wrapping graph_2d."""
+    return SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
+
+
+@pytest.fixture
+def solution_tracks_3d(graph_3d) -> SolutionTracks:
+    """Return a SolutionTracks object wrapping graph_3d."""
+    return SolutionTracks(graph=graph_3d, ndim=4, time_attr="t")
+
+
+@pytest.fixture
+def solution_tracks_3d_with_division(graph_3d_with_division) -> SolutionTracks:
+    """Return a SolutionTracks object wrapping graph_3d_with_division."""
+    return SolutionTracks(graph=graph_3d_with_division, ndim=4, time_attr="t")
+
+
+@pytest.fixture
+def solution_tracks_2d_without_segmentation(
+    graph_2d_without_segmentation,
+) -> SolutionTracks:
+    """Return a SolutionTracks object wrapping graph_2d_without_segmentation."""
+    return SolutionTracks(graph=graph_2d_without_segmentation, ndim=3, time_attr="t")
+
+
+@pytest.fixture
+def segmentation_2d(graph_2d):
+    return np.asarray(Tracks(graph_2d, ndim=3, time_attr="t").segmentation)
+
+
+@pytest.fixture
+def segmentation_3d(graph_3d):
+    return np.asarray(Tracks(graph_3d, ndim=4, time_attr="t").segmentation)

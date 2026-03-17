@@ -4,16 +4,10 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
-from funtracks.data_model import SolutionTracks, Tracks
 from funtracks.utils.tracksdata_utils import create_empty_graphview_graph
 
 from motile_tracker.motile.backend import MotileRun, SolverParams
 from motile_tracker.motile.menus.motile_widget import MotileWidget
-
-
-@pytest.fixture
-def segmentation_2d(graph_2d):
-    return np.asarray(Tracks(graph_2d, ndim=3, time_attr="t").segmentation)
 
 
 def test_motile_widget_initialization(make_napari_viewer):
@@ -34,7 +28,7 @@ def test_motile_widget_initialization(make_napari_viewer):
     assert hasattr(widget.view_run_widget, "edit_run")
 
 
-def test_view_run(make_napari_viewer, graph_2d, qtbot):
+def test_view_run(make_napari_viewer, solution_tracks_2d, qtbot):
     """Test view_run method with different track types."""
     viewer = make_napari_viewer()
     widget = MotileWidget(viewer)
@@ -53,8 +47,7 @@ def test_view_run(make_napari_viewer, graph_2d, qtbot):
     assert not widget.edit_run_widget.isVisible()
 
     # Test 2: SolutionTracks (non-MotileRun) hides viewer
-    tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
-    widget.view_run(tracks)
+    widget.view_run(solution_tracks_2d)
     assert not widget.view_run_widget.isVisible()
 
 

@@ -5,20 +5,17 @@ Tests cover button states, button interactions, and track ID display.
 
 from unittest.mock import MagicMock
 
-from funtracks.data_model import SolutionTracks
 from PyQt6.QtCore import Qt
 
 from motile_tracker.application_menus.editing_menu import EditingMenu
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
 
-def test_button_states(make_napari_viewer, graph_2d, click_node):
+def test_button_states(make_napari_viewer, solution_tracks_2d, click_node):
     """Test button enable/disable states based on selection."""
     viewer = make_napari_viewer()
-    # TODO Teun: can we define this somewhere globally, that time_attr="t"
-    tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
-    tracks_viewer.update_tracks(tracks=tracks, name="test")
+    tracks_viewer.update_tracks(tracks=solution_tracks_2d, name="test")
 
     editing_menu = EditingMenu(viewer)
 
@@ -77,12 +74,11 @@ def test_button_states(make_napari_viewer, graph_2d, click_node):
     assert not editing_menu.create_edge_btn.isEnabled()
 
 
-def test_button_interactions(make_napari_viewer, graph_2d, qtbot, click_node):
+def test_button_interactions(make_napari_viewer, solution_tracks_2d, qtbot, click_node):
     """Test button click handlers."""
     viewer = make_napari_viewer()
-    tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
-    tracks_viewer.update_tracks(tracks=tracks, name="test")
+    tracks_viewer.update_tracks(tracks=solution_tracks_2d, name="test")
 
     # Mock all methods before creating EditingMenu
     delete_mock = MagicMock()
@@ -142,12 +138,11 @@ def test_button_interactions(make_napari_viewer, graph_2d, qtbot, click_node):
     redo_mock.assert_called_once()
 
 
-def test_track_id_display(make_napari_viewer, graph_2d, click_node):
+def test_track_id_display(make_napari_viewer, solution_tracks_2d, click_node):
     """Test track ID label updates."""
     viewer = make_napari_viewer()
-    tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
-    tracks_viewer.update_tracks(tracks=tracks, name="test")
+    tracks_viewer.update_tracks(tracks=solution_tracks_2d, name="test")
 
     editing_menu = EditingMenu(viewer)
 

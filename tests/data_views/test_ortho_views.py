@@ -1,6 +1,5 @@
 import numpy as np
 import pytest
-from funtracks.data_model import SolutionTracks
 from napari.layers import Labels, Points
 from napari_orthogonal_views.ortho_view_widget import OrthoViewWidget
 
@@ -24,16 +23,15 @@ class MockEvent:
         self.value = value
 
 
-def test_ortho_views(viewer, qtbot, graph_3d_with_division):
+def test_ortho_views(viewer, qtbot, solution_tracks_3d_with_division):
     """Test if the tracks layers are correctly displayed on the orthoviews"""
 
     # Initalize orthogonal views
     m = initialize_ortho_views(viewer)
 
     # Create example tracks
-    tracks = SolutionTracks(graph=graph_3d_with_division, ndim=4, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
-    tracks_viewer.update_tracks(tracks=tracks, name="test")
+    tracks_viewer.update_tracks(tracks=solution_tracks_3d_with_division, name="test")
 
     assert isinstance(viewer.layers[-1], TrackPoints)
     assert isinstance(viewer.layers[-2], TrackLabels)

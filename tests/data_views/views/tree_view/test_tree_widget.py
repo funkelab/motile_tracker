@@ -8,7 +8,6 @@ from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
-from funtracks.data_model import SolutionTracks
 from PyQt6.QtCore import QRectF
 from qtpy.QtCore import Qt
 
@@ -26,12 +25,11 @@ def clear_viewer_layers(viewer):
     viewer.layers.clear()
 
 
-def test_tree_plot_initialization_and_update(viewer, graph_2d):
+def test_tree_plot_initialization_and_update(viewer, solution_tracks_2d):
     """Test TreePlot initialization, signals, and update method."""
     # Need napari viewer context for Qt initialization
-    tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
-    tracks_viewer.update_tracks(tracks=tracks, name="test")
+    tracks_viewer.update_tracks(tracks=solution_tracks_2d, name="test")
 
     tree_widget = TreeWidget(viewer)
     tree_plot = tree_widget.tree_widget
@@ -61,7 +59,7 @@ def test_tree_plot_initialization_and_update(viewer, graph_2d):
     assert tree_widget.tree_widget.view_direction == "horizontal"
 
 
-def test_tree_plot_data_display(viewer, graph_2d):
+def test_tree_plot_data_display(viewer, solution_tracks_2d):
     """Test TreePlot data display with empty data, track data, and view directions."""
     tree_widget = TreeWidget(viewer)
     tree_plot = tree_widget.tree_widget
@@ -74,9 +72,8 @@ def test_tree_plot_data_display(viewer, graph_2d):
     assert tree_plot.node_ids == []
 
     # Test 2: Actual track data
-    tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
-    tracks_viewer.update_tracks(tracks=tracks, name="test")
+    tracks_viewer.update_tracks(tracks=solution_tracks_2d, name="test")
 
     # Create new tree_widget after loading data
     tree_widget = TreeWidget(viewer)
@@ -117,11 +114,10 @@ def test_tree_plot_selection(viewer, qtbot):
     assert blocker.signal_triggered
 
 
-def test_centering(viewer, graph_2d):
+def test_centering(viewer, solution_tracks_2d):
     """Test centering on nodes with various scenarios."""
-    tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
-    tracks_viewer.update_tracks(tracks=tracks, name="test")
+    tracks_viewer.update_tracks(tracks=solution_tracks_2d, name="test")
 
     tree_widget = TreeWidget(viewer)
     tree_plot = tree_widget.tree_widget
@@ -205,7 +201,7 @@ def test_centering(viewer, graph_2d):
     # Should have updated sizes and outlines without error
 
 
-def test_tree_widget_initialization(viewer, graph_2d):
+def test_tree_widget_initialization(viewer, solution_tracks_2d):
     """Test TreeWidget initialization without and with tracks."""
 
     # Test 1: Basic initialization
@@ -222,9 +218,8 @@ def test_tree_widget_initialization(viewer, graph_2d):
     assert hasattr(tree_widget, "flip_widget")
 
     # Test 2: Initialization with tracks loaded
-    tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
-    tracks_viewer.update_tracks(tracks=tracks, name="test")
+    tracks_viewer.update_tracks(tracks=solution_tracks_2d, name="test")
 
     tree_widget_with_tracks = TreeWidget(viewer)
 
@@ -233,11 +228,10 @@ def test_tree_widget_initialization(viewer, graph_2d):
 
 
 @patch.object(NavigationWidget, "move")
-def test_keyboard_shortcuts_all(mock_move, viewer, graph_2d, qtbot):
+def test_keyboard_shortcuts_all(mock_move, viewer, solution_tracks_2d, qtbot):
     """Test all keyboard shortcuts including standard keys, releases, arrows, and toggles."""
-    tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
-    tracks_viewer.update_tracks(tracks=tracks, name="test")
+    tracks_viewer.update_tracks(tracks=solution_tracks_2d, name="test")
 
     # Mock all methods
     delete_mock = MagicMock()
@@ -333,11 +327,10 @@ def test_keyboard_shortcuts_all(mock_move, viewer, graph_2d, qtbot):
     restore_mock.assert_called_once()
 
 
-def test_mode_and_plot_type_switching(viewer, graph_2d, click_node):
+def test_mode_and_plot_type_switching(viewer, solution_tracks_2d, click_node):
     """Test mode switching, plot type switching, and their interaction."""
-    tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
-    tracks_viewer.update_tracks(tracks=tracks, name="test")
+    tracks_viewer.update_tracks(tracks=solution_tracks_2d, name="test")
 
     tree_widget = TreeWidget(viewer)
 
@@ -381,11 +374,10 @@ def test_mode_and_plot_type_switching(viewer, graph_2d, click_node):
     assert tree_widget.view_direction == "horizontal"
 
 
-def test_lineage_mode_edge_cases(viewer, graph_2d, click_node):
+def test_lineage_mode_edge_cases(viewer, solution_tracks_2d, click_node):
     """Test lineage mode edge cases with selection changes."""
-    tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
-    tracks_viewer.update_tracks(tracks=tracks, name="test")
+    tracks_viewer.update_tracks(tracks=solution_tracks_2d, name="test")
 
     tree_widget = TreeWidget(viewer)
 
@@ -414,7 +406,7 @@ def test_lineage_mode_edge_cases(viewer, graph_2d, click_node):
     # Test passes if we reach here without exception
 
 
-def test_tree_widget_integration(viewer, graph_2d):
+def test_tree_widget_integration(viewer, solution_tracks_2d):
     """Test TreeWidget signal response, axis flipping, and mouse controls."""
     tracks_viewer = TracksViewer.get_instance(viewer)
 
@@ -423,8 +415,7 @@ def test_tree_widget_integration(viewer, graph_2d):
     assert tree_widget.track_df.empty
 
     # Update tracks
-    tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
-    tracks_viewer.update_tracks(tracks=tracks, name="test")
+    tracks_viewer.update_tracks(tracks=solution_tracks_2d, name="test")
 
     # Verify track_df was updated
     assert not tree_widget.track_df.empty
@@ -447,11 +438,10 @@ def test_tree_widget_integration(viewer, graph_2d):
     tree_widget.set_mouse_enabled(x=True, y=True)
 
 
-def test_update_track_data_without_reset(viewer, graph_2d):
+def test_update_track_data_without_reset(viewer, solution_tracks_2d):
     """Test _update_track_data preserves axis_order when reset_view=False."""
-    tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
-    tracks_viewer.update_tracks(tracks=tracks, name="test")
+    tracks_viewer.update_tracks(tracks=solution_tracks_2d, name="test")
 
     tree_widget = TreeWidget(viewer)
 

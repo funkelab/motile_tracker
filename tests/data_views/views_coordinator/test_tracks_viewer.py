@@ -347,23 +347,21 @@ class TestUndoRedo:
 class TestLayerCreation:
     """Tests that the correct napari layers are created after loading tracks."""
 
-    def test_layers_present_after_update_tracks(self, viewer, graph_2d):
+    def test_layers_present_after_update_tracks(self, viewer, solution_tracks_2d):
         """Test that points, tracks graph, and seg layers are added to the viewer
         after calling update_tracks with a SolutionTracks that has segmentation."""
-        tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
         tracks_viewer = TracksViewer.get_instance(viewer)
-        tracks_viewer.update_tracks(tracks=tracks, name="test")
+        tracks_viewer.update_tracks(tracks=solution_tracks_2d, name="test")
 
         layer_names = [layer.name for layer in viewer.layers]
         assert "test_points" in layer_names
         assert "test_tracks" in layer_names
         assert "test_seg" in layer_names
 
-    def test_layer_types_after_update_tracks(self, viewer, graph_2d):
+    def test_layer_types_after_update_tracks(self, viewer, solution_tracks_2d):
         """Test that the created layers have the correct types."""
-        tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
         tracks_viewer = TracksViewer.get_instance(viewer)
-        tracks_viewer.update_tracks(tracks=tracks, name="test")
+        tracks_viewer.update_tracks(tracks=solution_tracks_2d, name="test")
 
         layers_by_name = {layer.name: layer for layer in viewer.layers}
         assert isinstance(layers_by_name["test_points"], TrackPoints)

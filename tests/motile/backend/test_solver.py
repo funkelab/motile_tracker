@@ -1,19 +1,7 @@
-import numpy as np
 import pytest
-from funtracks.data_model import SolutionTracks, Tracks
 from funtracks.utils.tracksdata_utils import assert_node_attrs_equal_with_masks
 
 from motile_tracker.motile.backend import SolverParams, solve
-
-
-@pytest.fixture
-def segmentation_2d(graph_2d):
-    return np.asarray(Tracks(graph_2d, ndim=3, time_attr="t").segmentation)
-
-
-@pytest.fixture
-def segmentation_3d(graph_3d):
-    return np.asarray(Tracks(graph_3d, ndim=4, time_attr="t").segmentation)
 
 
 # capsys is a pytest fixture that captures stdout and stderr output streams
@@ -71,16 +59,12 @@ def test_solve_chunked_overlap_required():
         params.overlap_size = 0
 
 
-def test_solve_single_window(graph_3d):
+def test_solve_single_window(segmentation_3d):
     """Test solving just a single window for interactive testing."""
     params = SolverParams()
     params.appear_cost = None
     params.window_size = 3
     params.single_window_start = 1  # Start at frame 1
-
-    segmentation_3d = np.asarray(
-        SolutionTracks(graph_3d, ndim=4, time_attr="t").segmentation
-    )
 
     solution = solve(params, segmentation_3d)
 
@@ -92,12 +76,8 @@ def test_solve_single_window(graph_3d):
         assert 1 <= node_time < 4, f"Node {node} has time {node_time}, expected 1-3"
 
 
-def test_solve_single_window_invalid_start(graph_3d):
+def test_solve_single_window_invalid_start(segmentation_3d):
     """Test that invalid window_start raises ValueError."""
-
-    segmentation_3d = np.asarray(
-        SolutionTracks(graph_3d, ndim=4, time_attr="t").segmentation
-    )
 
     params = SolverParams()
     params.appear_cost = None

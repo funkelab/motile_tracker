@@ -9,7 +9,6 @@ from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
-from funtracks.data_model import SolutionTracks
 from qtpy.QtWidgets import QMessageBox
 
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
@@ -115,7 +114,7 @@ def test_confirm_force_operation_all_buttons(
 )
 def test_on_paint_invalid_action_upstream_division1_forceable(
     viewer,
-    graph_3d_with_division,
+    solution_tracks_3d_with_division,
     monkeypatch,
     confirm_response,
     expect_force_retry,
@@ -141,7 +140,7 @@ def test_on_paint_invalid_action_upstream_division1_forceable(
     """
 
     # Create example tracks
-    tracks = SolutionTracks(graph=graph_3d_with_division, ndim=4, time_attr="t")
+    tracks = solution_tracks_3d_with_division
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
 
@@ -225,7 +224,7 @@ def test_on_paint_invalid_action_upstream_division1_forceable(
 )
 def test_on_paint_invalid_action_upstream_division2_forceable(
     viewer,
-    graph_3d_with_division,
+    solution_tracks_3d_with_division,
     monkeypatch,
     confirm_response,
     expect_force_retry,
@@ -247,7 +246,7 @@ def test_on_paint_invalid_action_upstream_division2_forceable(
     """
 
     # Create example tracks
-    tracks = SolutionTracks(graph=graph_3d_with_division, ndim=4, time_attr="t")
+    tracks = solution_tracks_3d_with_division
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=tracks, name="test")
 
@@ -331,7 +330,7 @@ def test_on_paint_invalid_action_upstream_division2_forceable(
 )
 def test_invalid_edge_force(
     viewer,
-    graph_3d_with_division,
+    solution_tracks_3d_with_division,
     monkeypatch,
     confirm_response,
     expect_force_retry,
@@ -354,9 +353,8 @@ def test_invalid_edge_force(
     """
 
     # Create example tracks
-    tracks = SolutionTracks(graph=graph_3d_with_division, ndim=4, time_attr="t")
     tracks_viewer = TracksViewer.get_instance(viewer)
-    tracks_viewer.update_tracks(tracks=tracks, name="test")
+    tracks_viewer.update_tracks(tracks=solution_tracks_3d_with_division, name="test")
 
     ### 1) Simulate paint event with new label
     tracks_viewer.tracking_layers.seg_layer.mode = "paint"
@@ -394,9 +392,9 @@ def test_invalid_edge_force(
     tracks_viewer.create_edge()
 
     if expect_force_retry:
-        assert tracks.graph.has_edge(5, 4)
-        assert not tracks.graph.has_edge(2, 4)
+        assert solution_tracks_3d_with_division.graph.has_edge(5, 4)
+        assert not solution_tracks_3d_with_division.graph.has_edge(2, 4)
     else:
-        assert not tracks.graph.has_edge(5, 4)
-        assert tracks.graph.has_edge(2, 4)
+        assert not solution_tracks_3d_with_division.graph.has_edge(5, 4)
+        assert solution_tracks_3d_with_division.graph.has_edge(2, 4)
     assert tracks_viewer.force == confirm_response[1]

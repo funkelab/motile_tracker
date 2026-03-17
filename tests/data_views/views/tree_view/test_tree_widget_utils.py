@@ -2,7 +2,6 @@ import napari
 import pandas as pd
 import polars as pl
 from funtracks.annotators import TrackAnnotator
-from funtracks.data_model import SolutionTracks
 from funtracks.features import Feature
 
 from motile_tracker.data_views.views.tree_view.tree_widget_utils import (
@@ -10,8 +9,8 @@ from motile_tracker.data_views.views.tree_view.tree_widget_utils import (
 )
 
 
-def test_track_df(graph_2d):
-    tracks = SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
+def test_track_df(solution_tracks_2d):
+    tracks = solution_tracks_2d
     ann = TrackAnnotator(tracks, lineage_key="lineage_id", tracklet_key="track_id")
     tracks.graph.add_node_attr_key("custom_attr", default_value=0, dtype=pl.Int64)
 
