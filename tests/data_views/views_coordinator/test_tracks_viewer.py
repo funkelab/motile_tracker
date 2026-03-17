@@ -368,12 +368,12 @@ class TestLayerCreation:
         assert isinstance(layers_by_name["test_tracks"], TrackGraph)
         assert isinstance(layers_by_name["test_seg"], TrackLabels)
 
-    def test_layers_present_after_solve(self, viewer, graph_2d):
+    def test_layers_present_after_solve(self, viewer, segmentation_2d):
         """End-to-end test: solve on a segmentation, wrap result in MotileRun,
         load into TracksViewer, and verify all three layer types are present."""
         from motile_tracker.motile.backend import MotileRun, SolverParams, solve
 
-        segmentation = np.asarray(Tracks(graph_2d, ndim=3, time_attr="t").segmentation)
+        segmentation = segmentation_2d
         params = SolverParams()
         params.appear_cost = None
         solution_graph = solve(params, segmentation)
