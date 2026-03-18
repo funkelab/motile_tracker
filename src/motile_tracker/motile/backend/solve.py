@@ -4,6 +4,7 @@ import logging
 import time
 from collections.abc import Callable
 
+import ilpy
 import networkx as nx
 import numpy as np
 from funtracks.candidate_graph import (
@@ -521,3 +522,15 @@ def construct_solver(cand_graph: nx.DiGraph, solver_params: SolverParams) -> Sol
             name="iou",
         )
     return solver
+
+
+def get_solver_name() -> str:
+    """Return the name of the ILP solver backend that will be used.
+
+    Attempts Gurobi first; falls back to SCIP.
+    """
+    try:
+        ilpy.solver_backends.create_solver_backend(ilpy.Preference.Gurobi)
+        return "Gurobi"
+    except RuntimeError:
+        return "SCIP"
