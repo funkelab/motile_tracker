@@ -19,10 +19,8 @@ from qtpy.QtWidgets import (
 from superqt import QCollapsible
 
 from motile_tracker.data_views.key_bindable import KeyBindable
-from motile_tracker.data_views.keybindings_config import (
-    TREE_WIDGET_KEYMAP,
-    bind_keymap,
-)
+from motile_tracker.data_views.keybindings_config import bind_keymap
+from motile_tracker.data_views.keybindings_manager import KeybindingsManager
 from motile_tracker.data_views.views.tree_view.custom_table_widget import (
     ColoredTableWidget,
 )
@@ -604,21 +602,31 @@ class TreeWidget(KeyBindable, QWidget):
         main_layout.addWidget(splitter)
         self.setLayout(main_layout)
 
-        # Bind all keybindings via the KeyBindable mixin.
-        # TreeWidget methods (toggle_display_mode, flip_axes, navigate_*, zoom_*)
-        # take priority; remaining actions fall through to tracks_viewer.
-        bind_keymap(self, TREE_WIDGET_KEYMAP, self, self.tracks_viewer)
-
-        # Key-release handlers for zoom constraint reset
-        @self.bind_key_release("x")
-        def _release_x():
-            self.tree_widget.setMouseEnabled(x=True, y=True)
-
-        @self.bind_key_release("y")
-        def _release_y():
-            self.tree_widget.setMouseEnabled(x=True, y=True)
+        # Bind keybindings via the KeyBindable mixin (uses manager for current state)
+        self._kb_mgr = KeybindingsManager.get_instance()
+        self._bind_all_keys()
+        self._kb_mgr.keybindings_changed.connect(self._on_keybindings_changed)
 
         self._update_track_data(reset_view=True)
+
+    def _bind_all_keys(self):
+        """Bind all key-press and key-release handlers from the current manager state."""
+        keymap = self._kb_mgr.get_tree_widget_keymap()
+        bind_keymap(self, keymap, self, self.tracks_viewer)
+
+        # Key-release handlers for zoom constraint reset
+        for key in self._kb_mgr.get_keys("zoom_constrain_x"):
+            self.bind_key_release(key)(self._reset_mouse_zoom)
+        for key in self._kb_mgr.get_keys("zoom_constrain_y"):
+            self.bind_key_release(key)(self._reset_mouse_zoom)
+
+    def _reset_mouse_zoom(self):
+        self.tree_widget.setMouseEnabled(x=True, y=True)
+
+    def _on_keybindings_changed(self):
+        """Rebind all keys when keybindings change at runtime."""
+        self.clear_keymap()
+        self._bind_all_keys()
 
     def toggle_display_mode(self):
         """Toggle display mode."""

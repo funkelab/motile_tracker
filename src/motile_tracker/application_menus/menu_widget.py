@@ -2,6 +2,7 @@ import napari
 from qtpy.QtWidgets import (
     QHBoxLayout,
     QLabel,
+    QPushButton,
     QScrollArea,
     QTabWidget,
     QVBoxLayout,
@@ -9,6 +10,7 @@ from qtpy.QtWidgets import (
 )
 
 from motile_tracker.application_menus.editing_menu import EditingMenu
+from motile_tracker.application_menus.keybindings_editor import KeybindingsDialog
 from motile_tracker.application_menus.visualization_widget import (
     LabelVisualizationWidget,
 )
@@ -40,17 +42,21 @@ class MenuWidget(QScrollArea):
         self.tabwidget.addTab(editing_widget, "Edit Tracks")
         self.tabwidget.addTab(self.tracks_viewer.collection_widget, "Groups")
 
-        # Header with title and help links
+        # Header with title, help link, and keybindings button
         header_layout = QHBoxLayout()
         header_layout.setContentsMargins(5, 5, 5, 0)
         header_label = QLabel(
             f"<b>Motile Tracker</b> · "
-            f'<a href="{DOCS_URL}"><font color=yellow>Docs</font></a> · '
-            f'<a href="{KEYBINDINGS_URL}"><font color=yellow>Keybindings</font></a>'
+            f'<a href="{DOCS_URL}"><font color=yellow>Docs</font></a>'
         )
         header_label.setOpenExternalLinks(True)
         header_layout.addWidget(header_label)
         header_layout.addStretch()
+
+        keybindings_btn = QPushButton("Keybindings")
+        keybindings_btn.setMaximumWidth(100)
+        keybindings_btn.clicked.connect(self._open_keybindings_dialog)
+        header_layout.addWidget(keybindings_btn)
 
         # Container widget with header + tabs
         container = QWidget()
@@ -63,6 +69,10 @@ class MenuWidget(QScrollArea):
 
         self.setWidget(container)
         self.setWidgetResizable(True)
+
+    def _open_keybindings_dialog(self):
+        dlg = KeybindingsDialog(self)
+        dlg.exec_()
 
     def _has_visualization_tab(self):
         return self.tabwidget.indexOf(self.visualization_widget) != -1

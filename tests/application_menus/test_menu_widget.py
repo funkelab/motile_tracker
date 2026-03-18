@@ -3,7 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-from qtpy.QtWidgets import QLabel, QTabWidget, QWidget
+from qtpy.QtWidgets import QLabel, QPushButton, QTabWidget, QWidget
 
 from motile_tracker.application_menus.menu_widget import MenuWidget
 
@@ -68,14 +68,18 @@ def test_menu_widget_initialization(
     assert widget.tabwidget.tabText(2) == "Edit Tracks"
     assert widget.tabwidget.tabText(3) == "Groups"
 
-    # Test 3: Verify header with docs and keybindings links
+    # Test 3: Verify header with docs link and keybindings button
     labels = widget.findChildren(QLabel)
     header_labels = [label for label in labels if "Motile Tracker" in label.text()]
     assert len(header_labels) == 1
     header = header_labels[0]
     assert "Docs" in header.text()
-    assert "Keybindings" in header.text()
     assert "href=" in header.text()
+
+    # Keybindings is now a button instead of a link
+    buttons = widget.findChildren(QPushButton)
+    kb_buttons = [b for b in buttons if b.text() == "Keybindings"]
+    assert len(kb_buttons) == 1
 
 
 @patch("motile_tracker.application_menus.menu_widget.TracksViewer.get_instance")

@@ -11,7 +11,8 @@ from napari_orthogonal_views.ortho_view_manager import (  # noqa
     _get_manager,
 )
 
-from motile_tracker.data_views.keybindings_config import NAPARI_KEYMAP, bind_keymap
+from motile_tracker.data_views.keybindings_config import bind_keymap
+from motile_tracker.data_views.keybindings_manager import KeybindingsManager
 from motile_tracker.data_views.views.layers.click_utils import (
     detect_click,
     get_click_value,
@@ -285,7 +286,11 @@ def track_layers_hook(
     copied_layer.mouse_drag_callbacks.append(click_wrapper)
 
     # Bind keys to original layer TracksViewer
-    bind_keymap(copied_layer, NAPARI_KEYMAP, orig_layer.tracks_viewer)
+    bind_keymap(
+        copied_layer,
+        KeybindingsManager.get_instance().get_napari_keymap(),
+        orig_layer.tracks_viewer,
+    )
     if isinstance(orig_layer, TrackLabels):
         copied_layer.bind_key("m")(orig_layer.assign_new_label)
 

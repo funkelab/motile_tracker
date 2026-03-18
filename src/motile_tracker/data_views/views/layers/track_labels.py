@@ -13,10 +13,8 @@ from napari.utils import DirectLabelColormap
 from napari.utils.action_manager import action_manager
 from napari.utils.notifications import show_info
 
-from motile_tracker.data_views.keybindings_config import (
-    NAPARI_KEYMAP,
-    bind_keymap,
-)
+from motile_tracker.data_views.keybindings_config import bind_keymap
+from motile_tracker.data_views.keybindings_manager import KeybindingsManager
 from motile_tracker.data_views.views.layers.click_utils import (
     detect_click,
     get_click_value,
@@ -107,7 +105,11 @@ class TrackLabels(ContourLabels):
         self.foreground_contour = False
 
         # Key bindings (should be specified both on the viewer (in tracks_viewer)
-        bind_keymap(self, NAPARI_KEYMAP, self.tracks_viewer)
+        bind_keymap(
+            self,
+            KeybindingsManager.get_instance().get_napari_keymap(),
+            self.tracks_viewer,
+        )
 
         # Listen to paint events and changing the selected label
         self.mouse_drag_callbacks.append(self.click)

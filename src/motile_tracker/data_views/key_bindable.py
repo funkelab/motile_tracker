@@ -124,6 +124,11 @@ class KeyBindable:
         self._keymap: dict[str, callable] = {}
         self._release_keymap: dict[str, callable] = {}
 
+    def clear_keymap(self):
+        """Remove all key-press and key-release bindings."""
+        self._keymap.clear()
+        self._release_keymap.clear()
+
     def bind_key(self, key_string: str, overwrite: bool = False):
         """Decorator that registers a handler for the given key string.
 

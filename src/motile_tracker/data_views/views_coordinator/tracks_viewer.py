@@ -14,9 +14,10 @@ from funtracks.user_actions import (
 from psygnal import Signal
 
 from motile_tracker.data_views.keybindings_config import (
-    NAPARI_KEYMAP,
     bind_keymap,
+    rebind_keymap,
 )
+from motile_tracker.data_views.keybindings_manager import KeybindingsManager
 from motile_tracker.data_views.node_type import NodeType
 from motile_tracker.data_views.views.layers.track_labels import new_label
 from motile_tracker.data_views.views.layers.tracks_layer_group import TracksLayerGroup
@@ -92,7 +93,9 @@ class TracksViewer:
         self.collection_widget = CollectionWidget(self)
         self.collection_widget.group_changed.connect(self.update_selection)
 
+        self._kb_mgr = KeybindingsManager.get_instance()
         self.set_keybinds()
+        self._kb_mgr.keybindings_changed.connect(self._on_keybindings_changed)
 
         self.viewer.dims.events.ndisplay.connect(self.update_selection)
 
@@ -101,7 +104,62 @@ class TracksViewer:
         self.tracks_list.colormap = self.colormap
 
     def set_keybinds(self):
-        bind_keymap(self.viewer, NAPARI_KEYMAP, self)
+        self._last_napari_keymap = self._kb_mgr.get_napari_keymap()
+        bind_keymap(self.viewer, self._last_napari_keymap, self)
+
+    def _on_keybindings_changed(self):
+        """Rebind all napari targets when keybindings change at runtime."""
+        new_keymap = self._kb_mgr.get_napari_keymap()
+        old_keymap = self._last_napari_keymap
+
+        # Rebind the viewer
+        rebind_keymap(self.viewer, old_keymap, new_keymap, self)
+
+        # Rebind active tracking layers
+        for layer in (
+            self.tracking_layers.points_layer,
+            self.tracking_layers.seg_layer,
+        ):
+            if layer is not None:
+                rebind_keymap(layer, old_keymap, new_keymap, self)
+
+        # Rebind ortho view layers (if ortho views are active)
+        self._rebind_ortho_layers(old_keymap, new_keymap)
+
+        self._last_napari_keymap = new_keymap
+
+    def _rebind_ortho_layers(
+        self,
+        old_keymap: dict[str, list[str]],
+        new_keymap: dict[str, list[str]],
+    ):
+        """Rebind keymaps on all copied layers in the ortho view widgets."""
+        try:
+            from napari_orthogonal_views.ortho_view_manager import _get_manager
+
+            from motile_tracker.data_views.views.layers.track_labels import (
+                TrackLabels,
+            )
+            from motile_tracker.data_views.views.layers.track_points import (
+                TrackPoints,
+            )
+
+            mgr = _get_manager(self.viewer)
+            if not mgr.is_shown():
+                return
+            for widget in (mgr.right_widget, mgr.bottom_widget):
+                if not hasattr(widget, "vm_container"):
+                    continue
+                for layer in widget.vm_container.viewer_model.layers:
+                    # Copied layers are plain napari Labels/Points, not our
+                    # Track* subclasses, but they still have bind_key.
+                    # We rebind all layers that were given keybindings by the
+                    # track_layers_hook.
+                    if isinstance(layer, (TrackLabels, TrackPoints)):
+                        continue  # these are originals, skip
+                    rebind_keymap(layer, old_keymap, new_keymap, self)
+        except Exception:
+            pass  # ortho views may not be installed or initialized
 
     def request_new_track(self) -> None:
         """Request a new track id (with new segmentation label if a seg layer is present)"""

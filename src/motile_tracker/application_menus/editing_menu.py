@@ -8,6 +8,7 @@ from qtpy.QtWidgets import (
     QWidget,
 )
 
+from motile_tracker.data_views.keybindings_manager import KeybindingsManager
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
 
@@ -16,6 +17,7 @@ class EditingMenu(QWidget):
         super().__init__()
 
         self.tracks_viewer = TracksViewer.get_instance(viewer)
+        self._kb_mgr = KeybindingsManager.get_instance()
         self.tracks_viewer.selected_nodes.list_updated.connect(self.update_buttons)
         layout = QVBoxLayout()
 
@@ -33,10 +35,10 @@ class EditingMenu(QWidget):
         node_box.setMaximumHeight(120)
         node_box_layout = QVBoxLayout()
 
-        self.delete_node_btn = QPushButton("Delete [D]")
+        self.delete_node_btn = QPushButton(self._btn_label("Delete", "delete_node"))
         self.delete_node_btn.clicked.connect(self.tracks_viewer.delete_node)
         self.delete_node_btn.setEnabled(False)
-        self.swap_nodes_btn = QPushButton("Swap [S]")
+        self.swap_nodes_btn = QPushButton(self._btn_label("Swap", "swap_nodes"))
         self.swap_nodes_btn.clicked.connect(self.tracks_viewer.swap_nodes)
         self.swap_nodes_btn.setEnabled(False)
 
@@ -49,10 +51,10 @@ class EditingMenu(QWidget):
         edge_box.setMaximumHeight(120)
         edge_box_layout = QVBoxLayout()
 
-        self.delete_edge_btn = QPushButton("Break [B]")
+        self.delete_edge_btn = QPushButton(self._btn_label("Break", "delete_edge"))
         self.delete_edge_btn.clicked.connect(self.tracks_viewer.delete_edge)
         self.delete_edge_btn.setEnabled(False)
-        self.create_edge_btn = QPushButton("Add [A]")
+        self.create_edge_btn = QPushButton(self._btn_label("Add", "create_edge"))
         self.create_edge_btn.clicked.connect(self.tracks_viewer.create_edge)
         self.create_edge_btn.setEnabled(False)
 
@@ -61,10 +63,10 @@ class EditingMenu(QWidget):
 
         edge_box.setLayout(edge_box_layout)
 
-        self.undo_btn = QPushButton("Undo (Z)")
+        self.undo_btn = QPushButton(self._btn_label("Undo", "undo"))
         self.undo_btn.clicked.connect(self.tracks_viewer.undo)
 
-        self.redo_btn = QPushButton("Redo (R)")
+        self.redo_btn = QPushButton(self._btn_label("Redo", "redo"))
         self.redo_btn.clicked.connect(self.tracks_viewer.redo)
 
         layout.addWidget(node_box)
@@ -74,6 +76,24 @@ class EditingMenu(QWidget):
 
         self.setLayout(layout)
         self.setMaximumHeight(450)
+
+        self._kb_mgr.keybindings_changed.connect(self._update_button_labels)
+
+    def _key_hint(self, action: str) -> str:
+        """Return the first key for *action* as a display hint."""
+        keys = self._kb_mgr.get_keys(action)
+        return keys[0].upper() if keys else "?"
+
+    def _btn_label(self, label: str, action: str) -> str:
+        return f"{label} [{self._key_hint(action)}]"
+
+    def _update_button_labels(self):
+        self.delete_node_btn.setText(self._btn_label("Delete", "delete_node"))
+        self.swap_nodes_btn.setText(self._btn_label("Swap", "swap_nodes"))
+        self.delete_edge_btn.setText(self._btn_label("Break", "delete_edge"))
+        self.create_edge_btn.setText(self._btn_label("Add", "create_edge"))
+        self.undo_btn.setText(self._btn_label("Undo", "undo"))
+        self.redo_btn.setText(self._btn_label("Redo", "redo"))
 
     def update_track_id_color(self):
         """Display track ID value and color"""

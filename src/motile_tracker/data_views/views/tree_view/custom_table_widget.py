@@ -22,10 +22,8 @@ from qtpy.QtWidgets import (
 )
 
 from motile_tracker.data_views.key_bindable import KeyBindable
-from motile_tracker.data_views.keybindings_config import (
-    TABLE_WIDGET_KEYMAP,
-    bind_keymap,
-)
+from motile_tracker.data_views.keybindings_config import bind_keymap
+from motile_tracker.data_views.keybindings_manager import KeybindingsManager
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
 
@@ -170,7 +168,13 @@ class ColoredTableWidget(QWidget):
 
         self.tracks_viewer = tracks_viewer
         self._table_widget = CustomTableWidget()
-        bind_keymap(self._table_widget, TABLE_WIDGET_KEYMAP, self.tracks_viewer)
+        self._kb_mgr = KeybindingsManager.get_instance()
+        bind_keymap(
+            self._table_widget,
+            self._kb_mgr.get_table_widget_keymap(),
+            self.tracks_viewer,
+        )
+        self._kb_mgr.keybindings_changed.connect(self._on_keybindings_changed)
         self.special_selection = []
 
         self.set_data(df)
@@ -250,6 +254,15 @@ class ColoredTableWidget(QWidget):
 
         finally:
             self._syncing = False
+
+    def _on_keybindings_changed(self):
+        """Rebind table widget keys when keybindings change at runtime."""
+        self._table_widget.clear_keymap()
+        bind_keymap(
+            self._table_widget,
+            self._kb_mgr.get_table_widget_keymap(),
+            self.tracks_viewer,
+        )
 
     def _select_rows(self, rows: list[int]) -> None:
         """Replace current table selection with given rows.

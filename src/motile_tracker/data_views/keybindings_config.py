@@ -56,7 +56,25 @@ def bind_keymap(
 
         handler = _make_handler(owner, method_name)
         for key in keys:
-            target.bind_key(key)(handler)
+            target.bind_key(key, overwrite=True)(handler)
+
+
+def rebind_keymap(
+    target: TrackPoints | Points | TrackLabels | Labels | KeyBindable,
+    old_keymap: dict[str, list[str]],
+    new_keymap: dict[str, list[str]],
+    *providers: TracksViewer | KeyBindable,
+):
+    """Neutralize old key bindings that are no longer present, then bind new ones.
+
+    Used when keybindings change at runtime to update napari layers/viewer.
+    """
+    new_keys = {k for keys in new_keymap.values() for k in keys}
+    for keys in old_keymap.values():
+        for key in keys:
+            if key not in new_keys:
+                target.bind_key(key, overwrite=True)(lambda *a, **kw: None)
+    bind_keymap(target, new_keymap, *providers)
 
 
 KEYBINDINGS = {
