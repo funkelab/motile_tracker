@@ -1,0 +1,31 @@
+cff-version: 1.2.0
+title: motile-tracker
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Caroline
+    family-names: Malin-Mayor
+    email: malinmayorc@janelia.hhmi.org
+    affiliation: HHMI Janelia Research Campus
+  - given-names: Anniek
+    family-names: Stokkermans
+    affiliation: Hubrecht Institute
+  - given-names: Teun
+    family-names: Huijben
+    affiliation: Biohub
+  - given-names: Jan
+    family-names: Funke
+    affiliation: HHMI Janelia Research Campus; Human Technopole
+repository-code: https://github.com/funkelab/motile_tracker
+url: https://funkelab.github.io/motile_tracker/
+abstract: >-
+  Application for interactive tracking and track editing with global
+  optimization.
+keywords:
+  - tracking
+  - napari
+  - image-processing
+  - cell-tracking
+license: BSD-3-Clause
