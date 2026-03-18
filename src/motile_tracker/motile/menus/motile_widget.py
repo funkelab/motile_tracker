@@ -131,18 +131,27 @@ class MotileWidget(QWidget):
             else:
                 raise
 
-        run.graph = solve(
+        solution_graph = solve(
             run.solver_params,
             input_data,
             lambda event_data: self._on_solver_event(run, event_data),
             scale=run.scale,
             cand_graph=cand_graph,
         )
-        # run was initialized with an empty graph, so SolutionTracks.__init__ never
-        # assigned track IDs or computed segmentation. Now that run.graph has been
-        # replaced with the solution, we explicitly recompute them. Ideally solve()
-        # would return a SolutionTracks so this would not be needed.
-        run.enable_features([run.features.tracklet_key, run.features.lineage_key])
+        # Create a new MotileRun with the solution graph so that
+        # SolutionTracks.__init__ runs fresh and correctly assigns track IDs
+        # via _setup_core_computed_features (detecting that track_id is absent).
+        run = MotileRun(
+            graph=solution_graph,
+            run_name=run.run_name,
+            solver_params=run.solver_params,
+            input_segmentation=run.input_segmentation,
+            input_points=run.input_points,
+            time=run.time,
+            gaps=run.gaps,
+            scale=run.scale,
+            ndim=run.ndim,
+        )
         if "mask" in run.graph.node_attr_keys():
             from tracksdata.array import GraphArrayView
 
