@@ -112,9 +112,7 @@ class TrackLabels(ContourLabels):
         # Listen to paint events and changing the selected label
         self.mouse_drag_callbacks.append(self.click)
         self.events.paint.connect(self._on_paint)
-        self.tracks_viewer.selected_nodes.list_updated.connect(
-            self.update_selected_label
-        )
+        self.tracks_viewer.node_selection_updated.connect(self.update_selected_label)
         self.events.mode.connect(self._check_mode)
         self.events.selected_label.connect(self._ensure_valid_label)
 
