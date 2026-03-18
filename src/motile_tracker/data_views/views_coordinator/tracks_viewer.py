@@ -14,7 +14,7 @@ from funtracks.user_actions import (
 from psygnal import Signal
 
 from motile_tracker.data_views.keybindings_config import (
-    KEYMAP,
+    NAPARI_KEYMAP,
     bind_keymap,
 )
 from motile_tracker.data_views.node_type import NodeType
@@ -101,7 +101,7 @@ class TracksViewer:
         self.tracks_list.colormap = self.colormap
 
     def set_keybinds(self):
-        bind_keymap(self.viewer, KEYMAP, self)
+        bind_keymap(self.viewer, NAPARI_KEYMAP, self)
 
     def request_new_track(self) -> None:
         """Request a new track id (with new segmentation label if a seg layer is present)"""

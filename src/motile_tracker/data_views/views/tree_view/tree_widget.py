@@ -9,7 +9,7 @@ import pyqtgraph as pg
 from psygnal import Signal
 from pyqtgraph.Qt import QtCore
 from qtpy.QtCore import Qt
-from qtpy.QtGui import QColor, QKeyEvent, QMouseEvent
+from qtpy.QtGui import QColor, QMouseEvent
 from qtpy.QtWidgets import (
     QHBoxLayout,
     QSplitter,
@@ -18,11 +18,10 @@ from qtpy.QtWidgets import (
 )
 from superqt import QCollapsible
 
+from motile_tracker.data_views.key_bindable import KeyBindable
 from motile_tracker.data_views.keybindings_config import (
-    GENERAL_KEY_ACTIONS,
-    TREE_WIDGET_MODIFIER_ACTIONS,
-    TREE_WIDGET_NAVIGATION_KEYS,
-    TREE_WIDGET_SPECIFIC_ACTIONS,
+    TREE_WIDGET_KEYMAP,
+    bind_keymap,
 )
 from motile_tracker.data_views.views.tree_view.custom_table_widget import (
     ColoredTableWidget,
@@ -41,6 +40,23 @@ from motile_tracker.data_views.views.tree_view.tree_widget_utils import (
     get_features_from_tracks,
 )
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
+
+
+class TrackIDAxis(pg.AxisItem):
+    """Axis that maps x_axis_pos integer positions to track ID labels.
+
+    pyqtgraph chooses which ticks to show based on zoom level, so labels
+    only appear when zoomed in enough.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._track_id_map: dict[int, str] = {}
+
+    def tickStrings(self, values, scale, spacing):
+        if self._track_id_map:
+            return [self._track_id_map.get(int(round(v)), "") for v in values]
+        return super().tickStrings(values, scale, spacing)
 
 
 class CustomViewBox(pg.ViewBox):
@@ -108,7 +124,13 @@ class TreePlot(pg.PlotWidget):
         """Construct the pyqtgraph treewidget. This is the actual canvas
         on which the tree view is drawn.
         """
-        super().__init__(viewBox=CustomViewBox())
+        super().__init__(
+            viewBox=CustomViewBox(),
+            axisItems={
+                "bottom": TrackIDAxis(orientation="bottom"),
+                "left": TrackIDAxis(orientation="left"),
+            },
+        )
 
         self.setFocusPolicy(Qt.StrongFocus)
         self.setTitle("Lineage Tree")
@@ -124,6 +146,7 @@ class TreePlot(pg.PlotWidget):
 
         self.view_direction = None
         self.feature = None
+        self._track_labels: list[tuple[int, int, np.ndarray]] = []
         self.g = pg.GraphItem()
         self.g.scatter.sigClicked.connect(self._on_click)
         self.addItem(self.g)
@@ -199,7 +222,7 @@ class TreePlot(pg.PlotWidget):
         axis_titles = {
             "time": "Time Point",
             "feature": f"Object {self.feature} in calibrated units",
-            "tree": "",
+            "tree": "Tracklet ID",
         }
         if allow_flip:
             if view_direction == "vertical":
@@ -214,10 +237,8 @@ class TreePlot(pg.PlotWidget):
             self.getAxis(time_axis).setStyle(showValues=True)
 
             self.setLabel(feature_axis, text=axis_titles[plot_type])
-            if plot_type == "tree":
-                self.getAxis(feature_axis).setStyle(showValues=False)
-            else:
-                self.getAxis(feature_axis).setStyle(showValues=True)
+            self.getAxis(feature_axis).setStyle(showValues=True)
+            if plot_type == "feature":
                 self.autoRange()  # not sure if this is necessary or not
 
         if (
@@ -286,6 +307,7 @@ class TreePlot(pg.PlotWidget):
         )
         self.g.scatter.setPen(self.outline_pen)
         self.g.scatter.setSize(self.sizes)
+        self._update_track_labels(view_direction)
 
     def _create_pyqtgraph_content(
         self, track_df: pd.DataFrame, plot_type: str, feature: str | None = None
@@ -335,6 +357,34 @@ class TreePlot(pg.PlotWidget):
         self.outline_pen = np.array(
             [pg.mkPen(QColor(150, 150, 150)) for i in range(len(self._pos))]
         )
+
+        # Build track ID label data: one label per unique track_id
+        self._track_labels = []
+        if track_df is not None and not track_df.empty and plot_type == "tree":
+            label_df = track_df.drop_duplicates(subset="track_id")[
+                ["track_id", "x_axis_pos", "color"]
+            ]
+            for _, row in label_df.iterrows():
+                self._track_labels.append(
+                    (int(row["track_id"]), int(row["x_axis_pos"]), row["color"])
+                )
+
+    def _update_track_labels(self, view_direction: str) -> None:
+        """Update the axis label mapping so track IDs show on the non-time axis.
+
+        Args:
+            view_direction: "horizontal" or "vertical"
+        """
+        axis_name = "bottom" if view_direction == "vertical" else "left"
+
+        axis = self.getAxis(axis_name)
+        if self._track_labels:
+            pos_to_label = {
+                x_pos: str(track_id) for track_id, x_pos, _ in self._track_labels
+            }
+            axis._track_id_map = pos_to_label
+        else:
+            axis._track_id_map = {}
 
     def set_selection(self, selected_nodes: list[Any], plot_type: str) -> None:
         """Set the provided list of nodes to be selected. Increases the size
@@ -460,11 +510,12 @@ class TreePlot(pg.PlotWidget):
         view_box.setRange(xRange=new_x_range, yRange=new_y_range, padding=0)
 
 
-class TreeWidget(QWidget):
+class TreeWidget(KeyBindable, QWidget):
     """pyqtgraph-based widget for lineage tree visualization and navigation"""
 
     def __init__(self, viewer: napari.Viewer):
         super().__init__()
+        self.__init_keymap__()
         self.track_df = pd.DataFrame()  # all tracks
         self.lineage_df = pd.DataFrame()  # the currently viewed subset of lineages
         self.graph = None
@@ -552,80 +603,22 @@ class TreeWidget(QWidget):
         main_layout = QHBoxLayout()
         main_layout.addWidget(splitter)
         self.setLayout(main_layout)
+
+        # Bind all keybindings via the KeyBindable mixin.
+        # TreeWidget methods (toggle_display_mode, flip_axes, navigate_*, zoom_*)
+        # take priority; remaining actions fall through to tracks_viewer.
+        bind_keymap(self, TREE_WIDGET_KEYMAP, self, self.tracks_viewer)
+
+        # Key-release handlers for zoom constraint reset
+        @self.bind_key_release("x")
+        def _release_x():
+            self.tree_widget.setMouseEnabled(x=True, y=True)
+
+        @self.bind_key_release("y")
+        def _release_y():
+            self.tree_widget.setMouseEnabled(x=True, y=True)
+
         self._update_track_data(reset_view=True)
-
-    def keyPressEvent(self, event: QKeyEvent) -> None:
-        """Handle key press events.
-
-        Priority order:
-        1. Tree-widget-specific keybinds (highest priority) - call TreeWidget methods
-        2. General keybinds (work in table widget too) - call tracks_viewer methods
-        3. Modifier keybinds (mouse zoom constraints)
-        4. Navigation (arrow keys)
-        """
-        # Handle tree-widget-specific keybinds first (higher priority)
-        action_name = TREE_WIDGET_SPECIFIC_ACTIONS.get(event.key())
-        if action_name:
-            method = getattr(self, action_name, None)
-            if method:
-                method()
-                event.accept()
-                return
-
-        # Try general keybinds (these also work in table widget)
-        action_name = GENERAL_KEY_ACTIONS.get(event.key())
-        if action_name:
-            method = getattr(self.tracks_viewer, action_name, None)
-            if method:
-                method()
-                event.accept()
-                return
-
-        # Handle mouse zoom constraints (X/Y axes)
-        if event.key() in TREE_WIDGET_MODIFIER_ACTIONS:
-            x_enabled, y_enabled = TREE_WIDGET_MODIFIER_ACTIONS[event.key()]
-            self.set_mouse_enabled(x=x_enabled, y=y_enabled)
-            event.accept()
-            return
-
-        # Handle navigation (Arrow keys)
-        direction = TREE_WIDGET_NAVIGATION_KEYS.get(event.key())
-        if direction:
-            self.navigation_widget.move(direction)
-            self.tree_widget.setFocus()
-            event.accept()
-
-    def delete_node(self):
-        """Delete a node."""
-        self.tracks_viewer.delete_node()
-
-    def create_edge(self):
-        """Create an edge."""
-        self.tracks_viewer.create_edge()
-
-    def delete_edge(self):
-        """Delete an edge."""
-        self.tracks_viewer.delete_edge()
-
-    def swap_nodes(self):
-        """Swap the nodes by swapping upstream edges"""
-        self.tracks_viewer.swap_nodes()
-
-    def undo(self):
-        """Undo action."""
-        self.tracks_viewer.undo()
-
-    def redo(self):
-        """Redo action."""
-        self.tracks_viewer.redo()
-
-    def deselect(self):
-        """Deselect all nodes"""
-        self.tracks_viewer.deselect()
-
-    def restore_selection(self):
-        """Restore previous selection"""
-        self.tracks_viewer.restore_selection()
 
     def toggle_display_mode(self):
         """Toggle display mode."""
@@ -634,6 +627,34 @@ class TreeWidget(QWidget):
     def toggle_feature_mode(self):
         """Toggle feature mode."""
         self.plot_type_widget._toggle_plot_type()
+
+    def navigate_left(self):
+        """Navigate left in the tree."""
+        self.navigation_widget.move("left")
+        self.tree_widget.setFocus()
+
+    def navigate_right(self):
+        """Navigate right in the tree."""
+        self.navigation_widget.move("right")
+        self.tree_widget.setFocus()
+
+    def navigate_up(self):
+        """Navigate up in the tree."""
+        self.navigation_widget.move("up")
+        self.tree_widget.setFocus()
+
+    def navigate_down(self):
+        """Navigate down in the tree."""
+        self.navigation_widget.move("down")
+        self.tree_widget.setFocus()
+
+    def zoom_constrain_x(self):
+        """Constrain zoom to X axis only."""
+        self.set_mouse_enabled(x=True, y=False)
+
+    def zoom_constrain_y(self):
+        """Constrain zoom to Y axis only."""
+        self.set_mouse_enabled(x=False, y=True)
 
     def flip_axes(self):
         """Flip the axes of the plot"""
@@ -654,12 +675,6 @@ class TreeWidget(QWidget):
     def set_mouse_enabled(self, x: bool, y: bool):
         """Enable or disable mouse zoom scrolling in X or Y direction."""
         self.tree_widget.setMouseEnabled(x=x, y=y)
-
-    def keyReleaseEvent(self, ev):
-        """Reset the mouse scrolling when releasing the X/Y key"""
-
-        if ev.key() == Qt.Key_X or ev.key() == Qt.Key_Y:
-            self.tree_widget.setMouseEnabled(x=True, y=True)
 
     def _update_selected(self):
         """Called whenever the selection list is updated. Only re-computes

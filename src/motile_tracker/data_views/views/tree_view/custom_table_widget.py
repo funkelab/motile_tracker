@@ -8,7 +8,7 @@ from qtpy.QtCore import (
     Qt,
     QTimer,
 )
-from qtpy.QtGui import QColor, QKeyEvent, QMouseEvent, QPen
+from qtpy.QtGui import QColor, QMouseEvent, QPen
 from qtpy.QtWidgets import (
     QAbstractItemView,
     QLabel,
@@ -21,7 +21,11 @@ from qtpy.QtWidgets import (
     QWidget,
 )
 
-from motile_tracker.data_views.keybindings_config import GENERAL_KEY_ACTIONS
+from motile_tracker.data_views.key_bindable import KeyBindable
+from motile_tracker.data_views.keybindings_config import (
+    TABLE_WIDGET_KEYMAP,
+    bind_keymap,
+)
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
 
@@ -63,9 +67,10 @@ class FloatDelegate(QStyledItemDelegate):
         return f"{number:.{self.nDecimals}f}"
 
 
-class CustomTableWidget(QTableWidget):
+class CustomTableWidget(KeyBindable, QTableWidget):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.__init_keymap__()
         self.verticalHeader().setSectionsClickable(False)
         self._drag_start_row = None
 
@@ -156,28 +161,6 @@ class CustomTableWidget(QTableWidget):
         self._drag_start_row = None
         super().mouseReleaseEvent(event)
 
-    def keyPressEvent(self, event: QKeyEvent) -> None:
-        """Handle key press events for common tracksviewer actions."""
-        # Get the parent ColoredTableWidget to access tracks_viewer
-        parent = self.parent()
-        if parent is None or not hasattr(parent, "tracks_viewer"):
-            super().keyPressEvent(event)
-            return
-
-        tracks_viewer = parent.tracks_viewer
-
-        # Get the action name from the general keybind mapping
-        action_name = GENERAL_KEY_ACTIONS.get(event.key())
-        if action_name:
-            method = getattr(tracks_viewer, action_name, None)
-            if method:
-                method()
-                event.accept()
-                return
-
-        # Allow parent class to handle other events
-        super().keyPressEvent(event)
-
 
 class ColoredTableWidget(QWidget):
     """Customized table widget with colored rows based on label colors in a napari Labels layer"""
@@ -187,6 +170,7 @@ class ColoredTableWidget(QWidget):
 
         self.tracks_viewer = tracks_viewer
         self._table_widget = CustomTableWidget()
+        bind_keymap(self._table_widget, TABLE_WIDGET_KEYMAP, self.tracks_viewer)
         self.special_selection = []
 
         self.set_data(df)

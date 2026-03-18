@@ -14,7 +14,7 @@ from napari.utils.notifications import show_info
 from psygnal import Signal
 
 from motile_tracker.data_views.keybindings_config import (
-    KEYMAP,
+    NAPARI_KEYMAP,
     bind_keymap,
 )
 from motile_tracker.data_views.node_type import NodeType
@@ -92,7 +92,7 @@ class TrackPoints(ZOnlyPoints):
         )
 
         # Key bindings (should be specified both on the viewer (in tracks_viewer)
-        bind_keymap(self, KEYMAP, self.tracks_viewer)
+        bind_keymap(self, NAPARI_KEYMAP, self.tracks_viewer)
 
         # Connect to click events to select nodes
         @self.mouse_drag_callbacks.append
