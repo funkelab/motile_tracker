@@ -20,6 +20,7 @@ from motile_tracker.data_views.keybindings_config import (
 from motile_tracker.data_views.node_type import NodeType
 from motile_tracker.data_views.views.layers.click_utils import (
     detect_click,
+    detect_side_button,
     get_click_value,
 )
 from motile_tracker.data_views.views_coordinator.user_dialogs import (
@@ -139,6 +140,12 @@ class TrackPoints(ZOnlyPoints):
                 was clicked
             _layer (napari.layers.Points | None): Optional, unused. The (ortho view) layer on which the click occurred, which is forwarded by default.
         """
+
+        # Intercept mouse side button navigation (back/forward)
+        mouse_button = detect_side_button(event)
+        if mouse_button is not None:
+            self.tracks_viewer.select_node_set_from_history(previous=mouse_button == 4)
+            return
 
         if point_index is None:
             self.tracks_viewer.selected_nodes.reset()

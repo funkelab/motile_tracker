@@ -19,6 +19,7 @@ from motile_tracker.data_views.keybindings_config import (
 )
 from motile_tracker.data_views.views.layers.click_utils import (
     detect_click,
+    detect_side_button,
     get_click_value,
 )
 from motile_tracker.data_views.views.layers.contour_labels import ContourLabels
@@ -121,9 +122,11 @@ class TrackLabels(ContourLabels):
 
     # Connect click events to node selection
     def click(self, _, event):
-        if (
-            event.type == "mouse_press" and self.mode == "pan_zoom"
-        ):  # disable selecting in lineage mode in 3D
+        side_button = detect_side_button(event)
+        if side_button is not None:
+            self.process_click(event, label=None, side_button=side_button)
+        elif self.mode == "pan_zoom" and event.type == "mouse_press":
+            # disable selecting in lineage mode in 3D
             # differentiate between click and drag
             was_click = yield from detect_click(event)
             if was_click:
@@ -136,16 +139,26 @@ class TrackLabels(ContourLabels):
         new_label(self)
 
     def process_click(
-        self, event: Event, label: int, layer: ContourLabels | None = None
+        self,
+        event: Event,
+        label: int,
+        side_button: int | None = None,
+        layer: ContourLabels | None = None,
     ):
         """Process the click event to update the selected nodes.
 
         Args:
             event (Event): The click event.
             label (int): The label value at the clicked position.
+            side_button (int | None): the integer for the mouse side buttons (4: back, 5: forward)
             layer (ContourLabels | None): The (ortho view) layer from which the click originated.
                 If provided, it is used to check label visibility in that layer's colormap.
         """
+
+        # Intercept mouse side button navigation (back/forward)
+        if side_button is not None:
+            self.tracks_viewer.select_node_set_from_history(previous=side_button == 4)
+            return
 
         if label is not None and label != 0:
             # check visibility in the respective colormap. If a label is not visible, it

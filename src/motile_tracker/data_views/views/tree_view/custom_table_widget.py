@@ -22,6 +22,9 @@ from qtpy.QtWidgets import (
 )
 
 from motile_tracker.data_views.keybindings_config import GENERAL_KEY_ACTIONS
+from motile_tracker.data_views.views.layers.click_utils import (
+    detect_side_button,
+)
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
 
@@ -74,7 +77,18 @@ class CustomTableWidget(QTableWidget):
         - Plain click: single selection, toggle if already selected
         - Shift: append to selection.
         - Ctrl/CMD: center node, should not affect selection.
+        - Side buttons (back/forward): navigate selection history.
         """
+        # Intercept mouse side buttons for selection history navigation
+        side_button = detect_side_button(event)
+
+        if side_button is not None:
+            self.parent().tracks_viewer.select_node_set_from_history(
+                previous=side_button == 4
+            )
+            return
+
+        # Handle other clicks for new selection and centering
         index = self.indexAt(event.pos())
         if not index.isValid():
             return

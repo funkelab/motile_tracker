@@ -24,6 +24,9 @@ from motile_tracker.data_views.keybindings_config import (
     TREE_WIDGET_NAVIGATION_KEYS,
     TREE_WIDGET_SPECIFIC_ACTIONS,
 )
+from motile_tracker.data_views.views.layers.click_utils import (
+    detect_side_button,
+)
 from motile_tracker.data_views.views.tree_view.custom_table_widget import (
     ColoredTableWidget,
 )
@@ -50,6 +53,7 @@ class CustomViewBox(pg.ViewBox):
         kwds["enableMenu"] = False
         pg.ViewBox.__init__(self, *args, **kwds)
         # self.setMouseMode(self.RectMode)
+        self.mouse_start_pos = None  # Initialize to prevent AttributeError
 
     ## reimplement right-click to zoom out
     def mouseClickEvent(self, ev):
@@ -81,9 +85,12 @@ class CustomViewBox(pg.ViewBox):
 
             # Once the drag finishes, emit the rectangle
             if ev.isFinish():
-                rect_end_pos = self.mapSceneToView(ev.scenePos())
-                rect = QtCore.QRectF(self.mouse_start_pos, rect_end_pos).normalized()
-                self.selected_rect.emit(rect)  # emit the rectangle
+                if self.mouse_start_pos is not None:
+                    rect_end_pos = self.mapSceneToView(ev.scenePos())
+                    rect = QtCore.QRectF(
+                        self.mouse_start_pos, rect_end_pos
+                    ).normalized()
+                    self.selected_rect.emit(rect)  # emit the rectangle
                 ev.accept()
 
                 if hasattr(self, "rbScaleBox") and self.rbScaleBox:
@@ -103,6 +110,7 @@ class TreePlot(pg.PlotWidget):
     node_clicked = Signal(Any, bool)  # node_id, append
     jump_to_node = Signal(int)  # node to jump to
     nodes_selected = Signal(list, bool)
+    update_selection = Signal(bool)  # forward or backward in selection history
 
     def __init__(self) -> pg.PlotWidget:
         """Construct the pyqtgraph treewidget. This is the actual canvas
@@ -126,6 +134,7 @@ class TreePlot(pg.PlotWidget):
         self.feature = None
         self.g = pg.GraphItem()
         self.g.scatter.sigClicked.connect(self._on_click)
+        self.scene().sigMouseClicked.connect(self._on_scene_click)
         self.addItem(self.g)
         self.set_view("vertical", plot_type="tree")
         self.getViewBox().selected_rect.connect(self.select_points_in_rect)
@@ -228,6 +237,13 @@ class TreePlot(pg.PlotWidget):
             self.autoRange()
         self.view_direction = view_direction
         self.plot_type = plot_type
+
+    def _on_scene_click(self, event: QMouseEvent):
+        """Intercept mouse clicks on the scene to detect clicks of the back and forward buttons for selection history navigation."""
+
+        side_button = detect_side_button(event)
+        if side_button is not None:
+            self.update_selection.emit(side_button == 4)
 
     def _on_click(self, _, points: np.ndarray, ev: QMouseEvent) -> None:
         """Adds the selected point to the selected_nodes list. Called when
@@ -481,6 +497,9 @@ class TreeWidget(QWidget):
         layout = QVBoxLayout()
 
         self.tree_widget: TreePlot = TreePlot()
+        self.tree_widget.update_selection.connect(
+            self.tracks_viewer.select_node_set_from_history
+        )
         self.tree_widget.node_clicked.connect(self.selected_nodes.add)
         self.tree_widget.jump_to_node.connect(self.tracks_viewer.center_on_node)
         self.tree_widget.nodes_selected.connect(self.selected_nodes.add_list)

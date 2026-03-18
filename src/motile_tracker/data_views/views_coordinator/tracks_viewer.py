@@ -26,8 +26,8 @@ from motile_tracker.data_views.views.tree_view.tree_widget_utils import (
 from motile_tracker.data_views.views_coordinator.groups import (
     CollectionWidget,
 )
-from motile_tracker.data_views.views_coordinator.node_selection_list import (
-    NodeSelectionList,
+from motile_tracker.data_views.views_coordinator.node_selection_history import (
+    NodeSelectionHistory,
 )
 from motile_tracker.data_views.views_coordinator.tracks_list import TracksList
 from motile_tracker.data_views.views_coordinator.user_dialogs import (
@@ -80,7 +80,7 @@ class TracksViewer:
         self.visible: list | str = []
         self.tracking_layers = TracksLayerGroup(self.viewer, self.tracks, "", self)
         self.center_node.connect(self.tracking_layers.center_view)
-        self.selected_nodes = NodeSelectionList()
+        self.selected_nodes = NodeSelectionHistory()
         self.selected_nodes.list_updated.connect(self.filter_selection)
 
         self.tracks_list = TracksList()
@@ -164,7 +164,7 @@ class TracksViewer:
             tracks (funtracks.data_model.Tracks): The tracks to visualize in napari.
             name (str): The name of the tracks to display in the layer names
         """
-        self.selected_nodes._set = set()
+        self.selected_nodes.reset()
 
         if self.tracks is not None:
             self.tracks.refresh.disconnect(self._refresh)
@@ -408,3 +408,7 @@ class TracksViewer:
 
     def restore_selection(self, event=None):
         self.selected_nodes.restore()
+
+    def select_node_set_from_history(self, previous: bool):
+        """Move forwards or backwards through selection history."""
+        self.selected_nodes.select_node_set_from_history(previous=previous)

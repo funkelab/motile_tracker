@@ -88,6 +88,16 @@ KEYBINDINGS = {
         "qt_keys": [Qt.Key_Slash],
         "targets": ["tracks_viewer"],
     },
+    "select_previous": {
+        "napari_keys": ["p"],  # Previous: Navigate backwards in selection history
+        "qt_keys": [Qt.Key_P],
+        "targets": ["tracks_viewer"],
+    },
+    "select_next": {
+        "napari_keys": ["n"],  # Next: Navigate forwards in selection history
+        "qt_keys": [Qt.Key_N],
+        "targets": ["tracks_viewer"],
+    },
     # Actions available in both napari and tree_widget (but connected to different functions)
     "toggle_display_mode": {
         "napari_keys": ["q"],
