@@ -169,7 +169,11 @@ class ExportDialog:
                 file_path = Path(file_dialog.selectedFiles()[0])
                 try:
                     export_to_geff(
-                        tracks, file_path, overwrite=True, node_ids=nodes_to_keep
+                        tracks,
+                        file_path,
+                        overwrite=True,
+                        node_ids=nodes_to_keep,
+                        save_segmentation=relabel_by_tracklet_id,
                     )
                     return True
                 except ValueError as e:

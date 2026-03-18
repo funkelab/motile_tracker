@@ -217,7 +217,7 @@ def test_export_dialog_geff(mock_tracks, fake_parent, tmp_path):
 
     assert result is True
     mock_export_geff.assert_called_once_with(
-        mock_tracks, geff_file, overwrite=True, node_ids={1, 2}
+        mock_tracks, geff_file, overwrite=True, node_ids={1, 2}, save_segmentation=False
     )
 
 

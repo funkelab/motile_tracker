@@ -99,7 +99,7 @@ class MotileRun(SolutionTracks):
             ) from e
         return time, run_name
 
-    def save(self, base_path: str | Path) -> Path:
+    def save(self, base_path: str | Path, save_segmentation: bool = False) -> Path:
         """Save the run in the provided directory. Creates a subdirectory from
         the timestamp and run name and stores one file for each element of the
         run in that subdirectory.
@@ -114,7 +114,7 @@ class MotileRun(SolutionTracks):
         base_path = Path(base_path)
         run_dir = base_path / self._make_id()
         Path.mkdir(run_dir)
-        export_to_geff(self, run_dir)
+        export_to_geff(self, run_dir, save_segmentation=save_segmentation)
         self._save_params(run_dir)
         self._save_attrs(run_dir)
         if self.input_points is not None:
