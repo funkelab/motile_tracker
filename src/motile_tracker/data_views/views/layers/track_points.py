@@ -326,14 +326,17 @@ class TrackPoints(ZOnlyPoints):
         self.border_color = [1, 1, 1, 1]
         self.size = self.default_size
         for node in self.tracks_viewer.selected_nodes:
-            index = self.node_index_dict[node]
-            self.border_color[index] = (
-                0,
-                1,
-                1,
-                1,
-            )
-            self.size[index] = math.ceil(self.default_size + 0.3 * self.default_size)
+            index = self.node_index_dict.get(node, None)
+            if index is not None:
+                self.border_color[index] = (
+                    0,
+                    1,
+                    1,
+                    1,
+                )
+                self.size[index] = math.ceil(
+                    self.default_size + 0.3 * self.default_size
+                )
 
         # emit the event to trigger update in orthogonal views
         self.border_color = self.border_color

@@ -80,7 +80,7 @@ class CollectionWidget(QWidget):
         super().__init__()
 
         self.tracks_viewer = tracks_viewer
-        self.tracks_viewer.selected_nodes.list_updated.connect(
+        self.tracks_viewer.node_selection_updated.connect(
             self._update_buttons_and_node_count
         )
 
@@ -249,7 +249,7 @@ class CollectionWidget(QWidget):
         ]
         for item in items:
             nodes = item.collection
-            graph_nodes = set(self.tracks_viewer.tracks.graph.nodes)
+            graph_nodes = set(self.tracks_viewer.tracks.nodes())
             item.collection = {item for item in nodes if item in graph_nodes}
             item.update_node_count()
 

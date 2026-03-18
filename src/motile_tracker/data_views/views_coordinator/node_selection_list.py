@@ -68,6 +68,16 @@ class NodeSelectionList(QObject):
         self._reset_iterator()
         self.list_updated.emit()
 
+    def filter(self, valid_items: set[int]) -> None:
+        """Silently filter the selection to only keep items that are in valid_items,
+        without emitting list_updated.
+
+        Args:
+            valid_items: Set of node IDs that are valid/still exist.
+        """
+        self._set = self._set & valid_items
+        self._reset_iterator()
+
     def __contains__(self, item: int) -> bool:
         return item in self._set
 

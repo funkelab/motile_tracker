@@ -244,7 +244,7 @@ class ColoredTableWidget(QWidget):
         self._table_widget.setItemDelegate(delegate)
 
         self._table_widget.itemSelectionChanged.connect(self._on_selection_changed)
-        self.tracks_viewer.selected_nodes.list_updated.connect(self._update_selected)
+        self.tracks_viewer.node_selection_updated.connect(self._update_selected)
         self.tracks_viewer.center_node.connect(self.scroll_to_node)
 
     def _update_selected(self) -> None:
@@ -345,17 +345,18 @@ class ColoredTableWidget(QWidget):
         self._syncing = True
         try:
             index = self._find_row(ID=node)
-            selection_model = self._table_widget.selectionModel()
+            if index is not None:
+                selection_model = self._table_widget.selectionModel()
 
-            model_index = self._table_widget.model().index(index, 0)
+                model_index = self._table_widget.model().index(index, 0)
 
-            if (
-                selection_model.isSelected(model_index)
-                and len(selection_model.selectedRows()) == 1
-            ):
-                return
+                if (
+                    selection_model.isSelected(model_index)
+                    and len(selection_model.selectedRows()) == 1
+                ):
+                    return
 
-            self.scroll_to_row(index)
+                self.scroll_to_row(index)
 
         finally:
             self._syncing = False
