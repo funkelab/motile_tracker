@@ -124,14 +124,14 @@ class TrackLabels(ContourLabels):
     def click(self, _, event):
         side_button = detect_side_button(event)
         if side_button is not None:
-            self.process_click(event, label=None, side_button=side_button)
+            self.process_click(event, side_button=side_button)
         elif self.mode == "pan_zoom" and event.type == "mouse_press":
             # disable selecting in lineage mode in 3D
             # differentiate between click and drag
             was_click = yield from detect_click(event)
             if was_click:
                 value = get_click_value(self, event)
-                self.process_click(event, value)
+                self.process_click(event, value=value)
 
     def assign_new_label(self, event):
         """Function for orthoviews to connect to so the 'm' event can be processed here"""
@@ -141,7 +141,7 @@ class TrackLabels(ContourLabels):
     def process_click(
         self,
         event: Event,
-        label: int,
+        value: int | None = None,
         side_button: int | None = None,
         layer: ContourLabels | None = None,
     ):
@@ -149,7 +149,7 @@ class TrackLabels(ContourLabels):
 
         Args:
             event (Event): The click event.
-            label (int): The label value at the clicked position.
+            value (int): The label value (node) at the clicked position.
             side_button (int | None): the integer for the mouse side buttons (4: back, 5: forward)
             layer (ContourLabels | None): The (ortho view) layer from which the click originated.
                 If provided, it is used to check label visibility in that layer's colormap.
@@ -160,23 +160,23 @@ class TrackLabels(ContourLabels):
             self.tracks_viewer.select_node_set_from_history(previous=side_button == 4)
             return
 
-        if label is not None and label != 0:
+        if value is not None and value != 0:
             # check visibility in the respective colormap. If a label is not visible, it
             # is not allowed to be selected from this view
             if layer is not None:
-                is_visible = layer.colormap.color_dict.get(label)[3] > 0
+                is_visible = layer.colormap.color_dict.get(value)[3] > 0
             else:
-                is_visible = self.colormap.color_dict.get(label)[3] > 0
+                is_visible = self.colormap.color_dict.get(value)[3] > 0
             if is_visible:
                 append = "Shift" in event.modifiers
                 jump = "Control" in event.modifiers
                 if jump:
-                    self.tracks_viewer.center_on_node(label)
+                    self.tracks_viewer.center_on_node(value)
                 else:
-                    self.tracks_viewer.selected_nodes.add(label, append)
+                    self.tracks_viewer.selected_nodes.add(value, append)
             else:
                 warnings.warn(
-                    f"Node {label} is not visible in this view and cannot be selected.",
+                    f"Node {value} is not visible in this view and cannot be selected.",
                     stacklevel=2,
                 )
 
