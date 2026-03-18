@@ -4,6 +4,7 @@ import logging
 import time
 from collections.abc import Callable
 
+import ilpy
 import networkx as nx
 import numpy as np
 from funtracks.candidate_graph import (
@@ -29,6 +30,7 @@ def solve(
     on_solver_update: Callable | None = None,
     scale: list | None = None,
     cand_graph: nx.DiGraph | None = None,
+    backend: ilpy.Preference = ilpy.Preference.Any,
 ) -> nx.DiGraph:
     """Get a tracking solution for the given segmentation and parameters.
 
@@ -51,6 +53,8 @@ def solve(
         cand_graph (nx.DiGraph, optional): A pre-built candidate graph. If
             provided, skips candidate graph construction (except for
             single-window mode which always builds its own). Defaults to None.
+        backend (ilpy.Preference, optional): The ILP solver backend to use.
+            Defaults to Any (uses whatever is available).
 
     Returns:
         nx.DiGraph: A solution graph where the ids of the nodes correspond to
@@ -62,15 +66,17 @@ def solve(
         solver_params.window_size is not None
         and solver_params.single_window_start is not None
     ):
-        return _solve_single_window(input_data, solver_params, on_solver_update, scale)
+        return _solve_single_window(
+            input_data, solver_params, on_solver_update, scale, backend
+        )
 
     if cand_graph is None:
         cand_graph = build_candidate_graph(input_data, solver_params, scale)
 
     if solver_params.window_size is not None:
-        return _solve_chunked(cand_graph, solver_params, on_solver_update)
+        return _solve_chunked(cand_graph, solver_params, on_solver_update, backend)
 
-    return _solve_full(cand_graph, solver_params, on_solver_update)
+    return _solve_full(cand_graph, solver_params, on_solver_update, backend)
 
 
 def build_candidate_graph(
@@ -98,11 +104,12 @@ def _solve_full(
     cand_graph: nx.DiGraph,
     solver_params: SolverParams,
     on_solver_update: Callable | None = None,
+    backend: ilpy.Preference = ilpy.Preference.Any,
 ) -> nx.DiGraph:
     """Solve the tracking problem on the full candidate graph at once."""
     solver = construct_solver(cand_graph, solver_params)
     start_time = time.time()
-    solution = solver.solve(verbose=False, on_event=on_solver_update)
+    solution = solver.solve(verbose=False, on_event=on_solver_update, backend=backend)
     logger.info("Solution took %.2f seconds", time.time() - start_time)
 
     solution_graph = solver.get_selected_subgraph(solution=solution)
@@ -115,6 +122,7 @@ def _solve_window(
     window_subgraph: nx.DiGraph,
     solver_params: SolverParams,
     on_solver_update: Callable | None = None,
+    backend: ilpy.Preference = ilpy.Preference.Any,
 ) -> nx.DiGraph | None:
     """Solve a single window subgraph.
 
@@ -145,7 +153,7 @@ def _solve_window(
     # Construct and solve
     solver = construct_solver(window_subgraph, solver_params)
     start_time = time.time()
-    solution = solver.solve(verbose=False, on_event=on_solver_update)
+    solution = solver.solve(verbose=False, on_event=on_solver_update, backend=backend)
     logger.info("Window solved in %.2f seconds", time.time() - start_time)
     solution_graph = solver.get_selected_subgraph(solution=solution)
     return graph_to_nx(solution_graph)
@@ -221,6 +229,7 @@ def _solve_single_window(
     solver_params: SolverParams,
     on_solver_update: Callable | None = None,
     scale: list | None = None,
+    backend: ilpy.Preference = ilpy.Preference.Any,
 ) -> nx.DiGraph:
     """Solve a single window for interactive parameter testing.
 
@@ -250,7 +259,7 @@ def _solve_single_window(
     cand_graph = build_candidate_graph(sliced_data, solver_params, scale)
 
     start_time = time.time()
-    solution = _solve_window(cand_graph, solver_params, on_solver_update)
+    solution = _solve_window(cand_graph, solver_params, on_solver_update, backend)
     logger.info("Single window solution took %.2f seconds", time.time() - start_time)
 
     if solution is None:
@@ -274,6 +283,7 @@ def _solve_chunked(
     cand_graph: nx.DiGraph,
     solver_params: SolverParams,
     on_solver_update: Callable | None = None,
+    backend: ilpy.Preference = ilpy.Preference.Any,
 ) -> nx.DiGraph:
     """Solve the tracking problem in chunks using a sliding window approach.
 
@@ -356,6 +366,7 @@ def _solve_chunked(
             window_subgraph,
             solver_params,
             on_solver_update,
+            backend,
         )
 
         if window_solution_nx is None:

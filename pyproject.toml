@@ -74,6 +74,7 @@ testing =[
     "pytest>=8.3,<9",
     "pytest-cov>=6",
     "pytest-qt>=4.4,<5",
+    "pytest-benchmark>=5",
 ]
 docs = [
     "myst-parser>=4,<5",
@@ -101,6 +102,8 @@ conflicts = [
 ]
 
 [tool.pytest.ini_options]
+addopts = ["--benchmark-disable"]
+markers = ["gurobi: requires gurobi license (run with -m gurobi)"]
 filterwarnings = [
     "error::DeprecationWarning:funtracks",
 ]
