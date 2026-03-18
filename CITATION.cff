@@ -12,8 +12,11 @@ authors:
   - given-names: Anniek
     family-names: Stokkermans
     affiliation: Hubrecht Institute
-  - given-names: Teun
+  - given-names: Teun A.P.M.
     family-names: Huijben
+    affiliation: Biohub
+  - given-names: Loïc A.
+    family-names: Royer
     affiliation: Biohub
   - given-names: Jan
     family-names: Funke
