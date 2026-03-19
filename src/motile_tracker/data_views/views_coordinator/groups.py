@@ -48,12 +48,18 @@ class CollectionButton(QWidget):
         self.export.setFixedSize(20, 20)
         self.export.setToolTip("Export nodes in this group to CSV or geff")
 
+        select_icon = qticon(FA6S.computer_mouse, color="white")
+        self.select_nodes_in_group_btn = QPushButton(icon=select_icon)
+        self.select_nodes_in_group_btn.setFixedSize(20, 20)
+        self.select_nodes_in_group_btn.setToolTip("Select nodes in group")
+
         self.delete = QPushButton(icon=delete_icon)
         self.delete.setFixedSize(20, 20)
         layout = QHBoxLayout()
         layout.setSpacing(1)
         layout.addWidget(self.name)
         layout.addWidget(self.node_count)
+        layout.addWidget(self.select_nodes_in_group_btn)
         layout.addWidget(self.export)
         layout.addWidget(self.delete)
         layout.setSpacing(10)
@@ -98,19 +104,31 @@ class CollectionWidget(QWidget):
         selection_layout = QHBoxLayout()
 
         col1_layout = QVBoxLayout()
-        self.select_btn = QPushButton("Select nodes in group")
-        self.select_btn.clicked.connect(self._select_nodes)
         self.invert_btn = QPushButton("Invert selection")
         self.invert_btn.clicked.connect(self._invert_selection)
-        self.jump_to_next_btn = QPushButton("View next selected node")
+
+        arrow_layout = QHBoxLayout()
+        left_arrow = qticon(FA6S.arrow_left, color="white")
+        self.jump_to_previous_btn = QPushButton(icon=left_arrow)
+        self.jump_to_previous_btn.clicked.connect(
+            lambda: self._jump_to_node(forward=False)
+        )
+        self.jump_to_previous_btn.setToolTip("Navigate to previous selected node")
+
+        right_arrow = qticon(FA6S.arrow_right, color="white")
+        self.jump_to_next_btn = QPushButton(icon=right_arrow)
         self.jump_to_next_btn.clicked.connect(lambda: self._jump_to_node(forward=True))
+        self.jump_to_next_btn.setToolTip("Navigate to next selected node")
+
+        arrow_layout.addWidget(self.jump_to_previous_btn)
+        arrow_layout.addWidget(self.jump_to_next_btn)
+
         self.select_next_set_btn = QPushButton("Next Selection [N]")
         self.select_next_set_btn.clicked.connect(
             lambda: self.tracks_viewer.select_node_set_from_history(previous=False)
         )
-        col1_layout.addWidget(self.select_btn)
         col1_layout.addWidget(self.invert_btn)
-        col1_layout.addWidget(self.jump_to_next_btn)
+        col1_layout.addLayout(arrow_layout)
         col1_layout.addWidget(self.select_next_set_btn)
 
         col2_layout = QVBoxLayout()
@@ -118,10 +136,6 @@ class CollectionWidget(QWidget):
         self.deselect_btn.clicked.connect(self.tracks_viewer.deselect)
         self.reselect_btn = QPushButton("Restore selection [E]")
         self.reselect_btn.clicked.connect(self.tracks_viewer.restore_selection)
-        self.jump_to_previous_btn = QPushButton("View previous selected node")
-        self.jump_to_previous_btn.clicked.connect(
-            lambda: self._jump_to_node(forward=False)
-        )
 
         self.select_previous_set_btn = QPushButton("Previous Selection [P]")
         self.select_previous_set_btn.clicked.connect(
@@ -130,7 +144,6 @@ class CollectionWidget(QWidget):
 
         col2_layout.addWidget(self.deselect_btn)
         col2_layout.addWidget(self.reselect_btn)
-        col2_layout.addWidget(self.jump_to_previous_btn)
         col2_layout.addWidget(self.select_previous_set_btn)
 
         selection_layout.addLayout(col1_layout)
@@ -188,6 +201,7 @@ class CollectionWidget(QWidget):
         self.setLayout(layout)
 
         self._update_buttons_and_node_count()
+        self.tracks_viewer.node_selection_updated.connect(self.update_selection_buttons)
 
     def _update_buttons_and_node_count(self) -> None:
         """Enable or disable selection and edit buttons depending on whether a group is
@@ -208,17 +222,19 @@ class CollectionWidget(QWidget):
             self.remove_node_btn.setEnabled(False)
             self.remove_track_btn.setEnabled(False)
             self.remove_lineage_btn.setEnabled(False)
-            self.select_btn.setEnabled(False)
 
         if selected:
             self.collection_list.itemWidget(
                 selected[0]
             ).update_node_count()  # update the node count
 
-            if len(self.selected_collection.collection) > 0:
-                self.select_btn.setEnabled(True)
-            else:
-                self.select_btn.setEnabled(False)
+        if self.tracks_viewer.tracks is not None:
+            self.new_group_button.setEnabled(True)
+        else:
+            self.new_group_button.setEnabled(False)
+
+    def update_selection_buttons(self):
+        """Update the button states based on the current node selection (history)"""
 
         if len(self.tracks_viewer.selected_nodes) > 0:
             self.deselect_btn.setEnabled(True)
@@ -228,11 +244,6 @@ class CollectionWidget(QWidget):
             self.deselect_btn.setEnabled(False)
             self.jump_to_next_btn.setEnabled(False)
             self.jump_to_previous_btn.setEnabled(False)
-
-        if self.tracks_viewer.tracks is not None:
-            self.new_group_button.setEnabled(True)
-        else:
-            self.new_group_button.setEnabled(False)
 
         if (
             self.tracks_viewer.selected_nodes._pointer
@@ -280,16 +291,6 @@ class CollectionWidget(QWidget):
             graph_nodes = set(self.tracks_viewer.tracks.nodes())
             item.collection = {item for item in nodes if item in graph_nodes}
             item.update_node_count()
-
-    def _select_nodes(self) -> None:
-        """Select all nodes in the collection"""
-
-        selected = self.collection_list.selectedItems()
-        if selected:
-            self.selected_collection = self.collection_list.itemWidget(selected[0])
-            self.tracks_viewer.selected_nodes.add_list(
-                list(self.selected_collection.collection), append=False
-            )
 
     def retrieve_existing_groups(self) -> None:
         """Create collections based on the node attributes. Nodes assigned to a group
@@ -467,6 +468,9 @@ class CollectionWidget(QWidget):
         self.collection_list.addItem(item)
         group_row.delete.clicked.connect(partial(self._remove_group, item))
         group_row.export.clicked.connect(partial(self._show_export_dialog, item))
+        group_row.select_nodes_in_group_btn.clicked.connect(
+            partial(self._select_nodes, item)
+        )
 
         if select:
             self.collection_list.setCurrentRow(len(self.collection_list) - 1)
@@ -523,4 +527,11 @@ class CollectionWidget(QWidget):
             name=group_name,
             nodes_to_keep=nodes_to_keep,
             colormap=self.tracks_viewer.colormap,
+        )
+
+    def _select_nodes(self, item: QListWidgetItem) -> None:
+        """Select all nodes in the collection"""
+
+        self.tracks_viewer.selected_nodes.add_list(
+            list(self.collection_list.itemWidget(item).collection), append=False
         )
