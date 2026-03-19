@@ -23,7 +23,7 @@ from qtpy.QtWidgets import (
 )
 from tqdm import tqdm
 
-from motile_tracker.motile.backend import MotileRun
+from motile_tracker.motile.backend import MotileRun, get_solver_name
 
 from .params_editor import SolverParamsEditor
 
@@ -52,7 +52,7 @@ class RunEditor(QGroupBox):
         self.layer_selection_box: QComboBox
 
         # Generate Tracks button
-        generate_tracks_btn = QPushButton("Run Tracking")
+        generate_tracks_btn = QPushButton(f"Run Tracking ({get_solver_name()})")
         generate_tracks_btn.clicked.connect(self.emit_run)
         generate_tracks_btn.setToolTip(
             "Might take minutes or longer for larger samples."
