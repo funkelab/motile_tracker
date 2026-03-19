@@ -16,7 +16,7 @@ from qtpy.QtWidgets import (
 
 
 class ExportTypeDialog(QDialog):
-    def __init__(self, parent=None, label: str = ""):
+    def __init__(self, parent=None, label: str = "", has_segmentation: bool = False):
         super().__init__(parent)
         self.setWindowTitle("Select Export Type")
 
@@ -26,42 +26,53 @@ class ExportTypeDialog(QDialog):
             layout.addWidget(QLabel(label))
 
         self.export_type_combo = QComboBox()
-        self.export_type_combo.addItems(["CSV", "geff"])
+        self.export_type_combo.addItems(["geff", "CSV"])
         layout.addWidget(self.export_type_combo)
 
-        self.relabel_checkbox = QCheckBox(
-            "Export segmentation relabeled by Tracklet ID"
-        )
-        layout.addWidget(self.relabel_checkbox)
+        self.seg_checkbox = QCheckBox("Export segmentation")
+        self.seg_checkbox.setVisible(has_segmentation)
+        layout.addWidget(self.seg_checkbox)
+
+        self.seg_format_label = QLabel("Segmentation format:")
+        self.seg_format_combo = QComboBox()
+        self.seg_format_combo.addItems(["zarr", "tiff"])
+        self.relabel_checkbox = QCheckBox("Relabel segmentation by Track ID")
+        self.relabel_checkbox.setChecked(True)
+
+        for w in (self.seg_format_label, self.seg_format_combo, self.relabel_checkbox):
+            w.setVisible(False)
+            layout.addWidget(w)
 
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         layout.addWidget(buttons)
-
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
 
-        # Initial visibility
-        self._update_checkbox_visibility(self.export_type_combo.currentText())
+        self.seg_checkbox.toggled.connect(self._on_seg_toggled)
 
-        # Update visibility when export type changes
-        self.export_type_combo.currentTextChanged.connect(
-            self._update_checkbox_visibility
-        )
-
-    def _update_checkbox_visibility(self, export_type: str):
-        self.relabel_checkbox.setVisible(export_type == "CSV")
+    def _on_seg_toggled(self, checked: bool):
+        for w in (self.seg_format_label, self.seg_format_combo, self.relabel_checkbox):
+            w.setVisible(checked)
 
     @property
     def export_type(self) -> str:
         return self.export_type_combo.currentText()
 
     @property
-    def relabel_by_tracklet_id(self) -> bool:
-        return self.relabel_checkbox.isChecked()
+    def save_segmentation(self) -> bool:
+        return self.seg_checkbox.isChecked()
+
+    @property
+    def seg_file_format(self) -> str:
+        return self.seg_format_combo.currentText()
+
+    @property
+    def seg_label_attr(self) -> str | None:
+        return "track_id" if self.relabel_checkbox.isChecked() else None
 
 
 class ExportDialog:
-    """Handles exporting tracks to CSV or Geff."""
+    """Handles exporting tracks to CSV or geff."""
 
     @staticmethod
     def show_export_dialog(
@@ -72,7 +83,7 @@ class ExportDialog:
         nodes_to_keep: set[int] | None = None,
     ):
         """
-        Export tracks to CSV or Geff, with the option to export a subset of nodes only.
+        Export tracks to CSV or geff, with the option to export a subset of nodes only.
 
         Args:
             tracks (Tracks): to be exported Tracks object.
@@ -81,9 +92,8 @@ class ExportDialog:
                 nodes will automatically be included to make sure the graph has no missing
                   parent nodes.
         """
-
         if nodes_to_keep is None:
-            label = "Choose export format:"
+            label = "Choose tracks export format:"
         else:
             label = (
                 f"<p style='white-space: normal;'>"
@@ -92,51 +102,57 @@ class ExportDialog:
                 f"<i>Note that ancestors will also be included to maintain a valid "
                 f"graph.</i>"
                 f"</p>"
-                f"<p>Choose export format:</p>"
+                f"<p>Choose tracks export format:</p>"
             )
 
-        dialog = ExportTypeDialog(parent, label)
+        dialog = ExportTypeDialog(
+            parent, label, has_segmentation=tracks.segmentation is not None
+        )
 
         if dialog.exec_() != QDialog.Accepted:
             return False
 
         export_type = dialog.export_type
-        relabel_by_tracklet_id = dialog.relabel_by_tracklet_id
+        save_segmentation = dialog.save_segmentation
+        seg_file_format = dialog.seg_file_format
+        seg_label_attr = dialog.seg_label_attr
 
         if export_type == "CSV":
-            # CSV file dialog
-            csv_dialog = QFileDialog(parent, "Save to CSV")  # set title
+            csv_dialog = QFileDialog(parent, "Save to CSV")
             csv_dialog.setFileMode(QFileDialog.AnyFile)
             csv_dialog.setAcceptMode(QFileDialog.AcceptSave)
             csv_dialog.setNameFilter("CSV files (*.csv)")
             csv_dialog.setDefaultSuffix("csv")
-            default_csv_file = f"{name}_tracks.csv"
-            csv_dialog.selectFile(str(Path.home() / default_csv_file))
+            csv_dialog.selectFile(str(Path.home() / f"{name}_tracks.csv"))
 
             if not csv_dialog.exec_():
-                return False  # User canceled
+                return False
 
             file_path = Path(csv_dialog.selectedFiles()[0])
             seg_path = None
 
-            # Optional segmentation dialog
-            if relabel_by_tracklet_id:
-                default_seg_path = file_path.with_suffix(".tif")
-                seg_dialog = QFileDialog(
-                    parent, "Save segmentation to TIF"
-                )  # set title
-                seg_dialog.setFileMode(QFileDialog.AnyFile)
-                seg_dialog.setAcceptMode(QFileDialog.AcceptSave)
-                seg_dialog.setNameFilter("TIF files (*.tif)")
-                seg_dialog.setDefaultSuffix("tif")
-                seg_dialog.selectFile(str(default_seg_path))
+            if save_segmentation:
+                if seg_file_format == "tiff":
+                    seg_dialog = QFileDialog(parent, "Save segmentation as TIFF")
+                    seg_dialog.setFileMode(QFileDialog.AnyFile)
+                    seg_dialog.setAcceptMode(QFileDialog.AcceptSave)
+                    seg_dialog.setNameFilter("TIF files (*.tif)")
+                    seg_dialog.setDefaultSuffix("tif")
+                    seg_dialog.selectFile(str(file_path.with_suffix(".tif")))
+                else:
+                    seg_dialog = QFileDialog(parent, "Save segmentation as Zarr")
+                    seg_dialog.setFileMode(QFileDialog.AnyFile)
+                    seg_dialog.setAcceptMode(QFileDialog.AcceptSave)
+                    seg_dialog.setNameFilter("Zarr folder (*.zarr)")
+                    seg_dialog.setDefaultSuffix("zarr")
+                    seg_dialog.selectFile(
+                        str(file_path.with_name(file_path.stem + "_seg.zarr"))
+                    )
 
                 if not seg_dialog.exec_():
-                    return False  # User canceled
-
+                    return False
                 seg_path = Path(seg_dialog.selectedFiles()[0])
 
-            # Construct color_dict from colormap
             nodes = tracks.graph.node_ids()
             track_ids = [tracks.get_track_id(node) for node in nodes]
             colors = [colormap.map(tid) for tid in track_ids]
@@ -151,8 +167,10 @@ class ExportDialog:
                 color_dict=color_dict,
                 node_ids=nodes_to_keep,
                 use_display_names=True,
-                export_seg=relabel_by_tracklet_id,
+                export_seg=save_segmentation,
                 seg_path=seg_path,
+                seg_label_attr=seg_label_attr,
+                seg_file_format=seg_file_format,
             )
             return True
 
@@ -162,20 +180,23 @@ class ExportDialog:
             file_dialog.setAcceptMode(QFileDialog.AcceptSave)
             file_dialog.setNameFilter("Zarr folder (*.zarr)")
             file_dialog.setDefaultSuffix("zarr")
-            default_file = f"{name}_geff.zarr"
-            file_dialog.selectFile(str(Path.home() / default_file))
+            file_dialog.selectFile(str(Path.home() / f"{name}_geff.zarr"))
 
-            if file_dialog.exec_():
-                file_path = Path(file_dialog.selectedFiles()[0])
-                try:
-                    export_to_geff(
-                        tracks,
-                        file_path,
-                        overwrite=True,
-                        node_ids=nodes_to_keep,
-                        save_segmentation=relabel_by_tracklet_id,
-                    )
-                    return True
-                except ValueError as e:
-                    QMessageBox.warning(parent, "Export Error", str(e))
+            if not file_dialog.exec_():
+                return False
+
+            file_path = Path(file_dialog.selectedFiles()[0])
+            try:
+                export_to_geff(
+                    tracks,
+                    file_path,
+                    overwrite=True,
+                    node_ids=nodes_to_keep,
+                    save_segmentation=save_segmentation,
+                    seg_label_attr=seg_label_attr,
+                    seg_file_format=seg_file_format,
+                )
+                return True
+            except ValueError as e:
+                QMessageBox.warning(parent, "Export Error", str(e))
         return False
