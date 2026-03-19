@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Optional
 
 import napari
+from funtracks.actions import AddNode, DeleteNode
 from funtracks.data_model import SolutionTracks
 from funtracks.exceptions import InvalidActionError
 from funtracks.user_actions import (
@@ -78,6 +79,9 @@ class TracksViewer:
         self.mode = "all"
         self.tracks: SolutionTracks | None = None
         self.visible: list | str = []
+        self.deleted_nodes: set[int] = (
+            set()
+        )  # Track deleted nodes for efficient filtering
         self.tracking_layers = TracksLayerGroup(self.viewer, self.tracks, "", self)
         self.center_node.connect(self.tracking_layers.center_view)
         self.selected_nodes = NodeSelectionHistory()
@@ -168,11 +172,15 @@ class TracksViewer:
 
         if self.tracks is not None:
             self.tracks.refresh.disconnect(self._refresh)
+            self.tracks.action_applied.disconnect(self._on_action_applied)
 
         self.tracks = tracks
+        self.deleted_nodes.clear()  # Reset deleted nodes when switching tracks
 
         # listen to refresh signals from the tracks
         self.tracks.refresh.connect(self._refresh)
+        # connect to action_applied signal to track deleted nodes
+        self.tracks.action_applied.connect(self._on_action_applied)
 
         # deactivate the input labels layer
         for layer in self.viewer.layers:
@@ -268,13 +276,25 @@ class TracksViewer:
         """
         self.center_node.emit(node)
 
+    def _on_action_applied(self, action) -> None:
+        """Handle action_applied signal from tracks.
+
+        Updates the deleted_nodes set to track which nodes have been deleted,
+        and clears nodes that were added back (via undo or re-addition).
+
+        Args:
+            action: The action that was applied (from funtracks)
+        """
+
+        if isinstance(action, DeleteNode):
+            self.deleted_nodes.add(action.node)
+        elif isinstance(action, AddNode):
+            self.deleted_nodes.discard(action.node)
+
     def filter_selection(self) -> None:
-        """Check if all nodes in the selection exist on the tracks, and filter out
-        any missing nodes before emitting the update signals."""
+        """Filter out any deleted nodes before emitting the update signals."""
 
-        valid_nodes = set(self.tracks.nodes()) if self.tracks else set()
-        self.selected_nodes.filter(valid_nodes)
-
+        self.selected_nodes.filter(self.deleted_nodes)
         # Trigger the update cycle
         self.update_selection()
         self.node_selection_updated.emit()
@@ -412,3 +432,11 @@ class TracksViewer:
     def select_node_set_from_history(self, previous: bool):
         """Move forwards or backwards through selection history."""
         self.selected_nodes.select_node_set_from_history(previous=previous)
+
+    def select_next(self, event=None):
+        """Select next node set from history"""
+        self.selected_nodes.select_node_set_from_history(previous=False)
+
+    def select_previous(self, event=None):
+        """Select previous node set from history"""
+        self.selected_nodes.select_node_set_from_history(previous=True)

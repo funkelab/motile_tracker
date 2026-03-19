@@ -123,8 +123,8 @@ class NodeSelectionHistory(QObject):
         self._reset_iterator()
         self.list_updated.emit()
 
-    def filter(self, valid_items: set[int]) -> None:
-        """Silently filter the current selection to only keep items that are in valid_items,
+    def filter(self, invalid_items: set[int]) -> None:
+        """Silently filter the current selection to discard items that are in invalid_items,
         without modifying the history.
 
         Creates a filtered view of the current selection that persists until the next
@@ -132,10 +132,10 @@ class NodeSelectionHistory(QObject):
         actions can also be selected again.
 
         Args:
-            valid_items: Set of existing node IDs.
+            invalid_items: Set of node IDs that do no longer exist on tracks.
         """
         unfiltered = self._history[self._pointer]
-        self._filtered_set = unfiltered & valid_items  # Store the filtered view
+        self._filtered_set = unfiltered - invalid_items  # Store the filtered view
         self._reset_iterator()
 
     def select_node_set_from_history(self, previous: bool) -> None:
