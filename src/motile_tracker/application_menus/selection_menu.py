@@ -68,11 +68,13 @@ class SelectionWidget(QWidget):
         self.deselect_btn = QPushButton("Deselect [ESC]")
         self.deselect_btn.setToolTip("Deselect all nodes.")
         self.deselect_btn.clicked.connect(self.tracks_viewer.deselect)
+        self.deselect_btn.setEnabled(False)
 
         # Button to restore previous selection
         self.reselect_btn = QPushButton("Restore selection [E]")
         self.reselect_btn.setToolTip("Restore the last selection.")
         self.reselect_btn.clicked.connect(self.tracks_viewer.restore_selection)
+        self.reselect_btn.setEnabled(False)
 
         # Organize buttons in two vertical columns
         col1_layout = QVBoxLayout()
@@ -109,21 +111,15 @@ class SelectionWidget(QWidget):
             self.jump_to_next_btn.setEnabled(False)
             self.jump_to_previous_btn.setEnabled(False)
 
-        if (
-            self.tracks_viewer.selected_nodes._pointer
-            < len(self.tracks_viewer.selected_nodes._history) - 1
-        ):
-            self.select_next_set_btn.setEnabled(True)
-        else:
-            self.select_next_set_btn.setEnabled(False)
-
-        if (
-            self.tracks_viewer.selected_nodes._pointer > 0
-            and len(self.tracks_viewer.selected_nodes._history) > 0
-        ):
-            self.select_previous_set_btn.setEnabled(True)
-        else:
-            self.select_previous_set_btn.setEnabled(False)
+        self.reselect_btn.setEnabled(
+            self.tracks_viewer.selected_nodes.has_valid_prev_set
+        )
+        self.select_next_set_btn.setEnabled(
+            self.tracks_viewer.selected_nodes.has_next_set
+        )
+        self.select_previous_set_btn.setEnabled(
+            self.tracks_viewer.selected_nodes.has_previous_set
+        )
 
     def _jump_to_node(self, forward: bool) -> None:
         """Jump to the next/previous selected node in the list"""

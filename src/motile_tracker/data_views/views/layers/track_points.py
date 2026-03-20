@@ -101,7 +101,7 @@ class TrackPoints(ZOnlyPoints):
             side_button = detect_side_button(event)
             if side_button is not None:
                 self.process_click(event, side_button=side_button)
-            if event.type == "mouse_press" and self.mode == "pan_zoom":
+            elif event.type == "mouse_press" and self.mode == "pan_zoom":
                 was_click = yield from detect_click(event)
                 if was_click:
                     # find the point matching the click location, if any. Warning: the
