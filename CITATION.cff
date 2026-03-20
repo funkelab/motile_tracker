@@ -18,9 +18,12 @@ authors:
   - given-names: Loïc A.
     family-names: Royer
     affiliation: Biohub
+  - given-names: Takashi
+    family-names: Hiiragi
+    affiliation: Hubrecht Institute
   - given-names: Jan
     family-names: Funke
-    affiliation: HHMI Janelia Research Campus; Human Technopole
+    affiliation: HHMI Janelia Research Campus; Fondazione Human Technopole
 repository-code: https://github.com/funkelab/motile_tracker
 url: https://funkelab.github.io/motile_tracker/
 abstract: >-
