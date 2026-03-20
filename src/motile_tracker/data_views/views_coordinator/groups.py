@@ -48,7 +48,7 @@ class CollectionButton(QWidget):
         self.export.setFixedSize(20, 20)
         self.export.setToolTip("Export nodes in this group to CSV or geff")
 
-        select_icon = qticon(FA6S.computer_mouse, color="white")
+        select_icon = qticon(FA6S.arrow_pointer, color="white")
         self.select_nodes_in_group_btn = QPushButton(icon=select_icon)
         self.select_nodes_in_group_btn.setFixedSize(20, 20)
         self.select_nodes_in_group_btn.setToolTip("Select nodes in group")
@@ -99,57 +99,6 @@ class CollectionWidget(QWidget):
         self.collection_list.itemSelectionChanged.connect(self._selection_changed)
         self.selected_collection = None
 
-        # Select widget group
-        select_widget = QGroupBox("Selection")
-        selection_layout = QHBoxLayout()
-
-        col1_layout = QVBoxLayout()
-        self.invert_btn = QPushButton("Invert selection")
-        self.invert_btn.clicked.connect(self._invert_selection)
-
-        arrow_layout = QHBoxLayout()
-        left_arrow = qticon(FA6S.arrow_left, color="white")
-        self.jump_to_previous_btn = QPushButton(icon=left_arrow)
-        self.jump_to_previous_btn.clicked.connect(
-            lambda: self._jump_to_node(forward=False)
-        )
-        self.jump_to_previous_btn.setToolTip("Navigate to previous selected node")
-
-        right_arrow = qticon(FA6S.arrow_right, color="white")
-        self.jump_to_next_btn = QPushButton(icon=right_arrow)
-        self.jump_to_next_btn.clicked.connect(lambda: self._jump_to_node(forward=True))
-        self.jump_to_next_btn.setToolTip("Navigate to next selected node")
-
-        arrow_layout.addWidget(self.jump_to_previous_btn)
-        arrow_layout.addWidget(self.jump_to_next_btn)
-
-        self.select_next_set_btn = QPushButton("Next Selection [N]")
-        self.select_next_set_btn.clicked.connect(
-            lambda: self.tracks_viewer.select_node_set_from_history(previous=False)
-        )
-        col1_layout.addWidget(self.invert_btn)
-        col1_layout.addLayout(arrow_layout)
-        col1_layout.addWidget(self.select_next_set_btn)
-
-        col2_layout = QVBoxLayout()
-        self.deselect_btn = QPushButton("Deselect [ESC]")
-        self.deselect_btn.clicked.connect(self.tracks_viewer.deselect)
-        self.reselect_btn = QPushButton("Restore selection [E]")
-        self.reselect_btn.clicked.connect(self.tracks_viewer.restore_selection)
-
-        self.select_previous_set_btn = QPushButton("Previous Selection [P]")
-        self.select_previous_set_btn.clicked.connect(
-            lambda: self.tracks_viewer.select_node_set_from_history(previous=True)
-        )
-
-        col2_layout.addWidget(self.deselect_btn)
-        col2_layout.addWidget(self.reselect_btn)
-        col2_layout.addWidget(self.select_previous_set_btn)
-
-        selection_layout.addLayout(col1_layout)
-        selection_layout.addLayout(col2_layout)
-        select_widget.setLayout(selection_layout)
-
         # edit layout
         edit_widget = QGroupBox("Edit group")
         edit_layout = QVBoxLayout()
@@ -195,13 +144,11 @@ class CollectionWidget(QWidget):
         # combine widgets
         layout = QVBoxLayout()
         layout.addWidget(self.collection_list)
-        layout.addWidget(select_widget)
         layout.addWidget(edit_widget)
         layout.addWidget(new_group_box)
         self.setLayout(layout)
 
         self._update_buttons_and_node_count()
-        self.tracks_viewer.node_selection_updated.connect(self.update_selection_buttons)
 
     def _update_buttons_and_node_count(self) -> None:
         """Enable or disable selection and edit buttons depending on whether a group is
@@ -232,48 +179,6 @@ class CollectionWidget(QWidget):
             self.new_group_button.setEnabled(True)
         else:
             self.new_group_button.setEnabled(False)
-
-    def update_selection_buttons(self):
-        """Update the button states based on the current node selection (history)"""
-
-        if len(self.tracks_viewer.selected_nodes) > 0:
-            self.deselect_btn.setEnabled(True)
-            self.jump_to_next_btn.setEnabled(True)
-            self.jump_to_previous_btn.setEnabled(True)
-        else:
-            self.deselect_btn.setEnabled(False)
-            self.jump_to_next_btn.setEnabled(False)
-            self.jump_to_previous_btn.setEnabled(False)
-
-        if (
-            self.tracks_viewer.selected_nodes._pointer
-            < len(self.tracks_viewer.selected_nodes._history) - 1
-        ):
-            self.select_next_set_btn.setEnabled(True)
-        else:
-            self.select_next_set_btn.setEnabled(False)
-
-        if (
-            self.tracks_viewer.selected_nodes._pointer > 0
-            and len(self.tracks_viewer.selected_nodes._history) > 0
-        ):
-            self.select_previous_set_btn.setEnabled(True)
-        else:
-            self.select_previous_set_btn.setEnabled(False)
-
-    def _jump_to_node(self, forward: bool) -> None:
-        """Jump to the next/previous selected node in the list"""
-
-        node = self.tracks_viewer.selected_nodes.next_node(forward)
-        if node:
-            self.tracks_viewer.center_on_node(node)
-
-    def _invert_selection(self) -> None:
-        """Invert the current selection"""
-
-        all_nodes = set(self.tracks_viewer.tracks.graph.nodes)
-        inverted = list(all_nodes - set(self.tracks_viewer.selected_nodes))
-        self.tracks_viewer.selected_nodes.add_list(inverted, append=False)
 
     def _refresh(self) -> None:
         """Keep the node collection in sync with the node group attributes on the graph"""

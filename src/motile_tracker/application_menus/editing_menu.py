@@ -17,7 +17,9 @@ class EditingMenu(QWidget):
 
         self.tracks_viewer = TracksViewer.get_instance(viewer)
         self.tracks_viewer.node_selection_updated.connect(self.update_buttons)
-        layout = QVBoxLayout()
+
+        box = QGroupBox("Editing")
+        box_layout = QVBoxLayout()
 
         self.label = QLabel(f"Current Track ID: {self.tracks_viewer.selected_track}")
         self.tracks_viewer.update_track_id.connect(self.update_track_id_color)
@@ -27,7 +29,7 @@ class EditingMenu(QWidget):
         track_layout = QHBoxLayout()
         track_layout.addWidget(self.label)
         track_layout.addWidget(new_track_btn)
-        layout.addLayout(track_layout)
+        box_layout.addLayout(track_layout)
 
         node_box = QGroupBox("Edit Node(s)")
         node_box.setMaximumHeight(120)
@@ -67,12 +69,16 @@ class EditingMenu(QWidget):
         self.redo_btn = QPushButton("Redo (R)")
         self.redo_btn.clicked.connect(self.tracks_viewer.redo)
 
-        layout.addWidget(node_box)
-        layout.addWidget(edge_box)
-        layout.addWidget(self.undo_btn)
-        layout.addWidget(self.redo_btn)
+        box_layout.addWidget(node_box)
+        box_layout.addWidget(edge_box)
+        box_layout.addWidget(self.undo_btn)
+        box_layout.addWidget(self.redo_btn)
 
-        self.setLayout(layout)
+        box.setLayout(box_layout)
+
+        main_layout = QVBoxLayout()
+        main_layout.addWidget(box)
+        self.setLayout(main_layout)
         self.setMaximumHeight(450)
 
     def update_track_id_color(self):
