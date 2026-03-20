@@ -29,6 +29,15 @@ class ExportTypeDialog(QDialog):
         self.export_type_combo.addItems(["GEFF", "CSV"])
         layout.addWidget(self.export_type_combo)
 
+        self._geff_seg_label = QLabel(
+            "<i>The segmentation is part of the graph and is always saved with GEFF. "
+            "No need to export it separately (unless you want to open it as a "
+            "standalone file).</i>"
+        )
+        self._geff_seg_label.setWordWrap(True)
+        self._geff_seg_label.setVisible(False)
+        layout.addWidget(self._geff_seg_label)
+
         self.seg_checkbox = QCheckBox("Export segmentation")
         self.seg_checkbox.setVisible(has_segmentation)
         layout.addWidget(self.seg_checkbox)
@@ -48,7 +57,15 @@ class ExportTypeDialog(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
 
+        self._has_segmentation = has_segmentation
         self.seg_checkbox.toggled.connect(self._on_seg_toggled)
+        self.export_type_combo.currentTextChanged.connect(self._on_export_type_changed)
+        self._on_export_type_changed(self.export_type_combo.currentText())
+
+    def _on_export_type_changed(self, export_type: str) -> None:
+        is_geff = export_type == "GEFF"
+        self.seg_checkbox.setVisible(self._has_segmentation)
+        self._geff_seg_label.setVisible(self._has_segmentation and is_geff)
 
     def _on_seg_toggled(self, checked: bool):
         for w in (self.seg_format_label, self.seg_format_combo, self.relabel_checkbox):

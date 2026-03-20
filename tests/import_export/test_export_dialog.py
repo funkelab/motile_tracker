@@ -49,9 +49,16 @@ def test_checkbox_hidden_without_segmentation(qtbot):
 
 
 def test_checkbox_visible_with_segmentation(qtbot):
+    """Checkbox is visible for both GEFF and CSV when segmentation is present."""
     dialog = ExportTypeDialog(has_segmentation=True)
     qtbot.addWidget(dialog)
+    # Default is GEFF: checkbox visible, info label also visible
     assert dialog.seg_checkbox.isVisibleTo(dialog)
+    assert dialog._geff_seg_label.isVisibleTo(dialog)
+    # Switch to CSV: checkbox still visible, info label hidden
+    dialog.export_type_combo.setCurrentText("CSV")
+    assert dialog.seg_checkbox.isVisibleTo(dialog)
+    assert not dialog._geff_seg_label.isVisibleTo(dialog)
 
 
 def test_seg_options_hidden_by_default(qtbot):
