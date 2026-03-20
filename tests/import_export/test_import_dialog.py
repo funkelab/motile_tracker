@@ -17,6 +17,11 @@ from funtracks.data_model import Tracks
 from funtracks.import_export import export_to_csv, export_to_geff
 
 from motile_tracker.import_export.menus.import_dialog import ImportDialog
+from motile_tracker.import_export.menus.segmentation_widgets import (
+    geff_has_embedded_segmentation,
+)
+from motile_tracker.motile.backend.motile_run import MotileRun
+from motile_tracker.motile.backend.solver_params import SolverParams
 
 
 @pytest.fixture(autouse=True)
@@ -98,14 +103,16 @@ def test_import_dialog_csv(qtbot, small_csv, dim_3d, include_seg):
     optional = dialog.prop_map_widget.optional_features
     if "area" in optional:
         combo = optional["area"]["feature_option"]
-        combo.setCurrentIndex(combo.count() - 1)
+        # "Custom" is always index 0 (default)
+        assert combo.currentIndex() == 0
         assert combo.currentText() == "Custom"
         assert optional["area"]["recompute"].isEnabled() is False
-        combo.setCurrentIndex(0)
         if include_seg:
+            # First regionprops feature is at index 1
+            combo.setCurrentIndex(1)
             assert optional["area"]["recompute"].isEnabled() is True
         else:
-            assert optional["area"]["recompute"].isEnabled() is False
+            assert combo.count() == 1  # only "Custom", no regionprops options
 
 
 def test_csv_import_2d_with_segmentation(
@@ -335,6 +342,8 @@ def test_geff_import_2d_with_segmentation(qtbot, tmp_path, graph_2d, monkeypatch
     assert dialog.tracks.graph.num_nodes() == graph_2d.num_nodes()
     assert dialog.tracks.graph.num_edges() == graph_2d.num_edges()
     assert dialog.tracks.ndim == 3
+    for node_id in dialog.tracks.graph.node_ids():
+        dialog.tracks.get_time(node_id)
 
 
 def test_geff_import_3d_with_segmentation(
@@ -386,6 +395,8 @@ def test_geff_import_3d_with_segmentation(
     assert dialog.tracks.graph.num_nodes() == solution_tracks_3d.graph.num_nodes()
     assert dialog.tracks.graph.num_edges() == solution_tracks_3d.graph.num_edges()
     assert dialog.tracks.ndim == 4
+    for node_id in dialog.tracks.graph.node_ids():
+        dialog.tracks.get_time(node_id)
 
 
 def test_geff_import_without_segmentation(
@@ -430,6 +441,8 @@ def test_geff_import_without_segmentation(
     assert dialog.tracks is not None, "Tracks should not be None"
     assert dialog.tracks.graph.num_nodes() == tracks.graph.num_nodes()
     assert dialog.tracks.graph.num_edges() == tracks.graph.num_edges()
+    for node_id in dialog.tracks.graph.node_ids():
+        dialog.tracks.get_time(node_id)
 
 
 def test_geff_import_without_axes_metadata(qtbot, tmp_path, graph_2d, monkeypatch):
@@ -445,7 +458,7 @@ def test_geff_import_without_axes_metadata(qtbot, tmp_path, graph_2d, monkeypatc
     export_to_geff(tracks, geff_path)
 
     # Remove axes metadata from the geff file
-    root = zarr.open_group(geff_path / "tracks", mode="r+")
+    root = zarr.open_group(geff_path / "tracks.geff", mode="r+")
     geff_metadata = dict(root.attrs.get("geff", {}))
     del geff_metadata["axes"]
     root.attrs["geff"] = geff_metadata
@@ -496,3 +509,236 @@ def test_geff_import_without_axes_metadata(qtbot, tmp_path, graph_2d, monkeypatc
     final_metadata = dict(dialog.import_widget.root.attrs.get("geff", {}))
     assert "axes" in final_metadata, "Axes should have been generated"
     assert len(final_metadata["axes"]) == 3, "Should have 3 axes for 2D+time"
+    for node_id in dialog.tracks.graph.node_ids():
+        dialog.tracks.get_time(node_id)
+
+
+def test_geff_import_embedded_segmentation(qtbot, tmp_path, graph_2d, monkeypatch):
+    """Test that embedded segmentation (mask/bbox + segmentation_shape) is reconstructed.
+
+    Regression test for the bug where mask/bbox were not included in the name_map
+    passed to import_from_geff, causing tracks.segmentation to be None even though
+    the GEFF contained embedded mask data and a segmentation_shape zarr attribute.
+    """
+    monkeypatch.setattr(ImportDialog, "_resize_dialog", lambda self: None)
+
+    tracks = Tracks(graph_2d, ndim=3, time_attr="t")
+    geff_path = tmp_path / "test_embedded_seg.zarr"
+    export_to_geff(tracks, geff_path, save_segmentation=False)
+
+    # Verify that the geff has embedded segmentation (precondition)
+    import zarr as _zarr
+
+    root = _zarr.open_group(geff_path / "tracks.geff", mode="r")
+    assert geff_has_embedded_segmentation(root), (
+        "Precondition: geff should have mask/bbox and segmentation_shape"
+    )
+
+    dialog = ImportDialog(import_type="geff")
+    qtbot.addWidget(dialog)
+    dialog.import_widget._load_geff(geff_path)
+
+    assert dialog.import_widget.root is not None
+
+    # Embedded segmentation detected: info label shown, radios hidden.
+    # Use isHidden() because the dialog itself is not shown (parent is hidden),
+    # so isVisible() would return False for all children regardless.
+    assert not dialog.segmentation_widget._embedded_info_label.isHidden()
+    assert dialog.segmentation_widget.external_segmentation_radio.isHidden()
+
+    # mask/bbox should not appear as optional features (they are handled automatically)
+    assert "mask" not in dialog.prop_map_widget.optional_features
+    assert "bbox" not in dialog.prop_map_widget.optional_features
+
+    # Even though include_seg() returns False (no external seg path), regionprops options
+    # should be available for numeric features because embedded segmentation is present.
+    assert dialog.prop_map_widget.seg_for_features is True
+    assert dialog.prop_map_widget.seg is False  # scale widget / seg_id still hidden
+
+    # Recompute must be disabled for embedded segmentation: funtracks does not register
+    # a RegionPropsAnnotator when segmentation_path=None, so recompute would fail.
+    for widgets in dialog.prop_map_widget.optional_features.values():
+        assert not widgets["recompute"].isEnabled()
+
+    assert dialog.finish_button.isEnabled()
+
+    dialog._finish()
+
+    assert dialog.tracks is not None
+    assert dialog.tracks.segmentation is not None, (
+        "Segmentation should be reconstructed from embedded mask/bbox data"
+    )
+    assert dialog.tracks.graph.num_nodes() == graph_2d.num_nodes()
+    assert dialog.tracks.graph.num_edges() == graph_2d.num_edges()
+
+
+def test_geff_import_old_geff_warning(qtbot, tmp_path, graph_2d, monkeypatch):
+    """Test that the old GEFF warning is shown when mask/bbox is present but
+    segmentation_shape is missing (simulating a GEFF exported by an older funtracks).
+    """
+    monkeypatch.setattr(ImportDialog, "_resize_dialog", lambda self: None)
+
+    tracks = Tracks(graph_2d, ndim=3, time_attr="t")
+    geff_path = tmp_path / "old_geff.zarr"
+    export_to_geff(tracks, geff_path, save_segmentation=False)
+
+    # Remove segmentation_shape to simulate old funtracks export
+    root = zarr.open_group(geff_path / "tracks.geff", mode="r+")
+    del root.attrs["segmentation_shape"]
+
+    dialog = ImportDialog(import_type="geff")
+    qtbot.addWidget(dialog)
+    dialog.import_widget._load_geff(geff_path)
+
+    assert dialog.import_widget.root is not None
+
+    # Old GEFF warning should be shown (mask/bbox present, no segmentation_shape)
+    assert not dialog.segmentation_widget._old_geff_warning_label.isHidden()
+    assert dialog.segmentation_widget._embedded_info_label.isHidden()
+    assert not dialog.segmentation_widget.none_radio.isHidden()
+    assert not dialog.segmentation_widget.external_segmentation_radio.isHidden()
+
+    # None radio is the default (no related_objects since save_segmentation=False)
+    assert dialog.segmentation_widget.none_radio.isChecked()
+    assert dialog.finish_button.isEnabled()
+
+    dialog._finish()
+
+    assert dialog.tracks is not None
+    assert dialog.tracks.graph.num_nodes() == graph_2d.num_nodes()
+    assert dialog.tracks.graph.num_edges() == graph_2d.num_edges()
+
+
+def test_geff_import_with_related_data(qtbot, tmp_path, graph_2d, monkeypatch):
+    """Test that related object radio buttons are shown for old GEFF with
+    related_objects metadata, and that selecting one loads the segmentation.
+    """
+    monkeypatch.setattr(ImportDialog, "_resize_dialog", lambda self: None)
+
+    tracks = Tracks(graph_2d, ndim=3, time_attr="t")
+    geff_path = tmp_path / "old_geff_with_related.zarr"
+    # save_segmentation=True writes segmentation + adds related_objects to geff metadata.
+    # seg_label_attr=None preserves node IDs as pixel values (consistent with other tests).
+    export_to_geff(tracks, geff_path, save_segmentation=True, seg_label_attr=None)
+
+    # Remove segmentation_shape to simulate old funtracks export
+    root = zarr.open_group(geff_path / "tracks.geff", mode="r+")
+    del root.attrs["segmentation_shape"]
+
+    dialog = ImportDialog(import_type="geff")
+    qtbot.addWidget(dialog)
+    dialog.import_widget._load_geff(geff_path)
+
+    assert dialog.import_widget.root is not None
+
+    # Old GEFF warning visible; related radio buttons populated
+    assert not dialog.segmentation_widget._old_geff_warning_label.isHidden()
+    assert len(dialog.segmentation_widget.related_object_radio_buttons) > 0
+
+    # Related radio is auto-checked → include_seg() is True
+    assert dialog.segmentation_widget.include_seg() is True
+
+    # Resolved path must exist on disk
+    seg_path = dialog.segmentation_widget.get_segmentation_path()
+    assert seg_path is not None
+    assert seg_path.exists()
+
+    assert dialog.finish_button.isEnabled()
+
+    # seg_id is visible; map it to None (node id == seg id, funtracks handles it)
+    prop_map = dialog.prop_map_widget
+    seg_combo = prop_map.mapping_widgets["seg_id"]
+    seg_combo.setCurrentText("None")
+    prop_map._update_props_left()
+
+    dialog._finish()
+
+    assert dialog.tracks is not None
+    assert dialog.tracks.segmentation is not None
+    assert dialog.tracks.graph.num_nodes() == graph_2d.num_nodes()
+    assert dialog.tracks.graph.num_edges() == graph_2d.num_edges()
+
+
+def test_geff_import_no_mask_with_segmentation_shape(
+    qtbot, tmp_path, graph_2d_without_segmentation, monkeypatch
+):
+    """Test that injecting segmentation_shape without mask/bbox shows the normal
+    flow (no warning, no embedded info) and produces no segmentation on import.
+    """
+    monkeypatch.setattr(ImportDialog, "_resize_dialog", lambda self: None)
+
+    tracks = Tracks(graph_2d_without_segmentation, ndim=3, time_attr="t")
+    geff_path = tmp_path / "no_mask_with_shape.zarr"
+    export_to_geff(tracks, geff_path, save_segmentation=False)
+
+    # Manually inject segmentation_shape even though no mask/bbox exist
+    root = zarr.open_group(geff_path / "tracks.geff", mode="r+")
+    attrs = dict(root.attrs)
+    attrs["segmentation_shape"] = [5, 100, 100]
+    root.attrs["segmentation_shape"] = [5, 100, 100]
+
+    dialog = ImportDialog(import_type="geff")
+    qtbot.addWidget(dialog)
+    dialog.import_widget._load_geff(geff_path)
+
+    assert dialog.import_widget.root is not None
+
+    # Normal flow: no warning, no embedded info
+    assert dialog.segmentation_widget._embedded_info_label.isHidden()
+    assert dialog.segmentation_widget._old_geff_warning_label.isHidden()
+    assert not dialog.segmentation_widget.none_radio.isHidden()
+    assert not dialog.segmentation_widget.external_segmentation_radio.isHidden()
+
+    # None radio is the default
+    assert dialog.segmentation_widget.none_radio.isChecked()
+    assert dialog.finish_button.isEnabled()
+
+    dialog._finish()
+
+    assert dialog.tracks is not None
+    assert dialog.tracks.segmentation is None
+    assert dialog.tracks.graph.num_nodes() == graph_2d_without_segmentation.num_nodes()
+    assert dialog.tracks.graph.num_edges() == graph_2d_without_segmentation.num_edges()
+
+
+def test_motile_run_save_load(tmp_path, graph_2d):
+    """Test full MotileRun save/load round-trip."""
+    run = MotileRun(
+        graph=graph_2d,
+        run_name="test_run",
+        solver_params=SolverParams(),
+        ndim=3,
+        time_attr="t",
+    )
+    run_dir = run.save(tmp_path)
+
+    assert (run_dir / "tracks.geff").exists()
+    assert (run_dir / "solver_params.json").exists()
+    assert (run_dir / "attrs.json").exists()
+
+    loaded = MotileRun.load(run_dir)
+    assert loaded.run_name == run.run_name
+    assert loaded.graph.num_nodes() == graph_2d.num_nodes()
+    assert loaded.graph.num_edges() == graph_2d.num_edges()
+    assert loaded.solver_params is not None
+
+
+def test_motile_run_load_backward_compat(tmp_path, graph_2d):
+    """Test that MotileRun.load falls back to 'tracks' when 'tracks.geff' is absent."""
+    run = MotileRun(
+        graph=graph_2d,
+        run_name="old_run",
+        solver_params=SolverParams(),
+        ndim=3,
+        time_attr="t",
+    )
+    run_dir = run.save(tmp_path)
+
+    # Simulate old save format: rename tracks.geff → tracks
+    (run_dir / "tracks.geff").rename(run_dir / "tracks")
+    assert not (run_dir / "tracks.geff").exists()
+
+    loaded = MotileRun.load(run_dir)
+    assert loaded.run_name == "old_run"
+    assert loaded.graph.num_nodes() == graph_2d.num_nodes()
+    assert loaded.graph.num_edges() == graph_2d.num_edges()

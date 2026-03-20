@@ -26,7 +26,7 @@ class ExportTypeDialog(QDialog):
             layout.addWidget(QLabel(label))
 
         self.export_type_combo = QComboBox()
-        self.export_type_combo.addItems(["geff", "CSV"])
+        self.export_type_combo.addItems(["GEFF", "CSV"])
         layout.addWidget(self.export_type_combo)
 
         self.seg_checkbox = QCheckBox("Export segmentation")
@@ -174,8 +174,8 @@ class ExportDialog:
             )
             return True
 
-        elif export_type == "geff":
-            file_dialog = QFileDialog(parent, "Save as geff file")
+        elif export_type == "GEFF":
+            file_dialog = QFileDialog(parent, "Save as GEFF file")
             file_dialog.setFileMode(QFileDialog.AnyFile)
             file_dialog.setAcceptMode(QFileDialog.AcceptSave)
             file_dialog.setNameFilter("Zarr folder (*.zarr)")

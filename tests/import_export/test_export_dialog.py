@@ -315,7 +315,7 @@ def test_export_geff_no_seg(mock_tracks, fake_parent, tmp_path, mock_colormap):
 
     mock_dialog = MagicMock()
     mock_dialog.exec_.return_value = 1
-    mock_dialog.export_type = "geff"
+    mock_dialog.export_type = "GEFF"
     mock_dialog.save_segmentation = False
     mock_dialog.seg_file_format = "zarr"
     mock_dialog.seg_label_attr = "track_id"
@@ -365,7 +365,7 @@ def test_export_geff_with_seg_zarr(
 
     mock_dialog = MagicMock()
     mock_dialog.exec_.return_value = 1
-    mock_dialog.export_type = "geff"
+    mock_dialog.export_type = "GEFF"
     mock_dialog.save_segmentation = True
     mock_dialog.seg_file_format = "zarr"
     mock_dialog.seg_label_attr = "track_id"
@@ -414,7 +414,7 @@ def test_export_geff_with_seg_tiff(
 
     mock_dialog = MagicMock()
     mock_dialog.exec_.return_value = 1
-    mock_dialog.export_type = "geff"
+    mock_dialog.export_type = "GEFF"
     mock_dialog.save_segmentation = True
     mock_dialog.seg_file_format = "tiff"
     mock_dialog.seg_label_attr = None
@@ -461,7 +461,7 @@ def test_export_geff_error(mock_tracks, fake_parent, tmp_path, mock_colormap):
 
     mock_dialog = MagicMock()
     mock_dialog.exec_.return_value = 1
-    mock_dialog.export_type = "geff"
+    mock_dialog.export_type = "GEFF"
     mock_dialog.save_segmentation = False
     mock_dialog.seg_file_format = "zarr"
     mock_dialog.seg_label_attr = "track_id"

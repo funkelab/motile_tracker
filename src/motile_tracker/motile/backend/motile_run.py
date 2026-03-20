@@ -143,7 +143,11 @@ class MotileRun(SolutionTracks):
         params = cls._load_params(run_dir)
         input_points = cls._load_array(run_dir, IN_POINTS_FILENAME, required=False)
         attrs = cls._load_attrs(run_dir)
-        tracks = import_from_geff(run_dir / "tracks")
+        # Support both old ("tracks") and new ("tracks.geff") save formats
+        tracks_path = run_dir / "tracks.geff"
+        if not tracks_path.exists():
+            tracks_path = run_dir / "tracks"
+        tracks = import_from_geff(tracks_path)
         if attrs is not None:
             seg_shape = attrs.get("segmentation_shape")
             if seg_shape is not None:
