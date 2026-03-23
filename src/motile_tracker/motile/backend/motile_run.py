@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import tracksdata as td
 from funtracks.data_model import SolutionTracks
-from funtracks.import_export import export_to_geff, import_from_geff
+from funtracks.import_export import export_to_geff, import_from_geff, load_v1_tracks
 
 from .solver_params import SolverParams
 
@@ -143,20 +143,24 @@ class MotileRun(SolutionTracks):
         params = cls._load_params(run_dir)
         input_points = cls._load_array(run_dir, IN_POINTS_FILENAME, required=False)
         attrs = cls._load_attrs(run_dir)
-        # Support both old ("tracks") and new ("tracks.geff") save formats
+        # Support old v1 ("graph.json" at run dir level), intermediate ("tracks" zarr),
+        # and new ("tracks.geff") save formats
         tracks_path = run_dir / "tracks.geff"
-        if not tracks_path.exists():
-            tracks_path = run_dir / "tracks"
-        tracks = import_from_geff(tracks_path)
+        if tracks_path.exists():
+            tracks = import_from_geff(tracks_path)
+        elif (run_dir / "graph.json").exists():
+            tracks = load_v1_tracks(run_dir, solution=True)
+        else:
+            tracks = import_from_geff(run_dir / "tracks")
         if attrs is not None:
             seg_shape = attrs.get("segmentation_shape")
             if seg_shape is not None:
                 tracks.graph.update_metadata(segmentation_shape=tuple(seg_shape))
             scale = attrs.get("scale") or tracks.scale
-            time_attr = attrs.get("time_attr") or td.DEFAULT_ATTR_KEYS.T
+            time_attr = attrs.get("time_attr") or tracks.features.time_key
         else:
             scale = tracks.scale
-            time_attr = td.DEFAULT_ATTR_KEYS.T
+            time_attr = tracks.features.time_key
         gaps = cls._load_list(run_dir=run_dir, filename=GAPS_FILENAME, required=False)
         return cls(
             graph=tracks.graph,
