@@ -474,7 +474,7 @@ class TreeWidget(QWidget):
 
         self.tracks_viewer = TracksViewer.get_instance(viewer)
         self.selected_nodes = self.tracks_viewer.selected_nodes
-        self.selected_nodes.list_updated.connect(self._update_selected)
+        self.tracks_viewer.node_selection_updated.connect(self._update_selected)
         self.tracks_viewer.tracks_updated.connect(self._update_track_data)
 
         # Construct the tree view pyqtgraph widget

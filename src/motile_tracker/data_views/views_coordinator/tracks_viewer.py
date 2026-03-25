@@ -49,6 +49,7 @@ class TracksViewer:
     update_track_id = Signal()
     mode_updated = Signal()
     center_node = Signal(int)  # emitted when any component wants to center on a node
+    node_selection_updated = Signal()
 
     @classmethod
     def get_instance(cls, viewer=None):
@@ -80,7 +81,7 @@ class TracksViewer:
         self.tracking_layers = TracksLayerGroup(self.viewer, self.tracks, "", self)
         self.center_node.connect(self.tracking_layers.center_view)
         self.selected_nodes = NodeSelectionList()
-        self.selected_nodes.list_updated.connect(self.update_selection)
+        self.selected_nodes.list_updated.connect(self.filter_selection)
 
         self.tracks_list = TracksList()
         self.tracks_list.view_tracks.connect(self.update_tracks)
@@ -266,6 +267,17 @@ class TracksViewer:
             node: The node ID to center on.
         """
         self.center_node.emit(node)
+
+    def filter_selection(self) -> None:
+        """Check if all nodes in the selection exist on the tracks, and filter out
+        any missing nodes before emitting the update signals."""
+
+        valid_nodes = set(self.tracks.nodes()) if self.tracks else set()
+        self.selected_nodes.filter(valid_nodes)
+
+        # Trigger the update cycle
+        self.update_selection()
+        self.node_selection_updated.emit()
 
     def update_selection(self, set_view: bool = True) -> None:
         """Sets the view and triggers visualization updates in other components"""
