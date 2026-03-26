@@ -50,7 +50,7 @@ def _make_single_node_graph(
     graph.bulk_add_nodes(nodes=[node], indices=[1])
 
     if seg_shape is not None:
-        graph.update_metadata(segmentation_shape=seg_shape)
+        graph._update_metadata(segmentation_shape=seg_shape)
 
     return graph
 

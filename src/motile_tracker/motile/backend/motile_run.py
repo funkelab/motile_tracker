@@ -155,7 +155,7 @@ class MotileRun(SolutionTracks):
         if attrs is not None:
             seg_shape = attrs.get("segmentation_shape")
             if seg_shape is not None:
-                tracks.graph.update_metadata(segmentation_shape=tuple(seg_shape))
+                tracks.graph._update_metadata(segmentation_shape=tuple(seg_shape))
             scale = attrs.get("scale") or tracks.scale
             time_attr = attrs.get("time_attr") or tracks.features.time_key
         else:
@@ -257,7 +257,7 @@ class MotileRun(SolutionTracks):
             directory (Path):  The directory in which to save the attributes
         """
         out_path = directory / ATTRS_FILENAME
-        seg_shape = self.graph.metadata().get("segmentation_shape")
+        seg_shape = self.graph.metadata.get("segmentation_shape")
         scale = (
             self.scale
             if not isinstance(self.scale, np.ndarray)
