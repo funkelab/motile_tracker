@@ -33,36 +33,36 @@ def test_ortho_views(viewer, qtbot, solution_tracks_3d_with_division):
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=solution_tracks_3d_with_division, name="test")
 
-    assert isinstance(viewer.layers[-1], TrackPoints)
-    assert isinstance(viewer.layers[-2], TrackLabels)
+    assert isinstance(viewer.layers[-1], TrackLabels)
+    assert isinstance(viewer.layers[-2], TrackPoints)
 
     # change attributes on the TrackLabels layer to check that they are correctly copied
-    viewer.layers[-2].contour = 1
-    viewer.layers[-2].mode = "erase"
+    viewer.layers[-1].contour = 1
+    viewer.layers[-1].mode = "erase"
 
     # show orthogonal views and check attributes
     m.show()
     qtbot.waitUntil(lambda: m.is_shown(), timeout=1000)
     assert isinstance(m.right_widget, OrthoViewWidget)
-    assert isinstance(m.right_widget.vm_container.viewer_model.layers[-1], Points)
-    assert isinstance(m.bottom_widget.vm_container.viewer_model.layers[-1], Points)
-    assert isinstance(m.right_widget.vm_container.viewer_model.layers[-2], Labels)
-    assert isinstance(m.bottom_widget.vm_container.viewer_model.layers[-2], Labels)
+    assert isinstance(m.right_widget.vm_container.viewer_model.layers[-1], Labels)
+    assert isinstance(m.bottom_widget.vm_container.viewer_model.layers[-1], Labels)
+    assert isinstance(m.right_widget.vm_container.viewer_model.layers[-2], Points)
+    assert isinstance(m.bottom_widget.vm_container.viewer_model.layers[-2], Points)
     assert (
-        m.right_widget.vm_container.viewer_model.layers[-2].contour
-        == viewer.layers[-2].contour
+        m.right_widget.vm_container.viewer_model.layers[-1].contour
+        == viewer.layers[-1].contour
     )
     assert (
-        m.right_widget.vm_container.viewer_model.layers[-2].mode
-        == viewer.layers[-2].mode
+        m.right_widget.vm_container.viewer_model.layers[-1].mode
+        == viewer.layers[-1].mode
     )
 
     # set to paint mode and test syncing
-    viewer.layers[-2].mode = "paint"
+    viewer.layers[-1].mode = "paint"
     assert (
-        viewer.layers[-2].mode
-        == m.right_widget.vm_container.viewer_model.layers[-2].mode
-        == m.bottom_widget.vm_container.viewer_model.layers[-2].mode
+        viewer.layers[-1].mode
+        == m.right_widget.vm_container.viewer_model.layers[-1].mode
+        == m.bottom_widget.vm_container.viewer_model.layers[-1].mode
     )
 
     # Test paint event on main viewer (indices, orig value, target_value)
@@ -77,12 +77,12 @@ def test_ortho_views(viewer, qtbot, solution_tracks_3d_with_division):
     step = list(viewer.dims.current_step)
     step[0] = 1
     viewer.dims.current_step = step
-    viewer.layers[-2]._on_paint(event)
+    viewer.layers[-1]._on_paint(event)
 
-    assert int(np.asarray(viewer.layers[-2].data[1, 15, 45, 75])) == 5
+    assert int(np.asarray(viewer.layers[-1].data[1, 15, 45, 75])) == 5
     assert np.array_equal(
-        np.asarray(viewer.layers[-2].data),
-        np.asarray(m.right_widget.vm_container.viewer_model.layers[-2].data),
+        np.asarray(viewer.layers[-1].data),
+        np.asarray(m.right_widget.vm_container.viewer_model.layers[-1].data),
     )
 
     # test paint event on one of the ortho views and see if a new node is added
@@ -90,17 +90,17 @@ def test_ortho_views(viewer, qtbot, solution_tracks_3d_with_division):
     step = list(viewer.dims.current_step)
     step[0] = 2
     viewer.dims.current_step = step
-    m.right_widget.vm_container.viewer_model.layers[-2].paint(
+    m.right_widget.vm_container.viewer_model.layers[-1].paint(
         coord=(2, 63, 20, 30), new_label=6, refresh=True
     )
     assert tracks_viewer.tracks.graph.num_nodes() == 6
 
     # test syncing of properties
-    viewer.layers[-2].selected_label = 7  # forward sync only
+    viewer.layers[-1].selected_label = 7  # forward sync only
     assert (
-        viewer.layers[-2].selected_label
-        == m.right_widget.vm_container.viewer_model.layers[-2].selected_label
-        == m.bottom_widget.vm_container.viewer_model.layers[-2].selected_label
+        viewer.layers[-1].selected_label
+        == m.right_widget.vm_container.viewer_model.layers[-1].selected_label
+        == m.bottom_widget.vm_container.viewer_model.layers[-1].selected_label
     )
 
     m.cleanup()
