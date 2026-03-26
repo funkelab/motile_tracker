@@ -47,6 +47,8 @@ class MotileRun(SolutionTracks):
         time: datetime | None = None,
         gaps: list[float] | None = None,
         status: str = "done",
+        _features=None,
+        _segmentation=None,
     ):
         if ndim is None and input_segmentation is not None:
             ndim = input_segmentation.ndim
@@ -57,6 +59,8 @@ class MotileRun(SolutionTracks):
             pos_attr=pos_attr,
             scale=scale,
             ndim=ndim,
+            features=_features,
+            _segmentation=_segmentation,
         )
         self.run_name = run_name
         self.solver_params = solver_params
@@ -173,6 +177,8 @@ class MotileRun(SolutionTracks):
             time_attr=time_attr,
             scale=scale,
             ndim=tracks.ndim,
+            _features=tracks.features,
+            _segmentation=tracks.segmentation,
         )
 
     def _save_params(self, run_dir: Path):
