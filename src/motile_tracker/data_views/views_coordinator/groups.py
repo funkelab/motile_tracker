@@ -71,8 +71,8 @@ class CollectionButton(QWidget):
         hint.setHeight(30)
         return hint
 
-    def update_node_count(self):
-        self.node_count.setText(f"{len(self.collection)} nodes")
+    def update_node_count(self, n_nodes: int) -> None:
+        self.node_count.setText(f"{n_nodes} nodes")
 
 
 class CollectionWidget(QWidget):
@@ -171,9 +171,13 @@ class CollectionWidget(QWidget):
             self.remove_lineage_btn.setEnabled(False)
 
         if selected:
-            self.collection_list.itemWidget(
-                selected[0]
-            ).update_node_count()  # update the node count
+            collection_item = self.collection_list.itemWidget(selected[0])
+            nodes = {
+                item
+                for item in collection_item.collection
+                if item not in self.tracks_viewer.selected_nodes.deleted_items
+            }
+            collection_item.update_node_count(len(nodes))
 
         if self.tracks_viewer.tracks is not None:
             self.new_group_button.setEnabled(True)
@@ -183,19 +187,17 @@ class CollectionWidget(QWidget):
     def _refresh(self) -> None:
         """Keep the node collection in sync with the node group attributes on the graph"""
 
-        # TODO Currently, this function only removes nodes that no longer exist in the
-        # graph. When undoing an action, a node can be put back in the graph, but in the
-        # current state it is not added back to the collection.
-
-        items = [
+        collection_items = [
             self.collection_list.itemWidget(self.collection_list.item(i))
             for i in range(self.collection_list.count())
         ]
-        for item in items:
-            nodes = item.collection
-            graph_nodes = set(self.tracks_viewer.tracks.nodes())
-            item.collection = {item for item in nodes if item in graph_nodes}
-            item.update_node_count()
+        for collection_item in collection_items:
+            nodes = {
+                node
+                for node in collection_item.collection
+                if node not in self.tracks_viewer.selected_nodes.deleted_items
+            }
+            collection_item.update_node_count(len(nodes))
 
     def retrieve_existing_groups(self) -> None:
         """Create collections based on the node attributes. Nodes assigned to a group
@@ -222,7 +224,14 @@ class CollectionWidget(QWidget):
                 group_dict[group_name] = nodes
                 self._add_group(name=group_name, select=True)
                 self.selected_collection.collection = set(group_dict[group_name])
-                self.selected_collection.update_node_count()  # update node count
+                nodes = [
+                    n
+                    for n in self.selected_collection.collection
+                    if n not in self.tracks_viewer.selected_nodes.deleted_items
+                ]
+                self.selected_collection.update_node_count(
+                    len(nodes)
+                )  # update node count
 
         self._update_buttons_and_node_count()
 
@@ -423,7 +432,11 @@ class CollectionWidget(QWidget):
         """
 
         group_name = self.collection_list.itemWidget(item).name.text()
-        nodes_to_keep = self.collection_list.itemWidget(item).collection
+        nodes_to_keep = [
+            node
+            for node in self.collection_list.itemWidget(item).collection
+            if node not in self.tracks_viewer.selected_nodes.deleted_items
+        ]
 
         # Keep nodes that belong to the selected group and export
         ExportDialog.show_export_dialog(
@@ -437,6 +450,8 @@ class CollectionWidget(QWidget):
     def _select_nodes(self, item: QListWidgetItem) -> None:
         """Select all nodes in the collection"""
 
-        self.tracks_viewer.selected_nodes.add_list(
-            list(self.collection_list.itemWidget(item).collection), append=False
-        )
+        nodes = list(self.collection_list.itemWidget(item).collection)
+        nodes = [
+            n for n in nodes if n not in self.tracks_viewer.selected_nodes.deleted_items
+        ]
+        self.tracks_viewer.selected_nodes.add_list(nodes, append=False)
