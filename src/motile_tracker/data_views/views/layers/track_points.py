@@ -89,7 +89,7 @@ class TrackPoints(ZOnlyPoints):
                 "track_id": track_ids,
             },  # TODO: use features
             border_color=[1, 1, 1, 1],
-            blending="translucent_no_depth",
+            blending="translucent",
         )
 
         # Key bindings (should be specified both on the viewer (in tracks_viewer)
