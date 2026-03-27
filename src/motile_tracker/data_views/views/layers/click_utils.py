@@ -3,6 +3,33 @@ from collections.abc import Generator
 
 from napari.layers import Labels, Points
 from napari.utils.events import Event
+from qtpy.QtCore import Qt
+from qtpy.QtGui import QMouseEvent
+
+QT_BUTTON_TO_INT = {
+    Qt.BackButton: 4,
+    Qt.ForwardButton: 5,
+}
+
+
+def detect_side_button(event: Event | QMouseEvent) -> int | None:
+    """Detect if a mouse side button (back/forward) was pressed.
+
+    Args:
+        event: The napari mouse event or QMouseEvent / pyqtgraph MouseClickEvent
+
+    Returns:
+        MouseButton integer (4: back, 5: forward), or None if not a side button
+    """
+
+    # check if the event is a QMouseEvent or a pyqtgrpah MouseClickEvent
+    button_attr = getattr(event, "button", None)
+    if callable(button_attr):
+        return QT_BUTTON_TO_INT.get(button_attr())
+
+    # event is a napari Event: button is already an int
+    button = button_attr
+    return button if button in (4, 5) else None
 
 
 def detect_click(event: Event) -> Generator[None, None, bool]:

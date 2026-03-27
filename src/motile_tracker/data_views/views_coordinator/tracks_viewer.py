@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Optional
 
 import napari
+from funtracks.actions import AddNode, BasicAction, DeleteNode
 from funtracks.data_model import SolutionTracks
 from funtracks.exceptions import InvalidActionError
 from funtracks.user_actions import (
@@ -26,8 +27,8 @@ from motile_tracker.data_views.views.tree_view.tree_widget_utils import (
 from motile_tracker.data_views.views_coordinator.groups import (
     CollectionWidget,
 )
-from motile_tracker.data_views.views_coordinator.node_selection_list import (
-    NodeSelectionList,
+from motile_tracker.data_views.views_coordinator.node_selection_history import (
+    NodeSelectionHistory,
 )
 from motile_tracker.data_views.views_coordinator.tracks_list import TracksList
 from motile_tracker.data_views.views_coordinator.user_dialogs import (
@@ -49,6 +50,7 @@ class TracksViewer:
     update_track_id = Signal()
     mode_updated = Signal()
     center_node = Signal(int)  # emitted when any component wants to center on a node
+    node_selection_updated = Signal()
 
     @classmethod
     def get_instance(cls, viewer=None):
@@ -79,8 +81,8 @@ class TracksViewer:
         self.visible: list | str = []
         self.tracking_layers = TracksLayerGroup(self.viewer, self.tracks, "", self)
         self.center_node.connect(self.tracking_layers.center_view)
-        self.selected_nodes = NodeSelectionList()
-        self.selected_nodes.list_updated.connect(self.update_selection)
+        self.selected_nodes = NodeSelectionHistory()
+        self.selected_nodes.selection_updated.connect(self.filter_selection)
 
         self.tracks_list = TracksList()
         self.tracks_list.view_tracks.connect(self.update_tracks)
@@ -153,7 +155,7 @@ class TracksViewer:
 
         # restore selection and/or highlighting in all napari Views (napari Views do not
         # know about their selection ('all' vs 'lineage'), but TracksViewer does)
-        self.update_selection()
+        self.filter_selection()  # to update the list of deleted nodes and trigger update
 
     def update_tracks(self, tracks: SolutionTracks, name: str) -> None:
         """Stop viewing a previous set of tracks and replace it with a new one.
@@ -163,15 +165,19 @@ class TracksViewer:
             tracks (funtracks.data_model.Tracks): The tracks to visualize in napari.
             name (str): The name of the tracks to display in the layer names
         """
-        self.selected_nodes._set = set()
+        self.selected_nodes.reset()
 
         if self.tracks is not None:
             self.tracks.refresh.disconnect(self._refresh)
+            self.tracks.action_applied.disconnect(self._on_action_applied)
 
         self.tracks = tracks
+        self.selected_nodes.deleted_items.clear()  # Reset deleted nodes when switching tracks
 
         # listen to refresh signals from the tracks
         self.tracks.refresh.connect(self._refresh)
+        # connect to action_applied signal to track deleted nodes
+        self.tracks.action_applied.connect(self._on_action_applied)
 
         # deactivate the input labels layer
         for layer in self.viewer.layers:
@@ -266,6 +272,29 @@ class TracksViewer:
             node: The node ID to center on.
         """
         self.center_node.emit(node)
+
+    def _on_action_applied(self, action: BasicAction) -> None:
+        """Handle action_applied signal from tracks.
+
+        Updates the deleted_items set to track which nodes have been deleted,
+        and clears nodes that were added back (via undo or re-addition).
+
+        Args:
+            action: The action that was applied (from funtracks)
+        """
+
+        if isinstance(action, DeleteNode):
+            self.selected_nodes.deleted_items.add(action.node)
+        elif isinstance(action, AddNode):
+            self.selected_nodes.deleted_items.discard(action.node)
+
+    def filter_selection(self) -> None:
+        """Filter out any deleted nodes before emitting the update signals."""
+
+        self.selected_nodes.filter()
+        # Trigger the update cycle
+        self.update_selection()
+        self.node_selection_updated.emit()
 
     def update_selection(self, set_view: bool = True) -> None:
         """Sets the view and triggers visualization updates in other components"""
@@ -396,3 +425,15 @@ class TracksViewer:
 
     def restore_selection(self, event=None):
         self.selected_nodes.restore()
+
+    def select_node_set_from_history(self, previous: bool):
+        """Move forwards or backwards through selection history."""
+        self.selected_nodes.select_node_set_from_history(previous=previous)
+
+    def select_next(self, event=None):
+        """Select next node set from history"""
+        self.selected_nodes.select_node_set_from_history(previous=False)
+
+    def select_previous(self, event=None):
+        """Select previous node set from history"""
+        self.selected_nodes.select_node_set_from_history(previous=True)
