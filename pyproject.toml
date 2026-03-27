@@ -30,8 +30,8 @@ classifiers = [
 ]
 
 dependencies =[
-    "napari>=0.6.2,<1",
-    "funtracks>=1.8.0,<3",
+    "napari>=0.6.2,<0.7.0",
+    "funtracks",
     "appdirs>=1,<2",
     "numpy>=2,<3",
     "magicgui>=0.10.1",
@@ -90,6 +90,10 @@ dev = [
     {include-group = "docs"},
 ]
 # For gurobi, install separately: uv pip install "gurobipy>=12,<13"
+
+[tool.uv.sources]
+#TODO Teun: release funtracks-v2 and use PyPI instead of git dependency
+funtracks = { git = "https://github.com/funkelab/funtracks", rev = "9be0cbfbd06c54638e270c84bf14f388a9f74df7" }
 
 [tool.uv]
 # gurobi12 and gurobi13 conflict with each other (mutually exclusive version pins)

@@ -1,9 +1,10 @@
 """Tests for RunEditor - the UI for configuring and starting tracking runs."""
 
 import dask.array as da
-import networkx as nx
 import numpy as np
 import pytest
+import tracksdata as td
+from funtracks.utils.tracksdata_utils import create_empty_graphview_graph
 
 from motile_tracker.motile.backend import MotileRun, SolverParams
 from motile_tracker.motile.menus.run_editor import RunEditor
@@ -11,6 +12,7 @@ from motile_tracker.motile.menus.run_editor import RunEditor
 
 def test_run_editor_initialization(make_napari_viewer, segmentation_2d):
     """Test RunEditor widget initialization."""
+
     # Test 1: RunEditor creates all UI elements correctly
     viewer = make_napari_viewer()
     editor = RunEditor(viewer)
@@ -101,11 +103,11 @@ def test_run_creation(make_napari_viewer, segmentation_2d):
     run = editor.get_run()
     assert run is not None
     assert run.run_name == "test_run"
-    assert run.segmentation is not None
-    assert np.array_equal(run.segmentation, segmentation_2d)
+    assert run.input_segmentation is not None
+    assert np.array_equal(run.input_segmentation, segmentation_2d)
     assert run.input_points is None
     assert tuple(run.scale) == (1, 2, 3)
-    assert isinstance(run.graph, nx.DiGraph)
+    assert isinstance(run.graph, td.graph.GraphView)
 
     # Test 2: get_run creates run with Points layer
     points_data = np.array([[0, 10, 20], [1, 30, 40]])
@@ -115,7 +117,7 @@ def test_run_creation(make_napari_viewer, segmentation_2d):
     run2 = editor.get_run()
     assert run2 is not None
     assert run2.run_name == "points_run"
-    assert run2.segmentation is None
+    assert run2.input_segmentation is None
     assert run2.input_points is not None
     assert np.array_equal(run2.input_points, points_data)
     assert tuple(run2.scale) == (1, 2, 3)
@@ -153,8 +155,8 @@ def test_run_creation(make_napari_viewer, segmentation_2d):
     editor6.layer_selection_box.setCurrentText("seg1")
     run7 = editor6.get_run()
     assert run7 is not None
-    assert isinstance(run7.segmentation, np.ndarray)
-    assert not isinstance(run7.segmentation, da.Array)
+    assert isinstance(run7.input_segmentation, np.ndarray)
+    assert not isinstance(run7.input_segmentation, da.Array)
 
     # Test 7: get_run uses solver params from the editor
     viewer.add_labels(segmentation_2d, name="seg_params")
@@ -194,10 +196,11 @@ def test_new_run(make_napari_viewer, segmentation_2d, qtbot):
     # Test: new_run loads run name and solver params
     custom_params = SolverParams(max_edge_distance=999.0, max_children=5)
     existing_run = MotileRun(
-        graph=nx.DiGraph(),
-        segmentation=segmentation_2d,
+        graph=create_empty_graphview_graph(),
+        input_segmentation=segmentation_2d,
         run_name="existing_run",
         solver_params=custom_params,
+        ndim=3,
     )
     editor.new_run(existing_run)
     assert editor.run_name.text() == "existing_run"

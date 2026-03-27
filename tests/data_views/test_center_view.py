@@ -1,13 +1,59 @@
 """Tests for center_view functionality with different scale configurations."""
 
 import napari
-import networkx as nx
 import numpy as np
 import pytest
+import tracksdata as td
 from funtracks.data_model import SolutionTracks
+from funtracks.utils.tracksdata_utils import create_empty_graphview_graph
+from tracksdata.nodes._mask import Mask
 
 from motile_tracker.data_views.views.ortho_views import initialize_ortho_views
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
+
+
+def _make_single_node_graph(
+    tmp_path,
+    pos: list,
+    seg_bbox: list | None = None,
+    seg_shape: tuple | None = None,
+) -> td.graph.GraphView:
+    """Create a 3D+time tracksdata graph with a single node at the given position.
+
+    Args:
+        tmp_path: Pytest tmp_path for the SQLite database.
+        pos: Node position in world coordinates [z, y, x].
+        seg_bbox: Bounding box [z0, y0, x0, z1, y1, x1] for the node's mask.
+            If provided, mask/bbox node attributes and segmentation_shape metadata
+            are added so SolutionTracks can reconstruct the segmentation.
+        seg_shape: Full segmentation array shape (t, z, y, x). Required when
+            seg_bbox is provided.
+    """
+    node_attributes = ["pos", "area"]
+    if seg_bbox is not None:
+        node_attributes += [td.DEFAULT_ATTR_KEYS.MASK, td.DEFAULT_ATTR_KEYS.BBOX]
+
+    graph = create_empty_graphview_graph(
+        node_attributes=node_attributes,
+        ndim=4,
+        database=str(tmp_path / "graph.db"),
+    )
+
+    node: dict = {"t": 0, "pos": list(pos), "area": 1000.0, "solution": 1}
+    if seg_bbox is not None:
+        bbox = np.array(seg_bbox, dtype=np.int64)
+        mask_shape = tuple(int(bbox[i + 3] - bbox[i]) for i in range(3))
+        node[td.DEFAULT_ATTR_KEYS.MASK] = Mask(
+            np.ones(mask_shape, dtype=bool), bbox=bbox
+        )
+        node[td.DEFAULT_ATTR_KEYS.BBOX] = bbox
+
+    graph.bulk_add_nodes(nodes=[node], indices=[1])
+
+    if seg_shape is not None:
+        graph._update_metadata(segmentation_shape=seg_shape)
+
+    return graph
 
 
 @pytest.fixture
@@ -31,7 +77,7 @@ class TestCenterViewWithScale:
     - center_view should position the viewer at the node's world coordinates
     """
 
-    def test_center_view_with_z_scale_less_than_one(self, viewer):
+    def test_center_view_with_z_scale_less_than_one(self, viewer, tmp_path):
         """Test center_view when z-scale < 1 (common for anisotropic z).
 
         With z-scale = 0.5:
@@ -40,32 +86,16 @@ class TestCenterViewWithScale:
         """
 
         # Create graph - positions are in WORLD coordinates
-        graph = nx.DiGraph()
-        # Node at world position [5, 10, 10]
-        nodes = [
-            (
-                1,
-                {
-                    "pos": [5, 10, 10],  # world coords
-                    "time": 0,
-                    "area": 1000,
-                },
-            ),
-        ]
-        graph.add_nodes_from(nodes)
-
-        # Create segmentation (20 pixels in z)
-        # With z-scale=0.5, world z-extent is 0-10
-        segmentation = np.zeros((2, 20, 20, 20), dtype="int32")
-        segmentation[0, 9:11, 9:11, 9:11] = 1  # pixel z=10, world z=5
+        # Node at world position [5, 10, 10]; pixel z=10 (box [9:11,9:11,9:11])
+        graph = _make_single_node_graph(
+            tmp_path,
+            pos=[5, 10, 10],
+            seg_bbox=[9, 9, 9, 11, 11, 11],
+            seg_shape=(2, 20, 20, 20),
+        )
 
         scale = [1.0, 0.5, 1.0, 1.0]  # t, z, y, x
-        tracks = SolutionTracks(
-            graph=graph,
-            segmentation=segmentation,
-            scale=scale,
-            ndim=4,
-        )
+        tracks = SolutionTracks(graph=graph, scale=scale, ndim=4, time_attr="t")
 
         tracks_viewer = TracksViewer.get_instance(viewer)
         tracks_viewer.update_tracks(tracks=tracks, name="test")
@@ -88,38 +118,23 @@ class TestCenterViewWithScale:
             f"Viewer dims.point={viewer.dims.point}"
         )
 
-    def test_center_view_with_z_scale_greater_than_one(self, viewer):
+    def test_center_view_with_z_scale_greater_than_one(self, viewer, tmp_path):
         """Test center_view when z-scale > 1.
 
         With z-scale = 2.0:
         - Segmentation pixel z=5 corresponds to world z=10
         """
 
-        graph = nx.DiGraph()
-        # Node at world position [10, 10, 10]
-        nodes = [
-            (
-                1,
-                {
-                    "pos": [10, 10, 10],  # world coords
-                    "time": 0,
-                    "area": 1000,
-                },
-            ),
-        ]
-        graph.add_nodes_from(nodes)
-
-        # Segmentation with 20 pixels in z, scale=2 -> world z-extent 0-40
-        segmentation = np.zeros((2, 20, 20, 20), dtype="int32")
-        segmentation[0, 4:6, 9:11, 9:11] = 1  # pixel z=5, world z=10
+        # Node at world position [10, 10, 10]; pixel z=5 (box [4:6,9:11,9:11])
+        graph = _make_single_node_graph(
+            tmp_path,
+            pos=[10, 10, 10],
+            seg_bbox=[4, 9, 9, 6, 11, 11],
+            seg_shape=(2, 20, 20, 20),
+        )
 
         scale = [1.0, 2.0, 1.0, 1.0]
-        tracks = SolutionTracks(
-            graph=graph,
-            segmentation=segmentation,
-            scale=scale,
-            ndim=4,
-        )
+        tracks = SolutionTracks(graph=graph, scale=scale, ndim=4, time_attr="t")
 
         tracks_viewer = TracksViewer.get_instance(viewer)
         tracks_viewer.update_tracks(tracks=tracks, name="test")
@@ -141,7 +156,7 @@ class TestCenterViewWithScale:
             f"Viewer dims.point={viewer.dims.point}"
         )
 
-    def test_center_view_with_image_layer_different_scale(self, viewer):
+    def test_center_view_with_image_layer_different_scale(self, viewer, tmp_path):
         """Test center_view when image layer has different scale than tracks seg layer.
 
         Image layer: scale [1,1,1,1], 20 z-pixels -> world z 0-20
@@ -152,30 +167,16 @@ class TestCenterViewWithScale:
         image_data = np.random.rand(2, 20, 20, 20)
         viewer.add_image(image_data, name="raw_image")
 
-        graph = nx.DiGraph()
-        # Node at world z=5
-        nodes = [
-            (
-                1,
-                {
-                    "pos": [5, 10, 10],
-                    "time": 0,
-                    "area": 1000,
-                },
-            ),
-        ]
-        graph.add_nodes_from(nodes)
-
-        segmentation = np.zeros((2, 20, 20, 20), dtype="int32")
-        segmentation[0, 9:11, 9:11, 9:11] = 1
+        # Node at world z=5 (box [9:11,9:11,9:11])
+        graph = _make_single_node_graph(
+            tmp_path,
+            pos=[5, 10, 10],
+            seg_bbox=[9, 9, 9, 11, 11, 11],
+            seg_shape=(2, 20, 20, 20),
+        )
 
         scale = [1.0, 0.5, 1.0, 1.0]
-        tracks = SolutionTracks(
-            graph=graph,
-            segmentation=segmentation,
-            scale=scale,
-            ndim=4,
-        )
+        tracks = SolutionTracks(graph=graph, scale=scale, ndim=4, time_attr="t")
 
         tracks_viewer = TracksViewer.get_instance(viewer)
         tracks_viewer.update_tracks(tracks=tracks, name="test")
@@ -197,30 +198,17 @@ class TestCenterViewWithScale:
             f"Viewer dims.point={viewer.dims.point}"
         )
 
-    def test_center_view_no_scale(self, viewer):
+    def test_center_view_no_scale(self, viewer, tmp_path):
         """Test center_view when no scale is set (defaults to 1.0)."""
 
-        graph = nx.DiGraph()
-        nodes = [
-            (
-                1,
-                {
-                    "pos": [10, 10, 10],
-                    "time": 0,
-                    "area": 1000,
-                },
-            ),
-        ]
-        graph.add_nodes_from(nodes)
-
-        segmentation = np.zeros((2, 20, 20, 20), dtype="int32")
-        segmentation[0, 9:11, 9:11, 9:11] = 1
-
-        tracks = SolutionTracks(
-            graph=graph,
-            segmentation=segmentation,
-            ndim=4,
+        graph = _make_single_node_graph(
+            tmp_path,
+            pos=[10, 10, 10],
+            seg_bbox=[9, 9, 9, 11, 11, 11],
+            seg_shape=(2, 20, 20, 20),
         )
+
+        tracks = SolutionTracks(graph=graph, ndim=4, time_attr="t")
 
         tracks_viewer = TracksViewer.get_instance(viewer)
         tracks_viewer.update_tracks(tracks=tracks, name="test")
@@ -245,7 +233,7 @@ class TestCenterViewWithScale:
             f"Viewer dims.point={viewer.dims.point}"
         )
 
-    def test_center_view_no_segmentation_with_scaled_image(self, viewer):
+    def test_center_view_no_segmentation_with_scaled_image(self, viewer, tmp_path):
         """Test center_view when there is no segmentation, only points and an image layer.
 
         Image layer: scale [1, 0.5, 1, 1], 20 z-pixels -> world z 0-10
@@ -257,26 +245,11 @@ class TestCenterViewWithScale:
         image_data = np.random.rand(2, 20, 20, 20)
         viewer.add_image(image_data, name="raw_image", scale=[1.0, 0.5, 1.0, 1.0])
 
-        graph = nx.DiGraph()
-        # Node at world position [5, 10, 10]
-        nodes = [
-            (
-                1,
-                {
-                    "pos": [5, 10, 10],  # world coords
-                    "time": 0,
-                    "area": 1000,
-                },
-            ),
-        ]
-        graph.add_nodes_from(nodes)
+        # Node at world position [5, 10, 10] — no segmentation
+        graph = _make_single_node_graph(tmp_path, pos=[5, 10, 10])
 
-        # No segmentation
         tracks = SolutionTracks(
-            graph=graph,
-            segmentation=None,
-            scale=[1.0, 0.5, 1.0, 1.0],
-            ndim=4,
+            graph=graph, scale=[1.0, 0.5, 1.0, 1.0], ndim=4, time_attr="t"
         )
 
         tracks_viewer = TracksViewer.get_instance(viewer)
@@ -299,7 +272,7 @@ class TestCenterViewWithScale:
             f"Viewer dims.point={viewer.dims.point}"
         )
 
-    def test_center_view_no_segmentation_mismatched_scales(self, viewer):
+    def test_center_view_no_segmentation_mismatched_scales(self, viewer, tmp_path):
         """Test center_view with no segmentation and mismatched image/points scales.
 
         Image layer: scale [1, 1, 1, 1], 20 z-pixels -> world z 0-20
@@ -314,26 +287,11 @@ class TestCenterViewWithScale:
         image_data = np.random.rand(2, 20, 20, 20)
         viewer.add_image(image_data, name="raw_image")
 
-        graph = nx.DiGraph()
-        # Node at world position [5, 10, 10]
-        nodes = [
-            (
-                1,
-                {
-                    "pos": [5, 10, 10],  # world coords
-                    "time": 0,
-                    "area": 1000,
-                },
-            ),
-        ]
-        graph.add_nodes_from(nodes)
+        # Node at world position [5, 10, 10] — no segmentation
+        graph = _make_single_node_graph(tmp_path, pos=[5, 10, 10])
 
-        # No segmentation, but tracks have scale
         tracks = SolutionTracks(
-            graph=graph,
-            segmentation=None,
-            scale=[1.0, 0.5, 1.0, 1.0],
-            ndim=4,
+            graph=graph, scale=[1.0, 0.5, 1.0, 1.0], ndim=4, time_attr="t"
         )
 
         tracks_viewer = TracksViewer.get_instance(viewer)
@@ -356,7 +314,7 @@ class TestCenterViewWithScale:
             f"Viewer dims.point={viewer.dims.point}"
         )
 
-    def test_center_view_syncs_ortho_views(self, viewer, qtbot):
+    def test_center_view_syncs_ortho_views(self, viewer, qtbot, tmp_path):
         """Test that center_view properly syncs ortho views so points are visible.
 
         When center_view is called, the ortho views should also update their
@@ -366,30 +324,16 @@ class TestCenterViewWithScale:
         # Initialize orthogonal views
         ortho_manager = initialize_ortho_views(viewer)
 
-        graph = nx.DiGraph()
-        # Node at world position [5, 10, 10]
-        nodes = [
-            (
-                1,
-                {
-                    "pos": [5, 10, 10],  # world coords
-                    "time": 0,
-                    "area": 1000,
-                },
-            ),
-        ]
-        graph.add_nodes_from(nodes)
-
-        segmentation = np.zeros((2, 20, 20, 20), dtype="int32")
-        segmentation[0, 9:11, 9:11, 9:11] = 1
+        # Node at world position [5, 10, 10] (box [9:11,9:11,9:11])
+        graph = _make_single_node_graph(
+            tmp_path,
+            pos=[5, 10, 10],
+            seg_bbox=[9, 9, 9, 11, 11, 11],
+            seg_shape=(2, 20, 20, 20),
+        )
 
         scale = [1.0, 0.5, 1.0, 1.0]  # z-scale = 0.5
-        tracks = SolutionTracks(
-            graph=graph,
-            segmentation=segmentation,
-            scale=scale,
-            ndim=4,
-        )
+        tracks = SolutionTracks(graph=graph, scale=scale, ndim=4, time_attr="t")
 
         # Show orthogonal views BEFORE adding tracks so they get the layers
         ortho_manager.show()

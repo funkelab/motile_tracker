@@ -25,6 +25,9 @@ from qtpy.QtWidgets import (
 from motile_tracker.import_export.menus.geff_import_utils import (
     clear_layout,
 )
+from motile_tracker.import_export.menus.segmentation_widgets import (
+    geff_has_embedded_segmentation,
+)
 
 
 def get_attr_dtype_zarr(root: zarr.Group, attr: str) -> str:
@@ -79,6 +82,7 @@ class StandardFieldMapWidget(QWidget):
         super().__init__()
 
         self.seg = False
+        self.seg_for_features = False
         self.incl_z = True
         self.has_duplicates = False
         self.node_attrs: list[str] = []
@@ -128,6 +132,7 @@ class StandardFieldMapWidget(QWidget):
         """Update the mapping widget with the provided root group and segmentation flag."""
 
         self.seg = seg
+        self.seg_for_features = seg
         self.incl_z = incl_z
 
         self.df = df
@@ -156,16 +161,26 @@ class StandardFieldMapWidget(QWidget):
         self.update_mapping(seg)
 
     def extract_geff_property_fields(
-        self, root: zarr.Group, seg: bool, incl_z: bool
+        self,
+        root: zarr.Group,
+        seg: bool,
+        incl_z: bool,
+        seg_for_features: bool | None = None,
     ) -> None:
         """Update the mapping widget with the provided root group and segmentation flag."""
 
         self.seg = seg
+        self.seg_for_features = seg if seg_for_features is None else seg_for_features
         self.incl_z = incl_z
 
         self.setVisible(False)
         self.node_attrs = list(root["nodes"]["props"].group_keys())
         self.metadata = dict(root.attrs.get("geff", {}))
+
+        # Exclude mask/bbox from optional features when they are embedded segmentation
+        # attributes that will be imported automatically (segmentation_shape present).
+        if geff_has_embedded_segmentation(root):
+            self.node_attrs = [a for a in self.node_attrs if a not in ("mask", "bbox")]
 
         # Retrieve attribute types from the zarr group
         self.attr_types = {
@@ -238,6 +253,12 @@ class StandardFieldMapWidget(QWidget):
         for attribute in self.standard_fields:
             if attribute in mapping:
                 continue
+            # seg_id is semantically specific: only match exactly to avoid stealing
+            # track_id or other columns via fuzzy matching (e.g. 'seg_id' ~ 'track_id'
+            # scores above the 0.4 cutoff and can prevent tracklet_id from being mapped).
+            if attribute == "seg_id":
+                mapping[attribute] = "None"
+                continue
             if len(self.props_left) > 0:
                 lower_map = {p.lower(): p for p in self.props_left}
                 closest = difflib.get_close_matches(
@@ -274,6 +295,8 @@ class StandardFieldMapWidget(QWidget):
         attr_checkbox.toggled.connect(self._check_for_duplicates)
         # Feature option combobox
         feature_option = QComboBox()
+        # Always have "Custom" as first (default) option
+        feature_option.addItem("Custom")
         # Numerical types & segmentation provided => list regionprops features
         if (
             self.attr_types.get(attribute)
@@ -281,15 +304,12 @@ class StandardFieldMapWidget(QWidget):
                 "int",
                 "float",
             }
-            and self.seg
+            and self.seg_for_features
         ):
             feature_option.addItems(self.feature_options)
         elif self.attr_types.get(attribute) in {"bool", "object", "0"}:
             # Boolean or unknown/object types => grouping option
             feature_option.addItem("Group")
-
-        # Always have "Custom" as last option
-        feature_option.addItem("Custom")
         feature_option.currentIndexChanged.connect(self._check_for_duplicates)
 
         # Recompute checkbox - initially disabled
@@ -300,8 +320,10 @@ class StandardFieldMapWidget(QWidget):
         def make_on_change(checkbox, combo):
             def on_change(index):
                 selected_feature = combo.currentText()
-                # Enable recompute only if the selected feature corresponds to a regionprops feature
-                if selected_feature in self.feature_options:
+                # Recompute requires an external segmentation path (self.seg=True).
+                # Embedded segmentation (seg_for_features=True, seg=False) does not
+                # register a RegionPropsAnnotator, so recompute is not supported.
+                if selected_feature in self.feature_options and self.seg:
                     checkbox.setEnabled(True)
                 else:
                     checkbox.setEnabled(False)
@@ -393,7 +415,9 @@ class StandardFieldMapWidget(QWidget):
             "x": "The world x-coordinate of the node.",
             "seg_id": (
                 "The integer label value in the segmentation file. Choose None "
-                "if the label values are identical to the node IDs."
+                "if the label values are identical to the node IDs. "
+                "If the segmentation was exported with 'relabel to track_id', "
+                "set this to the track_id column."
             ),
             DEFAULT_TRACKLET_KEY: (
                 "(Optional) The tracklet id this node belongs to, defined as a "
@@ -514,7 +538,10 @@ class StandardFieldMapWidget(QWidget):
 
         Returns dict mapping property name to recompute boolean.
 
-        Custom and Group features are excluded (handled via name_map).
+        Group features are excluded (handled via name_map only).
+        Custom float/int features are included with recompute=False so they
+        get registered in tracks.features and appear in the tree dropdown and
+        table view. Custom string/bool features are excluded (name_map only).
         """
         node_features = {}
         for attr, widgets in self.optional_features.items():
@@ -522,9 +549,14 @@ class StandardFieldMapWidget(QWidget):
                 selected = widgets["feature_option"].currentText()
                 recompute = widgets["recompute"].isChecked()
 
-                if selected in ("Custom", "Group"):
-                    # Custom/Group features are added to name_map instead
+                if selected == "Group":
                     continue
-
-                node_features[attr] = recompute
+                elif selected == "Custom":
+                    # Float/int Custom features: register as static feature in
+                    # tracks.features so they appear in tree/table views.
+                    if self.attr_types.get(attr) in {"int", "float"}:
+                        node_features[attr] = False
+                else:
+                    # Regionprops feature
+                    node_features[attr] = recompute
         return node_features

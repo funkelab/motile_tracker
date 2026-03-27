@@ -30,6 +30,7 @@ from motile_tracker.import_export.menus.scale_widget import ScaleWidget
 from motile_tracker.import_export.menus.segmentation_widgets import (
     CSVSegmentationWidget,
     GeffSegmentationWidget,
+    geff_has_embedded_segmentation,
 )
 
 
@@ -49,8 +50,8 @@ class ImportDialog(QDialog):
         self.seg = None
         self.df = None
         self.incl_z = False
-        self.setWindowTitle(f"Import external tracks from {import_type}")
-        self.name = f"Tracks from {import_type}"
+        self.setWindowTitle(f"Import external tracks from {import_type.upper()}")
+        self.name = f"Tracks from {import_type.upper()}"
 
         # cancel and finish buttons
         self.button_layout = QHBoxLayout()
@@ -146,7 +147,11 @@ class ImportDialog(QDialog):
                     )
 
                 self.prop_map_widget.extract_geff_property_fields(
-                    self.import_widget.root, self.seg, self.incl_z
+                    self.import_widget.root,
+                    self.seg,
+                    self.incl_z,
+                    seg_for_features=self.seg
+                    or geff_has_embedded_segmentation(self.import_widget.root),
                 )
 
             else:
@@ -333,6 +338,16 @@ class ImportDialog(QDialog):
                 name_map = {k: v for k, v in name_map.items() if v != "None"}
                 node_features = self.prop_map_widget.get_node_features()
 
+                # When embedded segmentation is present (mask + bbox in graph) and no
+                # external segmentation file is provided, ensure those attributes are
+                # loaded so funtracks can reconstruct the segmentation as a
+                # GraphArrayView.
+                if segmentation_path is None and geff_has_embedded_segmentation(
+                    self.import_widget.root
+                ):
+                    name_map.setdefault("mask", "mask")
+                    name_map.setdefault("bbox", "bbox")
+
                 # Generate axes metadata if missing (required for funtracks validation)
                 geff_metadata = dict(self.import_widget.root.attrs.get("geff", {}))
                 if "axes" not in geff_metadata:
@@ -349,7 +364,7 @@ class ImportDialog(QDialog):
                         node_features=node_features,
                         scale=scale,
                     )
-                except (ValueError, OSError, FileNotFoundError, AssertionError) as e:
+                except Exception as e:  # noqa: BLE001
                     QMessageBox.critical(self, "Error", f"Failed to load tracks: {e}")
                     return
                 self.accept()
@@ -375,7 +390,7 @@ class ImportDialog(QDialog):
                         features=features,
                         node_name_map=node_name_map,
                     )
-                except (ValueError, OSError, FileNotFoundError, AssertionError) as e:
+                except Exception as e:  # noqa: BLE001
                     QMessageBox.critical(self, "Error", f"Failed to load tracks: {e}")
                     return
                 self.accept()
