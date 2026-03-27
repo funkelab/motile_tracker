@@ -453,17 +453,27 @@ def construct_solver(
             constraints.
     """
     tg = TrackGraph(frame_attribute="t")
-    for node_id in cand_graph.node_ids():
-        tg.add_node(
-            node_id,
-            {
-                k: v
-                for k, v in cand_graph.nodes[node_id].to_dict().items()
-                if k not in _SKIP_ATTRS
-            },
-        )
-    for u, v in cand_graph.edge_list():
-        tg.add_edge((u, v), cand_graph.edges[cand_graph.edge_id(u, v)].to_dict())
+
+    # Bulk-fetch node attributes (one polars scan instead of N individual scans)
+    node_df = cand_graph.node_attrs()
+    skip_cols = [c for c in node_df.columns if c in _SKIP_ATTRS]
+    if skip_cols:
+        node_df = node_df.drop(skip_cols)
+    node_id_col = td.DEFAULT_ATTR_KEYS.NODE_ID
+    for row in node_df.rows(named=True):
+        node_id = row.pop(node_id_col)
+        tg.add_node(node_id, row)
+
+    # Bulk-fetch edge attributes (one polars scan instead of N individual scans)
+    edge_df = cand_graph.edge_attrs()
+    src_col = td.DEFAULT_ATTR_KEYS.EDGE_SOURCE
+    tgt_col = td.DEFAULT_ATTR_KEYS.EDGE_TARGET
+    eid_col = td.DEFAULT_ATTR_KEYS.EDGE_ID
+    for row in edge_df.rows(named=True):
+        src = row.pop(src_col)
+        tgt = row.pop(tgt_col)
+        row.pop(eid_col)
+        tg.add_edge((src, tgt), row)
 
     solver = Solver(tg)
     solver.add_constraint(MaxChildren(solver_params.max_children))
