@@ -6,6 +6,7 @@ import napari.layers
 import numpy as np
 import pandas as pd
 from funtracks.data_model import Tracks
+from tracksdata.constants import DEFAULT_ATTR_KEYS
 
 from motile_tracker.data_views.node_type import NodeType
 
@@ -38,6 +39,31 @@ def extract_sorted_tracks(
         return None
 
     solution_nx_graph = tracks.graph
+    time_key = tracks.features.time_key
+    tracklet_key = tracks.features.tracklet_key
+
+    # Batch-fetch all node attributes in one SQL query instead of per-node calls.
+    node_feature_keys = [
+        key
+        for key, feature in tracks.features.items()
+        if feature.get("feature_type") != "edge"
+        and key in solution_nx_graph.node_attr_keys()
+    ]
+    all_keys = list(
+        {DEFAULT_ATTR_KEYS.NODE_ID, time_key, tracklet_key} | set(node_feature_keys)
+    )
+    df_attrs = solution_nx_graph.node_attrs(attr_keys=all_keys)
+
+    node_ids_list = df_attrs[DEFAULT_ATTR_KEYS.NODE_ID].to_list()
+    node_to_time = dict(zip(node_ids_list, df_attrs[time_key].to_list(), strict=True))
+    node_to_track_id = dict(
+        zip(node_ids_list, df_attrs[tracklet_key].to_list(), strict=True)
+    )
+    feat_cols = {key: df_attrs[key].to_list() for key in node_feature_keys}
+    node_to_feat = {
+        node: {key: feat_cols[key][i] for key in node_feature_keys}
+        for i, node in enumerate(node_ids_list)
+    }
 
     track_list = []
     parent_mapping = []
@@ -75,16 +101,12 @@ def extract_sorted_tracks(
         tracklets.append(component)
 
     for node_set in tracklets:
-        # Sort nodes in each weakly connected component by their time attribute to
-        # ensure correct order
-        sorted_nodes = sorted(
-            node_set,
-            key=lambda node: tracks.get_time(node),
-        )
+        # Sort nodes in each tracklet by time using the precomputed dict
+        sorted_nodes = sorted(node_set, key=lambda node: node_to_time[node])
 
         # track_id and color are the same for all nodes in a node_set
         parent_track_id = None
-        track_id = tracks.get_track_id(sorted_nodes[0])
+        track_id = node_to_track_id[sorted_nodes[0]]
         color = np.concatenate((colormap.map(track_id)[:3] * 255, [255]))
 
         for node in sorted_nodes:
@@ -99,7 +121,7 @@ def extract_sorted_tracks(
                 symbol = "o"
 
             track_dict = {
-                "t": tracks.get_time(node),
+                "t": node_to_time[node],
                 "node_id": node,
                 "track_id": track_id,
                 "color": color,
@@ -112,9 +134,11 @@ def extract_sorted_tracks(
             for feature_key, feature in tracks.features.items():
                 if feature.get("feature_type") == "edge":
                     continue
+                if feature_key not in node_to_feat[node]:
+                    continue
                 display_name = feature.get("display_name", feature_key)
                 value_names = feature.get("value_names", None)
-                val = tracks.get_node_attr(node, feature_key)
+                val = node_to_feat[node][feature_key]
                 num_values = feature.get("num_values", 1)
                 if num_values > 1:
                     for i in range(num_values):
@@ -141,9 +165,7 @@ def extract_sorted_tracks(
                 track_dict["parent_id"] = parent_id
 
                 if parent_track_id is None:
-                    parent_track_id = solution_nx_graph.nodes[parent_id][
-                        tracks.features.tracklet_key
-                    ]
+                    parent_track_id = node_to_track_id[parent_id]
                 track_dict["parent_track_id"] = parent_track_id
 
             else:
@@ -157,7 +179,9 @@ def extract_sorted_tracks(
             {"track_id": track_id, "parent_track_id": parent_track_id, "node_id": node}
         )
 
-    x_axis_order = get_sorted_track_ids(solution_nx_graph, "track_id", prev_axis_order)
+    x_axis_order = get_sorted_track_ids(
+        solution_nx_graph, node_to_track_id, prev_axis_order
+    )
 
     for node in track_list:
         node["x_axis_pos"] = x_axis_order.index(node["track_id"])
@@ -202,7 +226,7 @@ def order_roots_by_prev(prev_axis_order: list[int], roots: list[int]) -> list[in
 
 def get_sorted_track_ids(
     graph,
-    tracklet_id_key: str = "tracklet_id",
+    node_to_track_id: dict,
     prev_axis_order: list[int] | None = None,
 ) -> list[Any]:
     """
@@ -212,7 +236,7 @@ def get_sorted_track_ids(
 
     Args:
         graph: graph with a tracklet_id attribute on it.
-        tracklet_id_key (str): tracklet_id key on the graph.
+        node_to_track_id (dict): precomputed mapping from node_id to track_id.
 
     Returns:
         list[Any] of ordered tracklet_ids.
@@ -233,15 +257,11 @@ def get_sorted_track_ids(
     # Create tracklet_id to parent_tracklet_id mapping (0 if tracklet has no parent)
     tracklet_to_parent_tracklet = {}
     for node in topo_order:
-        data = graph.nodes[node]
-        tracklet = data[tracklet_id_key]
+        tracklet = node_to_track_id[node]
         if tracklet in tracklet_to_parent_tracklet:
             continue
         predecessors = list(graph.predecessors(node))
-        if predecessors:
-            parent_tracklet_id = graph.nodes[predecessors[0]][tracklet_id_key]
-        else:
-            parent_tracklet_id = 0
+        parent_tracklet_id = node_to_track_id[predecessors[0]] if predecessors else 0
         tracklet_to_parent_tracklet[tracklet] = parent_tracklet_id
 
     # Final sorted order of roots

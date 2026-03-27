@@ -134,6 +134,7 @@ class TracksLayerGroup:
             if isinstance(visible_nodes, str):
                 visible_tracks = visible_nodes  # "all"
             else:
+                # visible_nodes is a small subset — use per-node lookup, not bulk batch
                 visible_tracks = list(
                     {self.tracks.get_track_id(node) for node in visible_nodes}
                 )
@@ -144,7 +145,7 @@ class TracksLayerGroup:
         location, if the node is not already in the field of view"""
 
         if self.seg_layer is None or self.seg_layer.mode == "pan_zoom":
-            location = self.tracks.get_positions([node], incl_time=True)[0].tolist()
+            location = self.tracks.get_position(node, incl_time=True)
             assert len(location) == self.viewer.dims.ndim, (
                 f"Location {location} does not match viewer number of dims "
                 f"{self.viewer.dims.ndim}"

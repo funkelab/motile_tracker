@@ -171,7 +171,7 @@ class ExportDialog:
                 seg_path = Path(seg_dialog.selectedFiles()[0])
 
             nodes = tracks.graph.node_ids()
-            track_ids = [tracks.get_track_id(node) for node in nodes]
+            track_ids = tracks.get_track_ids(nodes)
             colors = [colormap.map(tid) for tid in track_ids]
             color_dict = {
                 **dict(zip(nodes, colors, strict=True)),

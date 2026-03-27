@@ -438,7 +438,7 @@ class ColoredTableWidget(QWidget):
         tracks = self.tracks_viewer.tracks
         if tracks is not None:
             nodes = tracks.graph.node_ids()
-            track_ids = [tracks.get_track_id(node) for node in nodes]
+            track_ids = tracks.get_track_ids(nodes)
             colors = [self.tracks_viewer.colormap.map(tid) for tid in track_ids]
         else:
             nodes = []

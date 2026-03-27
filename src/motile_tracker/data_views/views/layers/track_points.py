@@ -67,9 +67,7 @@ class TrackPoints(ZOnlyPoints):
 
         points = self.tracks_viewer.tracks.get_positions(self.nodes, incl_time=True)
 
-        track_ids = [
-            self.tracks_viewer.tracks.get_track_id(node) for node in self.nodes
-        ]
+        track_ids = self.tracks_viewer.tracks.get_track_ids(self.nodes)
         colors = [self.tracks_viewer.colormap.map(track_id) for track_id in track_ids]
         symbols = self.get_symbols(
             self.tracks_viewer.tracks, self.tracks_viewer.symbolmap
@@ -172,9 +170,7 @@ class TrackPoints(ZOnlyPoints):
 
         self.node_index_dict = {node: idx for idx, node in enumerate(self.nodes)}
 
-        track_ids = [
-            self.tracks_viewer.tracks.get_track_id(node) for node in self.nodes
-        ]
+        track_ids = self.tracks_viewer.tracks.get_track_ids(self.nodes)
         self.data = self.tracks_viewer.tracks.get_positions(self.nodes, incl_time=True)
         self.data_updated.emit()  # emit update signal for the orthogonal views to connect to
 

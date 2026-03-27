@@ -151,7 +151,7 @@ def test_export_csv_no_seg(mock_tracks, fake_parent, tmp_path, mock_colormap):
     csv_file = tmp_path / "tracks.csv"
     mock_tracks.graph = MagicMock()
     mock_tracks.graph.node_ids.return_value = [1, 2]
-    mock_tracks.get_track_id.side_effect = lambda n: n
+    mock_tracks.get_track_ids.return_value = [1, 2]
 
     mock_dialog = MagicMock()
     mock_dialog.exec_.return_value = 1
@@ -207,7 +207,7 @@ def test_export_csv_with_seg_zarr(
     zarr_file = tmp_path / "tracks_seg.zarr"
     mock_tracks_with_seg.graph = MagicMock()
     mock_tracks_with_seg.graph.node_ids.return_value = [1, 2]
-    mock_tracks_with_seg.get_track_id.side_effect = lambda n: n
+    mock_tracks_with_seg.get_track_ids.return_value = [1, 2]
 
     mock_dialog = MagicMock()
     mock_dialog.exec_.return_value = 1
@@ -266,7 +266,7 @@ def test_export_csv_with_seg_tiff(
     tif_file = tmp_path / "tracks.tif"
     mock_tracks_with_seg.graph = MagicMock()
     mock_tracks_with_seg.graph.node_ids.return_value = [1]
-    mock_tracks_with_seg.get_track_id.side_effect = lambda n: n
+    mock_tracks_with_seg.get_track_ids.return_value = [1]
 
     mock_dialog = MagicMock()
     mock_dialog.exec_.return_value = 1
