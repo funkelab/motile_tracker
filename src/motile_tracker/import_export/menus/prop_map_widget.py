@@ -492,7 +492,7 @@ class StandardFieldMapWidget(QWidget):
         - Column name (to load from that column)
         - "Recompute" (to compute from segmentation)
 
-        Custom and Group features are excluded (handled via name_map).
+        Custom and Group features are handled by adding themselves under their own name.
         """
         features = {}
         for attr, widgets in self.optional_features.items():
@@ -501,8 +501,7 @@ class StandardFieldMapWidget(QWidget):
                 recompute = widgets["recompute"].isChecked()
 
                 if selected in ("Custom", "Group"):
-                    # Custom/Group features are added to name_map instead
-                    continue
+                    features[attr] = attr  # just add itself with its own name
                 elif recompute:
                     features[selected] = "Recompute"
                 else:
@@ -514,7 +513,7 @@ class StandardFieldMapWidget(QWidget):
 
         Returns dict mapping property name to recompute boolean.
 
-        Custom and Group features are excluded (handled via name_map).
+        Custom and Group features are handled by adding themselves under their own name.
         """
         node_features = {}
         for attr, widgets in self.optional_features.items():
@@ -523,8 +522,7 @@ class StandardFieldMapWidget(QWidget):
                 recompute = widgets["recompute"].isChecked()
 
                 if selected in ("Custom", "Group"):
-                    # Custom/Group features are added to name_map instead
-                    continue
+                    node_features[attr] = attr  # just add itself with its own name
 
                 node_features[attr] = recompute
         return node_features
