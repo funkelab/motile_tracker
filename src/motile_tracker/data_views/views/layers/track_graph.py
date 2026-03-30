@@ -72,10 +72,24 @@ def update_napari_tracks(
 
     # Build inter-track edges for divisions (parents with ≥2 children)
     node_to_track_id = dict(zip(node_ids, track_ids_arr.tolist(), strict=True))
-    parents = [node for node in graph.node_ids() if graph.out_degree(node) >= 2]
-    for parent in parents:
+
+    # Batch edge query instead of per-node out_degree/successors SQL calls
+    edge_df = graph.edge_attrs(
+        attr_keys=[DEFAULT_ATTR_KEYS.EDGE_SOURCE, DEFAULT_ATTR_KEYS.EDGE_TARGET]
+    )
+    parent_to_children: dict[int, list[int]] = {}
+    for src, tgt in zip(
+        edge_df[DEFAULT_ATTR_KEYS.EDGE_SOURCE].to_list(),
+        edge_df[DEFAULT_ATTR_KEYS.EDGE_TARGET].to_list(),
+        strict=True,
+    ):
+        parent_to_children.setdefault(src, []).append(tgt)
+
+    for parent, children in parent_to_children.items():
+        if len(children) < 2:
+            continue
         parent_track_id = node_to_track_id[parent]
-        for daughter in graph.successors(parent):
+        for daughter in children:
             child_track_id = node_to_track_id[daughter]
             if child_track_id in napari_edges:
                 napari_edges[child_track_id].append(parent_track_id)
