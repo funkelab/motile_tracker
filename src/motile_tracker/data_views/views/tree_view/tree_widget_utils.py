@@ -65,22 +65,31 @@ def extract_sorted_tracks(
         for i, node in enumerate(node_ids_list)
     }
 
+    # Batch-fetch all edges in one query and build adjacency maps.
+    # This replaces all per-node predecessors/successors/in_degree/out_degree calls.
+    edge_df = solution_nx_graph.edge_attrs(
+        attr_keys=[DEFAULT_ATTR_KEYS.EDGE_SOURCE, DEFAULT_ATTR_KEYS.EDGE_TARGET]
+    )
+    sources = edge_df[DEFAULT_ATTR_KEYS.EDGE_SOURCE].to_list()
+    targets = edge_df[DEFAULT_ATTR_KEYS.EDGE_TARGET].to_list()
+    child_to_parent: dict[int, int] = {}
+    parent_to_children: dict[int, list[int]] = {}
+    for src, tgt in zip(sources, targets, strict=True):
+        child_to_parent[tgt] = src
+        parent_to_children.setdefault(src, []).append(tgt)
+
     track_list = []
     parent_mapping = []
 
-    # Identify parent nodes (nodes with more than one child)
-    parent_nodes = [
-        n for n in solution_nx_graph.node_ids() if solution_nx_graph.out_degree(n) > 1
-    ]
-    end_nodes = [
-        n for n in solution_nx_graph.node_ids() if solution_nx_graph.out_degree(n) == 0
-    ]
+    # Identify parent nodes (nodes with more than one child) and end nodes
+    parent_nodes = [n for n in node_ids_list if len(parent_to_children.get(n, [])) > 1]
+    end_nodes = [n for n in node_ids_list if n not in parent_to_children]
 
     # BFS to collect tracklets, cutting edges at division (parent) nodes
     parent_node_set = set(parent_nodes)
     visited: set = set()
     tracklets: list[set] = []
-    for start_node in solution_nx_graph.node_ids():
+    for start_node in node_ids_list:
         if start_node in visited:
             continue
         component: set = set()
@@ -91,11 +100,11 @@ def extract_sorted_tracks(
                 continue
             visited.add(node)
             component.add(node)
-            for pred in solution_nx_graph.predecessors(node):
-                if pred not in visited and pred not in parent_node_set:
-                    queue.append(pred)
+            pred = child_to_parent.get(node)
+            if pred is not None and pred not in visited and pred not in parent_node_set:
+                queue.append(pred)
             if node not in parent_node_set:
-                for succ in solution_nx_graph.successors(node):
+                for succ in parent_to_children.get(node, []):
                     if succ not in visited:
                         queue.append(succ)
         tracklets.append(component)
@@ -157,11 +166,8 @@ def extract_sorted_tracks(
                     track_dict[display_name] = val
 
             # Determine parent_id and parent_track_id
-            predecessors = list(solution_nx_graph.predecessors(node))
-            if predecessors:
-                parent_id = predecessors[
-                    0
-                ]  # There should be only one predecessor in a lineage tree
+            parent_id = child_to_parent.get(node)
+            if parent_id is not None:
                 track_dict["parent_id"] = parent_id
 
                 if parent_track_id is None:
@@ -180,7 +186,11 @@ def extract_sorted_tracks(
         )
 
     x_axis_order = get_sorted_track_ids(
-        solution_nx_graph, node_to_track_id, prev_axis_order
+        node_ids_list,
+        node_to_track_id,
+        child_to_parent,
+        parent_to_children,
+        prev_axis_order,
     )
 
     for node in track_list:
@@ -225,8 +235,10 @@ def order_roots_by_prev(prev_axis_order: list[int], roots: list[int]) -> list[in
 
 
 def get_sorted_track_ids(
-    graph,
+    node_ids: list[int],
     node_to_track_id: dict,
+    child_to_parent: dict[int, int],
+    parent_to_children: dict[int, list[int]],
     prev_axis_order: list[int] | None = None,
 ) -> list[Any]:
     """
@@ -235,21 +247,24 @@ def get_sorted_track_ids(
     parent track id.
 
     Args:
-        graph: graph with a tracklet_id attribute on it.
+        node_ids: list of all node IDs.
         node_to_track_id (dict): precomputed mapping from node_id to track_id.
+        child_to_parent: precomputed mapping from child node_id to parent node_id.
+        parent_to_children: precomputed mapping from parent node_id to child node_ids.
+        prev_axis_order (list[int], Optional). The previous axis order.
 
     Returns:
         list[Any] of ordered tracklet_ids.
     """
 
     # Topological sort via Kahn's algorithm (BFS from roots)
-    in_degree = {n: graph.in_degree(n) for n in graph.node_ids()}
+    in_degree = {n: (1 if n in child_to_parent else 0) for n in node_ids}
     queue = [n for n, d in in_degree.items() if d == 0]
     topo_order = []
     while queue:
         node = queue.pop(0)
         topo_order.append(node)
-        for succ in graph.successors(node):
+        for succ in parent_to_children.get(node, []):
             in_degree[succ] -= 1
             if in_degree[succ] == 0:
                 queue.append(succ)
@@ -260,8 +275,8 @@ def get_sorted_track_ids(
         tracklet = node_to_track_id[node]
         if tracklet in tracklet_to_parent_tracklet:
             continue
-        predecessors = list(graph.predecessors(node))
-        parent_tracklet_id = node_to_track_id[predecessors[0]] if predecessors else 0
+        parent_id = child_to_parent.get(node)
+        parent_tracklet_id = node_to_track_id[parent_id] if parent_id is not None else 0
         tracklet_to_parent_tracklet[tracklet] = parent_tracklet_id
 
     # Final sorted order of roots
