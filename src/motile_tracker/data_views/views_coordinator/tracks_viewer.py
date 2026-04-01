@@ -60,17 +60,17 @@ class TracksViewer:
             cls._instance = TracksViewer(viewer)
         return cls._instance
 
-    @classmethod
-    def _clear_instance(cls):
-        if hasattr(cls, "_instance"):
-            del cls._instance
-
     def __init__(
         self,
         viewer: napari.Viewer,
     ):
         self.viewer = viewer
-        viewer.window._qt_window.destroyed.connect(TracksViewer._clear_instance)
+
+        def _clear_if_current():
+            if hasattr(TracksViewer, "_instance") and TracksViewer._instance is self:
+                del TracksViewer._instance
+
+        viewer.window._qt_window.destroyed.connect(_clear_if_current)
         self.colormap = napari.utils.colormaps.label_colormap(
             49,
             seed=0.5,
