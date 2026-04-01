@@ -354,6 +354,11 @@ class TestSingletonLifecycle:
             assert tv2.viewer is v2
         finally:
             v2.close()
+            qapp.processEvents()
+            # _clear_instance was called by the destroyed signal, so _instance is
+            # gone. Restore tv1 so the autouse reset_tracks_viewer fixture can
+            # clear the module viewer's keybindings on teardown.
+            TracksViewer._instance = tv1
 
 
 class TestUndoRedo:
