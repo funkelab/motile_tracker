@@ -5,6 +5,8 @@ Tests cover node operations, edge operations, display modes, and selection manag
 
 from unittest.mock import patch
 
+import napari
+import networkx as nx
 import pytest
 from funtracks.data_model import SolutionTracks
 
@@ -309,6 +311,49 @@ class TestSelectionManagement:
 
         # selected_track should be None
         assert tracks_viewer.selected_track is None
+
+
+class TestSingletonLifecycle:
+    """Tests for TracksViewer singleton creation, reuse, and cleanup."""
+
+    def test_instance_cleared_after_viewer_close(self, qapp):
+        """_instance must be cleared when the viewer's Qt window is destroyed.
+
+        Regression: without the destroyed-signal connection, _instance survives
+        viewer.close() and the next get_instance() call returns a stale wrapper,
+        crashing with RuntimeError (wrapped C++ object deleted).
+        """
+        v = napari.Viewer(show=False)
+        TracksViewer.get_instance(v)
+        assert hasattr(TracksViewer, "_instance")
+
+        v.close()
+        qapp.processEvents()
+
+        assert not hasattr(TracksViewer, "_instance"), (
+            "TracksViewer._instance was not cleared after viewer.close(). "
+            "A subsequent get_instance() call would return a stale, crashed wrapper."
+        )
+
+    def test_get_instance_returns_new_instance_for_different_viewer(self, viewer, qapp):
+        """get_instance(v2) must return a fresh instance bound to v2.
+
+        Regression: without the viewer-identity check, the existing _instance is
+        silently returned regardless of which viewer is passed, wiring all widgets
+        to the wrong canvas.
+        """
+        tv1 = TracksViewer.get_instance(viewer)
+        assert tv1.viewer is viewer
+
+        v2 = napari.Viewer(show=False)
+        try:
+            tv2 = TracksViewer.get_instance(v2)
+            assert tv2 is not tv1, (
+                "get_instance(v2) returned the existing instance bound to a different viewer"
+            )
+            assert tv2.viewer is v2
+        finally:
+            v2.close()
 
 
 class TestUndoRedo:
