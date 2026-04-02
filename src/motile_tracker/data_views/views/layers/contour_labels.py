@@ -180,6 +180,8 @@ class ContourLabels(napari.layers.Labels):
                 else:
                     visible_values = np.intp(value)
                 self._slice.image.raw[displayed_indices] = visible_values
+                if any(len(ax) == 0 for ax in indices):
+                    return
                 updated_slice = tuple(
                     slice(int(min(ax)), int(max(ax)) + 1) for ax in indices
                 )
