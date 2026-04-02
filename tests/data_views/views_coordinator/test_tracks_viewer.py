@@ -6,7 +6,6 @@ Tests cover node operations, edge operations, display modes, and selection manag
 from unittest.mock import patch
 
 import napari
-import networkx as nx
 import pytest
 from funtracks.data_model import SolutionTracks
 
