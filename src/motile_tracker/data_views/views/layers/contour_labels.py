@@ -210,6 +210,44 @@ class ContourLabels(napari.layers.Labels):
             return
         super().data_setitem(indices, value, refresh)
 
+    def undo(self):
+        """Override undo for read-only data (e.g. GraphArrayView).
+
+        napari's default Labels.undo() calls data_setitem() to restore old
+        values. For read-only data, ContourLabels.data_setitem() cannot write
+        to the underlying array and instead fires events.paint as a signal for
+        upstream code to handle the change. Firing events.paint during an undo
+        triggers the same paint-event callbacks that initiated the undo in the
+        first place, causing a recursive loop and a TypeError.
+
+        This override breaks the loop by restoring the display buffer directly
+        from the undo history atoms, without going through data_setitem or
+        emitting any paint event.
+
+        This method is called (via super().undo()) from TrackLabels in three
+        situations: reverting a failed paint on the main layer, reverting a
+        failed paint on an ortho-view copy of the layer, and rolling back an
+        invalid action inside _on_paint error handling.
+        """
+        if not hasattr(self.data, "__setitem__"):
+            if not self._undo_history:
+                return
+            item = self._undo_history.pop()
+            self._redo_history.append(item)
+            pt_not_disp = self._get_pt_not_disp()
+            for indices, old_values, _new_value in item:
+                displayed_indices = index_in_slice(
+                    indices, pt_not_disp, self._slice.slice_input.order
+                )
+                if isinstance(old_values, np.ndarray):
+                    vis_vals = old_values[elements_in_slice(indices, pt_not_disp)]
+                else:
+                    vis_vals = np.intp(old_values)
+                self._slice.image.raw[displayed_indices] = vis_vals
+            self.refresh()
+        else:
+            super().undo()
+
     def _read_old_values(self, indices):
         """Read current values at indices from a read-only array,
         materializing one timepoint at a time (the only supported access pattern)."""

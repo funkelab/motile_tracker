@@ -224,3 +224,67 @@ def test_ensure_valid_label(viewer, solution_tracks_3d_with_division):
     assert tracks_viewer.tracking_layers.seg_layer.selected_label == 5  # next available
     # value
     assert tracks_viewer.selected_track == 4  # new track id (still unused)
+
+
+def test_data_setitem_empty_indices_does_not_raise(
+    viewer, solution_tracks_3d_with_division
+):
+    """Regression: painting outside the array bounds produces empty index arrays.
+
+    napari clips brush pixels to the array bounds before calling data_setitem.
+    When all pixels are outside the bounds the resulting index arrays are empty,
+    and ``min()`` on an empty sequence raised ``ValueError``.
+    The fix returns early when any index array is empty.
+    """
+    tracks_viewer = TracksViewer.get_instance(viewer)
+    tracks_viewer.update_tracks(tracks=solution_tracks_3d_with_division, name="test")
+    seg_layer = tracks_viewer.tracking_layers.seg_layer
+
+    # Empty index arrays simulate the case where the brush was fully outside the image.
+    empty_indices = tuple(
+        np.array([], dtype=np.int64) for _ in range(seg_layer.data.ndim)
+    )
+
+    # Must not raise ValueError ("min() iterable argument is empty")
+    with seg_layer.block_history():
+        seg_layer.data_setitem(empty_indices, 1)
+
+
+def test_undo_on_readonly_data_does_not_fire_paint_event(
+    viewer, solution_tracks_3d_with_division
+):
+    """Regression: undo() on a layer with read-only data must restore the display
+    buffer directly, without firing events.paint.
+
+    Before the fix, undo() fell through to Labels.undo() which called
+    data_setitem(), which in turn fired events.paint for read-only (GraphArrayView)
+    data.  In the ortho-view scenario that paint event triggered a recursive revert
+    producing a TypeError.  The fix overrides undo() to restore the display buffer
+    directly without emitting any paint event.
+    """
+    tracks_viewer = TracksViewer.get_instance(viewer)
+    tracks_viewer.update_tracks(tracks=solution_tracks_3d_with_division, name="test")
+    seg_layer = tracks_viewer.tracking_layers.seg_layer
+
+    # Put a synthetic atom directly into _undo_history to avoid running the full
+    # paint pipeline (which has its own side-effects on the track graph).
+    # Atom format: (indices, old_values, new_value)
+    indices = (
+        np.array([0], dtype=np.int64),
+        np.array([50], dtype=np.int64),
+        np.array([50], dtype=np.int64),
+        np.array([50], dtype=np.int64),
+    )
+    old_values = np.array([0], dtype=np.int64)
+    seg_layer._undo_history.append([(indices, old_values, 1)])
+
+    paint_events_fired = []
+    seg_layer.events.paint.connect(lambda event: paint_events_fired.append(event))
+
+    # Must not fire a paint event (and must not raise).
+    seg_layer.undo()
+
+    assert paint_events_fired == [], (
+        "undo() on read-only data must restore the display buffer directly "
+        "without emitting events.paint"
+    )
