@@ -57,7 +57,7 @@ jobs:
           run: uv run pytest --color=yes --cov=motile_tracker --cov-report=xml --cov-report=term-missing .
 
       - name: Coverage
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: funkelab/motile_tracker
