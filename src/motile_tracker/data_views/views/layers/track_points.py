@@ -267,9 +267,10 @@ class TrackPoints(ZOnlyPoints):
                 nodes = [
                     int(self.properties["node_id"][ind]) for ind in self.selected_data
                 ]
-                attrs = [
-                    {position_key: self.data[ind][1:]} for ind in self.selected_data
-                ]
+                attrs = {
+                    position_key: [self.data[ind][1:] for ind in self.selected_data]
+                }
+
                 UserUpdateNodesAttrs(
                     self.tracks_viewer.tracks,
                     nodes=nodes,

@@ -320,7 +320,7 @@ class CollectionWidget(QWidget):
             UserUpdateNodesAttrs(
                 tracks=self.tracks_viewer.tracks,
                 nodes=list(nodes),
-                attrs={feature_key: True},
+                attrs={feature_key: [True] * len(nodes)},
             )
 
             self.group_changed.emit()
@@ -400,7 +400,7 @@ class CollectionWidget(QWidget):
             UserUpdateNodesAttrs(
                 tracks=self.tracks_viewer.tracks,
                 nodes=list(nodes),
-                attrs={feature_key: False},
+                attrs={feature_key: [False] * len(nodes)},
             )
 
             self.group_changed.emit()

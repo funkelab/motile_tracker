@@ -225,7 +225,7 @@ def test_update_data_without_seg_layer(
     points_layer._update_data(event)
     assert tracks_viewer.tracks.graph.num_nodes() == current_node_count - 1
 
-    # Test 3: Changed action updates node position
+    # Test 3: Changed action updates node position (single node)
     points_layer.selected_data.add(0)
     first_node = points_layer.nodes[0]
     original_pos = solution_tracks_2d_without_segmentation.graph.nodes[first_node][
@@ -237,6 +237,27 @@ def test_update_data_without_seg_layer(
     points_layer._update_data(event)
     updated_pos = tracks_viewer.tracks.graph.nodes[first_node]["pos"]
     assert not np.array_equal(updated_pos, original_pos)
+
+    # Test 4: Changed action updates position for ALL selected nodes (multi-node)
+    points_layer.selected_data.clear()
+    points_layer.selected_data.add(0)
+    points_layer.selected_data.add(1)
+    node_0 = points_layer.nodes[0]
+    node_1 = points_layer.nodes[1]
+    original_pos_0 = np.asarray(
+        solution_tracks_2d_without_segmentation.graph.nodes[node_0]["pos"]
+    ).copy()
+    original_pos_1 = np.asarray(
+        solution_tracks_2d_without_segmentation.graph.nodes[node_1]["pos"]
+    ).copy()
+    points_layer.data[0] = np.array([points_layer.data[0][0], 11.0, 22.0])
+    points_layer.data[1] = np.array([points_layer.data[1][0], 33.0, 44.0])
+    event = MockEvent(action="changed")
+    points_layer._update_data(event)
+    updated_pos_0 = np.asarray(tracks_viewer.tracks.graph.nodes[node_0]["pos"])
+    updated_pos_1 = np.asarray(tracks_viewer.tracks.graph.nodes[node_1]["pos"])
+    assert not np.array_equal(updated_pos_0, original_pos_0)
+    assert not np.array_equal(updated_pos_1, original_pos_1)
 
 
 def test_update_data_with_seg_layer(viewer, solution_tracks_2d):
