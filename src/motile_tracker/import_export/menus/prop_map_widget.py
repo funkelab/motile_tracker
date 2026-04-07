@@ -493,6 +493,7 @@ class StandardFieldMapWidget(QWidget):
         - "Recompute" (to compute from segmentation)
 
         Custom and Group features are handled by adding themselves under their own name.
+        If the name is the same as an annotated feature, unexpected behavior will occur.
         """
         features = {}
         for attr, widgets in self.optional_features.items():
