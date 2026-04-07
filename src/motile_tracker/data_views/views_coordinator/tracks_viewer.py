@@ -98,7 +98,6 @@ class TracksViewer:
         self.force = False
 
         self.collection_widget = CollectionWidget(self)
-        self.collection_widget.group_changed.connect(self.update_selection)
 
         self.set_keybinds()
 

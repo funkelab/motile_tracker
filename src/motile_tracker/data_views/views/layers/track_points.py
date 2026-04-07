@@ -8,7 +8,7 @@ import napari
 import numpy as np
 from funtracks.data_model import Tracks
 from funtracks.exceptions import InvalidActionError
-from funtracks.user_actions import UserAddNode, UserDeleteNodes, UserUpdateNodeAttrs
+from funtracks.user_actions import UserAddNode, UserDeleteNodes, UserUpdateNodesAttrs
 from napari.layers.points._points_mouse_bindings import select
 from napari.utils.notifications import show_info
 from psygnal import Signal
@@ -263,15 +263,18 @@ class TrackPoints(ZOnlyPoints):
         elif event.action == "changed":
             # we only want to allow this update if there is no seg layer
             if self.tracks_viewer.tracking_layers.seg_layer is None:
-                for ind in self.selected_data:
-                    point = self.data[ind]
-                    pos = point[1:]
-                    node_id = int(self.properties["node_id"][ind])
-                    UserUpdateNodeAttrs(
-                        self.tracks_viewer.tracks,
-                        node=node_id,
-                        attrs={self.tracks_viewer.tracks.features.position_key: pos},
-                    )
+                position_key = self.tracks_viewer.tracks.features.position_key
+                nodes = [
+                    int(self.properties["node_id"][ind]) for ind in self.selected_data
+                ]
+                attrs = [
+                    {position_key: self.data[ind][1:]} for ind in self.selected_data
+                ]
+                UserUpdateNodesAttrs(
+                    self.tracks_viewer.tracks,
+                    nodes=nodes,
+                    attrs=attrs,
+                )
 
             else:
                 self._refresh()  # refresh to move points back where they belong

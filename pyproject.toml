@@ -93,7 +93,7 @@ dev = [
 
 [tool.uv.sources]
 #TODO Teun: release funtracks-v2 and use PyPI instead of git dependency
-funtracks = { git = "https://github.com/funkelab/funtracks", rev = "fb7de05a6f66e5fbf05c91d87fa486e0148f0ff1" }
+funtracks = { git = "https://github.com/funkelab/funtracks", rev = "dc2c5b858cf2551885e9894b7079a9165623dd3f" }
 
 [tool.uv]
 # gurobi12 and gurobi13 conflict with each other (mutually exclusive version pins)
