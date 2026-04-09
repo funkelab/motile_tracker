@@ -1,0 +1,9 @@
+# Caroline is the default reviewer for all code
+* @cmalinmayor
+
+# Anniek is the tree widget expert
+/src/motile_tracker/data_views/views/tree_view/* @anniekstok
+
+
+# Anniek is also the import/export expert
+/src/motile_tracker/import_export/* @anniekstok
