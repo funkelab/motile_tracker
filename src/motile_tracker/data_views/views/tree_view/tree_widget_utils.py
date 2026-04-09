@@ -5,6 +5,7 @@ from typing import Any
 import napari.layers
 import numpy as np
 import pandas as pd
+import tracksdata as td
 from funtracks.data_model import Tracks
 from tracksdata.constants import DEFAULT_ATTR_KEYS
 
@@ -307,7 +308,7 @@ def get_sorted_track_ids(
     return x_axis_order
 
 
-def extract_lineage_tree(graph, node_id: str) -> list[str]:
+def extract_lineage_tree(graph: td.GraphView, node_id: str) -> list[str]:
     """Extract the entire lineage tree including horizontal relations for a given node"""
 
     # go up the tree to identify the root node
