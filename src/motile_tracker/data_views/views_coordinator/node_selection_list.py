@@ -15,6 +15,7 @@ class NodeSelectionList(QObject):
         self._set = set()  # Use a set for O(1) membership
         self._prev_set = set()
         self._iter_index = 0  # Track position for "next/previous node"
+        self.deleted_items: set[int] = set()  # set of invalid (deleted) nodes
 
     def _reset_iterator(self) -> None:
         """Reset iteration pointer whenever selection changes."""
@@ -68,14 +69,15 @@ class NodeSelectionList(QObject):
         self._reset_iterator()
         self.list_updated.emit()
 
-    def filter(self, valid_items: set[int]) -> None:
+    def filter(self) -> None:
         """Silently filter the selection to only keep items that are in valid_items,
         without emitting list_updated.
 
         Args:
             valid_items: Set of node IDs that are valid/still exist.
         """
-        self._set = self._set & valid_items
+
+        self._set = self._set - self.deleted_items
         self._reset_iterator()
 
     def __contains__(self, item: int) -> bool:
