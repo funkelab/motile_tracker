@@ -193,7 +193,7 @@ class NodeSelectionHistory:
         self.selection_updated.emit()
 
     def reset(self) -> None:
-        """Clear all elements from the selection without adding empty sets to restore."""
+        """Clear all elements from the selection and update history."""
 
         current = self._current.copy()
         if current:  # Only store non-empty previous selections
