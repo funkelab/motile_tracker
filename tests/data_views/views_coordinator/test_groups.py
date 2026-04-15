@@ -38,7 +38,7 @@ def test_collection_button(viewer):
     assert isinstance(button.collection, set)
 
     # Verify node count label
-    assert button.node_count.text() == "0 nodes"
+    assert button.node_count.text() == "0 node(s)"
 
     # Verify buttons exist
     assert button.delete is not None
@@ -48,12 +48,12 @@ def test_collection_button(viewer):
     # Test 2: Update node count with multiple nodes
     button.collection = {1, 2, 3, 4, 5}
     button.update_node_count()
-    assert button.node_count.text() == "5 nodes"
+    assert button.node_count.text() == "5 node(s)"
 
     # Remove some nodes
     button.collection = {1, 2}
     button.update_node_count()
-    assert button.node_count.text() == "2 nodes"
+    assert button.node_count.text() == "2 node(s)"
 
     # Test 3: Size hint returns correct height
     hint = button.sizeHint()
@@ -218,7 +218,7 @@ def test_add_remove_nodes(viewer, graph_2d, qtbot):
     assert 2 in widget.selected_collection.collection
     assert 3 in widget.selected_collection.collection
     assert len(widget.selected_collection.collection) == 3
-    assert widget.selected_collection.node_count.text() == "3 nodes"
+    assert widget.selected_collection.node_count.text() == "3 node(s)"
 
     # Test 2: Remove some nodes
     tracks_viewer.selected_nodes.add_list([2], append=False)
