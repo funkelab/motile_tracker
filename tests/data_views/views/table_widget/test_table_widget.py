@@ -62,7 +62,7 @@ def test_table_selection_updates_tracksviewer(colored_table_widget, qtbot):
 
     first_row_node = widget._table["ID"][0]
 
-    with qtbot.waitSignal(tracks_viewer.selected_nodes.list_updated, timeout=1000):
+    with qtbot.waitSignal(tracks_viewer.selected_nodes.selection_updated, timeout=1000):
         table.selectRow(0)
 
     assert first_row_node in tracks_viewer.selected_nodes.as_list
@@ -92,7 +92,7 @@ def test_no_infinite_selection_loop(colored_table_widget, qtbot):
     def spy():
         spy_count["calls"] += 1
 
-    tracks_viewer.selected_nodes.list_updated.connect(spy)
+    tracks_viewer.selected_nodes.selection_updated.connect(spy)
 
     table.selectRow(0)
     qtbot.wait(50)
