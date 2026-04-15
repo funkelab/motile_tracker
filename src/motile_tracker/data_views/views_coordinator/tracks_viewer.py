@@ -427,8 +427,8 @@ class TracksViewer:
 
     def select_next(self, event=None):
         """Select next node set from history"""
-        self.selected_nodes.select_node_set_from_history(previous=False)
+        self.select_node_set_from_history(previous=False)
 
     def select_previous(self, event=None):
         """Select previous node set from history"""
-        self.selected_nodes.select_node_set_from_history(previous=True)
+        self.select_node_set_from_history(previous=True)
