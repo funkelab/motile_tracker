@@ -41,7 +41,7 @@ class CollectionButton(QWidget):
         self.name.setFixedHeight(20)
         self.collection = set()
         delete_icon = QColoredSVGIcon.from_resources("delete").colored("white")
-        self.node_count = QLabel(f"{len(self.collection)} nodes")
+        self.node_count = QLabel(f"{len(self.collection)} node(s)")
 
         export_icon = qticon(FA6S.file_export, color="white")
         self.export = QPushButton(icon=export_icon)
@@ -71,8 +71,10 @@ class CollectionButton(QWidget):
         hint.setHeight(30)
         return hint
 
-    def update_node_count(self, n_nodes: int) -> None:
-        self.node_count.setText(f"{n_nodes} nodes")
+    def update_node_count(self, n_nodes: int | None = None) -> None:
+        if n_nodes is None:
+            n_nodes = len(self.collection)
+        self.node_count.setText(f"{n_nodes} node(s)")
 
 
 class CollectionWidget(QWidget):
@@ -192,12 +194,13 @@ class CollectionWidget(QWidget):
             for i in range(self.collection_list.count())
         ]
         for collection_item in collection_items:
-            nodes = {
-                node
-                for node in collection_item.collection
-                if node not in self.tracks_viewer.selected_nodes.deleted_items
-            }
-            collection_item.update_node_count(len(nodes))
+            nodes = (
+                collection_item.collection
+                - self.tracks_viewer.selected_nodes.deleted_items
+            )
+            collection_item.update_node_count(
+                len(nodes)
+            )  # update the count, but keep deleted nodes in the collection.
 
     def retrieve_existing_groups(self) -> None:
         """Create collections based on the node attributes. Nodes assigned to a group
