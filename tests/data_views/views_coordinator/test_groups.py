@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import pytest
 from funtracks.data_model import SolutionTracks
-from PyQt6.QtCore import Qt
+from qtpy.QtCore import Qt
 
 from motile_tracker.data_views.views_coordinator.groups import (
     CollectionButton,
