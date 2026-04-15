@@ -116,26 +116,33 @@ class NodeSelectionHistory(QObject):
 
     def _find_next_valid_index(self, start: int, step: int) -> int | None:
         """Find next index (forward/backward) with non-empty filtered set.
+
+        Skips indices that:
+        - Have empty sets after filtering deleted items
+        - Have the same filtered set as the current selection (consecutive duplicates)
+
         Args:
             start (int): starting index, e.g. the current pointer
             step (int): the value by which to increment (can be negative)
 
         Returns:
-            The next index in the history that contains at least one existing node, or
-            None if there is no such index.
+            The next index in the history that contains at least one existing node
+            and differs from the current selection, or None if there is no such index.
 
         """
 
         i = start + step
+        current_filtered = self._current
 
         if not self.deleted_items:
             while 0 <= i < self._history_size:
-                if self._history[i]:
+                if self._history[i] and self._history[i] != current_filtered:
                     return i
                 i += step
         else:
             while 0 <= i < self._history_size:
-                if self._history[i] - self.deleted_items:
+                filtered_set = self._history[i] - self.deleted_items
+                if filtered_set and filtered_set != current_filtered:
                     return i
                 i += step
 
