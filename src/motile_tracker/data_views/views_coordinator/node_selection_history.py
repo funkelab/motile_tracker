@@ -8,19 +8,14 @@ class NodeSelectionHistory(QObject):
     """History-aware selection list for nodes with signals on updates.
 
     Records sets of selected nodes and allows navigating backwards/forwards through the
-    selection history. Empty sets and consecutive duplicates are not included in the
-    history.
+    selection history. Consecutive duplicates or empty selections are skipped when
+    navigating.
 
     A filter function (called by TracksViewer) places a filter on top of the history, to
     ensure deleted nodes are never returned in the _current selection list, while allowing
     them to continue to exist in the history, so that they can be 'reactivated' if placed
     back. When selecting next/previous node sets, sets that are empty after filtering are
     skipped automatically.
-
-    Since empty sets are not allowed in the history, a separate is_empty flag is used to
-    indicate that no nodes are selected, which is set when the restore function is called.
-     Requesting to select the 'previous' set when the selection is empty, will therefore
-    call the history at the current pointer, instead of shifting the pointer backwards.
 
     The last selection is stored on _prev_set, and can be restored with the restore
     function, irrespective of the pointer in history.
@@ -45,19 +40,13 @@ class NodeSelectionHistory(QObject):
         self._pointer = 0  # Track position in history for sets of nodes
         self._iter_index = 0  # index for "next/previous node" (within selection)
 
-        self.is_empty = True  # Flag to indicate no nodes are selected
-        self._empty_set = set()  # Empty set to return in case no nodes are selected
-
     @property
     def _current(self) -> set[int]:
         """Get the current selection set. Priority: filtered > history."""
 
-        if not self.is_empty:
-            if self._filtered_set is not None:
-                return self._filtered_set
-            return self._history[self._pointer]
-        else:
-            return self._empty_set
+        if self._filtered_set is not None:
+            return self._filtered_set
+        return self._history[self._pointer] if self._history_size > 0 else set()
 
     @property
     def as_list(self) -> list[int]:
@@ -84,23 +73,12 @@ class NodeSelectionHistory(QObject):
     @property
     def has_next_set(self) -> bool:
         """Return True if a next set is available for selection (non-empty after filtering)."""
-        if self._history_size == 0:
-            return False
-
-        if self.is_empty and self._history[self._pointer] - self.deleted_items:
-            return True
 
         return self._find_next_valid_index(self._pointer, +1) is not None
 
     @property
     def has_previous_set(self) -> bool:
         """Return True if a previous set is available for selection (non-empty after filtering)."""
-
-        if self._history_size == 0:
-            return False
-
-        if self.is_empty and self._history[self._pointer] - self.deleted_items:
-            return True
 
         return self._find_next_valid_index(self._pointer, -1) is not None
 
@@ -127,9 +105,8 @@ class NodeSelectionHistory(QObject):
             new_set: The new selection set to potentially add to history.
         """
 
-        if not new_set or (
-            self._history_size > 0 and self._history[self._pointer] == new_set
-        ):  # no duplicates or empty sets
+        if self._history_size > 0 and self._history[self._pointer] == new_set:
+            # skip duplicates
             return
 
         # If not at the end of history, truncate the redo stack
@@ -139,6 +116,10 @@ class NodeSelectionHistory(QObject):
         # Add the new set to history and update pointer
         self._history.append(new_set.copy())
         self._pointer = self._history_size - 1
+
+        print("history updated", self._history)
+        print("current pointer", self._pointer)
+        print("current selection", self._current)
 
     def _find_next_valid_index(self, start: int, step: int) -> int | None:
         """Find next index (forward/backward) with non-empty filtered set.
@@ -188,7 +169,6 @@ class NodeSelectionHistory(QObject):
             new_set = {item}
 
         self._add_to_history(new_set)
-        self.is_empty = False
         self._reset_iterator()
         self.selection_updated.emit()
 
@@ -212,7 +192,6 @@ class NodeSelectionHistory(QObject):
             new_set = items_set.copy()
 
         self._add_to_history(new_set)
-        self.is_empty = False
         self._reset_iterator()
         self.selection_updated.emit()
 
@@ -223,7 +202,8 @@ class NodeSelectionHistory(QObject):
         current = self._current.copy()
         if current:  # Only store non-empty previous selections
             self._prev_set = current
-        self.is_empty = True
+
+        self._add_to_history(set())  # add empty set as the new selection
         self._reset_iterator()
         self.selection_updated.emit()
 
@@ -240,7 +220,6 @@ class NodeSelectionHistory(QObject):
             self._prev_set = prev_set
 
         self._filtered_set = None
-        self.is_empty = False
         self._reset_iterator()
         self.selection_updated.emit()
 
@@ -263,16 +242,6 @@ class NodeSelectionHistory(QObject):
     def select_node_set_from_history(self, previous: bool) -> None:
         """Move forwards or backwards in selection history, skipping invalid selections."""
 
-        # Special case: selection is inactive, try current pointer first
-        if self.is_empty and self._history_size > 0:
-            current_valid = self._history[self._pointer] - self.deleted_items
-            if current_valid:
-                self.is_empty = False
-                self._filtered_set = None
-                self._reset_iterator()
-                self.selection_updated.emit()
-                return
-
         step = -1 if previous else +1
         next_index = self._find_next_valid_index(self._pointer, step)
 
@@ -283,12 +252,12 @@ class NodeSelectionHistory(QObject):
 
         self._pointer = next_index
         self._filtered_set = None
-        self.is_empty = False
 
         self._prev_set = prev_set if prev_set else self._history[self._pointer]
 
         self._reset_iterator()
         self.selection_updated.emit()
+        print("current node set", self._current)
 
     def __contains__(self, item: int) -> bool:
         return item in self._current
