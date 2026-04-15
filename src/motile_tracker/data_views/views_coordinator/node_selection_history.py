@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from psygnal import Signal
-from qtpy.QtCore import QObject
 
 
-class NodeSelectionHistory(QObject):
+class NodeSelectionHistory:
     """History-aware selection list for nodes with signals on updates.
 
     Records sets of selected nodes and allows navigating backwards/forwards through the
