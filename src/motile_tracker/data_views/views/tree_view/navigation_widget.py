@@ -11,7 +11,7 @@ from qtpy.QtWidgets import (
 )
 
 if TYPE_CHECKING:
-    from motile_tracker.data_views import NodeSelectionList
+    from motile_tracker.data_views import NodeSelectionHistory
 
 
 class NavigationWidget(QWidget):
@@ -20,7 +20,7 @@ class NavigationWidget(QWidget):
         track_df: pd.DataFrame,
         lineage_df: pd.DataFrame,
         view_direction: str,
-        selected_nodes: NodeSelectionList,
+        selected_nodes: NodeSelectionHistory,
         plot_type: str,
     ):
         """Widget for controlling navigation in the tree widget
@@ -28,7 +28,7 @@ class NavigationWidget(QWidget):
         Args:
             track_df (pd.DataFrame): The dataframe holding the track information
             view_direction (str): The view direction of the tree widget. Options: "vertical", "horizontal".
-            selected_nodes (NodeSelectionList): The list of selected nodes.
+            selected_nodes (NodeSelectionHistory): The list of selected nodes.
             plot_type (str): either 'tree' or 'feature'
         """
 

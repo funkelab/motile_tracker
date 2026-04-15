@@ -9,6 +9,7 @@ from qtpy.QtWidgets import (
 )
 
 from motile_tracker.application_menus.editing_menu import EditingMenu
+from motile_tracker.application_menus.selection_menu import SelectionWidget
 from motile_tracker.application_menus.visualization_widget import (
     LabelVisualizationWidget,
 )
@@ -29,7 +30,17 @@ class MenuWidget(QScrollArea):
         self.tracks_viewer.tracks_updated.connect(self._toggle_visualization_widget)
 
         motile_widget = MotileWidget(viewer)
+
         editing_widget = EditingMenu(viewer)
+        selection_widget = SelectionWidget(self.tracks_viewer)
+        selection_editing_widget = QWidget()
+        selection_editing_layout = QVBoxLayout()
+        selection_editing_layout.addWidget(editing_widget)
+        selection_editing_layout.addWidget(selection_widget)
+        selection_editing_layout.setContentsMargins(0, 0, 0, 0)
+        selection_editing_widget.setLayout(selection_editing_layout)
+        selection_editing_widget.setMaximumHeight(600)
+
         self.visualization_widget = LabelVisualizationWidget(viewer)
         self._visualization_index = 3
 
@@ -37,7 +48,7 @@ class MenuWidget(QScrollArea):
 
         self.tabwidget.addTab(motile_widget, "Tracking")
         self.tabwidget.addTab(self.tracks_viewer.tracks_list, "Tracks List")
-        self.tabwidget.addTab(editing_widget, "Edit Tracks")
+        self.tabwidget.addTab(selection_editing_widget, "Editing && Selection")
         self.tabwidget.addTab(self.tracks_viewer.collection_widget, "Groups")
 
         # Header with title and help links

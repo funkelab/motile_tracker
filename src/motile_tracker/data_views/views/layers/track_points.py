@@ -20,6 +20,7 @@ from motile_tracker.data_views.keybindings_config import (
 from motile_tracker.data_views.node_type import NodeType
 from motile_tracker.data_views.views.layers.click_utils import (
     detect_click,
+    detect_side_button,
     get_click_value,
 )
 from motile_tracker.data_views.views_coordinator.user_dialogs import (
@@ -97,14 +98,17 @@ class TrackPoints(ZOnlyPoints):
         # Connect to click events to select nodes
         @self.mouse_drag_callbacks.append
         def click(layer, event):
-            if event.type == "mouse_press" and self.mode == "pan_zoom":
+            side_button = detect_side_button(event)
+            if side_button is not None:
+                self.process_click(event, side_button=side_button)
+            elif event.type == "mouse_press" and self.mode == "pan_zoom":
                 was_click = yield from detect_click(event)
                 if was_click:
                     # find the point matching the click location, if any. Warning: the
                     # search area depends on the point size. If points are large and
                     # overlapping, this may result in the wrong value being returned.
-                    value = get_click_value(self, event)
-                    self.process_click(event, value)
+                    point_index = get_click_value(self, event)
+                    self.process_click(event, value=point_index)
 
         # listen to updates of the data
         self.events.data.connect(self._update_data)
@@ -128,22 +132,29 @@ class TrackPoints(ZOnlyPoints):
     def process_click(
         self,
         event: Event,
-        point_index: int | None,
-        _layer: napari.layers.Points | None = None,
+        value: int | None = None,
+        side_button: int | None = None,
+        layer: napari.layers.Points | None = None,
     ):
         """Select the clicked point(s)
 
         Args:
             event (Event): The mouse event
-            point_index (int | None): The index of the clicked point, or None if no point
+            value (int | None): The index of the clicked point, or None if no point
                 was clicked
-            _layer (napari.layers.Points | None): Optional, unused. The (ortho view) layer on which the click occurred, which is forwarded by default.
+            side_button (int | None): the button index (4: back, 5: forward) if a mouse side button was used, or None if no side button was used.
+            layer (napari.layers.Points | None): Optional, unused. The (ortho view) layer on which the click occurred, which is forwarded by default.
         """
 
-        if point_index is None:
+        # Intercept mouse side button navigation (back/forward)
+        if side_button is not None:
+            self.tracks_viewer.select_node_set_from_history(previous=side_button == 4)
+            return
+
+        if value is None:
             self.tracks_viewer.selected_nodes.reset()
         else:
-            node_id = self.nodes[point_index]
+            node_id = self.nodes[value]
             append = "Shift" in event.modifiers
             jump = "Control" in event.modifiers
             if jump:
@@ -326,14 +337,17 @@ class TrackPoints(ZOnlyPoints):
         self.border_color = [1, 1, 1, 1]
         self.size = self.default_size
         for node in self.tracks_viewer.selected_nodes:
-            index = self.node_index_dict[node]
-            self.border_color[index] = (
-                0,
-                1,
-                1,
-                1,
-            )
-            self.size[index] = math.ceil(self.default_size + 0.3 * self.default_size)
+            index = self.node_index_dict.get(node, None)
+            if index is not None:
+                self.border_color[index] = (
+                    0,
+                    1,
+                    1,
+                    1,
+                )
+                self.size[index] = math.ceil(
+                    self.default_size + 0.3 * self.default_size
+                )
 
         # emit the event to trigger update in orthogonal views
         self.border_color = self.border_color
