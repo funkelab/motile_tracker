@@ -35,6 +35,7 @@ class SelectionWidget(QWidget):
         left_arrow = qticon(FA6S.arrow_left, color="white")
         self.jump_to_previous_btn = QPushButton(icon=left_arrow)
         self.jump_to_previous_btn.setToolTip("Navigate to previous selected node.")
+        self.jump_to_previous_btn.setEnabled(False)
         self.jump_to_previous_btn.clicked.connect(
             lambda: self._jump_to_node(forward=False)
         )
@@ -42,6 +43,7 @@ class SelectionWidget(QWidget):
         right_arrow = qticon(FA6S.arrow_right, color="white")
         self.jump_to_next_btn = QPushButton(icon=right_arrow)
         self.jump_to_next_btn.setToolTip("Navigate to next selected node.")
+        self.jump_to_next_btn.setEnabled(False)
         self.jump_to_next_btn.clicked.connect(lambda: self._jump_to_node(forward=True))
 
         arrow_layout = QHBoxLayout()
@@ -53,6 +55,7 @@ class SelectionWidget(QWidget):
         self.select_next_set_btn.setToolTip(
             "Select the next set of nodes from the selection history."
         )
+        self.select_next_set_btn.setEnabled(False)
         self.select_next_set_btn.clicked.connect(
             lambda: self.tracks_viewer.select_node_set_from_history(previous=False)
         )
@@ -60,6 +63,7 @@ class SelectionWidget(QWidget):
         self.select_previous_set_btn.setToolTip(
             "Select the previous set of nodes from the selection history."
         )
+        self.select_previous_set_btn.setEnabled(False)
         self.select_previous_set_btn.clicked.connect(
             lambda: self.tracks_viewer.select_node_set_from_history(previous=True)
         )
@@ -98,6 +102,9 @@ class SelectionWidget(QWidget):
 
         # Connect to selection updates to enable/disable buttons accordingly
         self.tracks_viewer.node_selection_updated.connect(self.update_selection_buttons)
+
+        # Set initial button states
+        self.update_selection_buttons()
 
     def update_selection_buttons(self):
         """Update the button states based on the current node selection (history)"""
