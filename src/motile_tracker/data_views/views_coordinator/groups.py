@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from functools import partial
 from typing import TYPE_CHECKING, Any
+from warnings import warn
 
 from fonticon_fa6 import FA6S
 from funtracks.features._feature import Feature
@@ -435,11 +436,14 @@ class CollectionWidget(QWidget):
         """
 
         group_name = self.collection_list.itemWidget(item).name.text()
-        nodes_to_keep = [
-            node
-            for node in self.collection_list.itemWidget(item).collection
-            if node not in self.tracks_viewer.selected_nodes.deleted_items
-        ]
+        nodes_to_keep = (
+            self.collection_list.itemWidget(item).collection
+            - self.tracks_viewer.selected_nodes.deleted_items
+        )
+
+        if len(nodes_to_keep) == 0:
+            warn("No nodes in this group to export!", stacklevel=2)
+            return
 
         # Keep nodes that belong to the selected group and export
         ExportDialog.show_export_dialog(
