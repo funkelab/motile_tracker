@@ -40,7 +40,7 @@ The following columns have to be selected:
 From this, a `SolutionTracks object`_ is generated, containing a networkx graph representing the tracking result, and optionally
 a segmentation. The networkx graph is directed, with nodes representing detections and
 edges going from a detection in time t to the same object in t+n (edges go forward in time).
-Nodes must have an attribute representing time, by default named "time" but a different name
+Nodes must have an attribute representing time, by default named "t" but a different name
 can be stored in the ``Tracks.time_attr`` attribute. Nodes must also have one or more attributes
 representing position. The default way of storing positions on nodes is an attribute called
 "pos" containing a list of position values, but dimensions can also be stored in separate attributes

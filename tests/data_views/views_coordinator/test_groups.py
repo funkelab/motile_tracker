@@ -7,7 +7,6 @@ selection operations, and export functionality.
 from unittest.mock import MagicMock, patch
 
 import pytest
-from funtracks.data_model import SolutionTracks
 from PyQt6.QtCore import Qt
 
 from motile_tracker.data_views.views_coordinator.groups import (
@@ -60,11 +59,10 @@ def test_collection_button(viewer):
     assert hint.height() == 30
 
 
-def test_collection_widget_initialization(viewer, graph_2d):
+def test_collection_widget_initialization(viewer, solution_tracks_2d):
     """Test CollectionWidget initializes correctly and has correct initial button states."""
-    tracks = SolutionTracks(graph=graph_2d, ndim=3)
     tracks_viewer = TracksViewer.get_instance(viewer)
-    tracks_viewer.update_tracks(tracks=tracks, name="test")
+    tracks_viewer.update_tracks(tracks=solution_tracks_2d, name="test")
 
     widget = CollectionWidget(tracks_viewer)
 
@@ -97,11 +95,10 @@ def test_collection_widget_initialization(viewer, graph_2d):
     assert widget.new_group_button.isEnabled()
 
 
-def test_group_creation_and_deletion(viewer, graph_2d, qtbot):
+def test_group_creation_and_deletion(viewer, solution_tracks_2d, qtbot):
     """Test creating groups (including duplicates) and deleting groups."""
-    tracks = SolutionTracks(graph=graph_2d, ndim=3)
     tracks_viewer = TracksViewer.get_instance(viewer)
-    tracks_viewer.update_tracks(tracks=tracks, name="test")
+    tracks_viewer.update_tracks(tracks=solution_tracks_2d, name="test")
 
     widget = CollectionWidget(tracks_viewer)
 
@@ -157,11 +154,10 @@ def test_group_creation_and_deletion(viewer, graph_2d, qtbot):
     assert "to_delete" not in tracks_viewer.tracks.features
 
 
-def test_button_states(viewer, graph_2d, qtbot):
+def test_button_states(viewer, solution_tracks_2d, qtbot, click_node):
     """Test button enable/disable states based on selection and group state."""
-    tracks = SolutionTracks(graph=graph_2d, ndim=3)
     tracks_viewer = TracksViewer.get_instance(viewer)
-    tracks_viewer.update_tracks(tracks=tracks, name="test")
+    tracks_viewer.update_tracks(tracks=solution_tracks_2d, name="test")
 
     widget = CollectionWidget(tracks_viewer)
 
@@ -171,7 +167,8 @@ def test_button_states(viewer, graph_2d, qtbot):
     assert not widget.jump_to_previous_btn.isEnabled()
 
     # Select nodes - navigation buttons now enabled
-    tracks_viewer.selected_nodes.add_list([1, 2], append=False)
+    click_node(tracks_viewer, 1)
+    click_node(tracks_viewer, 2, append=True)
     assert widget.deselect_btn.isEnabled()
     assert widget.jump_to_next_btn.isEnabled()
     assert widget.jump_to_previous_btn.isEnabled()
@@ -200,11 +197,10 @@ def test_button_states(viewer, graph_2d, qtbot):
     assert widget.select_btn.isEnabled()
 
 
-def test_add_remove_nodes(viewer, graph_2d, qtbot):
+def test_add_remove_nodes(viewer, solution_tracks_2d, qtbot, click_node):
     """Test adding and removing individual nodes to/from groups."""
-    tracks = SolutionTracks(graph=graph_2d, ndim=3)
     tracks_viewer = TracksViewer.get_instance(viewer)
-    tracks_viewer.update_tracks(tracks=tracks, name="test")
+    tracks_viewer.update_tracks(tracks=solution_tracks_2d, name="test")
 
     widget = CollectionWidget(tracks_viewer)
 
@@ -213,7 +209,9 @@ def test_add_remove_nodes(viewer, graph_2d, qtbot):
     qtbot.mouseClick(widget.new_group_button, Qt.MouseButton.LeftButton)
 
     # Test 1: Add nodes to group
-    tracks_viewer.selected_nodes.add_list([1, 2, 3], append=False)
+    click_node(tracks_viewer, 1)
+    click_node(tracks_viewer, 2, append=True)
+    click_node(tracks_viewer, 3, append=True)
     qtbot.mouseClick(widget.add_nodes_btn, Qt.MouseButton.LeftButton)
 
     # Verify nodes were added to collection
@@ -224,7 +222,7 @@ def test_add_remove_nodes(viewer, graph_2d, qtbot):
     assert widget.selected_collection.node_count.text() == "3 nodes"
 
     # Test 2: Remove some nodes
-    tracks_viewer.selected_nodes.add_list([2], append=False)
+    click_node(tracks_viewer, 2)
     qtbot.mouseClick(widget.remove_node_btn, Qt.MouseButton.LeftButton)
 
     # Verify node was removed
@@ -234,11 +232,10 @@ def test_add_remove_nodes(viewer, graph_2d, qtbot):
     assert len(widget.selected_collection.collection) == 2
 
 
-def test_add_remove_tracks(viewer, graph_2d, qtbot):
+def test_add_remove_tracks(viewer, solution_tracks_2d, qtbot, click_node):
     """Test adding and removing entire tracks to/from groups."""
-    tracks = SolutionTracks(graph=graph_2d, ndim=3)
     tracks_viewer = TracksViewer.get_instance(viewer)
-    tracks_viewer.update_tracks(tracks=tracks, name="test")
+    tracks_viewer.update_tracks(tracks=solution_tracks_2d, name="test")
 
     widget = CollectionWidget(tracks_viewer)
 
@@ -247,7 +244,7 @@ def test_add_remove_tracks(viewer, graph_2d, qtbot):
     qtbot.mouseClick(widget.new_group_button, Qt.MouseButton.LeftButton)
 
     # Test 1: Add entire track to group
-    tracks_viewer.selected_nodes.add_list([1], append=False)
+    click_node(tracks_viewer, 1)
     qtbot.mouseClick(widget.add_track_btn, Qt.MouseButton.LeftButton)
 
     # Verify all nodes in the track were added
@@ -261,7 +258,7 @@ def test_add_remove_tracks(viewer, graph_2d, qtbot):
     assert initial_count > 0
 
     # Test 2: Remove the entire track
-    tracks_viewer.selected_nodes.add_list([1], append=False)
+    click_node(tracks_viewer, 1)
     qtbot.mouseClick(widget.remove_track_btn, Qt.MouseButton.LeftButton)
 
     # Verify track was removed
@@ -269,11 +266,10 @@ def test_add_remove_tracks(viewer, graph_2d, qtbot):
         assert node not in widget.selected_collection.collection
 
 
-def test_add_remove_lineages(viewer, graph_2d, qtbot):
+def test_add_remove_lineages(viewer, solution_tracks_2d, qtbot, click_node):
     """Test adding and removing entire lineages to/from groups."""
-    tracks = SolutionTracks(graph=graph_2d, ndim=3)
     tracks_viewer = TracksViewer.get_instance(viewer)
-    tracks_viewer.update_tracks(tracks=tracks, name="test")
+    tracks_viewer.update_tracks(tracks=solution_tracks_2d, name="test")
 
     widget = CollectionWidget(tracks_viewer)
 
@@ -282,7 +278,7 @@ def test_add_remove_lineages(viewer, graph_2d, qtbot):
     qtbot.mouseClick(widget.new_group_button, Qt.MouseButton.LeftButton)
 
     # Test 1: Add entire lineage to group
-    tracks_viewer.selected_nodes.add_list([1], append=False)
+    click_node(tracks_viewer, 1)
     qtbot.mouseClick(widget.add_lineage_btn, Qt.MouseButton.LeftButton)
 
     # Verify lineage nodes were added (at least the selected node)
@@ -292,18 +288,17 @@ def test_add_remove_lineages(viewer, graph_2d, qtbot):
     initial_count = len(widget.selected_collection.collection)
 
     # Test 2: Remove the lineage
-    tracks_viewer.selected_nodes.add_list([1], append=False)
+    click_node(tracks_viewer, 1)
     qtbot.mouseClick(widget.remove_lineage_btn, Qt.MouseButton.LeftButton)
 
     # Verify lineage was removed (should be empty or much smaller)
     assert len(widget.selected_collection.collection) < initial_count
 
 
-def test_selection_operations(viewer, graph_2d, qtbot):
+def test_selection_operations(viewer, solution_tracks_2d, qtbot, click_node):
     """Test selection operations: select, deselect, invert, restore."""
-    tracks = SolutionTracks(graph=graph_2d, ndim=3)
     tracks_viewer = TracksViewer.get_instance(viewer)
-    tracks_viewer.update_tracks(tracks=tracks, name="test")
+    tracks_viewer.update_tracks(tracks=solution_tracks_2d, name="test")
 
     widget = CollectionWidget(tracks_viewer)
 
@@ -311,7 +306,9 @@ def test_selection_operations(viewer, graph_2d, qtbot):
     widget.group_name.setText("test_group")
     qtbot.mouseClick(widget.new_group_button, Qt.MouseButton.LeftButton)
 
-    tracks_viewer.selected_nodes.add_list([1, 2, 3], append=False)
+    click_node(tracks_viewer, 1)
+    click_node(tracks_viewer, 2, append=True)
+    click_node(tracks_viewer, 3, append=True)
     qtbot.mouseClick(widget.add_nodes_btn, Qt.MouseButton.LeftButton)
 
     # Test 1: Select all nodes in group
@@ -336,7 +333,7 @@ def test_selection_operations(viewer, graph_2d, qtbot):
     assert 3 in tracks_viewer.selected_nodes
 
     # Test 4: Invert selection
-    all_nodes = set(tracks.graph.nodes)
+    all_nodes = set(tracks_viewer.tracks.graph.node_ids())
     selected = [1, 2, 3]
 
     qtbot.mouseClick(widget.invert_btn, Qt.MouseButton.LeftButton)
@@ -347,11 +344,10 @@ def test_selection_operations(viewer, graph_2d, qtbot):
     assert actual == expected
 
 
-def test_node_navigation(viewer, graph_2d, qtbot):
+def test_node_navigation(viewer, solution_tracks_2d, qtbot, click_node):
     """Test jumping to next/previous selected nodes."""
-    tracks = SolutionTracks(graph=graph_2d, ndim=3)
     tracks_viewer = TracksViewer.get_instance(viewer)
-    tracks_viewer.update_tracks(tracks=tracks, name="test")
+    tracks_viewer.update_tracks(tracks=solution_tracks_2d, name="test")
 
     # Mock center_on_node to verify it's called
     center_mock = MagicMock()
@@ -360,7 +356,10 @@ def test_node_navigation(viewer, graph_2d, qtbot):
     widget = CollectionWidget(tracks_viewer)
 
     # Select multiple nodes
-    tracks_viewer.selected_nodes.add_list([1, 2, 3], append=False)
+    click_node(tracks_viewer, 1)
+    click_node(tracks_viewer, 2, append=True)
+    click_node(tracks_viewer, 3, append=True)
+    center_mock.reset_mock()  # reset calls that happened during selection setup
 
     # Test 1: Jump to next node
     qtbot.mouseClick(widget.jump_to_next_btn, Qt.MouseButton.LeftButton)
@@ -375,24 +374,24 @@ def test_node_navigation(viewer, graph_2d, qtbot):
 class TestRetrieveExistingGroups:
     """Test retrieving groups from track features."""
 
-    def test_retrieve_existing_groups(self, viewer, graph_2d):
+    def test_retrieve_existing_groups(self, viewer, solution_tracks_2d):
         """Test retrieving groups that exist as features on tracks."""
-        tracks = SolutionTracks(graph=graph_2d, ndim=3)
         tracks_viewer = TracksViewer.get_instance(viewer)
-        tracks_viewer.update_tracks(tracks=tracks, name="test")
+        tracks_viewer.update_tracks(tracks=solution_tracks_2d, name="test")
 
         # Add a boolean feature to tracks (simulates existing group)
         from funtracks.features import Feature
 
-        tracks.features["existing_group"] = Feature(
-            feature_type="node",
-            value_type="bool",
-            num_values=1,
+        tracks_viewer.tracks.add_feature(
+            "existing_group",
+            Feature(
+                feature_type="node", value_type="bool", num_values=1, default_value=None
+            ),
         )
 
         # Set some nodes to True for this feature
-        tracks.graph.nodes[1]["existing_group"] = True
-        tracks.graph.nodes[2]["existing_group"] = True
+        tracks_viewer.tracks.graph.nodes[1]["existing_group"] = True
+        tracks_viewer.tracks.graph.nodes[2]["existing_group"] = True
 
         widget = CollectionWidget(tracks_viewer)
         widget.retrieve_existing_groups()
@@ -407,11 +406,12 @@ class TestRetrieveExistingGroups:
         assert 1 in button.collection
         assert 2 in button.collection
 
-    def test_refresh_removes_deleted_nodes(self, viewer, graph_2d, qtbot):
+    def test_refresh_removes_deleted_nodes(
+        self, viewer, solution_tracks_2d, qtbot, click_node
+    ):
         """Test refresh removes nodes that no longer exist in graph."""
-        tracks = SolutionTracks(graph=graph_2d, ndim=3)
         tracks_viewer = TracksViewer.get_instance(viewer)
-        tracks_viewer.update_tracks(tracks=tracks, name="test")
+        tracks_viewer.update_tracks(tracks=solution_tracks_2d, name="test")
 
         widget = CollectionWidget(tracks_viewer)
 
@@ -419,13 +419,14 @@ class TestRetrieveExistingGroups:
         widget.group_name.setText("test_group")
         qtbot.mouseClick(widget.new_group_button, Qt.MouseButton.LeftButton)
 
-        tracks_viewer.selected_nodes.add_list([1, 2], append=False)
+        click_node(tracks_viewer, 1)
+        click_node(tracks_viewer, 2, append=True)
         qtbot.mouseClick(widget.add_nodes_btn, Qt.MouseButton.LeftButton)
 
         assert len(widget.selected_collection.collection) == 2
 
         # Remove a node from the graph
-        tracks.graph.remove_node(1)
+        tracks_viewer.tracks.graph.remove_node(1)
 
         # Refresh
         widget._refresh()
@@ -440,11 +441,12 @@ class TestRetrieveExistingGroups:
 
 
 @patch("motile_tracker.data_views.views_coordinator.groups.ExportDialog")
-def test_export_button_shows_dialog(mock_export_dialog, viewer, graph_2d, qtbot):
+def test_export_button_shows_dialog(
+    mock_export_dialog, viewer, solution_tracks_2d, qtbot, click_node
+):
     """Test export button shows export dialog."""
-    tracks = SolutionTracks(graph=graph_2d, ndim=3)
     tracks_viewer = TracksViewer.get_instance(viewer)
-    tracks_viewer.update_tracks(tracks=tracks, name="test")
+    tracks_viewer.update_tracks(tracks=solution_tracks_2d, name="test")
 
     widget = CollectionWidget(tracks_viewer)
 
@@ -452,7 +454,8 @@ def test_export_button_shows_dialog(mock_export_dialog, viewer, graph_2d, qtbot)
     widget.group_name.setText("export_test")
     qtbot.mouseClick(widget.new_group_button, Qt.MouseButton.LeftButton)
 
-    tracks_viewer.selected_nodes.add_list([1, 2], append=False)
+    click_node(tracks_viewer, 1)
+    click_node(tracks_viewer, 2, append=True)
     qtbot.mouseClick(widget.add_nodes_btn, Qt.MouseButton.LeftButton)
 
     # Click export button
@@ -466,6 +469,6 @@ def test_export_button_shows_dialog(mock_export_dialog, viewer, graph_2d, qtbot)
     # Verify correct parameters were passed
     call_args = mock_export_dialog.show_export_dialog.call_args
     assert call_args.kwargs["name"] == "export_test"
-    assert call_args.kwargs["tracks"] == tracks
+    assert call_args.kwargs["tracks"] == solution_tracks_2d
     assert 1 in call_args.kwargs["nodes_to_keep"]
     assert 2 in call_args.kwargs["nodes_to_keep"]

@@ -28,11 +28,13 @@ class NodeSelectionList(QObject):
             append: If True, add to existing selection (or remove if already present).
                 If False, replace selection with just this item.
         """
+        item = int(item)
         self._prev_set = self._set.copy()
-        if item in self._set:
-            self._set.remove(item)
-        elif append:
-            self._set.add(item)
+        if append:
+            if item in self._set:
+                self._set.remove(item)
+            else:
+                self._set.add(item)
         else:
             self._set = {item}
         self._reset_iterator()
@@ -47,7 +49,7 @@ class NodeSelectionList(QObject):
                 If False, replace selection with these items.
         """
         self._prev_set = self._set.copy()
-        items_set = set(items)
+        items_set = {int(i) for i in items}
         if append:
             self._set.symmetric_difference_update(items_set)
         else:

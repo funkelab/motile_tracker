@@ -27,6 +27,7 @@ from motile_tracker.import_export.menus.export_dialog import ExportDialog
 from motile_tracker.import_export.menus.import_dialog import (
     ImportDialog,
 )
+from motile_tracker.motile.backend.motile_run import MotileRun
 
 
 class TrackListWidget(QWidget):
@@ -233,7 +234,7 @@ class TracksList(QGroupBox):
             directory = Path(self.file_dialog.selectedFiles()[0])
             name = directory.stem
             try:
-                tracks = Tracks.load(directory, solution=True)
+                tracks = MotileRun.load(directory)
                 self.add_tracks(tracks, name, select=True)
             except (ValueError, FileNotFoundError) as e:
                 warn(f"Could not load tracks from {directory}: {e}", stacklevel=2)

@@ -98,7 +98,6 @@ class TracksViewer:
         self.force = False
 
         self.collection_widget = CollectionWidget(self)
-        self.collection_widget.group_changed.connect(self.update_selection)
 
         self.set_keybinds()
 
@@ -297,7 +296,9 @@ class TracksViewer:
 
         if self.tracks is None:
             return
-        UserDeleteNodes(self.tracks, nodes=self.selected_nodes.as_list)
+        UserDeleteNodes(
+            self.tracks, nodes=[int(n) for n in self.selected_nodes.as_list]
+        )
 
     def delete_edge(self, event=None):
         """Calls the UserAction to delete an edge between the two currently
@@ -316,6 +317,7 @@ class TracksViewer:
             if time1 > time2:
                 node1, node2 = node2, node1
 
+            node1, node2 = int(node1), int(node2)
             UserDeleteEdge(self.tracks, (node1, node2))
 
     def swap_nodes(self, event=None):
@@ -327,7 +329,7 @@ class TracksViewer:
             node1 = self.selected_nodes[0]
             node2 = self.selected_nodes[1]
 
-            UserSwapPredecessors(self.tracks, nodes=(node1, node2))
+            UserSwapPredecessors(self.tracks, nodes=(int(node1), int(node2)))
 
     def create_edge(self, event=None):
         """Add an edge between the two currently selected nodes"""
@@ -343,6 +345,8 @@ class TracksViewer:
 
             if time1 > time2:
                 node1, node2 = node2, node1
+
+            node1, node2 = int(node1), int(node2)
 
             try:
                 UserAddEdge(self.tracks, (node1, node2), force=self.force)
