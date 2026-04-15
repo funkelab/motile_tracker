@@ -16,7 +16,7 @@ class EditingMenu(QWidget):
         super().__init__()
 
         self.tracks_viewer = TracksViewer.get_instance(viewer)
-        self.tracks_viewer.selected_nodes.list_updated.connect(self.update_buttons)
+        self.tracks_viewer.node_selection_updated.connect(self.update_buttons)
         layout = QVBoxLayout()
 
         self.label = QLabel(f"Current Track ID: {self.tracks_viewer.selected_track}")
