@@ -227,25 +227,25 @@ class TestPreviousSetTracking:
         history.restore()
         assert set(history) == {3, 4}
 
-    def test_has_valid_prev_set(self):
-        """Test has_valid_prev_set property."""
+    def test_has_valid_last_shown_set(self):
+        """Test has_valid_last_shown_set property."""
         history = NodeSelectionHistory()
 
         # No previous set initially
-        assert not history.has_valid_prev_set
+        assert not history.has_valid_last_shown_set
 
         history.add_list([1, 2], append=False)
-        assert not history.has_valid_prev_set
+        assert not history.has_valid_last_shown_set
 
         history.add_list([3, 4], append=False)
-        assert history.has_valid_prev_set
+        assert history.has_valid_last_shown_set
 
         # With deleted items, may not be valid
         history.deleted_items.add(1)
         history.deleted_items.add(2)
 
         # _prev_set was [1, 2], all deleted, so not valid
-        assert not history.has_valid_prev_set
+        assert not history.has_valid_last_shown_set
 
     def test_restore_with_deleted_items(self):
         """Test restore functionality with deleted items."""

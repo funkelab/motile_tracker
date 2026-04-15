@@ -15,7 +15,7 @@ class NodeSelectionHistory:
     selecting next/previous node sets, sets that are empty after filtering are skipped
     automatically.
 
-    The last selection is stored on _prev_set, and can be restored with the restore
+    The last selection is stored on _last_shown_set, and can be restored with the restore
     function, irrespective of the pointer in history.
 
     For convenience, there are helper properties to check if a next or previous node set
@@ -29,7 +29,7 @@ class NodeSelectionHistory:
         super().__init__()
 
         self._history: list[set[int]] = []  # History of selection states
-        self._prev_set: set[int] = (
+        self._last_shown_set: set[int] = (
             set()
         )  # Previous selection, for restore functionality
         self.deleted_items: set[int] = set()  # set of invalid (deleted) nodes
@@ -79,16 +79,16 @@ class NodeSelectionHistory:
         return self._find_next_valid_index(self._pointer, -1) is not None
 
     @property
-    def has_valid_prev_set(self) -> bool:
+    def has_valid_last_shown_set(self) -> bool:
         """Return True if previous selection contains at least one valid item."""
 
-        if not self._prev_set:
+        if not self._last_shown_set:
             return False
 
         if not self.deleted_items:
             return True
 
-        return bool(self._prev_set - self.deleted_items)
+        return bool(self._last_shown_set - self.deleted_items)
 
     def _reset_iterator(self) -> None:
         """Reset iteration pointer whenever selection changes."""
@@ -157,7 +157,7 @@ class NodeSelectionHistory:
         """
         current = self._current.copy()
         if current:  # Only store non-empty previous selections
-            self._prev_set = current
+            self._last_shown_set = current
         new_set = current.copy()
         if item in new_set:
             new_set.remove(item)
@@ -180,7 +180,7 @@ class NodeSelectionHistory:
         """
         current = self._current.copy()
         if current:  # Only store non-empty previous selections
-            self._prev_set = current
+            self._last_shown_set = current
         new_set = current.copy()
         items_set = set(items)
         if append:
@@ -197,7 +197,7 @@ class NodeSelectionHistory:
 
         current = self._current.copy()
         if current:  # Only store non-empty previous selections
-            self._prev_set = current
+            self._last_shown_set = current
 
         self._add_to_history(set())  # add empty set as the new selection
         self._reset_iterator()
@@ -206,14 +206,14 @@ class NodeSelectionHistory:
     def restore(self) -> None:
         """Restore the previous selection, independent of where you are in history."""
 
-        if not self.has_valid_prev_set:
+        if not self.has_valid_last_shown_set:
             return
 
         prev_set = self._current.copy()
-        self._add_to_history(self._prev_set.copy())
+        self._add_to_history(self._last_shown_set.copy())
 
         if prev_set:
-            self._prev_set = prev_set
+            self._last_shown_set = prev_set
 
         self._reset_iterator()
         self.selection_updated.emit()
@@ -230,7 +230,7 @@ class NodeSelectionHistory:
         prev_set = self._current.copy()
 
         self._pointer = next_index
-        self._prev_set = prev_set if prev_set else self._history[self._pointer]
+        self._last_shown_set = prev_set if prev_set else self._history[self._pointer]
 
         self._reset_iterator()
         self.selection_updated.emit()

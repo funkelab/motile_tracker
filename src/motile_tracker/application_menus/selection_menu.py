@@ -119,7 +119,7 @@ class SelectionWidget(QWidget):
             self.jump_to_previous_btn.setEnabled(False)
 
         self.reselect_btn.setEnabled(
-            self.tracks_viewer.selected_nodes.has_valid_prev_set
+            self.tracks_viewer.selected_nodes.has_valid_last_shown_set
         )
         self.select_next_set_btn.setEnabled(
             self.tracks_viewer.selected_nodes.has_next_set
