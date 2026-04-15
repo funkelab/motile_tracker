@@ -50,7 +50,7 @@ class TracksViewer:
     update_track_id = Signal()
     mode_updated = Signal()
     center_node = Signal(int)  # emitted when any component wants to center on a node
-    node_selection_updated = Signal()
+    node_selection_updated = Signal(bool)
 
     @classmethod
     def get_instance(cls, viewer=None):
@@ -82,7 +82,7 @@ class TracksViewer:
         self.tracking_layers = TracksLayerGroup(self.viewer, self.tracks, "", self)
         self.center_node.connect(self.tracking_layers.center_view)
         self.selected_nodes = NodeSelectionHistory()
-        self.selected_nodes.selection_updated.connect(self.filter_selection)
+        self.selected_nodes.selection_updated.connect(self.update_selection)
 
         self.tracks_list = TracksList()
         self.tracks_list.view_tracks.connect(self.update_tracks)
@@ -155,7 +155,7 @@ class TracksViewer:
 
         # restore selection and/or highlighting in all napari Views (napari Views do not
         # know about their selection ('all' vs 'lineage'), but TracksViewer does)
-        self.filter_selection()  # to update the list of deleted nodes and trigger update
+        self.update_selection(update_counts=True)
 
     def update_tracks(self, tracks: SolutionTracks, name: str) -> None:
         """Stop viewing a previous set of tracks and replace it with a new one.
@@ -288,15 +288,9 @@ class TracksViewer:
         elif isinstance(action, AddNode):
             self.selected_nodes.deleted_items.discard(action.node)
 
-    def filter_selection(self) -> None:
-        """Filter out any deleted nodes before emitting the update signals."""
-
-        self.selected_nodes.filter()
-        # Trigger the update cycle
-        self.update_selection()
-        self.node_selection_updated.emit()
-
-    def update_selection(self, set_view: bool = True) -> None:
+    def update_selection(
+        self, set_view: bool = True, update_counts: bool = False
+    ) -> None:
         """Sets the view and triggers visualization updates in other components"""
 
         if set_view and len(self.selected_nodes) == 1:
@@ -312,6 +306,7 @@ class TracksViewer:
 
         self.set_track_id_color(self.selected_track)
         self.update_track_id.emit()
+        self.node_selection_updated.emit(update_counts)
 
     def delete_node(self, event=None):
         """Calls the UserAction to delete currently selected nodes"""

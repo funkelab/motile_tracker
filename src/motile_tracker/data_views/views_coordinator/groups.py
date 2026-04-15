@@ -150,7 +150,7 @@ class CollectionWidget(QWidget):
 
         self._update_buttons_and_node_count()
 
-    def _update_buttons_and_node_count(self) -> None:
+    def _update_buttons_and_node_count(self, update_counts: bool = True) -> None:
         """Enable or disable selection and edit buttons depending on whether a group is
         selected, nodes are selected, and whether the group contains any nodes"""
 
@@ -170,13 +170,13 @@ class CollectionWidget(QWidget):
             self.remove_track_btn.setEnabled(False)
             self.remove_lineage_btn.setEnabled(False)
 
-        if selected:
+        if selected and update_counts:
+            # only update the counts if the tracks data has been updated
             collection_item = self.collection_list.itemWidget(selected[0])
-            nodes = {
-                item
-                for item in collection_item.collection
-                if item not in self.tracks_viewer.selected_nodes.deleted_items
-            }
+            nodes = (
+                collection_item.collection
+                - self.tracks_viewer.selected_nodes.deleted_items
+            )
             collection_item.update_node_count(len(nodes))
 
         if self.tracks_viewer.tracks is not None:

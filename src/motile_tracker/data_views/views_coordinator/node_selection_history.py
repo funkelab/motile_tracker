@@ -11,11 +11,10 @@ class NodeSelectionHistory(QObject):
     selection history. Consecutive duplicates or empty selections are skipped when
     navigating.
 
-    A filter function (called by TracksViewer) places a filter on top of the history, to
-    ensure deleted nodes are never returned in the _current selection list, while allowing
-    them to continue to exist in the history, so that they can be 'reactivated' if placed
-    back. When selecting next/previous node sets, sets that are empty after filtering are
-    skipped automatically.
+    Deleted nodes are never returned in the _current selection list, but they are allowed
+    to exist in the history, so that they can be 'reactivated' if placed back. When
+    selecting next/previous node sets, sets that are empty after filtering are skipped
+    automatically.
 
     The last selection is stored on _prev_set, and can be restored with the restore
     function, irrespective of the pointer in history.
@@ -31,7 +30,6 @@ class NodeSelectionHistory(QObject):
         super().__init__()
 
         self._history: list[set[int]] = []  # History of selection states
-        self._filtered_set: set[int] | None = None  # Filtered view of current selection
         self._prev_set: set[int] = (
             set()
         )  # Previous selection, for restore functionality
@@ -42,11 +40,10 @@ class NodeSelectionHistory(QObject):
 
     @property
     def _current(self) -> set[int]:
-        """Get the current selection set. Priority: filtered > history."""
+        """Get the current selection set, minus deleted items."""
 
-        if self._filtered_set is not None:
-            return self._filtered_set
-        return self._history[self._pointer] if self._history_size > 0 else set()
+        selection = self._history[self._pointer] if self._history_size > 0 else set()
+        return selection - self.deleted_items
 
     @property
     def as_list(self) -> list[int]:
@@ -117,10 +114,6 @@ class NodeSelectionHistory(QObject):
         self._history.append(new_set.copy())
         self._pointer = self._history_size - 1
 
-        print("history updated", self._history)
-        print("current pointer", self._pointer)
-        print("current selection", self._current)
-
     def _find_next_valid_index(self, start: int, step: int) -> int | None:
         """Find next index (forward/backward) with non-empty filtered set.
         Args:
@@ -156,7 +149,6 @@ class NodeSelectionHistory(QObject):
             append: If True, add to existing selection (or remove if already present).
                 If False, replace selection with just this item.
         """
-        self._filtered_set = None  # Clear any active filter
         current = self._current.copy()
         if current:  # Only store non-empty previous selections
             self._prev_set = current
@@ -180,7 +172,6 @@ class NodeSelectionHistory(QObject):
             append: If True, toggle items in existing selection.
                 If False, replace selection with these items.
         """
-        self._filtered_set = None  # Clear any active filter
         current = self._current.copy()
         if current:  # Only store non-empty previous selections
             self._prev_set = current
@@ -198,7 +189,6 @@ class NodeSelectionHistory(QObject):
     def reset(self) -> None:
         """Clear all elements from the selection without adding empty sets to restore."""
 
-        self._filtered_set = None  # Clear any active filter
         current = self._current.copy()
         if current:  # Only store non-empty previous selections
             self._prev_set = current
@@ -219,25 +209,8 @@ class NodeSelectionHistory(QObject):
         if prev_set:
             self._prev_set = prev_set
 
-        self._filtered_set = None
         self._reset_iterator()
         self.selection_updated.emit()
-
-    def filter(self) -> None:
-        """Silently filter the current selection to discard items that are in invalid_items,
-        without modifying the history.
-
-        Creates a filtered view of the current selection that persists until the next
-        navigation, keeping the history intact, so that nodes that are put back via 'undo'
-        actions can also be selected again.
-        """
-
-        if self._history_size > 0:
-            unfiltered = self._history[self._pointer]
-            self._filtered_set = (
-                unfiltered - self.deleted_items
-            )  # Store the filtered view
-            self._reset_iterator()
 
     def select_node_set_from_history(self, previous: bool) -> None:
         """Move forwards or backwards in selection history, skipping invalid selections."""
@@ -251,13 +224,10 @@ class NodeSelectionHistory(QObject):
         prev_set = self._current.copy()
 
         self._pointer = next_index
-        self._filtered_set = None
-
         self._prev_set = prev_set if prev_set else self._history[self._pointer]
 
         self._reset_iterator()
         self.selection_updated.emit()
-        print("current node set", self._current)
 
     def __contains__(self, item: int) -> bool:
         return item in self._current
