@@ -1,5 +1,6 @@
 import difflib
 import inspect
+from typing import Any
 
 import pandas as pd
 import zarr
@@ -434,6 +435,7 @@ class StandardFieldMapWidget(QWidget):
 
         # Optional extra features
         self.feature_options = []
+        self.regionprop_feature_map = {}
         for name, func in inspect.getmembers(_regionprops_features, inspect.isfunction):
             if func.__module__ == "funtracks.features._regionprops_features":
                 sig = inspect.signature(func)
@@ -444,6 +446,7 @@ class StandardFieldMapWidget(QWidget):
                     feature = func()  # Call without ndim
                 display_name = feature.get("display_name", name)
                 self.feature_options.append(display_name)
+                self.regionprop_feature_map[display_name] = name.lower()
 
         # Clear existing optional layout and widgets
         clear_layout(self.optional_mapping_layout)
@@ -467,8 +470,19 @@ class StandardFieldMapWidget(QWidget):
     def get_name_map(self) -> dict[str, str]:
         """Return a mapping from standard field name to source property name.
 
-        Includes both standard fields (time, x, y, etc.) and any Custom/Group
-        features selected in optional features.
+        Maps standard funtracks attribute names (time, pos, id, etc.) to the
+        source column names in the imported data. Includes both standard fields
+        (time, x, y, etc.) and any Custom/Group features selected in optional
+        features.
+
+        Returns:
+            dict[str, str]: Mapping from standard attribute names to source names.
+                For example: {"time": "t", "id": "cell_id", "Custom1": "Custom1"}
+
+        Note:
+            Custom/Group features use identity mapping (attribute name maps to itself).
+            Regionprops features are NOT included in this map; they are handled
+            separately by get_features().
         """
         name_map = {
             attribute: combo.currentText()
@@ -485,45 +499,66 @@ class StandardFieldMapWidget(QWidget):
 
         return name_map
 
-    def get_features(self) -> dict[str, str]:
-        """Get features dict for tracks_from_df (CSV import).
+    def get_features(self) -> list[dict[str, Any]]:
+        """Construct a list of feature dictionaries for import based on user selections.
 
-        Returns dict mapping feature display name to either:
-        - Column name (to load from that column)
-        - "Recompute" (to compute from segmentation)
+        Each dictionary specifies how a single feature should be imported. Supports
+        two types of features:
+        1. Regionprops features: Computed from segmentation or loaded from CSV
+        2. Static features: Custom data columns imported as-is
 
-        Custom and Group features are handled by adding themselves under their own name.
-        If the name is the same as an annotated feature, unexpected behavior will occur.
+        Returns:
+            list[dict[str, Any]]: List of feature specifications, each containing:
+                - standard_name (str | None): Lower case name of the regionprops feature
+                  (e.g., "area", "circularity"), or None for static features.
+                - import_name (str): Column name in CSV/GEFF to import data from.
+                - display_name (str): Display name for the feature after import.
+                  For regionprops: the feature's display name (e.g., "Area").
+                  For static: column name with underscore prefix (e.g., "_my_metric").
+                - recompute (bool): Whether to recompute from segmentation.
+                  True only for regionprops features with segmentation available.
+                  Always False for static features.
+
+        Example:
+            If user selects "Area" feature with CSV column "Area" and recompute=False,
+            this returns:
+            [{
+                "standard_name": "area",
+                "import_name": "Area",
+                "display_name": "Area",
+                "recompute": False
+            }]
+
+            For a custom feature "MyMetric" from column "custom_col":
+            [{
+                "standard_name": None,
+                "import_name": "MyMetric",
+                "display_name": "_MyMetric",
+                "recompute": False
+            }]
         """
-        features = {}
+        features = []
         for attr, widgets in self.optional_features.items():
             if widgets["attr_checkbox"].isChecked():
                 selected = widgets["feature_option"].currentText()
-                recompute = widgets["recompute"].isChecked()
-
-                if selected in ("Custom", "Group"):
-                    features[attr] = attr  # just add itself with its own name
-                elif recompute:
-                    features[selected] = "Recompute"
+                # check if the selected name is a regionprops feature, if so get the corresponding standard_name
+                if selected in self.regionprop_feature_map:
+                    standard_name = self.regionprop_feature_map[selected]
+                    display_name = selected
+                    recompute = widgets["recompute"].isChecked()
                 else:
-                    features[selected] = attr  # column name
+                    standard_name = None
+                    display_name = (
+                        f"_{attr}" if selected == "Custom" else f"{attr}"
+                    )  # use column name with underscore prefix for display (static features only)
+                    recompute = False
+
+                feature_dict = {
+                    "standard_name": standard_name,
+                    "import_name": attr,
+                    "display_name": display_name,
+                    "recompute": recompute,
+                }
+                features.append(feature_dict)
+
         return features
-
-    def get_node_features(self) -> dict[str, bool]:
-        """Get node_features dict for import_from_geff (GEFF import).
-
-        Returns dict mapping property name to recompute boolean.
-
-        Custom and Group features are handled by adding themselves under their own name.
-        """
-        node_features = {}
-        for attr, widgets in self.optional_features.items():
-            if widgets["attr_checkbox"].isChecked():
-                selected = widgets["feature_option"].currentText()
-                recompute = widgets["recompute"].isChecked()
-
-                if selected in ("Custom", "Group"):
-                    node_features[attr] = attr  # just add itself with its own name
-
-                node_features[attr] = recompute
-        return node_features

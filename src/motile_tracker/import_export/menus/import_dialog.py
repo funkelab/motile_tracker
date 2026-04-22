@@ -331,7 +331,7 @@ class ImportDialog(QDialog):
                 name_map = self.prop_map_widget.get_name_map()
                 # Remove entries with "None" value - funtracks doesn't accept None mappings
                 name_map = {k: v for k, v in name_map.items() if v != "None"}
-                node_features = self.prop_map_widget.get_node_features()
+                node_features = self.prop_map_widget.get_features()
 
                 # Generate axes metadata if missing (required for funtracks validation)
                 geff_metadata = dict(self.import_widget.root.attrs.get("geff", {}))
