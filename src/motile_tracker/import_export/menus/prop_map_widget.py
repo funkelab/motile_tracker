@@ -1,13 +1,13 @@
 import difflib
-import inspect
 
 import pandas as pd
 import zarr
+from funtracks.annotators._regionprops_annotator import DEFAULT_POS_KEY
 from funtracks.annotators._track_annotator import (
     DEFAULT_LINEAGE_KEY,
     DEFAULT_TRACKLET_KEY,
 )
-from funtracks.features import _regionprops_features
+from funtracks.import_export._utils import get_default_key_to_feature_mapping
 from psygnal import Signal
 from qtpy.QtCore import Qt
 from qtpy.QtWidgets import (
@@ -432,18 +432,18 @@ class StandardFieldMapWidget(QWidget):
                 combo.setVisible(False)
                 label.setVisible(False)
 
-        # Optional extra features
+        # Optional extra features: build display_name -> default_key mapping
+        ndim = 4 if "z" in self.standard_fields else 3
+        available = get_default_key_to_feature_mapping(ndim=ndim, display_name=False)
+        standard_keys = set(self.standard_fields) | {DEFAULT_POS_KEY}
         self.feature_options = []
-        for name, func in inspect.getmembers(_regionprops_features, inspect.isfunction):
-            if func.__module__ == "funtracks.features._regionprops_features":
-                sig = inspect.signature(func)
-                if "ndim" in sig.parameters:
-                    ndim = 4 if "z" in self.standard_fields else 3
-                    feature = func(ndim)  # call with ndim
-                else:
-                    feature = func()  # Call without ndim
-                display_name = feature.get("display_name", name)
-                self.feature_options.append(display_name)
+        self.display_name_to_default_key: dict[str, str] = {}
+        for default_key, feature in available.items():
+            if feature["feature_type"] != "node" or default_key in standard_keys:
+                continue
+            display_name = feature.get("display_name", default_key)
+            self.feature_options.append(display_name)
+            self.display_name_to_default_key[display_name] = default_key
 
         # Clear existing optional layout and widgets
         clear_layout(self.optional_mapping_layout)
@@ -488,7 +488,7 @@ class StandardFieldMapWidget(QWidget):
     def get_features(self) -> dict[str, str]:
         """Get features dict for tracks_from_df (CSV import).
 
-        Returns dict mapping feature display name to either:
+        Returns dict mapping feature default key to either:
         - Column name (to load from that column)
         - "Recompute" (to compute from segmentation)
 
@@ -503,16 +503,18 @@ class StandardFieldMapWidget(QWidget):
 
                 if selected in ("Custom", "Group"):
                     features[attr] = attr  # just add itself with its own name
-                elif recompute:
-                    features[selected] = "Recompute"
                 else:
-                    features[selected] = attr  # column name
+                    default_key = self.display_name_to_default_key[selected]
+                    if recompute:
+                        features[default_key] = "Recompute"
+                    else:
+                        features[default_key] = attr  # column name
         return features
 
     def get_node_features(self) -> dict[str, bool]:
         """Get node_features dict for import_from_geff (GEFF import).
 
-        Returns dict mapping property name to recompute boolean.
+        Returns dict mapping feature default key to recompute boolean.
 
         Custom and Group features are handled by adding themselves under their own name.
         """
@@ -523,7 +525,8 @@ class StandardFieldMapWidget(QWidget):
                 recompute = widgets["recompute"].isChecked()
 
                 if selected in ("Custom", "Group"):
-                    node_features[attr] = attr  # just add itself with its own name
-
-                node_features[attr] = recompute
+                    node_features[attr] = recompute
+                else:
+                    default_key = self.display_name_to_default_key[selected]
+                    node_features[default_key] = recompute
         return node_features
