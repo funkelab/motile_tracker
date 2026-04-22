@@ -22,6 +22,10 @@ Napari viewer and layer key bindings and mouse functions
      - Clear selection
    * - E
      - Restore selection
+   * - P / Mouse button 4 (Back)
+     - Select previous node set
+   * - N / Mouse button 5 (Forward)
+     - Restore next node set
    * - Q
      - | Toggle between viewing all nodes in the
        | points/labels or only those for the currently
@@ -57,6 +61,10 @@ Tree view key and mouse functions
      - Clear selection
    * - E
      - Restore selection
+   * - P / Mouse button 4 (Back)
+     - Select previous node set
+   * - N / Mouse button 5 (Forward)
+     - Restore next node set
    * - Right mouse click
      - Reset view
    * - Q

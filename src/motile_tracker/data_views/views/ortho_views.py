@@ -14,6 +14,7 @@ from napari_orthogonal_views.ortho_view_manager import (  # noqa
 from motile_tracker.data_views.keybindings_config import KEYMAP, bind_keymap
 from motile_tracker.data_views.views.layers.click_utils import (
     detect_click,
+    detect_side_button,
     get_click_value,
 )
 from motile_tracker.data_views.views.layers.contour_labels import ContourLabels
@@ -272,11 +273,14 @@ def track_layers_hook(
     def click(
         orig_layer: TrackLabels | TrackPoints, layer: Labels | ZOnlyPoints, event: Event
     ):
-        if layer.mode == "pan_zoom":
+        side_button = detect_side_button(event)
+        if side_button is not None:
+            orig_layer.process_click(event, side_button=side_button)
+        elif layer.mode == "pan_zoom":
             was_click = yield from detect_click(event)
             if was_click:
                 value = get_click_value(layer, event)
-                orig_layer.process_click(event, value, layer)
+                orig_layer.process_click(event, value=value, layer=layer)
 
     # Wrap and attach click callback
     def click_wrapper(layer, event):
