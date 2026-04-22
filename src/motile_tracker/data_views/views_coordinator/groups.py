@@ -315,13 +315,13 @@ class CollectionWidget(QWidget):
                 self.selected_collection.collection | set(nodes)
             )
 
-            # Use UpdateNodeAttrs to set the feature value to True
+            # Use UpdateNodesAttrs to set the feature value to True
             feature_key = self.selected_collection.name.text()
 
             UserUpdateNodesAttrs(
                 tracks=self.tracks_viewer.tracks,
                 nodes=nodes,
-                attrs={feature_key: True},
+                attrs={feature_key: [True for _ in nodes]},
             )
 
             self.group_changed.emit()
@@ -398,11 +398,10 @@ class CollectionWidget(QWidget):
             }
 
             feature_key = self.selected_collection.name.text()
-            # attrs = {feature_key: [False for _ in nodes]}
             UserUpdateNodesAttrs(
                 tracks=self.tracks_viewer.tracks,
                 nodes=nodes,
-                attrs={feature_key: False},
+                attrs={feature_key: [False for _ in nodes]},
             )
 
             self.group_changed.emit()
