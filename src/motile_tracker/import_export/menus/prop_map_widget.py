@@ -436,6 +436,9 @@ class StandardFieldMapWidget(QWidget):
         ndim = 4 if "z" in self.standard_fields else 3
         available = get_default_key_to_feature_mapping(ndim=ndim, display_name=False)
         standard_keys = set(self.standard_fields) | {DEFAULT_POS_KEY}
+        # Lowercase for case-insensitive collision detection, since downstream
+        # code (e.g. tracks_from_df) lowercases feature keys before use.
+        self.reserved_keys = {k.lower() for k in available.keys() | standard_keys}
         self.feature_options = []
         self.display_name_to_default_key: dict[str, str] = {}
         for default_key, feature in available.items():
@@ -480,8 +483,10 @@ class StandardFieldMapWidget(QWidget):
             if widgets["attr_checkbox"].isChecked():
                 selected = widgets["feature_option"].currentText()
                 if selected in ("Custom", "Group"):
-                    # Map property name to itself (identity mapping)
-                    name_map[attr] = attr
+                    key = (
+                        f"custom_{attr}" if attr.lower() in self.reserved_keys else attr
+                    )
+                    name_map[key] = attr
 
         return name_map
 
@@ -492,8 +497,8 @@ class StandardFieldMapWidget(QWidget):
         - Column name (to load from that column)
         - "Recompute" (to compute from segmentation)
 
-        Custom and Group features are handled by adding themselves under their own name.
-        If the name is the same as an annotated feature, unexpected behavior will occur.
+        Custom and Group features are NOT included here — they are registered
+        via get_name_map() through the enable_features_from_name_map path.
         """
         features = {}
         for attr, widgets in self.optional_features.items():
@@ -502,7 +507,7 @@ class StandardFieldMapWidget(QWidget):
                 recompute = widgets["recompute"].isChecked()
 
                 if selected in ("Custom", "Group"):
-                    features[attr] = attr  # just add itself with its own name
+                    continue  # handled by get_name_map()
                 else:
                     default_key = self.display_name_to_default_key[selected]
                     if recompute:
@@ -516,16 +521,17 @@ class StandardFieldMapWidget(QWidget):
 
         Returns dict mapping feature default key to recompute boolean.
 
-        Custom and Group features are handled by adding themselves under their own name.
+        Custom and Group features are NOT included here — they are registered
+        via get_name_map() through the enable_features_from_name_map path.
         """
         node_features = {}
-        for attr, widgets in self.optional_features.items():
+        for _attr, widgets in self.optional_features.items():
             if widgets["attr_checkbox"].isChecked():
                 selected = widgets["feature_option"].currentText()
                 recompute = widgets["recompute"].isChecked()
 
                 if selected in ("Custom", "Group"):
-                    node_features[attr] = recompute
+                    continue  # handled by get_name_map()
                 else:
                     default_key = self.display_name_to_default_key[selected]
                     node_features[default_key] = recompute
