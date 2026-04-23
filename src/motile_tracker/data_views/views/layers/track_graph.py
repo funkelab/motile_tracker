@@ -73,28 +73,17 @@ def update_napari_tracks(
     # Build inter-track edges for divisions (parents with ≥2 children)
     node_to_track_id = dict(zip(node_ids, track_ids_arr.tolist(), strict=True))
 
-    # Batch edge query instead of per-node out_degree/successors SQL calls
-    edge_df = graph.edge_attrs(
-        attr_keys=[DEFAULT_ATTR_KEYS.EDGE_SOURCE, DEFAULT_ATTR_KEYS.EDGE_TARGET]
-    )
-    parent_to_children: dict[int, list[int]] = {}
-    for src, tgt in zip(
-        edge_df[DEFAULT_ATTR_KEYS.EDGE_SOURCE].to_list(),
-        edge_df[DEFAULT_ATTR_KEYS.EDGE_TARGET].to_list(),
-        strict=True,
-    ):
-        parent_to_children.setdefault(src, []).append(tgt)
-
-    for parent, children in parent_to_children.items():
-        if len(children) < 2:
-            continue
-        parent_track_id = node_to_track_id[parent]
-        for daughter in children:
-            child_track_id = node_to_track_id[daughter]
-            if child_track_id in napari_edges:
-                napari_edges[child_track_id].append(parent_track_id)
-            else:
-                napari_edges[child_track_id] = [parent_track_id]
+    # Query only dividing nodes via GROUP BY HAVING COUNT==2, then fetch their
+    # children with a single JOIN — avoids scanning every edge in the graph.
+    dividing = graph.dividing_nodes()
+    if dividing:
+        children_per_parent: dict[int, list[int]] = graph.successors(dividing)
+        for parent, children in children_per_parent.items():
+            parent_track_id = node_to_track_id[parent]
+            for child in children:
+                napari_edges.setdefault(node_to_track_id[child], []).append(
+                    parent_track_id
+                )
 
     return napari_data, napari_edges
 
