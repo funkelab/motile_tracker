@@ -209,18 +209,34 @@ def _solve_single_window(
         window_end,
     )
 
-    cand_graph = build_candidate_graph(input_data, solver_params, scale)
+    # Slice input to window frames only — avoids building full candidate graph
+    if input_data.ndim == 2:
+        # Points list: filter rows where time column (col 0) is in [window_start, window_end)
+        row_mask = (input_data[:, 0] >= window_start) & (input_data[:, 0] < window_end)
+        sliced_input = input_data[row_mask]
+    else:
+        # Segmentation: numpy slice is a view (no copy)
+        sliced_input = input_data[window_start:window_end]
 
-    # Filter candidate graph to window frames (times are already correct)
-    nodes_in_window = [
-        n
-        for n in cand_graph.node_ids()
-        if window_start <= cand_graph.nodes[n]["t"] < window_end
-    ]
-    window_subgraph = cand_graph.filter(node_ids=nodes_in_window).subgraph()
+    cand_graph = build_candidate_graph(sliced_input, solver_params, scale)
+
+    # For segmentation, compute_graph_from_seg assigns t as range(len(seg)) — shift to absolute
+    if input_data.ndim != 2 and window_start > 0:
+        node_ids = list(cand_graph.node_ids())
+        if node_ids:
+            df = cand_graph.node_attrs(attr_keys=[td.DEFAULT_ATTR_KEYS.NODE_ID, "t"])
+            t_by_id = dict(
+                zip(
+                    df[td.DEFAULT_ATTR_KEYS.NODE_ID].to_list(),
+                    df["t"].to_list(),
+                    strict=True,
+                )
+            )
+            shifted_times = [t_by_id[nid] + window_start for nid in node_ids]
+            cand_graph.update_node_attrs(node_ids=node_ids, attrs={"t": shifted_times})
 
     start_time = time.time()
-    solution = _solve_window(window_subgraph, solver_params, on_solver_update)
+    solution = _solve_window(cand_graph, solver_params, on_solver_update)
     logger.info("Single window solution took %.2f seconds", time.time() - start_time)
 
     if solution is None:
