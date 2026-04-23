@@ -2,6 +2,7 @@
 
 import logging
 
+import tracksdata as td
 from funtracks.data_model import SolutionTracks
 from funtracks.utils import ensure_unique_labels
 from napari import Viewer
@@ -37,6 +38,8 @@ class MotileWidget(QWidget):
     def __init__(self, viewer: Viewer):
         super().__init__()
         self.viewer: Viewer = viewer
+        self._cand_graph: td.graph.GraphView | None = None
+        self._cand_graph_key: tuple | None = None
         tracks_viewer = TracksViewer.get_instance(self.viewer)
         self.new_run.connect(tracks_viewer.tracks_list.add_tracks)
         tracks_viewer.tracks_list.view_tracks.connect(self.view_run)
@@ -84,6 +87,26 @@ class MotileWidget(QWidget):
         if run:
             self.edit_run_widget.new_run(run)
 
+    def _make_cand_graph_key(self, run: MotileRun) -> tuple:
+        """Return a cache key that captures everything that determines candidate graph structure.
+
+        The candidate graph depends on the input data identity, max_edge_distance, and
+        whether IOU is computed. Cost parameters (appear_cost, division_cost, etc.) do
+        NOT affect the graph structure, so they are excluded from the key.
+        """
+        data = (
+            run.input_segmentation
+            if run.input_segmentation is not None
+            else run.input_points
+        )
+        return (
+            data.shape,
+            str(data.dtype),
+            id(data),  # shape+dtype guard against id reuse across different arrays
+            run.solver_params.max_edge_distance,
+            run.solver_params.iou_cost is not None,
+        )
+
     def _generate_tracks(self, run: MotileRun) -> None:
         """Called when we start solving a new run. Switches from run editor to run
         viewer and starts solving of the new run in a separate thread to avoid blocking
@@ -119,17 +142,39 @@ class MotileWidget(QWidget):
         else:
             raise ValueError("Must have one of input segmentation or points")
 
-        try:
-            cand_graph = build_candidate_graph(input_data, run.solver_params, run.scale)
-        except ValueError as e:
-            if "Duplicate values found among nodes" in str(e):
-                run.input_segmentation = ensure_unique_labels(run.input_segmentation)
-                input_data = run.input_segmentation
+        key = self._make_cand_graph_key(run)
+        if self._cand_graph is not None and self._cand_graph_key == key:
+            logger.info(
+                "Reusing cached candidate graph (%d nodes, %d edges)",
+                self._cand_graph.num_nodes(),
+                self._cand_graph.num_edges(),
+            )
+            cand_graph = self._cand_graph
+        else:
+            logger.info("Building candidate graph...")
+            try:
                 cand_graph = build_candidate_graph(
                     input_data, run.solver_params, run.scale
                 )
-            else:
-                raise
+            except ValueError as e:
+                if "Duplicate values found among nodes" in str(e):
+                    run.input_segmentation = ensure_unique_labels(
+                        run.input_segmentation
+                    )
+                    input_data = run.input_segmentation
+                    key = self._make_cand_graph_key(run)
+                    cand_graph = build_candidate_graph(
+                        input_data, run.solver_params, run.scale
+                    )
+                else:
+                    raise
+            self._cand_graph = cand_graph
+            self._cand_graph_key = key
+            logger.info(
+                "Candidate graph built: %d nodes, %d edges",
+                cand_graph.num_nodes(),
+                cand_graph.num_edges(),
+            )
 
         solution_graph = solve(
             run.solver_params,
