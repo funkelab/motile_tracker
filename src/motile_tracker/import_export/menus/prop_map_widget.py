@@ -1,13 +1,13 @@
 import difflib
-import inspect
 
 import pandas as pd
 import zarr
+from funtracks.annotators._regionprops_annotator import DEFAULT_POS_KEY
 from funtracks.annotators._track_annotator import (
     DEFAULT_LINEAGE_KEY,
     DEFAULT_TRACKLET_KEY,
 )
-from funtracks.features import _regionprops_features
+from funtracks.import_export._utils import get_default_key_to_feature_mapping
 from psygnal import Signal
 from qtpy.QtCore import Qt
 from qtpy.QtWidgets import (
@@ -456,18 +456,21 @@ class StandardFieldMapWidget(QWidget):
                 combo.setVisible(False)
                 label.setVisible(False)
 
-        # Optional extra features
+        # Optional extra features: build display_name -> default_key mapping
+        ndim = 4 if "z" in self.standard_fields else 3
+        available = get_default_key_to_feature_mapping(ndim=ndim, display_name=False)
+        standard_keys = set(self.standard_fields) | {DEFAULT_POS_KEY}
+        # Lowercase for case-insensitive collision detection, since downstream
+        # code (e.g. tracks_from_df) lowercases feature keys before use.
+        self.reserved_keys = {k.lower() for k in available.keys() | standard_keys}
         self.feature_options = []
-        for name, func in inspect.getmembers(_regionprops_features, inspect.isfunction):
-            if func.__module__ == "funtracks.features._regionprops_features":
-                sig = inspect.signature(func)
-                if "ndim" in sig.parameters:
-                    ndim = 4 if "z" in self.standard_fields else 3
-                    feature = func(ndim)  # call with ndim
-                else:
-                    feature = func()  # Call without ndim
-                display_name = feature.get("display_name", name)
-                self.feature_options.append(display_name)
+        self.display_name_to_default_key: dict[str, str] = {}
+        for default_key, feature in available.items():
+            if feature["feature_type"] != "node" or default_key in standard_keys:
+                continue
+            display_name = feature.get("display_name", default_key)
+            self.feature_options.append(display_name)
+            self.display_name_to_default_key[display_name] = default_key
 
         # Clear existing optional layout and widgets
         clear_layout(self.optional_mapping_layout)
@@ -504,20 +507,22 @@ class StandardFieldMapWidget(QWidget):
             if widgets["attr_checkbox"].isChecked():
                 selected = widgets["feature_option"].currentText()
                 if selected in ("Custom", "Group"):
-                    # Map property name to itself (identity mapping)
-                    name_map[attr] = attr
+                    key = (
+                        f"custom_{attr}" if attr.lower() in self.reserved_keys else attr
+                    )
+                    name_map[key] = attr
 
         return name_map
 
     def get_features(self) -> dict[str, str]:
         """Get features dict for tracks_from_df (CSV import).
 
-        Returns dict mapping feature display name to either:
+        Returns dict mapping feature default key to either:
         - Column name (to load from that column)
         - "Recompute" (to compute from segmentation)
 
-        Custom and Group features are handled by adding themselves under their own name.
-        If the name is the same as an annotated feature, unexpected behavior will occur.
+        Custom and Group features are NOT included here — they are registered
+        via get_name_map() through the enable_features_from_name_map path.
         """
         features = {}
         for attr, widgets in self.optional_features.items():
@@ -526,37 +531,32 @@ class StandardFieldMapWidget(QWidget):
                 recompute = widgets["recompute"].isChecked()
 
                 if selected in ("Custom", "Group"):
-                    features[attr] = attr  # just add itself with its own name
-                elif recompute:
-                    features[selected] = "Recompute"
+                    continue  # handled by get_name_map()
                 else:
-                    features[selected] = attr  # column name
+                    default_key = self.display_name_to_default_key[selected]
+                    if recompute:
+                        features[default_key] = "Recompute"
+                    else:
+                        features[default_key] = attr  # column name
         return features
 
     def get_node_features(self) -> dict[str, bool]:
         """Get node_features dict for import_from_geff (GEFF import).
 
-        Returns dict mapping property name to recompute boolean.
+        Returns dict mapping feature default key to recompute boolean.
 
-        Group features are excluded (handled via name_map only).
-        Custom float/int features are included with recompute=False so they
-        get registered in tracks.features and appear in the tree dropdown and
-        table view. Custom string/bool features are excluded (name_map only).
+        Custom and Group features are NOT included here — they are registered
+        via get_name_map() through the enable_features_from_name_map path.
         """
         node_features = {}
-        for attr, widgets in self.optional_features.items():
+        for _attr, widgets in self.optional_features.items():
             if widgets["attr_checkbox"].isChecked():
                 selected = widgets["feature_option"].currentText()
                 recompute = widgets["recompute"].isChecked()
 
-                if selected == "Group":
-                    continue
-                elif selected == "Custom":
-                    # Float/int Custom features: register as static feature in
-                    # tracks.features so they appear in tree/table views.
-                    if self.attr_types.get(attr) in {"int", "float"}:
-                        node_features[attr] = False
+                if selected in ("Custom", "Group"):
+                    continue  # handled by get_name_map()
                 else:
-                    # Regionprops feature
-                    node_features[attr] = recompute
+                    default_key = self.display_name_to_default_key[selected]
+                    node_features[default_key] = recompute
         return node_features
