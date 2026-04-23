@@ -8,7 +8,7 @@ import napari
 import numpy as np
 from funtracks.data_model import Tracks
 from funtracks.exceptions import InvalidActionError
-from funtracks.user_actions import UserAddNode, UserDeleteNodes, UserUpdateNodeAttrs
+from funtracks.user_actions import UserAddNode, UserDeleteNodes, UserUpdateNodesAttrs
 from napari.layers.points._points_mouse_bindings import select
 from napari.utils.notifications import show_info
 from psygnal import Signal
@@ -63,14 +63,12 @@ class TrackPoints(ZOnlyPoints):
         tracks_viewer: TracksViewer,
     ):
         self.tracks_viewer = tracks_viewer
-        self.nodes = list(tracks_viewer.tracks.graph.nodes)
+        self.nodes = tracks_viewer.tracks.graph.node_ids()
         self.node_index_dict = {node: idx for idx, node in enumerate(self.nodes)}
 
         points = self.tracks_viewer.tracks.get_positions(self.nodes, incl_time=True)
 
-        track_ids = [
-            self.tracks_viewer.tracks.get_track_id(node) for node in self.nodes
-        ]
+        track_ids = self.tracks_viewer.tracks.get_track_ids(self.nodes)
         colors = [self.tracks_viewer.colormap.map(track_id) for track_id in track_ids]
         symbols = self.get_symbols(
             self.tracks_viewer.tracks, self.tracks_viewer.symbolmap
@@ -179,13 +177,11 @@ class TrackPoints(ZOnlyPoints):
         self.events.data.disconnect(
             self._update_data
         )  # do not listen to new events until updates are complete
-        self.nodes = list(self.tracks_viewer.tracks.graph.nodes)
+        self.nodes = self.tracks_viewer.tracks.graph.node_ids()
 
         self.node_index_dict = {node: idx for idx, node in enumerate(self.nodes)}
 
-        track_ids = [
-            self.tracks_viewer.tracks.get_track_id(node) for node in self.nodes
-        ]
+        track_ids = self.tracks_viewer.tracks.get_track_ids(self.nodes)
         self.data = self.tracks_viewer.tracks.get_positions(self.nodes, incl_time=True)
         self.data_updated.emit()  # emit update signal for the orthogonal views to connect to
 
@@ -278,15 +274,19 @@ class TrackPoints(ZOnlyPoints):
         elif event.action == "changed":
             # we only want to allow this update if there is no seg layer
             if self.tracks_viewer.tracking_layers.seg_layer is None:
-                for ind in self.selected_data:
-                    point = self.data[ind]
-                    pos = point[1:]
-                    node_id = self.properties["node_id"][ind]
-                    UserUpdateNodeAttrs(
-                        self.tracks_viewer.tracks,
-                        node=node_id,
-                        attrs={self.tracks_viewer.tracks.features.position_key: pos},
-                    )
+                position_key = self.tracks_viewer.tracks.features.position_key
+                nodes = [
+                    int(self.properties["node_id"][ind]) for ind in self.selected_data
+                ]
+                attrs = {
+                    position_key: [self.data[ind][1:] for ind in self.selected_data]
+                }
+
+                UserUpdateNodesAttrs(
+                    self.tracks_viewer.tracks,
+                    nodes=nodes,
+                    attrs=attrs,
+                )
 
             else:
                 self._refresh()  # refresh to move points back where they belong
@@ -307,7 +307,7 @@ class TrackPoints(ZOnlyPoints):
             1: NodeType.CONTINUE,
             2: NodeType.SPLIT,
         }
-        symbols = [symbolmap[statemap[degree]] for _, degree in tracks.graph.out_degree]
+        symbols = [symbolmap[statemap[degree]] for degree in tracks.graph.out_degree()]
         return symbols
 
     def update_point_outline(self, visible_nodes: list[int] | str) -> None:

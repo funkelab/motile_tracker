@@ -265,6 +265,28 @@ class CSVSegmentationWidget(QWidget):
             return None
 
 
+def _geff_has_mask_props(root: zarr.Group) -> bool:
+    """Return True if 'mask' and 'bbox' exist as actual node prop arrays in the zarr store."""
+    try:
+        props = root["nodes"]["props"]
+        return "mask" in props and "bbox" in props
+    except KeyError:
+        return False
+
+
+def geff_has_embedded_segmentation(root: zarr.Group) -> bool:
+    """Return True if the geff group has embedded segmentation that can be reconstructed.
+
+    Requires both:
+    - 'mask' and 'bbox' node prop arrays in the zarr store
+    - 'segmentation_shape' in zarr attrs (written by funtracks export_to_geff)
+
+    When both conditions are met, funtracks will reconstruct the segmentation
+    automatically as a GraphArrayView — no external segmentation file is needed.
+    """
+    return _geff_has_mask_props(root) and "segmentation_shape" in dict(root.attrs)
+
+
 class GeffSegmentationWidget(QWidget):
     """QWidget to select segmentation data when importing from geff."""
 
@@ -305,8 +327,33 @@ class GeffSegmentationWidget(QWidget):
             lambda: self.seg_updated.emit(self.none_radio.isChecked())
         )
 
+        # Info label shown when masks/bboxes are embedded in the graph
+        self._embedded_info_label = QLabel(
+            "Embedded segmentation detected (masks/bboxes). "
+            "The segmentation will be reconstructed automatically."
+        )
+        self._embedded_info_label.setWordWrap(True)
+        font = self._embedded_info_label.font()
+        font.setItalic(True)
+        self._embedded_info_label.setFont(font)
+        self._embedded_info_label.setVisible(False)
+
+        # Warning label shown when masks/bboxes are present but segmentation_shape is
+        # missing (GEFF exported by an older version of funtracks)
+        self._old_geff_warning_label = QLabel(
+            "⚠ This GEFF contains mask/bbox data but no segmentation_shape. "
+            "The segmentation cannot be reconstructed automatically. "
+            "Re-export with an updated version of funtracks, or provide an "
+            "external segmentation file below."
+        )
+        self._old_geff_warning_label.setWordWrap(True)
+        self._old_geff_warning_label.setStyleSheet("color: orange;")
+        self._old_geff_warning_label.setVisible(False)
+
         # Assemble group box layout
         box_layout = QVBoxLayout()
+        box_layout.addWidget(self._embedded_info_label)
+        box_layout.addWidget(self._old_geff_warning_label)
         box_layout.addLayout(none_radio_layout)
         box_layout.addLayout(self.related_objects_layout)
         box_layout.addLayout(external_segmentation_radio_layout)
@@ -322,7 +369,7 @@ class GeffSegmentationWidget(QWidget):
         self.setToolTip(
             "<html><body><p style='white-space:pre-wrap; width: 300px;'>"
             "Optionally select a segmentation image, or use associated data if provided"
-            " in the geff directory."
+            " in the GEFF directory."
         )
         self.setVisible(False)
 
@@ -336,16 +383,45 @@ class GeffSegmentationWidget(QWidget):
         clear_layout(self.related_objects_layout)
         self.related_object_radio_buttons = {}
         if self.root is not None:
-            metadata = dict(self.root.attrs)
-            related_objects = metadata.get("geff", {}).get("related_objects", None)
-            if related_objects:
-                for obj in related_objects:
-                    if obj.get("type") == "labels":
-                        radio = QRadioButton(f"Related data: {obj.get('path', None)}")
-                        radio.setChecked(True)
-                        self.button_group.addButton(radio)
-                        self.related_object_radio_buttons[obj.get("path", None)] = radio
-                        self.related_objects_layout.addWidget(radio)
+            if geff_has_embedded_segmentation(self.root):
+                # Embedded segmentation: hide radio options, show info label.
+                # segmentation_path=None will be passed to import_from_geff and
+                # funtracks will reconstruct the segmentation as a GraphArrayView.
+                self.none_radio.setVisible(False)
+                self.external_segmentation_radio.setVisible(False)
+                self.segmentation_widget.setVisible(False)
+                self._embedded_info_label.setVisible(True)
+                self._old_geff_warning_label.setVisible(False)
+                self.none_radio.setChecked(True)
+            elif _geff_has_mask_props(self.root):
+                # Old GEFF: masks present but segmentation_shape missing.
+                # Show a warning and the normal options so the user can provide
+                # an external segmentation or skip it.
+                self.none_radio.setVisible(True)
+                self.external_segmentation_radio.setVisible(True)
+                self._embedded_info_label.setVisible(False)
+                self._old_geff_warning_label.setVisible(True)
+            else:
+                self.none_radio.setVisible(True)
+                self.external_segmentation_radio.setVisible(True)
+                self._embedded_info_label.setVisible(False)
+                self._old_geff_warning_label.setVisible(False)
+
+            if not geff_has_embedded_segmentation(self.root):
+                metadata = dict(self.root.attrs)
+                related_objects = metadata.get("geff", {}).get("related_objects", None)
+                if related_objects:
+                    for obj in related_objects:
+                        if obj.get("type") == "labels":
+                            radio = QRadioButton(
+                                f"Related data: {obj.get('path', None)}"
+                            )
+                            radio.setChecked(True)
+                            self.button_group.addButton(radio)
+                            self.related_object_radio_buttons[obj.get("path", None)] = (
+                                radio
+                            )
+                            self.related_objects_layout.addWidget(radio)
             self.setVisible(True)
 
     def _toggle_segmentation(self, checked: bool) -> None:

@@ -5,9 +5,10 @@ from typing import TYPE_CHECKING
 
 import napari
 import numpy as np
+from tracksdata.constants import DEFAULT_ATTR_KEYS
 
 if TYPE_CHECKING:
-    from funtracks.data_model.solution_tracks import SolutionTracks
+    from funtracks.data_model import SolutionTracks
 
     from motile_tracker.data_views.views_coordinator.tracks_viewer import (
         TracksViewer,
@@ -38,36 +39,62 @@ def update_napari_tracks(
 
     ndim = tracks.ndim - 1
     graph = tracks.graph
-    napari_data = np.zeros((graph.number_of_nodes(), ndim + 2))
     napari_edges = {}
 
-    parents = [node for node, degree in graph.out_degree() if degree >= 2]
-    intertrack_edges = []
+    time_key = tracks.features.time_key
+    tracklet_key = tracks.features.tracklet_key
+    position_key = tracks.features.position_key
 
-    # Remove all intertrack edges from a copy of the original graph
-    graph_copy = graph.copy()
-    for parent in parents:
-        daughters = [child for _, child in graph.out_edges(parent)]
-        for daughter in daughters:
-            graph_copy.remove_edge(parent, daughter)
-            intertrack_edges.append((parent, daughter))
+    pos_keys = list(position_key) if isinstance(position_key, list) else [position_key]
 
-    for index, node in enumerate(graph.nodes(data=True)):
-        node_id, data = node
-        location = tracks.get_position(node_id)
-        napari_data[index] = [
-            tracks.get_track_id(node_id),
-            tracks.get_time(node_id),
-            *location,
-        ]
+    # One batch query instead of O(N) per-node queries
+    df = graph.node_attrs(
+        attr_keys=[DEFAULT_ATTR_KEYS.NODE_ID, time_key, tracklet_key] + pos_keys
+    )
 
-    for parent, child in intertrack_edges:
-        parent_track_id = tracks.get_track_id(parent)
-        child_track_id = tracks.get_track_id(child)
-        if child_track_id in napari_edges:
-            napari_edges[child_track_id].append(parent_track_id)
-        else:
-            napari_edges[child_track_id] = [parent_track_id]
+    node_ids = df[DEFAULT_ATTR_KEYS.NODE_ID].to_list()
+    track_ids_arr = df[tracklet_key].to_numpy()
+    times_arr = df[time_key].to_numpy()
+
+    if len(pos_keys) == 1:
+        pos_col = df[pos_keys[0]]
+        # Single position key may be a scalar column or a fixed-size array column
+        positions_arr = pos_col.to_numpy()
+        if positions_arr.ndim == 1:
+            positions_arr = positions_arr[:, np.newaxis]
+    else:
+        positions_arr = np.stack([df[k].to_numpy() for k in pos_keys], axis=1)
+
+    napari_data = np.zeros((len(node_ids), ndim + 2))
+    napari_data[:, 0] = track_ids_arr
+    napari_data[:, 1] = times_arr
+    napari_data[:, 2:] = positions_arr
+
+    # Build inter-track edges for divisions (parents with ≥2 children)
+    node_to_track_id = dict(zip(node_ids, track_ids_arr.tolist(), strict=True))
+
+    # Batch edge query instead of per-node out_degree/successors SQL calls
+    edge_df = graph.edge_attrs(
+        attr_keys=[DEFAULT_ATTR_KEYS.EDGE_SOURCE, DEFAULT_ATTR_KEYS.EDGE_TARGET]
+    )
+    parent_to_children: dict[int, list[int]] = {}
+    for src, tgt in zip(
+        edge_df[DEFAULT_ATTR_KEYS.EDGE_SOURCE].to_list(),
+        edge_df[DEFAULT_ATTR_KEYS.EDGE_TARGET].to_list(),
+        strict=True,
+    ):
+        parent_to_children.setdefault(src, []).append(tgt)
+
+    for parent, children in parent_to_children.items():
+        if len(children) < 2:
+            continue
+        parent_track_id = node_to_track_id[parent]
+        for daughter in children:
+            child_track_id = node_to_track_id[daughter]
+            if child_track_id in napari_edges:
+                napari_edges[child_track_id].append(parent_track_id)
+            else:
+                napari_edges[child_track_id] = [parent_track_id]
 
     return napari_data, napari_edges
 

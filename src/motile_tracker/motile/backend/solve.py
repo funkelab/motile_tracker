@@ -5,17 +5,16 @@ import time
 from collections.abc import Callable
 
 import ilpy
-import networkx as nx
 import numpy as np
+import tracksdata as td
 from funtracks.candidate_graph import (
     compute_graph_from_points_list,
     compute_graph_from_seg,
 )
+from funtracks.utils.tracksdata_utils import create_empty_graphview_graph
 from motile import Solver, TrackGraph
 from motile.constraints import MaxChildren, MaxParents, Pin
 from motile.costs import Appear, EdgeDistance, EdgeSelection, Split
-
-from motile_tracker.motile.backend.graph_to_nx import graph_to_nx
 
 from .solver_params import SolverParams
 
@@ -29,8 +28,8 @@ def solve(
     input_data: np.ndarray,
     on_solver_update: Callable | None = None,
     scale: list | None = None,
-    cand_graph: nx.DiGraph | None = None,
-) -> nx.DiGraph:
+    cand_graph: td.graph.GraphView | None = None,
+) -> td.graph.GraphView:
     """Get a tracking solution for the given segmentation and parameters.
 
     Constructs a candidate graph from the segmentation (unless one is
@@ -49,12 +48,12 @@ def solve(
             a dictionary of event data, and can be used to track progress of
             the solver. Defaults to None.
         scale (list, optional): The scale of the data in each dimension.
-        cand_graph (nx.DiGraph, optional): A pre-built candidate graph. If
+        cand_graph (td.graph.GraphView, optional): A pre-built candidate graph. If
             provided, skips candidate graph construction (except for
             single-window mode which always builds its own). Defaults to None.
 
     Returns:
-        nx.DiGraph: A solution graph where the ids of the nodes correspond to
+        td.graph.GraphView: A solution graph where the ids of the nodes correspond to
             the time and ids of the passed in segmentation labels. See funtracks for exact
             implementation details.
     """
@@ -63,22 +62,29 @@ def solve(
         solver_params.window_size is not None
         and solver_params.single_window_start is not None
     ):
-        return _solve_single_window(input_data, solver_params, on_solver_update, scale)
+        result = _solve_single_window(
+            input_data, solver_params, on_solver_update, scale
+        )
+    else:
+        if cand_graph is None:
+            cand_graph = build_candidate_graph(input_data, solver_params, scale)
 
-    if cand_graph is None:
-        cand_graph = build_candidate_graph(input_data, solver_params, scale)
+        if solver_params.window_size is not None:
+            result = _solve_chunked(cand_graph, solver_params, on_solver_update)
+        else:
+            result = _solve_full(cand_graph, solver_params, on_solver_update)
 
-    if solver_params.window_size is not None:
-        return _solve_chunked(cand_graph, solver_params, on_solver_update)
+    if input_data.ndim != 2:
+        result._update_metadata(segmentation_shape=input_data.shape)
 
-    return _solve_full(cand_graph, solver_params, on_solver_update)
+    return result
 
 
 def build_candidate_graph(
     input_data: np.ndarray,
     solver_params: SolverParams,
     scale: list | None = None,
-) -> nx.DiGraph:
+) -> td.graph.GraphView:
     """Build the candidate graph from input data."""
     if input_data.ndim == 2:
         cand_graph = compute_graph_from_points_list(
@@ -91,32 +97,37 @@ def build_candidate_graph(
             iou=solver_params.iou_cost is not None,
             scale=scale,
         )
-    logger.debug("Cand graph has %d nodes", cand_graph.number_of_nodes())
+    logger.debug("Cand graph has %d nodes", cand_graph.num_nodes())
     return cand_graph
 
 
 def _solve_full(
-    cand_graph: nx.DiGraph,
+    cand_graph: td.graph.GraphView,
     solver_params: SolverParams,
     on_solver_update: Callable | None = None,
-) -> nx.DiGraph:
+) -> td.graph.GraphView:
     """Solve the tracking problem on the full candidate graph at once."""
     solver = construct_solver(cand_graph, solver_params)
     start_time = time.time()
     solution = solver.solve(verbose=False, on_event=on_solver_update)
     logger.info("Solution took %.2f seconds", time.time() - start_time)
 
-    solution_graph = solver.get_selected_subgraph(solution=solution)
-    solution_nx_graph = graph_to_nx(solution_graph)
-    logger.debug("Solution graph has %d nodes", solution_nx_graph.number_of_nodes())
-    return solution_nx_graph
+    solution_tg = solver.get_selected_subgraph(solution=solution)
+    selected_nodes = list(solution_tg.nodes.keys())
+    selected_edges = set(solution_tg.edges.keys())
+    logger.debug("Solution graph has %d nodes", len(selected_nodes))
+    result = cand_graph.filter(node_ids=selected_nodes).subgraph().detach()
+    for u, v in list(result.edge_list()):
+        if (u, v) not in selected_edges:
+            result.remove_edge(u, v)
+    return result.filter().subgraph()
 
 
 def _solve_window(
-    window_subgraph: nx.DiGraph,
+    window_subgraph: td.graph.GraphView,
     solver_params: SolverParams,
     on_solver_update: Callable | None = None,
-) -> nx.DiGraph | None:
+) -> td.graph.GraphView | None:
     """Solve a single window subgraph.
 
     This is the core solving logic shared by both single window mode and
@@ -131,90 +142,29 @@ def _solve_window(
     Returns:
         The solution graph for this window, or None if the window has no nodes.
     """
-    if window_subgraph.number_of_nodes() == 0:
+    if window_subgraph.num_nodes() == 0:
         return None
 
-    # Handle edge case: if no edges, we can't solve (motile requires edges)
-    # Just return all nodes directly
-    if window_subgraph.number_of_edges() == 0:
+    # Handle edge case: if no edges, motile can't solve — return all nodes directly
+    if window_subgraph.num_edges() == 0:
         logger.info(
             "Window has no edges (%d nodes), returning nodes directly",
-            window_subgraph.number_of_nodes(),
+            window_subgraph.num_nodes(),
         )
-        return window_subgraph.copy()
+        return window_subgraph
 
-    # Construct and solve
     solver = construct_solver(window_subgraph, solver_params)
     start_time = time.time()
     solution = solver.solve(verbose=False, on_event=on_solver_update)
     logger.info("Window solved in %.2f seconds", time.time() - start_time)
-    solution_graph = solver.get_selected_subgraph(solution=solution)
-    return graph_to_nx(solution_graph)
-
-
-def _slice_input_for_single_window(
-    input_data: np.ndarray,
-    window_size: int,
-    window_start: int,
-) -> tuple[np.ndarray, int]:
-    """Slice input data to only include frames needed for single window solving.
-
-    This avoids building the full candidate graph when only solving a single window.
-
-    Args:
-        input_data: The full input segmentation or points list.
-        window_size: Number of frames in the window.
-        window_start: Starting frame index for the window.
-
-    Returns:
-        A tuple of (sliced_data, time_offset) where time_offset is the actual
-        start frame used (may differ from window_start if it was out of bounds).
-
-    Raises:
-        ValueError: If window_start is beyond the data range.
-    """
-    if input_data.ndim == 2:
-        # Points list: filter rows by time column (first column is time)
-        times = input_data[:, 0].astype(int)
-        min_time = int(times.min()) if len(times) > 0 else 0
-        max_time = int(times.max()) if len(times) > 0 else 0
-    else:
-        # Segmentation: time is first axis
-        min_time = 0
-        max_time = input_data.shape[0] - 1
-
-    # Validate window_start
-    if window_start < min_time:
-        raise ValueError(
-            f"single_window_start ({window_start}) is before first frame ({min_time})"
-        )
-    if window_start > max_time:
-        raise ValueError(
-            f"single_window_start ({window_start}) is beyond last frame ({max_time})"
-        )
-
-    # Warn if window extends beyond data
-    window_end = window_start + window_size
-    if window_end > max_time + 1:
-        logger.warning(
-            "Window end (%d) extends beyond last frame (%d), "
-            "window will be truncated to frames %d-%d",
-            window_end,
-            max_time,
-            window_start,
-            max_time,
-        )
-        window_end = max_time + 1
-
-    if input_data.ndim == 2:
-        # Filter points in the window and adjust time values
-        mask = (times >= window_start) & (times < window_end)
-        sliced_data = input_data[mask].copy()
-        sliced_data[:, 0] = sliced_data[:, 0] - window_start
-        return sliced_data, window_start
-    else:
-        sliced_data = input_data[window_start:window_end]
-        return sliced_data, window_start
+    solution_tg = solver.get_selected_subgraph(solution=solution)
+    selected_nodes = list(solution_tg.nodes.keys())
+    selected_edges = set(solution_tg.edges.keys())
+    result = window_subgraph.filter(node_ids=selected_nodes).subgraph().detach()
+    for u, v in list(result.edge_list()):
+        if (u, v) not in selected_edges:
+            result.remove_edge(u, v)
+    return result.filter().subgraph()
 
 
 def _solve_single_window(
@@ -222,11 +172,11 @@ def _solve_single_window(
     solver_params: SolverParams,
     on_solver_update: Callable | None = None,
     scale: list | None = None,
-) -> nx.DiGraph:
+) -> td.graph.GraphView:
     """Solve a single window for interactive parameter testing.
 
-    Slices the input data to only include frames in the window, builds
-    a candidate graph from that slice, solves, and restores original time values.
+    Builds the full candidate graph, filters it to the window frames, and solves.
+    Node times are naturally correct (no adjustment needed).
 
     Args:
         input_data: The full input segmentation or points list.
@@ -235,47 +185,61 @@ def _solve_single_window(
         scale: The scale of the data in each dimension.
 
     Returns:
-        The solution graph with original time values.
+        The solution graph for the requested window.
+
+    Raises:
+        ValueError: If single_window_start is beyond the data range.
     """
-    # Slice input data to only process needed frames
-    sliced_data, time_offset = _slice_input_for_single_window(
-        input_data, solver_params.window_size, solver_params.single_window_start
+    window_start = solver_params.single_window_start
+    window_size = solver_params.window_size
+    window_end = window_start + window_size
+
+    # Validate window_start against data range
+    max_time = (
+        input_data.shape[0] - 1 if input_data.ndim != 2 else int(input_data[:, 0].max())
     )
+    if window_start > max_time:
+        raise ValueError(
+            f"single_window_start ({window_start}) is beyond last frame ({max_time})"
+        )
 
     logger.info(
         "Solving single window: frames %d to %d (exclusive)",
-        time_offset,
-        time_offset + (solver_params.window_size or 0),
+        window_start,
+        window_end,
     )
 
-    cand_graph = build_candidate_graph(sliced_data, solver_params, scale)
+    cand_graph = build_candidate_graph(input_data, solver_params, scale)
+
+    # Filter candidate graph to window frames (times are already correct)
+    nodes_in_window = [
+        n
+        for n in cand_graph.node_ids()
+        if window_start <= cand_graph.nodes[n]["t"] < window_end
+    ]
+    window_subgraph = cand_graph.filter(node_ids=nodes_in_window).subgraph()
 
     start_time = time.time()
-    solution = _solve_window(cand_graph, solver_params, on_solver_update)
+    solution = _solve_window(window_subgraph, solver_params, on_solver_update)
     logger.info("Single window solution took %.2f seconds", time.time() - start_time)
 
     if solution is None:
         logger.warning("Window has no nodes")
-        return nx.DiGraph()
-
-    # Add time_offset back to node times to restore original time values
-    if time_offset > 0:
-        for node in solution.nodes:
-            solution.nodes[node]["time"] += time_offset
+        return create_empty_graphview_graph()
 
     logger.debug(
         "Single window solution has %d nodes, %d edges",
-        solution.number_of_nodes(),
-        solution.number_of_edges(),
+        solution.num_nodes(),
+        solution.num_edges(),
     )
     return solution
 
 
 def _solve_chunked(
-    cand_graph: nx.DiGraph,
+    cand_graph: td.graph.GraphView,
     solver_params: SolverParams,
     on_solver_update: Callable | None = None,
-) -> nx.DiGraph:
+) -> td.graph.GraphView:
     """Solve the tracking problem in chunks using a sliding window approach.
 
     This function solves the tracking problem in windows of `window_size` frames,
@@ -302,9 +266,9 @@ def _solve_chunked(
         )
 
     # Get the frame range from the candidate graph
-    times = [cand_graph.nodes[n]["time"] for n in cand_graph.nodes]
+    times = [cand_graph.nodes[n]["t"] for n in cand_graph.node_ids()]
     if not times:
-        return nx.DiGraph()
+        return create_empty_graphview_graph()
 
     min_time = min(times)
     max_time = max(times)
@@ -326,9 +290,8 @@ def _solve_chunked(
         overlap_size,
     )
 
-    # Initialize the combined solution graph
-    combined_solution = nx.DiGraph()
-
+    all_selected_nodes: set[int] = set()
+    all_selected_edges: set[tuple] = set()
     window_start = min_time
     window_num = 0
     start_time = time.time()
@@ -347,19 +310,17 @@ def _solve_chunked(
         # Extract subgraph for this window (includes PIN_ATTR if set on cand_graph)
         nodes_in_window = [
             n
-            for n in cand_graph.nodes
-            if window_start <= cand_graph.nodes[n]["time"] < window_end
+            for n in cand_graph.node_ids()
+            if window_start <= cand_graph.nodes[n]["t"] < window_end
         ]
-        window_subgraph = cand_graph.subgraph(nodes_in_window).copy()
+        window_subgraph = cand_graph.filter(node_ids=nodes_in_window).subgraph()
 
         # Solve this window
-        window_solution_nx = _solve_window(
-            window_subgraph,
-            solver_params,
-            on_solver_update,
+        window_solution = _solve_window(
+            window_subgraph, solver_params, on_solver_update
         )
 
-        if window_solution_nx is None:
+        if window_solution is None:
             logger.warning("Window %d has no nodes, skipping", window_num)
             window_start += window_size - overlap_size
             continue
@@ -367,28 +328,26 @@ def _solve_chunked(
         logger.debug(
             "Window %d solution has %d nodes, %d edges",
             window_num,
-            window_solution_nx.number_of_nodes(),
-            window_solution_nx.number_of_edges(),
+            window_solution.num_nodes(),
+            window_solution.num_edges(),
         )
 
-        # Determine which part of this window to add to the combined solution
-        # We only add nodes/edges that are not in the overlap region of the previous window
+        # Collect selected nodes and edges from this window, excluding the pinned
+        # overlap region that was already committed from the previous window.
         overlap_start = window_start + window_size - overlap_size
-        if window_num == 1:
-            # First window: add everything
-            _add_to_combined_solution(combined_solution, window_solution_nx)
-        else:
-            # Subsequent windows: only add nodes/edges after the pinned region
-            # The pinned region spans frames [window_start, window_start + overlap_size)
-            pin_end = window_start + overlap_size
-            _add_to_combined_solution(
-                combined_solution, window_solution_nx, from_frame=pin_end
-            )
+        from_frame = None if window_num == 1 else window_start + overlap_size
+        for nid in window_solution.node_ids():
+            if from_frame is None or window_solution.nodes[nid]["t"] >= from_frame:
+                all_selected_nodes.add(nid)
+        for u, v in window_solution.edge_list():
+            u_time = window_solution.nodes[u]["t"]
+            if from_frame is None or u_time >= from_frame:
+                all_selected_edges.add((u, v))
 
         # Set PIN_ATTR on candidate graph for the overlap region (for next window)
         if window_end <= max_time:
             _set_pinning_on_graph(
-                cand_graph, window_solution_nx, overlap_start, window_end
+                cand_graph, window_solution, overlap_start, window_end
             )
 
         # Move window
@@ -399,18 +358,26 @@ def _solve_chunked(
         window_num,
         time.time() - start_time,
     )
+
+    if not all_selected_nodes:
+        return create_empty_graphview_graph()
+
+    result = cand_graph.filter(node_ids=list(all_selected_nodes)).subgraph().detach()
+    for u, v in list(result.edge_list()):
+        if (u, v) not in all_selected_edges:
+            result.remove_edge(u, v)
+    result = result.filter().subgraph()
     logger.debug(
         "Combined solution has %d nodes, %d edges",
-        combined_solution.number_of_nodes(),
-        combined_solution.number_of_edges(),
+        result.num_nodes(),
+        result.num_edges(),
     )
-
-    return combined_solution
+    return result
 
 
 def _set_pinning_on_graph(
-    cand_graph: nx.DiGraph,
-    solution_graph: nx.DiGraph,
+    cand_graph: td.graph.GraphView,
+    solution_graph: td.graph.GraphView,
     overlap_start: int,
     overlap_end: int,
 ) -> None:
@@ -425,58 +392,59 @@ def _set_pinning_on_graph(
         overlap_start: Start frame of overlap region (inclusive).
         overlap_end: End frame of overlap region (exclusive).
     """
-    solution_nodes = set(solution_graph.nodes)
-    solution_edges = set(solution_graph.edges)
+    import polars as pl
+
+    solution_nodes = set(solution_graph.node_ids())
+    solution_edges = {tuple(e) for e in solution_graph.edge_list()}
+
+    # Ensure PIN_ATTR columns exist in schema (default None = not pinned)
+    if PIN_ATTR not in cand_graph.node_attr_keys():
+        cand_graph.add_node_attr_key(PIN_ATTR, pl.Boolean, default_value=None)
+    if PIN_ATTR not in cand_graph.edge_attr_keys():
+        cand_graph.add_edge_attr_key(PIN_ATTR, pl.Boolean, default_value=None)
 
     # Pin nodes in the overlap region
-    for node in cand_graph.nodes:
-        node_time = cand_graph.nodes[node]["time"]
+    nodes_to_pin = []
+    pin_node_values = []
+    for node in cand_graph.node_ids():
+        node_time = cand_graph.nodes[node]["t"]
         if overlap_start <= node_time < overlap_end:
-            cand_graph.nodes[node][PIN_ATTR] = node in solution_nodes
+            nodes_to_pin.append(node)
+            pin_node_values.append(node in solution_nodes)
+    if nodes_to_pin:
+        cand_graph.update_node_attrs(
+            node_ids=nodes_to_pin, attrs={PIN_ATTR: pin_node_values}
+        )
 
     # Pin edges where both endpoints are in the overlap region
-    for u, v in cand_graph.edges:
-        u_time = cand_graph.nodes[u]["time"]
-        v_time = cand_graph.nodes[v]["time"]
+    edges_to_pin = []
+    pin_edge_values = []
+    for u, v in cand_graph.edge_list():
+        u_time = cand_graph.nodes[u]["t"]
+        v_time = cand_graph.nodes[v]["t"]
         if (
             overlap_start <= u_time < overlap_end
             and overlap_start <= v_time < overlap_end
         ):
-            cand_graph.edges[u, v][PIN_ATTR] = (u, v) in solution_edges
+            edges_to_pin.append(cand_graph.edge_id(u, v))
+            pin_edge_values.append((u, v) in solution_edges)
+    if edges_to_pin:
+        cand_graph.update_edge_attrs(
+            edge_ids=edges_to_pin, attrs={PIN_ATTR: pin_edge_values}
+        )
 
 
-def _add_to_combined_solution(
-    combined: nx.DiGraph,
-    window_solution: nx.DiGraph,
-    from_frame: int | None = None,
-) -> None:
-    """Add nodes and edges from window solution to the combined solution.
-
-    Args:
-        combined: The combined solution graph to add to.
-        window_solution: The window solution to add from.
-        from_frame: If specified, only add nodes at or after this frame.
-    """
-    for node, data in window_solution.nodes(data=True):
-        if from_frame is not None:
-            node_time = data.get("time")
-            if node_time is not None and node_time < from_frame:
-                continue
-        if node not in combined:
-            combined.add_node(node, **data)
-
-    for u, v, data in window_solution.edges(data=True):
-        # Add edge if both nodes are in the combined graph
-        if u in combined and v in combined and not combined.has_edge(u, v):
-            combined.add_edge(u, v, **data)
+_SKIP_ATTRS = {td.DEFAULT_ATTR_KEYS.MASK, td.DEFAULT_ATTR_KEYS.BBOX}
 
 
-def construct_solver(cand_graph: nx.DiGraph, solver_params: SolverParams) -> Solver:
+def construct_solver(
+    cand_graph: td.graph.GraphView, solver_params: SolverParams
+) -> Solver:
     """Construct a motile solver with the parameters specified in the solver
     params object.
 
     Args:
-        cand_graph (nx.DiGraph): The candidate graph to use in the solver
+        cand_graph (td.graph.GraphView): The candidate graph to use in the solver
         solver_params (SolverParams): The costs and constraints to use in
             the solver
 
@@ -484,7 +452,30 @@ def construct_solver(cand_graph: nx.DiGraph, solver_params: SolverParams) -> Sol
         Solver: A motile solver with the specified graph, costs, and
             constraints.
     """
-    solver = Solver(TrackGraph(cand_graph, frame_attribute="time"))
+    tg = TrackGraph(frame_attribute="t")
+
+    # Bulk-fetch node attributes (one polars scan instead of N individual scans)
+    node_df = cand_graph.node_attrs()
+    skip_cols = [c for c in node_df.columns if c in _SKIP_ATTRS]
+    if skip_cols:
+        node_df = node_df.drop(skip_cols)
+    node_id_col = td.DEFAULT_ATTR_KEYS.NODE_ID
+    for row in node_df.rows(named=True):
+        node_id = row.pop(node_id_col)
+        tg.add_node(node_id, row)
+
+    # Bulk-fetch edge attributes (one polars scan instead of N individual scans)
+    edge_df = cand_graph.edge_attrs()
+    src_col = td.DEFAULT_ATTR_KEYS.EDGE_SOURCE
+    tgt_col = td.DEFAULT_ATTR_KEYS.EDGE_TARGET
+    eid_col = td.DEFAULT_ATTR_KEYS.EDGE_ID
+    for row in edge_df.rows(named=True):
+        src = row.pop(src_col)
+        tgt = row.pop(tgt_col)
+        row.pop(eid_col)
+        tg.add_edge((src, tgt), row)
+
+    solver = Solver(tg)
     solver.add_constraint(MaxChildren(solver_params.max_children))
     solver.add_constraint(MaxParents(1))
     solver.add_constraint(Pin(PIN_ATTR))

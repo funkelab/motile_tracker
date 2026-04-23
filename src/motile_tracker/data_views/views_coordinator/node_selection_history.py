@@ -152,17 +152,18 @@ class NodeSelectionHistory:
 
         Args:
             item: The node ID to add or toggle.
-            append: If True, add to existing selection (or remove if already present).
+            append: If True, toggle item in existing selection (add if absent, remove if present).
                 If False, replace selection with just this item.
         """
         current = self._current.copy()
         if current:  # Only store non-empty previous selections
             self._last_shown_set = current
         new_set = current.copy()
-        if item in new_set:
-            new_set.remove(item)
-        elif append:
-            new_set.add(item)
+        if append:
+            if item in new_set:
+                new_set.remove(item)
+            else:
+                new_set.add(item)
         else:
             new_set = {item}
 

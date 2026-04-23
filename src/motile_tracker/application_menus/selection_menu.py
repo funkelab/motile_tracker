@@ -138,6 +138,6 @@ class SelectionWidget(QWidget):
     def _invert_selection(self) -> None:
         """Invert the current selection"""
 
-        all_nodes = set(self.tracks_viewer.tracks.graph.nodes)
+        all_nodes = set(self.tracks_viewer.tracks.graph.node_ids())
         inverted = list(all_nodes - set(self.tracks_viewer.selected_nodes))
         self.tracks_viewer.selected_nodes.add_list(inverted, append=False)

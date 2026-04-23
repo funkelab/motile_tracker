@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 import napari
 import numpy as np
+import tracksdata as td
 from funtracks.exceptions import InvalidActionError
 from funtracks.user_actions import UserUpdateSegmentation
 from napari.layers import Labels
@@ -56,8 +57,10 @@ def _new_label(layer: TrackLabels, new_track_id=True):
             it to the selected_track attribute. Defaults to True.
     """
 
-    if isinstance(layer.data, np.ndarray):
-        new_selected_label = np.max(layer.data) + 1
+    if isinstance(layer.data, td.array.GraphArrayView):
+        new_selected_label = (
+            max(layer.tracks_viewer.tracks.graph.node_ids(), default=0) + 1
+        )
         if new_track_id or layer.tracks_viewer.selected_track is None:
             layer.tracks_viewer.set_new_track_id()
         layer.selected_label = new_selected_label
@@ -173,7 +176,7 @@ class TrackLabels(ContourLabels):
                 if jump:
                     self.tracks_viewer.center_on_node(value)
                 else:
-                    self.tracks_viewer.selected_nodes.add(value, append)
+                    self.tracks_viewer.selected_nodes.add(int(value), append)
             else:
                 warnings.warn(
                     f"Node {value} is not visible in this view and cannot be selected.",
@@ -189,8 +192,8 @@ class TrackLabels(ContourLabels):
         """
         tracks = self.tracks_viewer.tracks
         if tracks is not None:
-            nodes = list(tracks.graph.nodes())
-            track_ids = [tracks.get_track_id(node) for node in nodes]
+            nodes = tracks.graph.node_ids()
+            track_ids = tracks.get_track_ids(nodes)
             colors = [self.tracks_viewer.colormap.map(tid) for tid in track_ids]
         else:
             nodes = []
@@ -262,7 +265,10 @@ class TrackLabels(ContourLabels):
             for time_point in time_points:
                 time_mask = indices[0] == time_point
                 actions.append(
-                    (tuple(indices[dim][time_mask] for dim in range(ndim)), old_value)
+                    (
+                        tuple(indices[dim][time_mask] for dim in range(ndim)),
+                        int(old_value),
+                    )
                 )
         return new_value, actions
 

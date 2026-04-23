@@ -45,7 +45,7 @@ class ImportGeffWidget(QWidget):
         browse_layout.addWidget(self.geff_path_line)
         browse_layout.addWidget(self.geff_browse_button)
 
-        box = QGroupBox("Path to geff zarr directory")
+        box = QGroupBox("Path to GEFF zarr directory")
         box_layout = QVBoxLayout()
         box_layout.addLayout(browse_layout)
         box.setLayout(box_layout)
@@ -68,7 +68,7 @@ class ImportGeffWidget(QWidget):
     def _browse_geff(self) -> None:
         """Open File dialog to select geff folder"""
 
-        folder = QFileDialog.getExistingDirectory(self, "Select Geff Zarr directory")
+        folder = QFileDialog.getExistingDirectory(self, "Select GEFF Zarr directory")
         if folder:
             folder_path = Path(folder)
             self.geff_path_line.setText(str(folder_path))
@@ -94,7 +94,7 @@ class ImportGeffWidget(QWidget):
         geff_group = find_geff_group(root)
         if geff_group is None:
             QMessageBox.critical(
-                self, "Error", "No geff group found in the selected directory."
+                self, "Error", "No GEFF group found in the selected directory."
             )
             self.update_buttons.emit()
             return

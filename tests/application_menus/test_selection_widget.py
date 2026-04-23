@@ -5,19 +5,17 @@ Tests cover button states, button interactions, and selection history navigation
 
 from unittest.mock import MagicMock
 
-from funtracks.data_model import SolutionTracks
 from qtpy.QtCore import Qt
 
 from motile_tracker.application_menus.selection_menu import SelectionWidget
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
 
-def test_selection_widget_initialization(make_napari_viewer, graph_2d):
+def test_selection_widget_initialization(make_napari_viewer, solution_tracks_2d):
     """Test SelectionWidget initializes correctly with correct button states."""
     viewer = make_napari_viewer()
-    tracks = SolutionTracks(graph=graph_2d, ndim=3)
     tracks_viewer = TracksViewer.get_instance(viewer)
-    tracks_viewer.update_tracks(tracks=tracks, name="test")
+    tracks_viewer.update_tracks(tracks=solution_tracks_2d, name="test")
 
     widget = SelectionWidget(tracks_viewer)
 
@@ -42,12 +40,11 @@ def test_selection_widget_initialization(make_napari_viewer, graph_2d):
     assert widget.invert_btn.isEnabled()
 
 
-def test_button_states_on_selection(make_napari_viewer, graph_2d):
+def test_button_states_on_selection(make_napari_viewer, solution_tracks_2d):
     """Test button enable/disable states based on selection."""
     viewer = make_napari_viewer()
-    tracks = SolutionTracks(graph=graph_2d, ndim=3)
     tracks_viewer = TracksViewer.get_instance(viewer)
-    tracks_viewer.update_tracks(tracks=tracks, name="test")
+    tracks_viewer.update_tracks(tracks=solution_tracks_2d, name="test")
 
     widget = SelectionWidget(tracks_viewer)
 
@@ -64,12 +61,11 @@ def test_button_states_on_selection(make_napari_viewer, graph_2d):
     assert not widget.jump_to_previous_btn.isEnabled()
 
 
-def test_button_states_on_history_changes(make_napari_viewer, graph_2d):
+def test_button_states_on_history_changes(make_napari_viewer, solution_tracks_2d):
     """Test button states change when navigating selection history."""
     viewer = make_napari_viewer()
-    tracks = SolutionTracks(graph=graph_2d, ndim=3)
     tracks_viewer = TracksViewer.get_instance(viewer)
-    tracks_viewer.update_tracks(tracks=tracks, name="test")
+    tracks_viewer.update_tracks(tracks=solution_tracks_2d, name="test")
 
     widget = SelectionWidget(tracks_viewer)
 
@@ -88,12 +84,11 @@ def test_button_states_on_history_changes(make_napari_viewer, graph_2d):
     assert widget.reselect_btn.isEnabled()
 
 
-def test_button_interactions(make_napari_viewer, graph_2d, qtbot):
+def test_button_interactions(make_napari_viewer, solution_tracks_2d, qtbot):
     """Test button click handlers."""
     viewer = make_napari_viewer()
-    tracks = SolutionTracks(graph=graph_2d, ndim=3)
     tracks_viewer = TracksViewer.get_instance(viewer)
-    tracks_viewer.update_tracks(tracks=tracks, name="test")
+    tracks_viewer.update_tracks(tracks=solution_tracks_2d, name="test")
 
     widget = SelectionWidget(tracks_viewer)
 
@@ -134,12 +129,11 @@ def test_button_interactions(make_napari_viewer, graph_2d, qtbot):
     assert set(tracks_viewer.selected_nodes) == set(first_selection)
 
 
-def test_selection_history_navigation(make_napari_viewer, graph_2d):
+def test_selection_history_navigation(make_napari_viewer, solution_tracks_2d):
     """Test navigating through selection history."""
     viewer = make_napari_viewer()
-    tracks = SolutionTracks(graph=graph_2d, ndim=3)
     tracks_viewer = TracksViewer.get_instance(viewer)
-    tracks_viewer.update_tracks(tracks=tracks, name="test")
+    tracks_viewer.update_tracks(tracks=solution_tracks_2d, name="test")
 
     widget = SelectionWidget(tracks_viewer)
 

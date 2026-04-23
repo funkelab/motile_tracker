@@ -1,181 +1,46 @@
-import networkx as nx
 import numpy as np
 import pytest
-from skimage.draw import disk
+import tracksdata as td
+from funtracks.data_model import SolutionTracks, Tracks
+from funtracks.utils.tracksdata_utils import create_empty_graphview_graph
+from tracksdata.nodes._mask import Mask
 
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
 
 @pytest.fixture
-def segmentation_2d():
-    frame_shape = (100, 100)
-    total_shape = (5, *frame_shape)
-    segmentation = np.zeros(total_shape, dtype="int32")
-    # make frame with one cell in center with label 1
-    rr, cc = disk(center=(50, 50), radius=20, shape=(100, 100))
-    segmentation[0][rr, cc] = 1
+def click_node():
+    """Return a helper that selects a node by simulating a layer click.
 
-    # make frame with two cells
-    # first cell centered at (20, 80) with label 2
-    # second cell centered at (60, 45) with label 3
-    rr, cc = disk(center=(20, 80), radius=10, shape=frame_shape)
-    segmentation[1][rr, cc] = 2
-    rr, cc = disk(center=(60, 45), radius=15, shape=frame_shape)
-    segmentation[1][rr, cc] = 3
+    Prefers the TrackLabels path when a seg layer exists, because that is
+    the realistic path that produces np.int64 node IDs (via layer.get_value()
+    on a numpy image array). When no seg layer is present, falls back to
+    adding np.int64 directly so the type is still realistic.
 
-    # continue track 3 with squares from 0 to 4 in x and y with label 3
-    segmentation[2, 0:4, 0:4] = 4
-    segmentation[4, 0:4, 0:4] = 5
+    This ensures operations like create_edge() are tested with the same types
+    they receive in the real UI, catching bugs like tracksdata's in_degree()
+    failing on np.int64.
 
-    # unconnected node
-    segmentation[4, 96:100, 96:100] = 6
+    Usage::
 
-    return segmentation
+        click_node(tracks_viewer, node_id)               # select only this node
+        click_node(tracks_viewer, node_id, append=True)  # shift-click (append)
+    """
 
+    class _Event:
+        def __init__(self, append):
+            self.modifiers = ["Shift"] if append else []
 
-@pytest.fixture
-def graph_2d():
-    graph = nx.DiGraph()
-    nodes = [
-        (
-            1,
-            {
-                "pos": [50, 50],
-                "time": 0,
-                "area": 1245,
-                "track_id": 1,
-            },
-        ),
-        (
-            2,
-            {
-                "pos": [20, 80],
-                "time": 1,
-                "track_id": 2,
-                "area": 305,
-            },
-        ),
-        (
-            3,
-            {
-                "pos": [60, 45],
-                "time": 1,
-                "area": 697,
-                "track_id": 3,
-            },
-        ),
-        (
-            4,
-            {
-                "pos": [1.5, 1.5],
-                "time": 2,
-                "area": 16,
-                "track_id": 3,
-            },
-        ),
-        (
-            5,
-            {
-                "pos": [1.5, 1.5],
-                "time": 4,
-                "area": 16,
-                "track_id": 3,
-            },
-        ),
-        # unconnected node
-        (
-            6,
-            {
-                "pos": [97.5, 97.5],
-                "time": 4,
-                "area": 16,
-                "track_id": 5,
-            },
-        ),
-    ]
-    edges = [
-        (1, 2, {"iou": 0.0}),
-        (1, 3, {"iou": 0.395}),
-        (
-            3,
-            4,
-            {"iou": 0.0},
-        ),
-        (
-            4,
-            5,
-            {"iou": 1.0},
-        ),
-    ]
-    graph.add_nodes_from(nodes)
-    graph.add_edges_from(edges)
-    return graph
+    def _click(tracks_viewer, node_id, append=False):
+        seg_layer = tracks_viewer.tracking_layers.seg_layer
+        if seg_layer is not None:
+            # Realistic path: Labels layer returns np.int64 from image pixel values
+            seg_layer.process_click(_Event(append), np.int64(node_id))
+        else:
+            # No seg layer: node_id comes from graph.node_ids() which returns Python int
+            tracks_viewer.selected_nodes.add(node_id, append)
 
-
-def sphere(center, radius, shape):
-    assert len(center) == len(shape)
-    indices = np.moveaxis(np.indices(shape), 0, -1)  # last dim is the index
-    distance = np.linalg.norm(np.subtract(indices, np.asarray(center)), axis=-1)
-    mask = distance <= radius
-    return mask
-
-
-@pytest.fixture
-def segmentation_3d():
-    frame_shape = (100, 100, 100)
-    total_shape = (2, *frame_shape)
-    segmentation = np.zeros(total_shape, dtype="int32")
-    # make frame with one cell in center with label 1
-    mask = sphere(center=(50, 50, 50), radius=20, shape=frame_shape)
-    segmentation[0][mask] = 1
-
-    # make frame with two cells
-    # first cell centered at (20, 50, 80) with label 2
-    # second cell centered at (60, 50, 45) with label 3
-    mask = sphere(center=(20, 50, 80), radius=10, shape=frame_shape)
-    segmentation[1][mask] = 2
-    mask = sphere(center=(60, 50, 45), radius=15, shape=frame_shape)
-    segmentation[1][mask] = 3
-
-    return segmentation
-
-
-@pytest.fixture
-def graph_3d():
-    graph = nx.DiGraph()
-    nodes = [
-        (
-            1,
-            {
-                "pos": [50, 50, 50],
-                "time": 0,
-            },
-        ),
-        (
-            2,
-            {
-                "pos": [20, 50, 80],
-                "time": 1,
-            },
-        ),
-        (
-            3,
-            {
-                "pos": [60, 50, 45],
-                "time": 1,
-            },
-        ),
-    ]
-    edges = [
-        (1, 2),
-        (1, 3),
-    ]
-    graph.add_nodes_from(nodes)
-    graph.add_edges_from(edges)
-    return graph
-
-
-# Data views specific fixtures
+    return _click
 
 
 @pytest.fixture(autouse=True)
@@ -198,66 +63,255 @@ def reset_tracks_viewer():
         del TracksViewer._instance
 
 
-@pytest.fixture
-def graph_3d_with_division():
-    """3D graph with 4 nodes and a division event (node 2 splits into 3 and 4).
+def _make_mask(bbox: list[int]) -> Mask:
+    """Create a filled box Mask from a bbox.
 
-    All nodes have AREA attribute set to 1000. This fixture is used for testing
-    division-specific behavior in the data_views tests.
+    For 2D spatial masks: bbox = [y0, x0, y1, x1]
+    For 3D spatial masks: bbox = [z0, y0, x0, z1, y1, x1]
     """
-    graph = nx.DiGraph()
-    nodes = [
-        (
-            1,
-            {
-                "pos": [50, 50, 50],
-                "time": 0,
-                "area": 1000,
-            },
-        ),
-        (
-            2,
-            {
-                "pos": [20, 50, 80],
-                "time": 1,
-                "area": 1000,
-            },
-        ),
-        (
-            3,
-            {
-                "pos": [60, 50, 45],
-                "time": 2,
-                "area": 1000,
-            },
-        ),
-        (
-            4,
-            {
-                "pos": [40, 70, 60],
-                "time": 2,
-                "area": 1000,
-            },
-        ),
+    ndim = len(bbox) // 2
+    shape = tuple(bbox[i + ndim] - bbox[i] for i in range(ndim))
+    return Mask(np.ones(shape, dtype=bool), bbox=np.array(bbox, dtype=np.int64))
+
+
+@pytest.fixture
+def graph_2d() -> td.graph.GraphView:
+    """2D+time graph (ndim=3) with 6 nodes including a division and an unconnected node.
+
+    Nodes include mask/bbox attributes (frame shape 100x100, 5 timepoints).
+    """
+    graph = create_empty_graphview_graph(
+        node_attributes=[
+            "pos",
+            "area",
+            "track_id",
+            "lineage_id",
+            td.DEFAULT_ATTR_KEYS.MASK,
+            td.DEFAULT_ATTR_KEYS.BBOX,
+        ],
+        edge_attributes=["iou"],
+        ndim=3,
+    )
+    # bboxes: [y0, x0, y1, x1]
+    bboxes = [
+        [30, 30, 71, 71],  # node 1, t=0: disk center=(50,50) r=20  → area 41*41=1681
+        [10, 70, 31, 91],  # node 2, t=1: disk center=(20,80) r=10  → area 21*21=441
+        [45, 30, 76, 61],  # node 3, t=1: disk center=(60,45) r=15  → area 31*31=961
+        [0, 0, 4, 4],  # node 4, t=2: square (0:4, 0:4)        → area 4*4=16
+        [0, 0, 4, 4],  # node 5, t=4: square (0:4, 0:4)        → area 4*4=16
+        [96, 96, 100, 100],  # node 6, t=4: square (96:100, 96:100)  → area 4*4=16
     ]
-    edges = [(1, 2), (2, 3), (2, 4)]
-    graph.add_nodes_from(nodes)
-    graph.add_edges_from(edges)
+    nodes = [
+        {
+            "t": 0,
+            "pos": [50.0, 50.0],
+            "area": 1681.0,
+            "track_id": 1,
+            "lineage_id": 1,
+            "solution": 1,
+        },
+        {
+            "t": 1,
+            "pos": [20.0, 80.0],
+            "area": 441.0,
+            "track_id": 2,
+            "lineage_id": 1,
+            "solution": 1,
+        },
+        {
+            "t": 1,
+            "pos": [60.0, 45.0],
+            "area": 961.0,
+            "track_id": 3,
+            "lineage_id": 1,
+            "solution": 1,
+        },
+        {
+            "t": 2,
+            "pos": [1.5, 1.5],
+            "area": 16.0,
+            "track_id": 3,
+            "lineage_id": 1,
+            "solution": 1,
+        },
+        {
+            "t": 4,
+            "pos": [1.5, 1.5],
+            "area": 16.0,
+            "track_id": 3,
+            "lineage_id": 1,
+            "solution": 1,
+        },
+        {
+            "t": 4,
+            "pos": [97.5, 97.5],
+            "area": 16.0,
+            "track_id": 5,
+            "lineage_id": 2,
+            "solution": 1,
+        },
+    ]
+    for node, bbox in zip(nodes, bboxes, strict=True):
+        node[td.DEFAULT_ATTR_KEYS.MASK] = _make_mask(bbox)
+        node[td.DEFAULT_ATTR_KEYS.BBOX] = np.array(bbox, dtype=np.int64)
+    graph.bulk_add_nodes(nodes=nodes, indices=[1, 2, 3, 4, 5, 6])
+    graph.bulk_add_edges(
+        [
+            {"source_id": 1, "target_id": 2, "iou": 0.0, "solution": 1},
+            {"source_id": 1, "target_id": 3, "iou": 0.395, "solution": 1},
+            {"source_id": 3, "target_id": 4, "iou": 0.0, "solution": 1},
+            {"source_id": 4, "target_id": 5, "iou": 1.0, "solution": 1},
+        ]
+    )
+    graph._update_metadata(segmentation_shape=(5, 100, 100))
     return graph
 
 
 @pytest.fixture
-def segmentation_3d_boxes():
-    """3D segmentation with 5 timepoints using box regions (not spheres).
+def graph_3d() -> td.graph.GraphView:
+    """3D+time graph (ndim=4) with 3 nodes and a division.
 
-    Contains 4 labeled regions across different timepoints. This differs from
-    segmentation_3d which uses sphere shapes and only has 2 timepoints.
+    Nodes include mask/bbox attributes (frame shape 100x100x100, 2 timepoints).
     """
-    frame_shape = (100, 100, 100)
-    total_shape = (5, *frame_shape)
-    segmentation = np.zeros(total_shape, dtype="int32")
-    segmentation[0, 45:55, 45:55, 45:55] = 1
-    segmentation[1, 15:25, 45:55, 75:85] = 2
-    segmentation[2, 55:65, 45:55, 40:50] = 3
-    segmentation[2, 35:45, 65:75, 55:65] = 4
-    return segmentation
+    graph = create_empty_graphview_graph(
+        node_attributes=["pos", td.DEFAULT_ATTR_KEYS.MASK, td.DEFAULT_ATTR_KEYS.BBOX],
+        ndim=4,
+    )
+    # bboxes: [z0, y0, x0, z1, y1, x1]
+    bboxes = [
+        [30, 30, 30, 71, 71, 71],  # node 1, t=0: sphere center=(50,50,50) r=20
+        [10, 40, 70, 31, 61, 91],  # node 2, t=1: sphere center=(20,50,80) r=10
+        [45, 35, 30, 76, 66, 61],  # node 3, t=1: sphere center=(60,50,45) r=15
+    ]
+    nodes = [
+        {"t": 0, "pos": [50.0, 50.0, 50.0], "solution": 1},
+        {"t": 1, "pos": [20.0, 50.0, 80.0], "solution": 1},
+        {"t": 1, "pos": [60.0, 50.0, 45.0], "solution": 1},
+    ]
+    for node, bbox in zip(nodes, bboxes, strict=True):
+        node[td.DEFAULT_ATTR_KEYS.MASK] = _make_mask(bbox)
+        node[td.DEFAULT_ATTR_KEYS.BBOX] = np.array(bbox, dtype=np.int64)
+    graph.bulk_add_nodes(nodes=nodes, indices=[1, 2, 3])
+    graph.bulk_add_edges(
+        [
+            {"source_id": 1, "target_id": 2, "solution": 1},
+            {"source_id": 1, "target_id": 3, "solution": 1},
+        ]
+    )
+    graph._update_metadata(segmentation_shape=(2, 100, 100, 100))
+    return graph
+
+
+@pytest.fixture
+def graph_2d_without_segmentation(graph_2d: td.graph.GraphView) -> td.graph.GraphView:
+    """Return a copy of graph_2d without segmentation-related node attributes."""
+    graph_without_seg = graph_2d.detach().filter().subgraph()
+    graph_without_seg.remove_node_attr_key(td.DEFAULT_ATTR_KEYS.MASK)
+    graph_without_seg.remove_node_attr_key(td.DEFAULT_ATTR_KEYS.BBOX)
+    graph_without_seg.remove_edge_attr_key("iou")
+    return graph_without_seg
+
+
+@pytest.fixture
+def graph_3d_with_division() -> td.graph.GraphView:
+    """3D+time graph (ndim=4) with 4 nodes and a division event (node 2 splits into 3 and 4).
+
+    Nodes include mask/bbox attributes (frame shape 100x100x100, 5 timepoints).
+    """
+    graph = create_empty_graphview_graph(
+        node_attributes=[
+            "pos",
+            "area",
+            td.DEFAULT_ATTR_KEYS.MASK,
+            td.DEFAULT_ATTR_KEYS.BBOX,
+        ],
+        ndim=4,
+    )
+    bboxes = [
+        [45, 45, 45, 55, 55, 55],  # node 1, t=0
+        [15, 45, 75, 25, 55, 85],  # node 2, t=1
+        [55, 45, 40, 65, 55, 50],  # node 3, t=2
+        [35, 65, 55, 45, 75, 65],  # node 4, t=2
+    ]
+    graph.bulk_add_nodes(
+        nodes=[
+            {
+                "t": 0,
+                "pos": [50.0, 50.0, 50.0],
+                "area": 1000.0,
+                td.DEFAULT_ATTR_KEYS.MASK: _make_mask(bboxes[0]),
+                td.DEFAULT_ATTR_KEYS.BBOX: np.array(bboxes[0], dtype=np.int64),
+                "solution": 1,
+            },
+            {
+                "t": 1,
+                "pos": [20.0, 50.0, 80.0],
+                "area": 1000.0,
+                td.DEFAULT_ATTR_KEYS.MASK: _make_mask(bboxes[1]),
+                td.DEFAULT_ATTR_KEYS.BBOX: np.array(bboxes[1], dtype=np.int64),
+                "solution": 1,
+            },
+            {
+                "t": 2,
+                "pos": [60.0, 50.0, 45.0],
+                "area": 1000.0,
+                td.DEFAULT_ATTR_KEYS.MASK: _make_mask(bboxes[2]),
+                td.DEFAULT_ATTR_KEYS.BBOX: np.array(bboxes[2], dtype=np.int64),
+                "solution": 1,
+            },
+            {
+                "t": 2,
+                "pos": [40.0, 70.0, 60.0],
+                "area": 1000.0,
+                td.DEFAULT_ATTR_KEYS.MASK: _make_mask(bboxes[3]),
+                td.DEFAULT_ATTR_KEYS.BBOX: np.array(bboxes[3], dtype=np.int64),
+                "solution": 1,
+            },
+        ],
+        indices=[1, 2, 3, 4],
+    )
+    graph.bulk_add_edges(
+        [
+            {"source_id": 1, "target_id": 2, "solution": 1},
+            {"source_id": 2, "target_id": 3, "solution": 1},
+            {"source_id": 2, "target_id": 4, "solution": 1},
+        ]
+    )
+    graph._update_metadata(segmentation_shape=(5, 100, 100, 100))
+    return graph
+
+
+@pytest.fixture
+def solution_tracks_2d(graph_2d) -> SolutionTracks:
+    """Return a SolutionTracks object wrapping graph_2d."""
+    return SolutionTracks(graph=graph_2d, ndim=3, time_attr="t")
+
+
+@pytest.fixture
+def solution_tracks_3d(graph_3d) -> SolutionTracks:
+    """Return a SolutionTracks object wrapping graph_3d."""
+    return SolutionTracks(graph=graph_3d, ndim=4, time_attr="t")
+
+
+@pytest.fixture
+def solution_tracks_3d_with_division(graph_3d_with_division) -> SolutionTracks:
+    """Return a SolutionTracks object wrapping graph_3d_with_division."""
+    return SolutionTracks(graph=graph_3d_with_division, ndim=4, time_attr="t")
+
+
+@pytest.fixture
+def solution_tracks_2d_without_segmentation(
+    graph_2d_without_segmentation,
+) -> SolutionTracks:
+    """Return a SolutionTracks object wrapping graph_2d_without_segmentation."""
+    return SolutionTracks(graph=graph_2d_without_segmentation, ndim=3, time_attr="t")
+
+
+@pytest.fixture
+def segmentation_2d(graph_2d):
+    return np.asarray(Tracks(graph_2d, ndim=3, time_attr="t").segmentation)
+
+
+@pytest.fixture
+def segmentation_3d(graph_3d):
+    return np.asarray(Tracks(graph_3d, ndim=4, time_attr="t").segmentation)
