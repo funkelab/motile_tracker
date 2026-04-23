@@ -103,16 +103,14 @@ def test_import_dialog_csv(qtbot, small_csv, dim_3d, include_seg):
     optional = dialog.prop_map_widget.optional_features
     if "area" in optional:
         combo = optional["area"]["feature_option"]
-        # "Custom" is always index 0 (default)
-        assert combo.currentIndex() == 0
+        combo.setCurrentIndex(combo.count() - 1)
         assert combo.currentText() == "Custom"
         assert optional["area"]["recompute"].isEnabled() is False
+        combo.setCurrentIndex(0)
         if include_seg:
-            # First regionprops feature is at index 1
-            combo.setCurrentIndex(1)
             assert optional["area"]["recompute"].isEnabled() is True
         else:
-            assert combo.count() == 1  # only "Custom", no regionprops options
+            assert optional["area"]["recompute"].isEnabled() is False
 
 
 class TestPropMapWidgetKeys:

@@ -295,8 +295,6 @@ class StandardFieldMapWidget(QWidget):
         attr_checkbox.toggled.connect(self._check_for_duplicates)
         # Feature option combobox
         feature_option = QComboBox()
-        # Always have "Custom" as first (default) option
-        feature_option.addItem("Custom")
         # Numerical types & segmentation provided => list regionprops features
         if (
             self.attr_types.get(attribute)
@@ -310,6 +308,8 @@ class StandardFieldMapWidget(QWidget):
         elif self.attr_types.get(attribute) in {"bool", "object", "0"}:
             # Boolean or unknown/object types => grouping option
             feature_option.addItem("Group")
+        # Always have "Custom" as last option
+        feature_option.addItem("Custom")
         feature_option.currentIndexChanged.connect(self._check_for_duplicates)
 
         # Recompute checkbox - initially disabled
