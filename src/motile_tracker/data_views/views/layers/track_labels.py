@@ -20,6 +20,7 @@ from motile_tracker.data_views.keybindings_config import (
 )
 from motile_tracker.data_views.views.layers.click_utils import (
     detect_click,
+    detect_side_button,
     get_click_value,
 )
 from motile_tracker.data_views.views.layers.contour_labels import ContourLabels
@@ -115,9 +116,7 @@ class TrackLabels(ContourLabels):
         # Listen to paint events and changing the selected label
         self.mouse_drag_callbacks.append(self.click)
         self.events.paint.connect(self._on_paint)
-        self.tracks_viewer.selected_nodes.list_updated.connect(
-            self.update_selected_label
-        )
+        self.tracks_viewer.node_selection_updated.connect(self.update_selected_label)
         self.events.mode.connect(self._check_mode)
         self.events.selected_label.connect(self._ensure_valid_label)
 
@@ -126,14 +125,16 @@ class TrackLabels(ContourLabels):
 
     # Connect click events to node selection
     def click(self, _, event):
-        if (
-            event.type == "mouse_press" and self.mode == "pan_zoom"
-        ):  # disable selecting in lineage mode in 3D
+        side_button = detect_side_button(event)
+        if side_button is not None:
+            self.process_click(event, side_button=side_button)
+        elif self.mode == "pan_zoom" and event.type == "mouse_press":
+            # disable selecting in lineage mode in 3D
             # differentiate between click and drag
             was_click = yield from detect_click(event)
             if was_click:
                 value = get_click_value(self, event)
-                self.process_click(event, value)
+                self.process_click(event, value=value)
 
     def assign_new_label(self, event):
         """Function for orthoviews to connect to so the 'm' event can be processed here"""
@@ -141,34 +142,44 @@ class TrackLabels(ContourLabels):
         new_label(self)
 
     def process_click(
-        self, event: Event, label: int, layer: ContourLabels | None = None
+        self,
+        event: Event,
+        value: int | None = None,
+        side_button: int | None = None,
+        layer: ContourLabels | None = None,
     ):
         """Process the click event to update the selected nodes.
 
         Args:
             event (Event): The click event.
-            label (int): The label value at the clicked position.
+            value (int): The label value (node) at the clicked position.
+            side_button (int | None): the integer for the mouse side buttons (4: back, 5: forward)
             layer (ContourLabels | None): The (ortho view) layer from which the click originated.
                 If provided, it is used to check label visibility in that layer's colormap.
         """
 
-        if label is not None and label != 0:
+        # Intercept mouse side button navigation (back/forward)
+        if side_button is not None:
+            self.tracks_viewer.select_node_set_from_history(previous=side_button == 4)
+            return
+
+        if value is not None and value != 0:
             # check visibility in the respective colormap. If a label is not visible, it
             # is not allowed to be selected from this view
             if layer is not None:
-                is_visible = layer.colormap.color_dict.get(label)[3] > 0
+                is_visible = layer.colormap.color_dict.get(value)[3] > 0
             else:
-                is_visible = self.colormap.color_dict.get(label)[3] > 0
+                is_visible = self.colormap.color_dict.get(value)[3] > 0
             if is_visible:
                 append = "Shift" in event.modifiers
                 jump = "Control" in event.modifiers
                 if jump:
-                    self.tracks_viewer.center_on_node(label)
+                    self.tracks_viewer.center_on_node(value)
                 else:
-                    self.tracks_viewer.selected_nodes.add(label, append)
+                    self.tracks_viewer.selected_nodes.add(int(value), append)
             else:
                 warnings.warn(
-                    f"Node {label} is not visible in this view and cannot be selected.",
+                    f"Node {value} is not visible in this view and cannot be selected.",
                     stacklevel=2,
                 )
 

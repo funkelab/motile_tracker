@@ -37,8 +37,8 @@ def click_node():
             # Realistic path: Labels layer returns np.int64 from image pixel values
             seg_layer.process_click(_Event(append), np.int64(node_id))
         else:
-            # No seg layer: cast to np.int64 to still match the real type
-            tracks_viewer.selected_nodes.add(np.int64(node_id), append)
+            # No seg layer: node_id comes from graph.node_ids() which returns Python int
+            tracks_viewer.selected_nodes.add(node_id, append)
 
     return _click
 

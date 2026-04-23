@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import napari
 import numpy as np
+from napari.layers.labels._labels_constants import (
+    Mode,
+)
+from napari.layers.labels._labels_mouse_bindings import draw, pick
 from napari.layers.labels._labels_utils import (
     expand_slice,
 )
@@ -9,6 +13,18 @@ from napari.utils import DirectLabelColormap
 from napari.utils._indexing import elements_in_slice, index_in_slice
 from napari.utils.events import Event
 from scipy import ndimage as ndi
+
+
+def left_only_draw(layer, event):
+    if event.button != 1:
+        return  # skip non‑left
+    yield from draw(layer, event)
+
+
+def left_only_pick(layer, event):
+    if event.button != 1:
+        return
+    pick(layer, event)
 
 
 def get_contours(
@@ -78,6 +94,10 @@ class ContourLabels(napari.layers.Labels):
 
         self._filled_labels = []
         self.events.add(filled_labels=Event)
+        self._drag_modes[Mode.PAINT] = left_only_draw
+        self._drag_modes[Mode.FILL] = left_only_draw
+        self._drag_modes[Mode.ERASE] = left_only_draw
+        self._drag_modes[Mode.PICK] = left_only_pick
 
     @property
     def filled_labels(self) -> list[int] | None:

@@ -15,6 +15,8 @@ class MainApp(QWidget):
     def __init__(self, viewer: napari.Viewer):
         super().__init__()
 
+        viewer.mouse_double_click_callbacks.clear()  # no double click to zoom
+
         self.menu_widget = MenuWidget(viewer)
         tree_widget = TreeWidget(viewer)
 

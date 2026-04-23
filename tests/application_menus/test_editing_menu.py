@@ -5,7 +5,7 @@ Tests cover button states, button interactions, and track ID display.
 
 from unittest.mock import MagicMock
 
-from PyQt6.QtCore import Qt
+from qtpy.QtCore import Qt
 
 from motile_tracker.application_menus.editing_menu import EditingMenu
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
@@ -120,13 +120,7 @@ def test_button_interactions(make_napari_viewer, solution_tracks_2d, qtbot, clic
     delete_edge_mock.assert_called_once()
 
     # Test 5: Start New Track button calls tracks_viewer.request_new_track()
-    new_track_btn = None
-    for child in editing_menu.children():
-        if hasattr(child, "text") and child.text() == "Start new":
-            new_track_btn = child
-            break
-    assert new_track_btn is not None, "Could not find 'Start new' button"
-    qtbot.mouseClick(new_track_btn, Qt.MouseButton.LeftButton)
+    qtbot.mouseClick(editing_menu.new_track_btn, Qt.MouseButton.LeftButton)
     new_track_mock.assert_called_once()
 
     # Test 6: Undo button calls tracks_viewer.undo()

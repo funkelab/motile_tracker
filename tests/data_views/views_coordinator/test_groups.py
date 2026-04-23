@@ -7,8 +7,9 @@ selection operations, and export functionality.
 from unittest.mock import MagicMock, patch
 
 import pytest
-from PyQt6.QtCore import Qt
+from qtpy.QtCore import Qt
 
+from motile_tracker.application_menus.selection_menu import SelectionWidget
 from motile_tracker.data_views.views_coordinator.groups import (
     CollectionButton,
     CollectionWidget,
@@ -37,7 +38,7 @@ def test_collection_button(viewer):
     assert isinstance(button.collection, set)
 
     # Verify node count label
-    assert button.node_count.text() == "0 nodes"
+    assert button.node_count.text() == "0 node(s)"
 
     # Verify buttons exist
     assert button.delete is not None
@@ -47,12 +48,12 @@ def test_collection_button(viewer):
     # Test 2: Update node count with multiple nodes
     button.collection = {1, 2, 3, 4, 5}
     button.update_node_count()
-    assert button.node_count.text() == "5 nodes"
+    assert button.node_count.text() == "5 node(s)"
 
     # Remove some nodes
     button.collection = {1, 2}
     button.update_node_count()
-    assert button.node_count.text() == "2 nodes"
+    assert button.node_count.text() == "2 node(s)"
 
     # Test 3: Size hint returns correct height
     hint = button.sizeHint()
@@ -72,24 +73,22 @@ def test_collection_widget_initialization(viewer, solution_tracks_2d):
     assert widget.selected_collection is None
 
     # Verify buttons exist
-    assert widget.select_btn is not None
-    assert widget.invert_btn is not None
-    assert widget.deselect_btn is not None
-    assert widget.reselect_btn is not None
     assert widget.add_nodes_btn is not None
     assert widget.remove_node_btn is not None
+    assert widget.add_track_btn is not None
+    assert widget.remove_track_btn is not None
+    assert widget.add_lineage_btn is not None
+    assert widget.remove_lineage_btn is not None
     assert widget.new_group_button is not None
 
     # Test 2: Initial button states when no groups exist
     # Edit buttons should be disabled (no group selected)
     assert not widget.add_nodes_btn.isEnabled()
     assert not widget.remove_node_btn.isEnabled()
-    assert not widget.select_btn.isEnabled()
-
-    # Selection buttons should be disabled (no nodes selected)
-    assert not widget.deselect_btn.isEnabled()
-    assert not widget.jump_to_next_btn.isEnabled()
-    assert not widget.jump_to_previous_btn.isEnabled()
+    assert not widget.add_track_btn.isEnabled()
+    assert not widget.remove_track_btn.isEnabled()
+    assert not widget.add_lineage_btn.isEnabled()
+    assert not widget.remove_lineage_btn.isEnabled()
 
     # New group button should be enabled (tracks exist)
     assert widget.new_group_button.isEnabled()
@@ -161,24 +160,23 @@ def test_button_states(viewer, solution_tracks_2d, qtbot, click_node):
 
     widget = CollectionWidget(tracks_viewer)
 
-    # Test 1: Navigation buttons initially disabled
-    assert not widget.deselect_btn.isEnabled()
-    assert not widget.jump_to_next_btn.isEnabled()
-    assert not widget.jump_to_previous_btn.isEnabled()
-
-    # Select nodes - navigation buttons now enabled
-    click_node(tracks_viewer, 1)
-    click_node(tracks_viewer, 2, append=True)
-    assert widget.deselect_btn.isEnabled()
-    assert widget.jump_to_next_btn.isEnabled()
-    assert widget.jump_to_previous_btn.isEnabled()
+    # Test 1: Edit buttons initially disabled (no group selected)
+    assert not widget.add_nodes_btn.isEnabled()
+    assert not widget.add_track_btn.isEnabled()
+    assert not widget.add_lineage_btn.isEnabled()
+    assert not widget.remove_node_btn.isEnabled()
+    assert not widget.remove_track_btn.isEnabled()
+    assert not widget.remove_lineage_btn.isEnabled()
 
     # Test 2: Edit buttons enabled when group selected and nodes selected
     # Create a group
     widget.group_name.setText("test_group")
     qtbot.mouseClick(widget.new_group_button, Qt.MouseButton.LeftButton)
 
-    # Verify edit buttons are enabled
+    # Ensure nodes are selected
+    tracks_viewer.selected_nodes.add_list([1, 2], append=False)
+
+    # Verify edit buttons are enabled when group selected and nodes selected
     assert widget.add_nodes_btn.isEnabled()
     assert widget.add_track_btn.isEnabled()
     assert widget.add_lineage_btn.isEnabled()
@@ -186,15 +184,14 @@ def test_button_states(viewer, solution_tracks_2d, qtbot, click_node):
     assert widget.remove_track_btn.isEnabled()
     assert widget.remove_lineage_btn.isEnabled()
 
-    # Test 3: Select button only enabled when selected group has nodes
-    # Select button should be disabled (no nodes in group yet)
-    assert not widget.select_btn.isEnabled()
-
-    # Add nodes to group
-    qtbot.mouseClick(widget.add_nodes_btn, Qt.MouseButton.LeftButton)
-
-    # Select button should now be enabled
-    assert widget.select_btn.isEnabled()
+    # Test 3: Edit buttons disabled when no nodes selected
+    tracks_viewer.selected_nodes.reset()
+    assert not widget.add_nodes_btn.isEnabled()
+    assert not widget.add_track_btn.isEnabled()
+    assert not widget.add_lineage_btn.isEnabled()
+    assert not widget.remove_node_btn.isEnabled()
+    assert not widget.remove_track_btn.isEnabled()
+    assert not widget.remove_lineage_btn.isEnabled()
 
 
 def test_add_remove_nodes(viewer, solution_tracks_2d, qtbot, click_node):
@@ -219,7 +216,7 @@ def test_add_remove_nodes(viewer, solution_tracks_2d, qtbot, click_node):
     assert 2 in widget.selected_collection.collection
     assert 3 in widget.selected_collection.collection
     assert len(widget.selected_collection.collection) == 3
-    assert widget.selected_collection.node_count.text() == "3 nodes"
+    assert widget.selected_collection.node_count.text() == "3 node(s)"
 
     # Test 2: Remove some nodes
     click_node(tracks_viewer, 2)
@@ -301,6 +298,7 @@ def test_selection_operations(viewer, solution_tracks_2d, qtbot, click_node):
     tracks_viewer.update_tracks(tracks=solution_tracks_2d, name="test")
 
     widget = CollectionWidget(tracks_viewer)
+    selection_widget = SelectionWidget(tracks_viewer)
 
     # Create a group and add nodes
     widget.group_name.setText("test_group")
@@ -311,11 +309,15 @@ def test_selection_operations(viewer, solution_tracks_2d, qtbot, click_node):
     click_node(tracks_viewer, 3, append=True)
     qtbot.mouseClick(widget.add_nodes_btn, Qt.MouseButton.LeftButton)
 
-    # Test 1: Select all nodes in group
+    # Test 1: Select all nodes in group via CollectionButton
     tracks_viewer.selected_nodes.reset()
     assert len(tracks_viewer.selected_nodes) == 0
 
-    qtbot.mouseClick(widget.select_btn, Qt.MouseButton.LeftButton)
+    item = widget.collection_list.item(0)
+    collection_btn = widget.collection_list.itemWidget(item)
+    qtbot.mouseClick(
+        collection_btn.select_nodes_in_group_btn, Qt.MouseButton.LeftButton
+    )
 
     # Verify nodes were selected
     assert 1 in tracks_viewer.selected_nodes
@@ -323,11 +325,11 @@ def test_selection_operations(viewer, solution_tracks_2d, qtbot, click_node):
     assert 3 in tracks_viewer.selected_nodes
 
     # Test 2: Deselect all nodes
-    qtbot.mouseClick(widget.deselect_btn, Qt.MouseButton.LeftButton)
+    qtbot.mouseClick(selection_widget.deselect_btn, Qt.MouseButton.LeftButton)
     assert len(tracks_viewer.selected_nodes) == 0
 
     # Test 3: Restore previous selection
-    qtbot.mouseClick(widget.reselect_btn, Qt.MouseButton.LeftButton)
+    qtbot.mouseClick(selection_widget.reselect_btn, Qt.MouseButton.LeftButton)
     assert 1 in tracks_viewer.selected_nodes
     assert 2 in tracks_viewer.selected_nodes
     assert 3 in tracks_viewer.selected_nodes
@@ -336,7 +338,7 @@ def test_selection_operations(viewer, solution_tracks_2d, qtbot, click_node):
     all_nodes = set(tracks_viewer.tracks.graph.node_ids())
     selected = [1, 2, 3]
 
-    qtbot.mouseClick(widget.invert_btn, Qt.MouseButton.LeftButton)
+    qtbot.mouseClick(selection_widget.invert_btn, Qt.MouseButton.LeftButton)
 
     # Verify selection was inverted
     expected = all_nodes - set(selected)
@@ -353,7 +355,7 @@ def test_node_navigation(viewer, solution_tracks_2d, qtbot, click_node):
     center_mock = MagicMock()
     tracks_viewer.center_on_node = center_mock
 
-    widget = CollectionWidget(tracks_viewer)
+    selection_widget = SelectionWidget(tracks_viewer)
 
     # Select multiple nodes
     click_node(tracks_viewer, 1)
@@ -362,12 +364,12 @@ def test_node_navigation(viewer, solution_tracks_2d, qtbot, click_node):
     center_mock.reset_mock()  # reset calls that happened during selection setup
 
     # Test 1: Jump to next node
-    qtbot.mouseClick(widget.jump_to_next_btn, Qt.MouseButton.LeftButton)
+    qtbot.mouseClick(selection_widget.jump_to_next_btn, Qt.MouseButton.LeftButton)
     center_mock.assert_called_once()
 
     # Test 2: Jump to previous node
     center_mock.reset_mock()
-    qtbot.mouseClick(widget.jump_to_previous_btn, Qt.MouseButton.LeftButton)
+    qtbot.mouseClick(selection_widget.jump_to_previous_btn, Qt.MouseButton.LeftButton)
     center_mock.assert_called_once()
 
 
@@ -428,16 +430,17 @@ class TestRetrieveExistingGroups:
         # Remove a node from the graph
         tracks_viewer.tracks.graph.remove_node(1)
 
+        # Mark the node as deleted in the selection system
+        tracks_viewer.selected_nodes.deleted_items.add(1)
+
         # Refresh
         widget._refresh()
 
-        # Verify node was removed from collection
-        assert 1 not in widget.selected_collection.collection
+        # Verify that the deleted node is still in the collection, but not in the node count
+        assert 1 in widget.selected_collection.collection
         assert 2 in widget.selected_collection.collection
-        assert len(widget.selected_collection.collection) == 1
-
-        assert 2 in widget.selected_collection.collection
-        assert len(widget.selected_collection.collection) == 1
+        assert len(widget.selected_collection.collection) == 2
+        assert widget.selected_collection.node_count.text() == "1 node(s)"
 
 
 @patch("motile_tracker.data_views.views_coordinator.groups.ExportDialog")

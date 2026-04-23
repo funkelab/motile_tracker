@@ -65,7 +65,7 @@ def test_menu_widget_initialization(
     assert widget.tabwidget.count() == 4
     assert widget.tabwidget.tabText(0) == "Tracking"
     assert widget.tabwidget.tabText(1) == "Tracks List"
-    assert widget.tabwidget.tabText(2) == "Edit Tracks"
+    assert widget.tabwidget.tabText(2) == "Editing && Selection"
     assert widget.tabwidget.tabText(3) == "Groups"
 
     # Test 3: Verify header with docs and keybindings links
