@@ -32,7 +32,7 @@ classifiers = [
 dependencies =[
     "napari>=0.6.2,<0.7.0",
     #TODO: make this a proper PyPI release
-    "funtracks @ git+https://github.com/funkelab/funtracks.git@v2.0.0-a1",
+    "funtracks>=2.0.0-a2,<3",
     "appdirs>=1,<2",
     "numpy>=2,<3",
     "magicgui>=0.10.1",
