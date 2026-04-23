@@ -1,3 +1,4 @@
+import numpy as np
 import pytest
 from funtracks.utils.tracksdata_utils import assert_node_attrs_equal_with_masks
 
@@ -89,6 +90,31 @@ def test_solve_single_window_start_0(segmentation_2d):
     for node in solution.node_ids():
         node_time = solution.nodes[node]["t"]
         assert 0 <= node_time < 2, f"Node {node} has time {node_time}, expected 0-1"
+
+
+def test_solve_single_window_points():
+    """Single-window mode with a points list (ndim==2 branch) as input."""
+    # Columns: (t, y, x) — points close enough to form edges within default max_edge_distance
+    points = np.array(
+        [
+            [0, 50.0, 50.0],
+            [1, 51.0, 51.0],
+            [2, 52.0, 52.0],
+            [3, 53.0, 53.0],
+        ]
+    )
+    params = SolverParams()
+    params.appear_cost = None
+    params.iou_cost = None  # points graphs have no iou edge attribute
+    params.window_size = 2
+    params.single_window_start = 1
+
+    solution = solve(params, points)
+
+    assert solution.num_nodes() > 0
+    for node in solution.node_ids():
+        node_time = solution.nodes[node]["t"]
+        assert 1 <= node_time < 3, f"Node {node} has time {node_time}, expected 1-2"
 
 
 def test_solve_single_window_invalid_start(segmentation_3d):
