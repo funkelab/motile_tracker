@@ -76,6 +76,21 @@ def test_solve_single_window(segmentation_3d):
         assert 1 <= node_time < 4, f"Node {node} has time {node_time}, expected 1-3"
 
 
+def test_solve_single_window_start_0(segmentation_2d):
+    """Window starting at frame 0 — no t-shift should be applied."""
+    params = SolverParams()
+    params.appear_cost = None
+    params.window_size = 2
+    params.single_window_start = 0
+
+    solution = solve(params, segmentation_2d)
+
+    assert solution.num_nodes() > 0
+    for node in solution.node_ids():
+        node_time = solution.nodes[node]["t"]
+        assert 0 <= node_time < 2, f"Node {node} has time {node_time}, expected 0-1"
+
+
 def test_solve_single_window_invalid_start(segmentation_3d):
     """Test that invalid window_start raises ValueError."""
 
