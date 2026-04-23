@@ -151,6 +151,7 @@ def test_solve_with_motile(make_napari_viewer, segmentation_2d):
         solver_params=SolverParams(),
         ndim=3,
     )
+    widget._cand_graph = None  # clear cache so build_candidate_graph is called
     with (
         patch(
             "motile_tracker.motile.menus.motile_widget.build_candidate_graph"
@@ -172,6 +173,7 @@ def test_solve_with_motile(make_napari_viewer, segmentation_2d):
         run_name="test_run",
         solver_params=SolverParams(),
     )
+    widget._cand_graph = None  # clear cache so build_candidate_graph is called
     with (
         patch(
             "motile_tracker.motile.menus.motile_widget.build_candidate_graph"
@@ -196,6 +198,7 @@ def test_solve_with_motile(make_napari_viewer, segmentation_2d):
         solver_params=SolverParams(),
     )
 
+    widget._cand_graph = None  # clear cache so build_candidate_graph is called
     with (
         patch(
             "motile_tracker.motile.menus.motile_widget.build_candidate_graph"
