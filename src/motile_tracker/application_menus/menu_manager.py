@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import napari
-from qtpy.QtWidgets import QDockWidget, QScrollArea, QTabBar
+from qtpy.QtCore import Qt
+from qtpy.QtWidgets import QDockWidget, QScrollArea, QTabBar, QTabWidget
 
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
@@ -59,6 +60,34 @@ class MenuManager:
                     if dw.windowTitle() == name:
                         self.dw_map[name] = dw
                         break
+
+        for tb in self.viewer.window._qt_window.findChildren(QTabBar):
+            tb.setUsesScrollButtons(True)
+            tb.setExpanding(False)
+            tb.setStyleSheet("""
+                QTabBar::tab {
+                    min-width: 50px;
+                }
+            """)
+
+    def _set_right_tabs_vertical(self):
+
+        qt_window = self.viewer.window._qt_window
+
+        qt_window.setTabPosition(
+            Qt.DockWidgetArea.RightDockWidgetArea, QTabWidget.TabPosition.East
+        )
+
+        for tb in self.viewer.window._qt_window.findChildren(QTabBar):
+            if tb.height() > tb.width():
+                tb.setUsesScrollButtons(True)
+                tb.setExpanding(False)
+                tb.setStyleSheet("""
+                    QTabBar::tab {
+                        min-width: 15px;
+                        min-height: 50px;
+                    }
+                """)
 
     def _create_scroll_wrapper(self, widget) -> QScrollArea:
         """Wrap a widget in a QScrollArea to make it scrollable."""
