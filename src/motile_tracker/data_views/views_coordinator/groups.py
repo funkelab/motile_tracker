@@ -26,10 +26,32 @@ from superqt.fonticon import icon as qticon
 if TYPE_CHECKING:
     from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
+import napari
+
 from motile_tracker.data_views.views.tree_view.tree_widget_utils import (
     extract_lineage_tree,
 )
 from motile_tracker.import_export.menus.export_dialog import ExportDialog
+
+
+class GroupWidget(QWidget):
+    """Creates or finds a TracksViewer and displays its Collection widget.
+    This is only used in case the user wants to open the groups from the plugins
+    menu.
+    """
+
+    def __init__(self, viewer: napari.Viewer):
+        super().__init__()
+
+        from motile_tracker.data_views.views_coordinator.tracks_viewer import (
+            TracksViewer,
+        )
+
+        tracks_viewer = TracksViewer.get_instance(viewer)
+        layout = QVBoxLayout()
+        layout.addWidget(tracks_viewer.collection_widget)
+
+        self.setLayout(layout)
 
 
 class CollectionButton(QWidget):

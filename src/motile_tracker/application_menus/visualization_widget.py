@@ -1,4 +1,7 @@
+import contextlib
+
 import napari
+from napari_orthogonal_views.ortho_view_manager import _VIEWER_MANAGERS
 from psygnal import Signal
 from qtpy.QtCore import QSignalBlocker
 from qtpy.QtWidgets import (
@@ -12,6 +15,7 @@ from qtpy.QtWidgets import (
 )
 from superqt import QLabeledDoubleSlider
 
+from motile_tracker.data_views.views.ortho_views import initialize_ortho_views
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
 
@@ -104,6 +108,8 @@ class LabelVisualizationWidget(QWidget):
     def __init__(self, viewer: napari.Viewer):
         super().__init__()
 
+        self.viewer = viewer
+
         self.tracks_viewer = TracksViewer.get_instance(viewer)
         layout = QVBoxLayout(self)
 
@@ -131,32 +137,88 @@ class LabelVisualizationWidget(QWidget):
 
         self.background_widget.setEnabled(False)  # initially disabled
 
+        self.show_ortho_views = QCheckBox("Show orthogonal views")
+        self.show_ortho_views.stateChanged.connect(self.initialize_ortho_views)
+
         layout.addWidget(self.mode_widget)
         layout.addWidget(self.highlight_widget)
         layout.addWidget(self.foreground_widget)
         layout.addWidget(self.background_widget)
+        layout.addWidget(self.show_ortho_views)
 
         self.setMaximumHeight(450)
+
+    def initialize_ortho_views(self, checked: bool):
+        """Initializes the ortho views."""
+
+        if self.show_ortho_views.isChecked() != checked:
+            # sync checkbox state, since there are two ways to trigger this function (checkbox or menu action in ortho view widget)
+            self.show_ortho_views.setChecked(checked)
+        if self.viewer in _VIEWER_MANAGERS:
+            self.orth_view_manager = _VIEWER_MANAGERS[self.viewer]
+            if not checked:
+                self.orth_view_manager.hide()
+                self.orth_view_manager.set_splitter_sizes(
+                    0.0, 0.0
+                )  # minimal size for right and bottom
+            else:
+                self.orth_view_manager.show()
+        else:
+            self.orth_view_manager = initialize_ortho_views(
+                self.viewer
+            )  # store to be able to disconnect later
+            self.orth_views_connection = (
+                self.orth_view_manager.main_controls_widget.show_orth_views.connect(
+                    self.initialize_ortho_views
+                )
+            )
+            # remove connection and reset checkbox when destroyed
+            self.orth_view_manager.main_controls_widget.destroyed.connect(
+                self._on_ortho_cleanup
+            )
+            self.orth_view_manager.show()
+
+    def _on_ortho_cleanup(self):
+        """Called when ortho_view_manager cleans up and deletes its widgets."""
+        self._disconnect_ortho_views()
+        # Uncheck the checkbox without triggering initialize_ortho_views
+        self.show_ortho_views.blockSignals(True)
+        self.show_ortho_views.setChecked(False)
+        self.show_ortho_views.blockSignals(False)
+
+    def _disconnect_ortho_views(self):
+        """Safely disconnect from ortho views signals."""
+
+        if (
+            self.orth_views_connection is not None
+            and self.orth_view_manager is not None
+        ):
+            with contextlib.suppress(TypeError, RuntimeError):
+                self.orth_view_manager.main_controls_widget.show_orth_views.disconnect(
+                    self.orth_views_connection
+                )
+            self.orth_views_connection = None
+        self.orth_view_manager = None
 
     def _update_mode(self, mode: str) -> None:
         """Update the display mode on the Tracksviewer"""
 
-        if self.tracks_viewer.tracking_layers.seg_layer is not None:
-            self.tracks_viewer.set_display_mode(mode)
-            self._update_widget_availability()
+        self.tracks_viewer.set_display_mode(mode)
+        self._update_widget_availability()
 
     def _update_widget_availability(self):
         """Update the radio buttons, show/hide the contour checkboxes when changing
         between contour and normal mode. Disable the background widget when the display
         mode is 'All', as there are no background labels in that case."""
 
+        # ensure the correct radio button is checked
+        mode = self.tracks_viewer.mode
+        with QSignalBlocker(self.mode_widget.radio_group):
+            self.mode_widget.button_for_mode(self.tracks_viewer.mode).setChecked(True)
         if self.tracks_viewer.tracking_layers.seg_layer is not None:
-            # ensure the correct radio button is checked
-            mode = self.tracks_viewer.mode
-            with QSignalBlocker(self.mode_widget.radio_group):
-                self.mode_widget.button_for_mode(self.tracks_viewer.mode).setChecked(
-                    True
-                )
+            self.highlight_widget.setVisible(True)
+            self.foreground_widget.setVisible(True)
+            self.background_widget.setVisible(True)
 
             self.background_widget.setEnabled(mode != "all")
 
@@ -170,6 +232,11 @@ class LabelVisualizationWidget(QWidget):
                 w.contour.setEnabled(show_contour)
 
             self._update_visualization()
+
+        else:
+            self.highlight_widget.setVisible(False)
+            self.foreground_widget.setVisible(False)
+            self.background_widget.setVisible(False)
 
     def _update_visualization(self):
         """Apply the values from the widget and send an update signal."""

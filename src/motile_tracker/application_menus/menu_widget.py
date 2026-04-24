@@ -8,8 +8,9 @@ from qtpy.QtWidgets import (
     QWidget,
 )
 
-from motile_tracker.application_menus.editing_menu import EditingMenu
-from motile_tracker.application_menus.selection_menu import SelectionWidget
+from motile_tracker.application_menus.editing_selection_menu import (
+    EditingSelectionWidget,
+)
 from motile_tracker.application_menus.visualization_widget import (
     LabelVisualizationWidget,
 )
@@ -31,15 +32,7 @@ class MenuWidget(QScrollArea):
 
         motile_widget = MotileWidget(viewer)
 
-        editing_widget = EditingMenu(viewer)
-        selection_widget = SelectionWidget(self.tracks_viewer)
-        selection_editing_widget = QWidget()
-        selection_editing_layout = QVBoxLayout()
-        selection_editing_layout.addWidget(editing_widget)
-        selection_editing_layout.addWidget(selection_widget)
-        selection_editing_layout.setContentsMargins(0, 0, 0, 0)
-        selection_editing_widget.setLayout(selection_editing_layout)
-        selection_editing_widget.setMaximumHeight(600)
+        selection_editing_widget = EditingSelectionWidget(viewer)
 
         self.visualization_widget = LabelVisualizationWidget(viewer)
         self._visualization_index = 3
