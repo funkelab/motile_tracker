@@ -60,6 +60,16 @@ class MenuManager:
                     if dw.windowTitle() == name:
                         self.dw_map[name] = dw
                         break
+            else:
+                self.visible_menus = self._get_visible_menu_widgets()
+                # if the menu exists already, check if it is visible. If not, make it visible again.
+                if name not in self.visible_menus and name in self.dw_map:
+                    dock_widget = self.viewer.window.dock_widgets[name]
+                    parent = dock_widget.parent()
+                    if parent is not None:
+                        parent.show()
+
+                    self.visible_menus.add(name)
 
         for tb in self.viewer.window._qt_window.findChildren(QTabBar):
             tb.setUsesScrollButtons(True)

@@ -15,6 +15,7 @@ from motile_tracker.application_menus.welcome_widget import WelcomeWidget
 from motile_tracker.data_views.views.tree_view.tree_widget import TreeWidget
 from motile_tracker.data_views.views_coordinator.groups import GroupWidget
 from motile_tracker.data_views.views_coordinator.tracks_list import TrackListWidget
+from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 from motile_tracker.motile.menus.motile_widget import MotileWidget
 
 MENU_WIDGETS = {
@@ -29,19 +30,49 @@ MENU_WIDGETS = {
 
 
 class MainApp(QWidget):
-    def __init__(self, viewer: napari.Viewer):
+    def __init__(self, viewer: napari.Viewer, mode: str = "all"):
         super().__init__()
 
         self.viewer = viewer
 
-        self.viewer.mouse_double_click_callbacks.clear()  # no double click to zoom
-        self.menu_manager = MenuManager(viewer)
+        tracks_viewer = TracksViewer.get_instance(viewer)
+        if tracks_viewer.menu_manager is not None:
+            self.menu_manager = tracks_viewer.menu_manager
+        else:
+            self.menu_manager = MenuManager(viewer)
 
-        for name, config in MENU_WIDGETS.items():
-            self.menu_manager.initialize_menu(menu={name: config})
+        self._init_mode(mode)
 
         QTimer.singleShot(0, self._remove_self)
+
+    def _init_mode(self, mode: str):
+        if mode == "all":
+            selected = MENU_WIDGETS
+
+        elif mode == "menus":
+            selected = {k: v for k, v in MENU_WIDGETS.items() if k != "Lineage View"}
+
+        elif mode == "lineage":
+            selected = {k: v for k, v in MENU_WIDGETS.items() if k == "Lineage View"}
+
+        for name, config in selected.items():
+            self.menu_manager.initialize_menu({name: config})
 
     def _remove_self(self):
         # This removes the *napari-created dock wrapper* around MainApp
         self.viewer.window.remove_dock_widget(self)
+
+
+class MainAppWidget(MainApp):
+    def __init__(self, napari_viewer: napari.Viewer):
+        super().__init__(napari_viewer, mode="all")
+
+
+class MenusWidget(MainApp):
+    def __init__(self, napari_viewer: napari.Viewer):
+        super().__init__(napari_viewer, mode="menus")
+
+
+class LineageWidget(MainApp):
+    def __init__(self, napari_viewer: napari.Viewer):
+        super().__init__(napari_viewer, mode="lineage")

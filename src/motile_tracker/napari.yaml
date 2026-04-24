@@ -7,14 +7,14 @@ categories: ["Utilities"]
 contributions:
   commands:
     - id: motile-tracker.main_app
-      python_name: motile_tracker.application_menus.main_app:MainApp
-      title: "Open the motile main application"
-    - id: motile-tracker.tree_widget
-      python_name: motile_tracker.data_views.views.tree_view.tree_widget:TreeWidget
-      title: "Open the lineage view widget"
+      python_name: motile_tracker.application_menus.main_app:MainAppWidget
+      title: "Open all menus and the lineage view"
     - id: motile-tracker.menus_widget
-      python_name: motile_tracker.application_menus.menu_widget:MenuWidget
-      title: "Open the motile menus widget"
+      python_name: motile_tracker.application_menus.main_app:MenusWidget
+      title: "Open all menus"
+    - id: motile-tracker.tree_widget
+      python_name: motile_tracker.application_menus.main_app:LineageWidget
+      title: "Open the lineage view widget"
     - id: motile-tracker.solve
       python_name: motile_tracker.motile.backend.solve:solve
       title: "Run motile tracking (backend only)"

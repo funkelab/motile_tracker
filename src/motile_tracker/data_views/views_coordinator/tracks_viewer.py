@@ -67,6 +67,7 @@ class TracksViewer:
         viewer: napari.Viewer,
     ):
         self.viewer = viewer
+        self.viewer.mouse_double_click_callbacks.clear()  # no double click to zoom
         self.menu_manager = None  # will be set by MenuManager after initialization
 
         def _clear_if_current():
