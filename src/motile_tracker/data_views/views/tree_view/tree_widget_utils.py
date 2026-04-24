@@ -349,11 +349,11 @@ def get_features_from_tracks(
         features_to_ignore = []
     features_to_plot = []
     if tracks is not None:
-        for feature in tracks.features.values():
+        for key, feature in tracks.features.items():
             # Skip edge features - only show node features in dropdown
             if feature["feature_type"] == "edge":
                 continue
-            name = feature["display_name"]
+            name = feature.get("display_name", key)
             if feature["value_type"] in ("float", "int"):
                 if feature["num_values"] > 1:
                     value_names = feature.get("value_names", None)
