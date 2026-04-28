@@ -61,3 +61,44 @@ def test_get_features_from_tracks_individual_pos_attrs():
 
     assert "y" in features
     assert "x" in features
+
+
+def test_extract_sorted_tracks_incomplete_lineage():
+    """BFS must not merge tracklets across track_id boundaries in incomplete graphs.
+
+    Full lineage: A(tk=1) -> B(tk=1, divides) -> C(tk=2) and B -> D(tk=3).
+    Loaded subset: only A, B, C (D is missing). B appears to have a single child
+    (C), so topology alone does not identify it as a division node. Without the
+    track_id guard the BFS follows A->B->C and merges all three into one tracklet.
+    With the fix, the BFS stops at the B->C edge (track_id 1 != 2), producing
+    separate tracklets {A, B} and {C}.
+    """
+    graph = create_empty_graphview_graph(
+        node_attributes=["pos", "track_id"],
+        ndim=3,
+    )
+    graph.bulk_add_nodes(
+        nodes=[
+            {"t": 0, "pos": [0.0, 0.0], "track_id": 1, "solution": 1},  # A, node 1
+            {"t": 1, "pos": [0.0, 0.0], "track_id": 1, "solution": 1},  # B, node 2
+            {"t": 2, "pos": [0.0, 0.0], "track_id": 2, "solution": 1},  # C, node 3
+        ],
+        indices=[1, 2, 3],
+    )
+    graph.bulk_add_edges(
+        [
+            {"source_id": 1, "target_id": 2, "solution": 1},  # A -> B
+            {"source_id": 2, "target_id": 3, "solution": 1},  # B -> C (cross boundary)
+        ]
+    )
+    tracks = SolutionTracks(graph=graph, ndim=3, time_attr="t")
+
+    colormap = napari.utils.colormaps.label_colormap(49, seed=0.5, background_value=0)
+    track_df, _ = extract_sorted_tracks(tracks, colormap)
+
+    # C (node 3) must be in its own tracklet with track_id=2, not merged into A+B (track_id=1)
+    node_c_track_id = track_df.loc[track_df["node_id"] == 3, "track_id"].values[0]
+    assert node_c_track_id == 2, (
+        f"Node C was merged into track {node_c_track_id} instead of its own track (2). "
+        "BFS crossed a track_id boundary in an incomplete lineage."
+    )

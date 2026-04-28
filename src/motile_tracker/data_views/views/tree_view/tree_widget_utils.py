@@ -102,11 +102,18 @@ def extract_sorted_tracks(
             visited.add(node)
             component.add(node)
             pred = child_to_parent.get(node)
-            if pred is not None and pred not in visited and pred not in parent_node_set:
+            if (
+                pred is not None
+                and pred not in visited
+                and pred not in parent_node_set
+                and node_to_track_id.get(pred) == node_to_track_id.get(node)
+            ):
                 queue.append(pred)
             if node not in parent_node_set:
                 for succ in parent_to_children.get(node, []):
-                    if succ not in visited:
+                    if succ not in visited and node_to_track_id.get(
+                        succ
+                    ) == node_to_track_id.get(node):
                         queue.append(succ)
         tracklets.append(component)
 
