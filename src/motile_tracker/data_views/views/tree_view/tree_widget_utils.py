@@ -17,6 +17,7 @@ def get_tracklets(
     child_to_parent: dict[int, int],
     node_ids: list[int],
     dividing_node_set: set[int],
+    node_to_track_id: dict[int, int],
 ) -> list[set[int]]:
     """Group nodes into tracklets by BFS, cutting at division nodes.
 
@@ -29,6 +30,7 @@ def get_tracklets(
         child_to_parent: maps each child node_id to its single parent node_id.
         node_ids: all node IDs to partition.
         dividing_node_set: set of node IDs that have ≥2 children (division nodes).
+        node_to_track_id: maps each node_id to its pre-computed tracklet ID.
 
     Returns:
         List of sets, one set of node IDs per tracklet.
@@ -51,11 +53,14 @@ def get_tracklets(
                 pred is not None
                 and pred not in visited
                 and pred not in dividing_node_set
+                and node_to_track_id.get(pred) == node_to_track_id.get(node)
             ):
                 queue.append(pred)
             if node not in dividing_node_set:
                 for succ in parent_to_children.get(node, []):
-                    if succ not in visited:
+                    if succ not in visited and node_to_track_id.get(
+                        succ
+                    ) == node_to_track_id.get(node):
                         queue.append(succ)
         tracklets.append(component)
     return tracklets
@@ -137,7 +142,7 @@ def extract_sorted_tracks(
 
     # BFS to collect tracklets, cutting edges at division (parent) nodes
     tracklets = get_tracklets(
-        parent_to_children, child_to_parent, node_ids_list, set(parent_nodes)
+        parent_to_children, child_to_parent, node_ids_list, set(parent_nodes), node_to_track_id
     )
 
     for node_set in tracklets:
