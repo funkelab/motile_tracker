@@ -158,6 +158,19 @@ def test_run_creation(make_napari_viewer, segmentation_2d):
     assert isinstance(run7.input_segmentation, np.ndarray)
     assert not isinstance(run7.input_segmentation, da.Array)
 
+    # Test 6b: get_run extracts highest resolution from multiscale labels
+    viewer6b = make_napari_viewer()
+    level0 = segmentation_2d
+    level1 = segmentation_2d[:, ::2, ::2]
+    viewer6b.add_labels([level0, level1], name="multiscale_seg", multiscale=True)
+    editor6b = RunEditor(viewer6b)
+    editor6b.layer_selection_box.setCurrentText("multiscale_seg")
+    run7b = editor6b.get_run()
+    assert run7b is not None
+    assert isinstance(run7b.input_segmentation, np.ndarray)
+    assert run7b.input_segmentation.shape == level0.shape
+    assert np.array_equal(run7b.input_segmentation, level0)
+
     # Test 7: get_run uses solver params from the editor
     viewer.add_labels(segmentation_2d, name="seg_params")
     editor7 = RunEditor(viewer)
