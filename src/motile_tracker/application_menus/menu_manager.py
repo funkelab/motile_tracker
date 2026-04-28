@@ -19,13 +19,13 @@ class MenuManager:
 
         # Track the active menu widgets for show/hide operations
         self.hidden = False
-        self._active_menu_widgets: set[str] = (
+        self.initialized_menu_widgets: set[str] = (
             set()
         )  # track which menu widgets have been initialized and added to the viewer
         self.visible_menus: set[str] = (
             set()
         )  # track which menu widgets are currently visible (subset of active_menu_widgets)
-        self.active_tabs: list[str] = []
+        self.active_tabs: list[str] = []  # track foreground tabs
         self.dw_map: dict[
             str, QDockWidget
         ] = {}  # map of menu widget names to their dock widgets
@@ -34,7 +34,7 @@ class MenuManager:
         """Initialize the menu by creating and adding the specified widgets."""
 
         for name, config in menu.items():
-            if name not in self._active_menu_widgets:
+            if name not in self.initialized_menu_widgets:
                 widget_cls = config["widget"]
                 location = config["location"]
 
@@ -48,7 +48,7 @@ class MenuManager:
                 )
 
                 # Track this menu widget as active and visible
-                self._active_menu_widgets.add(name)
+                self.initialized_menu_widgets.add(name)
                 self.visible_menus.add(name)
 
                 # immediately find the dock widget to map a reference
@@ -61,7 +61,7 @@ class MenuManager:
                         self.dw_map[name] = dw
                         break
             else:
-                self.visible_menus = self._get_visible_menu_widgets()
+                self.visible_menus = self._get_foreground_tabs()
                 # if the menu exists already, check if it is visible. If not, make it visible again.
                 if name not in self.visible_menus and name in self.dw_map:
                     dock_widget = self.viewer.window.dock_widgets[name]
@@ -107,8 +107,9 @@ class MenuManager:
         scroll_area.setStyleSheet("QScrollArea { border: none; }")
         return scroll_area
 
-    def _get_current_active_tabs(self) -> list[str]:
-        """Get the names of the currently active tabs."""
+    def _get_visible_tabs(self) -> list[str]:
+        """Get the names of the currently active tabs (dock widgets that are both
+        initialized and currently present in a dock)."""
 
         tabs = []
         tabbars = self.viewer.window._qt_window.findChildren(QTabBar)
@@ -118,16 +119,16 @@ class MenuManager:
                 tabs.append(active)
         return tabs
 
-    def set_active_tabs(self, tab_names: list[str]) -> None:
-        """Set the specified tab as active."""
+    def _set_foreground_tabs(self, tab_names: list[str]) -> None:
+        """Set the specified tab to the foreground."""
 
         tab_names = [name for name in tab_names if name in self.dw_map]
         for tab_name in tab_names:
             self.dw_map[tab_name].raise_()
         self.active_tabs = tab_names
 
-    def _get_visible_menu_widgets(self) -> set[str]:
-        """Get the set of currently visible menu widgets."""
+    def _get_foreground_tabs(self) -> set[str]:
+        """Get the names of the current foreground tabs"""
 
         return {name for name in self.dw_map if self.dw_map[name].isVisible()}
 
@@ -136,8 +137,8 @@ class MenuManager:
 
         if not self.hidden:
             # Save the currently visible and active widgets
-            self.visible_menus = self._get_visible_menu_widgets()
-            self.active_tabs = self._get_current_active_tabs()
+            self.visible_menus = self._get_visible_tabs()
+            self.active_tabs = self._get_foreground_tabs()
 
             # hide all menus
             for name in self.dw_map:
@@ -157,6 +158,6 @@ class MenuManager:
                         parent.show()
             # restore the previously active tab
             if len(self.active_tabs) > 0:
-                self.set_active_tabs(self.active_tabs)
+                self._set_foreground_tabs(self.active_tabs)
 
         self.hidden = not self.hidden
