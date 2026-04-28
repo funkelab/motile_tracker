@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
+from funtracks.data_model import SolutionTracks
 
 from motile_tracker.data_views.views.layers.track_points import (
     TrackPoints,
@@ -62,6 +63,22 @@ def test_initialization(viewer, solution_tracks_2d):
 
     # Verify type string
     assert points_layer._type_string == "points"
+
+
+def test_scale_propagated_to_points_layer(viewer, graph_3d):
+    """TrackPoints must forward tracks.scale to the napari Points constructor.
+
+    With anisotropic scale (z-step != xy-step), pixel and world coordinates
+    differ. Without the fix, Points silently defaults to scale=[1,1,1,1] and
+    appears misaligned with the Labels layer in the viewer.
+    """
+    scale = [1.0, 2.0, 1.0, 1.0]  # anisotropic z
+    tracks = SolutionTracks(graph=graph_3d, scale=scale, ndim=4, time_attr="t")
+    tracks_viewer = TracksViewer.get_instance(viewer)
+    tracks_viewer.update_tracks(tracks=tracks, name="test")
+
+    points_layer = tracks_viewer.tracking_layers.points_layer
+    assert np.allclose(points_layer.scale, scale)
 
 
 def test_custom_select_blocks_current_size(viewer, solution_tracks_2d):

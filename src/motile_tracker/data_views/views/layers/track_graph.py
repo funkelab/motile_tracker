@@ -119,6 +119,7 @@ class TrackGraph(napari.layers.Tracks):
             name=name,
             tail_length=3,
             color_by="track_id",
+            scale=tracks_viewer.tracks.scale,
         )
 
         self.colormaps_dict["track_id"] = self.tracks_viewer.colormap
