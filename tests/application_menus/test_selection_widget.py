@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 from qtpy.QtCore import Qt
 
-from motile_tracker.application_menus.selection_menu import SelectionWidget
+from motile_tracker.application_menus.editing_selection_menu import SelectionWidget
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
 

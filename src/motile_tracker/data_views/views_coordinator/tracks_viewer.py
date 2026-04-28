@@ -165,22 +165,27 @@ class TracksViewer:
 
         """
 
-        if self.tracks is None or not any(
-            name in self.menu_manager.initialized_menu_widgets
-            for name in ("Table", "Lineage View")
-        ):
-            # no need to update if there are no tracks or there is no widget that needs
-            # the dataframe
-            return
+        if self.menu_manager is not None:
+            if self.tracks is None or not any(
+                name in self.menu_manager.initialized_menu_widgets
+                for name in ("Table", "Lineage View")
+            ):
+                # no need to update if there are no tracks or there is no widget that needs
+                # the dataframe
+                return
 
-        if initialization and (
-            self.menu_manager._find_dock_widget_by_name("Table") is not None
-            or self.menu_manager._find_dock_widget_by_name("Lineage View") is not None
-        ):
-            # no need to call for update, since we already should have it for the existing
-            # table or tree widget
-            return
-        else:
+            if initialization and (
+                self.menu_manager._find_dock_widget_by_name("Table") is not None
+                or self.menu_manager._find_dock_widget_by_name("Lineage View")
+                is not None
+            ):
+                # no need to call for update, since we already should have it for the existing
+                # table or tree widget
+                return
+
+        # in the case menu_manager was never initialized, we cannot directly check if
+        # widgets exist, so we always update the track_df if self.tracks is not None.
+        if self.tracks is not None:
             if refresh_view:
                 self.track_df, self.axis_order = extract_sorted_tracks(
                     self.tracks, self.colormap
@@ -456,7 +461,7 @@ class TracksViewer:
     def hide_panels(self, event=None):
         """Show/hide menu and tree view panels without destroying"""
 
-        if self.menu_manager:
+        if self.menu_manager is not None:
             self.menu_manager.toggle_menu_panel_visibility()
 
     def deselect(self, event=None):
