@@ -152,7 +152,8 @@ class TracksViewer:
         The track_df should be updated when:
             - a tree or table widget is being initialized (initialization=True) and no
                 tree or table widget exists yet
-            - a normal update event happens (initialization = False)
+            - a normal update event happens (initialization = False) AND a tree widget
+            and/or table widget exists on menu_manager
 
         Args:
             initialization (bool | None = False): whether or not this is called by a tree
@@ -164,7 +165,12 @@ class TracksViewer:
 
         """
 
-        if self.tracks is None:
+        if self.tracks is None or not any(
+            name in self.menu_manager.initialized_menu_widgets
+            for name in ("Table", "Lineage View")
+        ):
+            # no need to update if there are no tracks or there is no widget that needs
+            # the dataframe
             return
 
         if initialization and (
@@ -200,12 +206,7 @@ class TracksViewer:
 
         self.tracking_layers._refresh()
 
-        # If a tree widget or table widget exists, we should update the tracks_df
-        if (
-            "Table" in self.menu_manager.initialized_menu_widgets
-            or "Lineage View" in self.menu_manager.initialized_menu_widgets
-        ):
-            self.update_track_df(initialization=False, refresh_view=refresh_view)
+        self.update_track_df(initialization=False, refresh_view=refresh_view)
 
         self.tracks_updated.emit(refresh_view)
 
@@ -256,12 +257,7 @@ class TracksViewer:
         # ensure a valid track is selected from the start
         self.request_new_track()
 
-        # If a tree widget or table widget exists, we should update the tracks_df
-        if (
-            "Table" in self.menu_manager.initialized_menu_widgets
-            or "Lineage View" in self.menu_manager.initialized_menu_widgets
-        ):
-            self.update_track_df(initialization=False, refresh_view=True)
+        self.update_track_df(initialization=False, refresh_view=True)
 
         # emit the update signal
         self.tracks_updated.emit(True)
