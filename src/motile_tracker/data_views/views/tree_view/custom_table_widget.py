@@ -207,6 +207,7 @@ class ColoredTableWidget(QWidget):
         self.tracks_viewer.update_track_df(
             initialization=True, refresh_view=True
         )  # make sure tracks_viewer initializes/updates the track df
+        self.tracks_viewer.table_widget_present = True
         self.tracks_viewer.tracks_updated.connect(self.update_data)
         self._table_widget = CustomTableWidget()
         self.special_selection = []

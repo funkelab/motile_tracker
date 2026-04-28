@@ -71,6 +71,8 @@ class TracksViewer:
         self.viewer = viewer
         self.viewer.mouse_double_click_callbacks.clear()  # no double click to zoom
         self.menu_manager = None  # will be set by MenuManager after initialization
+        self.tree_widget_present = False
+        self.table_widget_present = False
 
         def _clear_if_current():
             if hasattr(TracksViewer, "_instance") and TracksViewer._instance is self:
@@ -165,37 +167,34 @@ class TracksViewer:
 
         """
 
-        if self.menu_manager is not None:
-            if self.tracks is None or not any(
-                name in self.menu_manager.initialized_menu_widgets
-                for name in ("Table", "Lineage View")
-            ):
-                # no need to update if there are no tracks or there is no widget that needs
-                # the dataframe
-                return
+        if self.tracks is None:
+            return
 
-            if initialization and (
-                self.menu_manager._find_dock_widget_by_name("Table") is not None
-                or self.menu_manager._find_dock_widget_by_name("Lineage View")
-                is not None
-            ):
-                # no need to call for update, since we already should have it for the existing
-                # table or tree widget
-                return
+        if not initialization and (
+            self.tree_widget_present is False and self.table_widget_present is False
+        ):
+            # no need to update if there are no tracks or there is no widget that needs
+            # the dataframe
+            return
+
+        if initialization and (self.tree_widget_present or self.table_widget_present):
+            # no need to call for update, since we already should have it for the existing
+            # table or tree widget
+            return
 
         # in the case menu_manager was never initialized, we cannot directly check if
         # widgets exist, so we always update the track_df if self.tracks is not None.
-        if self.tracks is not None:
-            if refresh_view:
-                self.track_df, self.axis_order = extract_sorted_tracks(
-                    self.tracks, self.colormap
-                )
-            else:
-                self.track_df, self.axis_order = extract_sorted_tracks(
-                    self.tracks,
-                    self.colormap,
-                    self.axis_order,
-                )
+
+        if refresh_view:
+            self.track_df, self.axis_order = extract_sorted_tracks(
+                self.tracks, self.colormap
+            )
+        else:
+            self.track_df, self.axis_order = extract_sorted_tracks(
+                self.tracks,
+                self.colormap,
+                self.axis_order,
+            )
 
     def _refresh(self, node: str | None = None, refresh_view: bool = False) -> None:
         """Call refresh function on napari layers and the submit signal that tracks are

@@ -486,6 +486,7 @@ class TreeWidget(QWidget):
         self.tracks_viewer.update_track_df(
             initialization=True, refresh_view=True
         )  # make sure tracks_viewer initializes/updates the track df
+        self.tracks_viewer.tree_widget_present = True
         self.selected_nodes = self.tracks_viewer.selected_nodes
         self.tracks_viewer.node_selection_updated.connect(self._update_selected)
         self.tracks_viewer.tracks_updated.connect(self._update_track_data)
