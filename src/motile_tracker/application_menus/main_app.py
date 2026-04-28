@@ -33,7 +33,7 @@ MENU_WIDGETS = {
 }
 
 
-# --- MainAppWidget: initializes all widgets ---
+# MainAppWidget: initialize all widgets
 class MainAppWidget(QWidget):
     def __init__(self, napari_viewer: napari.Viewer):
         super().__init__()
@@ -45,6 +45,11 @@ class MainAppWidget(QWidget):
             self.menu_manager = MenuManager(napari_viewer)
         for name, config in MENU_WIDGETS.items():
             self.menu_manager.initialize_menu({name: config})
+        # make sure the 'Getting started' tab is the active foreground tab.
+        QTimer.singleShot(
+            0,
+            lambda: tracks_viewer.menu_manager.set_foreground_tabs(["Getting Started"]),
+        )
         QTimer.singleShot(0, self._remove_self)
 
     def _remove_self(self):

@@ -129,7 +129,7 @@ class MenuManager:
                 tabs.append(active)
         return tabs
 
-    def _set_foreground_tabs(self, tab_names: list[str]) -> None:
+    def set_foreground_tabs(self, tab_names: list[str]) -> None:
         """Set the specified tab to the foreground."""
 
         qt_window = self.viewer.window._qt_window
@@ -179,6 +179,6 @@ class MenuManager:
                 if self._find_dock_widget_by_name(name) is not None
             ]
             if len(self.active_tabs) > 0:
-                self._set_foreground_tabs(self.active_tabs)
+                self.set_foreground_tabs(self.active_tabs)
 
         self.hidden = not self.hidden
