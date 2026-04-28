@@ -47,23 +47,23 @@ contributions:
       title: "Load Mouse Embryo_Membrane tracking dataset"
   widgets:
     - command: motile-tracker.main_app
-      display_name: Main app
+      display_name: Open all widgets
     - command: motile-tracker.getting_started
-      display_name: Menus > Getting started
+      display_name: Getting started
     - command: motile-tracker.tracking
-      display_name: Menus > Tracking
+      display_name: Tracking
     - command: motile-tracker.tracks_list
-      display_name: Menus > Tracks List
+      display_name: Tracks List
     - command: motile-tracker.editing_selection
-      display_name: Menus > Editing && Selection
+      display_name: Editing & Selection
     - command: motile-tracker.visualization
-      display_name: Menus > Visualization
+      display_name: Visualization
     - command: motile-tracker.groups
-      display_name: Menus > Groups
+      display_name: Groups
     - command: motile-tracker.table
-      display_name: Menus > Table
+      display_name: Table
     - command: motile-tracker.lineage_view
-      display_name: Menus > Lineage View
+      display_name: Lineage View
   sample_data:
     - command: motile-tracker.Fluo_N2DL_HeLa
       key: "Fluo-N2DL-HeLa"
