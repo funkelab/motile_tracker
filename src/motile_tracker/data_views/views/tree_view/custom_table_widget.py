@@ -204,11 +204,14 @@ class ColoredTableWidget(QWidget):
         super().__init__()
 
         self.tracks_viewer = TracksViewer.get_instance(viewer)
+        self.tracks_viewer.update_track_df(
+            initialization=True, refresh_view=True
+        )  # make sure tracks_viewer initializes/updates the track df
         self.tracks_viewer.tracks_updated.connect(self.update_data)
         self._table_widget = CustomTableWidget()
         self.special_selection = []
 
-        self.set_data(self.tracks_viewer.track_df)
+        self.update_data()
         self.ascending = False  # for choosing whether to sort ascending or descending
         self._syncing = False
 

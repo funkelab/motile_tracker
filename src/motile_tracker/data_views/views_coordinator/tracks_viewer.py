@@ -145,6 +145,47 @@ class TracksViewer:
             [0, 0, 0, 0] if track_id is None else self.colormap.map(track_id)
         )
 
+    def update_track_df(
+        self, initialization: bool | None = False, refresh_view: bool | None = False
+    ) -> None:
+        """Create or update the pandas dataframe used by the TreeWidget and TableWidget.
+        The track_df should be updated when:
+            - a tree or table widget is being initialized (initialization=True) and no
+                tree or table widget exists yet
+            - a normal update event happens (initialization = False)
+
+        Args:
+            initialization (bool | None = False): whether or not this is called by a tree
+            or table widget that is initializing.
+            refresh_view (bool | None = False): whether or not we should not pass on the
+            previous axis_order. Should be False if we want to use the previous axis order
+             (current tracks got updated). Should be True if we have a new tracks object
+             and should therefore recompute the axis_order.
+
+        """
+
+        if self.tracks is None:
+            return
+
+        if initialization and (
+            self.menu_manager._find_dock_widget_by_name("Table") is not None
+            or self.menu_manager._find_dock_widget_by_name("Lineage View") is not None
+        ):
+            # no need to call for update, since we already should have it for the existing
+            # table or tree widget
+            return
+        else:
+            if refresh_view:
+                self.track_df, self.axis_order = extract_sorted_tracks(
+                    self.tracks, self.colormap
+                )
+            else:
+                self.track_df, self.axis_order = extract_sorted_tracks(
+                    self.tracks,
+                    self.colormap,
+                    self.axis_order,
+                )
+
     def _refresh(self, node: str | None = None, refresh_view: bool = False) -> None:
         """Call refresh function on napari layers and the submit signal that tracks are
         updated. Restore the selected_nodes, if possible
@@ -164,16 +205,8 @@ class TracksViewer:
             "Table" in self.menu_manager.initialized_menu_widgets
             or "Lineage View" in self.menu_manager.initialized_menu_widgets
         ):
-            if refresh_view:
-                self.track_df, self.axis_order = extract_sorted_tracks(
-                    self.tracks, self.colormap
-                )
-            else:
-                self.track_df, self.axis_order = extract_sorted_tracks(
-                    self.tracks,
-                    self.colormap,
-                    self.axis_order,
-                )
+            self.update_track_df(initialization=False, refresh_view=refresh_view)
+
         self.tracks_updated.emit(refresh_view)
 
         # if a new node was added, we would like to select this one now (call this after
@@ -228,9 +261,7 @@ class TracksViewer:
             "Table" in self.menu_manager.initialized_menu_widgets
             or "Lineage View" in self.menu_manager.initialized_menu_widgets
         ):
-            self.track_df, self.axis_order = extract_sorted_tracks(
-                self.tracks, self.colormap
-            )
+            self.update_track_df(initialization=False, refresh_view=True)
 
         # emit the update signal
         self.tracks_updated.emit(True)
