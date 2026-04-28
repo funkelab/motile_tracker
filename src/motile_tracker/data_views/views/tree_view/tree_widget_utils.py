@@ -142,7 +142,11 @@ def extract_sorted_tracks(
 
     # BFS to collect tracklets, cutting edges at division (parent) nodes
     tracklets = get_tracklets(
-        parent_to_children, child_to_parent, node_ids_list, set(parent_nodes), node_to_track_id
+        parent_to_children,
+        child_to_parent,
+        node_ids_list,
+        set(parent_nodes),
+        node_to_track_id,
     )
 
     for node_set in tracklets:
