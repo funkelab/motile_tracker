@@ -21,55 +21,38 @@ class MenuManager:
         self.hidden = False
         self.initialized_menu_widgets: set[str] = (
             set()
-        )  # track which menu widgets have been initialized and added to the viewer
-        self.visible_menus: set[str] = (
-            set()
-        )  # track which menu widgets are currently visible (subset of active_menu_widgets)
-        self.active_tabs: list[str] = []  # track foreground tabs
-        self.dw_map: dict[
-            str, QDockWidget
-        ] = {}  # map of menu widget names to their dock widgets
+        )  # names of widgets ever initialized
+        self.visible_menus: set[str] = set()  # names of widgets currently visible
+        self.active_tabs: list[str] = []  # names of foreground tabs
 
     def initialize_menu(self, menu: dict[str, dict[str, any]]) -> None:
-        """Initialize the menu by creating and adding the specified widgets."""
+        """Initialize the menu by creating and adding the specified widgets, with robust handling for closed/deleted dock widgets."""
 
         for name, config in menu.items():
-            if name not in self.initialized_menu_widgets:
-                widget_cls = config["widget"]
-                location = config["location"]
-
-                widget = widget_cls(self.viewer)
-                # Wrap the widget in a scroll area
-                scroll_wrapper = self._create_scroll_wrapper(widget)
-
-                # Add the scroll wrapper as a dock widget in the specified location
-                self.viewer.window.add_dock_widget(
-                    scroll_wrapper, area=location, name=name, tabify=True
-                )
-
-                # Track this menu widget as active and visible
-                self.initialized_menu_widgets.add(name)
-                self.visible_menus.add(name)
-
-                # immediately find the dock widget to map a reference
-                qt_window = self.viewer.window._qt_window
-                dock_widgets = qt_window.findChildren(QDockWidget)
-
-                # find the one we just added
-                for dw in dock_widgets:
-                    if dw.windowTitle() == name:
-                        self.dw_map[name] = dw
-                        break
-            else:
-                self.visible_menus = self._get_foreground_tabs()
-                # if the menu exists already, check if it is visible. If not, make it visible again.
-                if name not in self.visible_menus and name in self.dw_map:
-                    dock_widget = self.viewer.window.dock_widgets[name]
+            widget_exists = False
+            dock_widget = self._find_dock_widget_by_name(name)
+            if dock_widget is not None:
+                # Check if the widget is visible
+                if dock_widget.isVisible():
+                    widget_exists = True
+                else:
+                    # Widget exists but is hidden, show it
                     parent = dock_widget.parent()
                     if parent is not None:
                         parent.show()
-
                     self.visible_menus.add(name)
+                    widget_exists = True
+            # If widget does not exist (was closed/deleted), or never initialized, create it
+            if not widget_exists:
+                widget_cls = config["widget"]
+                location = config["location"]
+                widget = widget_cls(self.viewer)
+                scroll_wrapper = self._create_scroll_wrapper(widget)
+                self.viewer.window.add_dock_widget(
+                    scroll_wrapper, area=location, name=name, tabify=True
+                )
+                self.initialized_menu_widgets.add(name)
+                self.visible_menus.add(name)
 
         for tb in self.viewer.window._qt_window.findChildren(QTabBar):
             tb.setUsesScrollButtons(True)
@@ -79,6 +62,30 @@ class MenuManager:
                     min-width: 50px;
                 }
             """)
+
+    def _find_dock_widget_by_name(self, name: str):
+        """Find a dock widget by name, or return None if not found or deleted."""
+        # Try napari's dock_widgets dict first
+        dock_widgets = getattr(self.viewer.window, "dock_widgets", {})
+        dock_widget = dock_widgets.get(name, None)
+        # Check if the widget is still alive
+        if dock_widget is not None:
+            try:
+                _ = dock_widget.isVisible()
+                return dock_widget
+            except RuntimeError:
+                # Underlying C++ object was deleted
+                return None
+        # Fallback: search Qt window for a QDockWidget with the right title
+        qt_window = self.viewer.window._qt_window
+        for dw in qt_window.findChildren(QDockWidget):
+            if dw.windowTitle() == name:
+                try:
+                    _ = dw.isVisible()
+                    return dw
+                except RuntimeError:
+                    continue
+        return None
 
     def _set_right_tabs_vertical(self):
 
@@ -107,57 +114,71 @@ class MenuManager:
         scroll_area.setStyleSheet("QScrollArea { border: none; }")
         return scroll_area
 
-    def _get_visible_tabs(self) -> list[str]:
-        """Get the names of the currently active tabs (dock widgets that are both
-        initialized and currently present in a dock)."""
-
+    def _get_foreground_tabs(self) -> list[str]:
+        """Get the names of the currently active tabs (dock widgets that are both initialized and currently present in a dock)."""
         tabs = []
         tabbars = self.viewer.window._qt_window.findChildren(QTabBar)
         for tabbar in tabbars:
             active = tabbar.tabText(tabbar.currentIndex())
-            if active in self.dw_map:
+            if self._find_dock_widget_by_name(active) is not None:
                 tabs.append(active)
         return tabs
 
-    def _set_foreground_tabs(self, tab_names: list[str]) -> None:
+    def _set_foreground_tabs(self) -> None:
         """Set the specified tab to the foreground."""
 
-        tab_names = [name for name in tab_names if name in self.dw_map]
-        for tab_name in tab_names:
-            self.dw_map[tab_name].raise_()
-        self.active_tabs = tab_names
+        qt_window = self.viewer.window._qt_window
+        dock_widgets = qt_window.findChildren(QDockWidget)
 
-    def _get_foreground_tabs(self) -> set[str]:
+        for tab_name in self.active_tabs:
+            dock_widget = [dw for dw in dock_widgets if dw.windowTitle() == tab_name]
+
+            if len(dock_widget) > 0:
+                print("raise this widget", tab_name)
+                dock_widget[0].raise_()
+
+    def _get_visible_tabs(self) -> set[str]:
         """Get the names of the current foreground tabs"""
-
-        return {name for name in self.dw_map if self.dw_map[name].isVisible()}
+        return {
+            name
+            for name in self.initialized_menu_widgets
+            if self._find_dock_widget_by_name(name) is not None
+            and self._find_dock_widget_by_name(name).isVisible()
+        }
 
     def toggle_menu_panel_visibility(self) -> None:
         """Toggle visibility of all active menu widgets."""
-
         if not self.hidden:
             # Save the currently visible and active widgets
             self.visible_menus = self._get_visible_tabs()
-            self.active_tabs = self._get_foreground_tabs()
+            print("store these menus to be shown again", self.visible_menus)
+            self.active_tabs = list(self._get_foreground_tabs())
+            print("print this tab should be restored later", self.active_tabs)
 
             # hide all menus
-            for name in self.dw_map:
-                if name in self.viewer.window.dock_widgets:
-                    dock_widget = self.viewer.window.dock_widgets[name]
+            for name in self.initialized_menu_widgets:
+                dock_widget = self._find_dock_widget_by_name(name)
+                if dock_widget is not None:
                     parent = dock_widget.parent()
                     if parent is not None:
                         parent.close()
-
         else:
             # restore the previously visible widgets
+            print("restore these widgets", self.visible_menus)
             for name in self.visible_menus:
-                if name in self.viewer.window.dock_widgets:
-                    dock_widget = self.viewer.window.dock_widgets[name]
+                dock_widget = self._find_dock_widget_by_name(name)
+                if dock_widget is not None:
                     parent = dock_widget.parent()
                     if parent is not None:
                         parent.show()
             # restore the previously active tab
+            self.active_tabs = [
+                name
+                for name in self.active_tabs
+                if self._find_dock_widget_by_name(name) is not None
+            ]
             if len(self.active_tabs) > 0:
-                self._set_foreground_tabs(self.active_tabs)
+                print("activating this tab", self.active_tabs)
+                self._set_foreground_tabs()
 
         self.hidden = not self.hidden
