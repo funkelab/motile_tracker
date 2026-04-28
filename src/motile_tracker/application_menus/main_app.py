@@ -12,6 +12,9 @@ from motile_tracker.application_menus.visualization_widget import (
     LabelVisualizationWidget,
 )
 from motile_tracker.application_menus.welcome_widget import WelcomeWidget
+from motile_tracker.data_views.views.tree_view.custom_table_widget import (
+    ColoredTableWidget,
+)
 from motile_tracker.data_views.views.tree_view.tree_widget import TreeWidget
 from motile_tracker.data_views.views_coordinator.groups import GroupWidget
 from motile_tracker.data_views.views_coordinator.tracks_list import TrackListWidget
@@ -25,6 +28,7 @@ MENU_WIDGETS = {
     "Editing && Selection": {"widget": EditingSelectionWidget, "location": "right"},
     "Visualization": {"widget": LabelVisualizationWidget, "location": "right"},
     "Groups": {"widget": GroupWidget, "location": "right"},
+    "Table": {"widget": ColoredTableWidget, "location": "right"},
     "Lineage View": {"widget": TreeWidget, "location": "bottom"},
 }
 

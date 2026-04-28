@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Optional
 
 import napari
+import pandas as pd
 from funtracks.actions import AddNode, BasicAction, DeleteNode
 from funtracks.data_model import SolutionTracks
 from funtracks.exceptions import InvalidActionError
@@ -23,6 +24,7 @@ from motile_tracker.data_views.views.layers.track_labels import new_label
 from motile_tracker.data_views.views.layers.tracks_layer_group import TracksLayerGroup
 from motile_tracker.data_views.views.tree_view.tree_widget_utils import (
     extract_lineage_tree,
+    extract_sorted_tracks,
 )
 from motile_tracker.data_views.views_coordinator.groups import (
     CollectionWidget,
@@ -94,6 +96,9 @@ class TracksViewer:
         self.selected_nodes = NodeSelectionHistory()
         self.selected_nodes.selection_updated.connect(self.update_selection)
 
+        self.track_df = pd.DataFrame()  # initialize empty dataframe
+        self.axis_order: list[int] = []
+
         self.tracks_list = TracksList()
         self.tracks_list.view_tracks.connect(self.update_tracks)
         self.tracks_list.request_colormap.connect(self.set_colormap_to_trackslist)
@@ -154,6 +159,21 @@ class TracksViewer:
 
         self.tracking_layers._refresh()
 
+        # If a tree widget or table widget exists, we should update the tracks_df
+        if (
+            "Table" in self.menu_manager.initialized_menu_widgets
+            or "Lineage View" in self.menu_manager.initialized_menu_widgets
+        ):
+            if refresh_view:
+                self.track_df, self.axis_order = extract_sorted_tracks(
+                    self.tracks, self.colormap
+                )
+            else:
+                self.track_df, self.axis_order = extract_sorted_tracks(
+                    self.tracks,
+                    self.colormap,
+                    self.axis_order,
+                )
         self.tracks_updated.emit(refresh_view)
 
         # if a new node was added, we would like to select this one now (call this after
@@ -202,6 +222,15 @@ class TracksViewer:
 
         # ensure a valid track is selected from the start
         self.request_new_track()
+
+        # If a tree widget or table widget exists, we should update the tracks_df
+        if (
+            "Table" in self.menu_manager.initialized_menu_widgets
+            or "Lineage View" in self.menu_manager.initialized_menu_widgets
+        ):
+            self.track_df, self.axis_order = extract_sorted_tracks(
+                self.tracks, self.colormap
+            )
 
         # emit the update signal
         self.tracks_updated.emit(True)

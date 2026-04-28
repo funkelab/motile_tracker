@@ -12,7 +12,6 @@ from qtpy.QtCore import Qt
 from qtpy.QtGui import QColor, QKeyEvent, QMouseEvent
 from qtpy.QtWidgets import (
     QHBoxLayout,
-    QSplitter,
     QVBoxLayout,
     QWidget,
 )
@@ -27,9 +26,6 @@ from motile_tracker.data_views.keybindings_config import (
 from motile_tracker.data_views.views.layers.click_utils import (
     detect_side_button,
 )
-from motile_tracker.data_views.views.tree_view.custom_table_widget import (
-    ColoredTableWidget,
-)
 from motile_tracker.data_views.views.tree_view.flip_axes_widget import FlipTreeWidget
 from motile_tracker.data_views.views.tree_view.navigation_widget import NavigationWidget
 from motile_tracker.data_views.views.tree_view.tree_view_feature_widget import (
@@ -40,7 +36,6 @@ from motile_tracker.data_views.views.tree_view.tree_view_mode_widget import (
 )
 from motile_tracker.data_views.views.tree_view.tree_widget_utils import (
     extract_lineage_tree,
-    extract_sorted_tracks,
     get_features_from_tracks,
 )
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
@@ -481,7 +476,6 @@ class TreeWidget(QWidget):
 
     def __init__(self, viewer: napari.Viewer):
         super().__init__()
-        self.track_df = pd.DataFrame()  # all tracks
         self.lineage_df = pd.DataFrame()  # the currently viewed subset of lineages
         self.graph = None
         self.mode = "all"  # options: "all", "lineage"
@@ -523,7 +517,7 @@ class TreeWidget(QWidget):
 
         # Add navigation widget
         self.navigation_widget = NavigationWidget(
-            self.track_df,
+            self.tracks_viewer.track_df,
             self.lineage_df,
             self.view_direction,
             self.selected_nodes,
@@ -548,29 +542,19 @@ class TreeWidget(QWidget):
         panel.setMaximumHeight(82)
 
         # Make a collapsible for TreeView widgets
-        collapsable_widget = QCollapsible("Show/Hide Tree View Controls")
-        collapsable_widget.layout().setContentsMargins(0, 0, 0, 0)
-        collapsable_widget.layout().setSpacing(0)
-        collapsable_widget.addWidget(panel)
-        collapsable_widget.collapse(animate=False)
+        collapsible_widget = QCollapsible("Show/Hide Tree View Controls")
+        collapsible_widget.layout().setContentsMargins(0, 0, 0, 0)
+        collapsible_widget.layout().setSpacing(0)
+        collapsible_widget.addWidget(panel)
+        collapsible_widget.collapse(animate=False)
 
         tree_widget = QWidget()
-        layout.addWidget(collapsable_widget)
+        layout.addWidget(collapsible_widget)
         layout.addWidget(self.tree_widget)
         layout.setSpacing(0)
         tree_widget.setLayout(layout)
 
-        splitter = QSplitter(Qt.Horizontal)
-
-        self.table_widget = ColoredTableWidget(self.tracks_viewer, self.track_df)
-        splitter.addWidget(tree_widget)
-        splitter.addWidget(self.table_widget)
-        splitter.setStretchFactor(0, 7)
-        splitter.setStretchFactor(1, 1)
-
-        main_layout = QHBoxLayout()
-        main_layout.addWidget(splitter)
-        self.setLayout(main_layout)
+        self.setLayout(layout)
         self._update_track_data(reset_view=True)
 
     def keyPressEvent(self, event: QKeyEvent) -> None:
@@ -707,19 +691,8 @@ class TreeWidget(QWidget):
         """
 
         if self.tracks_viewer.tracks is None:
-            self.track_df = pd.DataFrame()
             self.graph = None
         else:
-            if reset_view:
-                self.track_df, self.axis_order = extract_sorted_tracks(
-                    self.tracks_viewer.tracks, self.tracks_viewer.colormap
-                )
-            else:
-                self.track_df, self.axis_order = extract_sorted_tracks(
-                    self.tracks_viewer.tracks,
-                    self.tracks_viewer.colormap,
-                    self.axis_order,
-                )
             self.graph = self.tracks_viewer.tracks.graph
 
         # check whether we have regionprop measurements and therefore should activate the
@@ -743,7 +716,7 @@ class TreeWidget(QWidget):
             allow_flip = False
 
         # also update the navigation widget
-        self.navigation_widget.track_df = self.track_df
+        self.navigation_widget.track_df = self.tracks_viewer.track_df
         self.navigation_widget.lineage_df = self.lineage_df
 
         # check which view to set
@@ -761,7 +734,7 @@ class TreeWidget(QWidget):
 
         else:
             self.tree_widget.update(
-                self.track_df,
+                self.tracks_viewer.track_df,
                 self.view_direction,
                 self.plot_type,
                 self.plot_type_widget.get_current_feature(),
@@ -769,11 +742,6 @@ class TreeWidget(QWidget):
                 reset_view=reset_view,
                 allow_flip=allow_flip,
             )
-
-        columns_to_display = ["node_id"] + get_features_from_tracks(
-            self.tracks_viewer.tracks
-        )
-        self.table_widget.set_data(self.track_df, columns_to_display)
 
     def _set_mode(self, mode: str) -> None:
         """Set the display mode to all or lineage view. Currently, linage
@@ -791,7 +759,7 @@ class TreeWidget(QWidget):
                 self.view_direction = "vertical"
             else:
                 self.view_direction = "horizontal"
-            df = self.track_df
+            df = self.tracks_viewer.track_df
         elif mode == "lineage":
             self.view_direction = "horizontal"
             self._update_lineage_df()
@@ -828,7 +796,7 @@ class TreeWidget(QWidget):
         if (
             plot_type == "feature"
             and current_feature is not None
-            and current_feature not in self.track_df.columns
+            and current_feature not in self.tracks_viewer.track_df.columns
         ):
             self._update_track_data(reset_view=False)
 
@@ -836,7 +804,7 @@ class TreeWidget(QWidget):
         self.navigation_widget.view_direction = self.view_direction
 
         if self.mode == "all":
-            df = self.track_df
+            df = self.tracks_viewer.track_df
         if self.mode == "lineage":
             df = self.lineage_df
 
@@ -870,8 +838,8 @@ class TreeWidget(QWidget):
             visible = []
             for node_id in self.selected_nodes:
                 visible += extract_lineage_tree(self.graph, node_id)
-        self.lineage_df = self.track_df[
-            self.track_df["node_id"].isin(visible)
+        self.lineage_df = self.tracks_viewer.track_df[
+            self.tracks_viewer.track_df["node_id"].isin(visible)
         ].reset_index()
         self.lineage_df["x_axis_pos"] = (
             self.lineage_df["x_axis_pos"].rank(method="dense").astype(int) - 1

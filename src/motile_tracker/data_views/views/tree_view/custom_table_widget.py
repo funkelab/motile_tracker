@@ -1,3 +1,4 @@
+import napari
 import numpy as np
 import pandas as pd
 from matplotlib.colors import to_rgba
@@ -24,6 +25,9 @@ from qtpy.QtWidgets import (
 from motile_tracker.data_views.keybindings_config import GENERAL_KEY_ACTIONS
 from motile_tracker.data_views.views.layers.click_utils import (
     detect_side_button,
+)
+from motile_tracker.data_views.views.tree_view.tree_widget_utils import (
+    get_features_from_tracks,
 )
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
@@ -196,14 +200,15 @@ class CustomTableWidget(QTableWidget):
 class ColoredTableWidget(QWidget):
     """Customized table widget with colored rows based on label colors in a napari Labels layer"""
 
-    def __init__(self, tracks_viewer: TracksViewer, df: pd.DataFrame):
+    def __init__(self, viewer: napari.Viewer):
         super().__init__()
 
-        self.tracks_viewer = tracks_viewer
+        self.tracks_viewer = TracksViewer.get_instance(viewer)
+        self.tracks_viewer.tracks_updated.connect(self.update_data)
         self._table_widget = CustomTableWidget()
         self.special_selection = []
 
-        self.set_data(df)
+        self.set_data(self.tracks_viewer.track_df)
         self.ascending = False  # for choosing whether to sort ascending or descending
         self._syncing = False
 
@@ -260,6 +265,14 @@ class ColoredTableWidget(QWidget):
         self._table_widget.itemSelectionChanged.connect(self._on_selection_changed)
         self.tracks_viewer.node_selection_updated.connect(self._update_selected)
         self.tracks_viewer.center_node.connect(self.scroll_to_node)
+
+    def update_data(self, **kwargs) -> None:
+        """Update the displayed data based on the tracks_df on TracksViewer"""
+
+        columns_to_display = ["node_id"] + get_features_from_tracks(
+            self.tracks_viewer.tracks
+        )
+        self.set_data(self.tracks_viewer.track_df, columns_to_display)
 
     def _update_selected(self) -> None:
         """Select the rows belonging to the nodes that are in the selection list of the
