@@ -1,2 +1,2 @@
-## from .main_app import MainApp  # removed, no longer exists
+from .main_app import StartupWidget  # noqa
 from .menu_widget import MenuWidget  # noqa

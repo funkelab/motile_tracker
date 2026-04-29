@@ -1,17 +1,24 @@
+import argparse
 import sys
 
 import napari
 
-from motile_tracker.application_menus.main_app import MainApp
+from motile_tracker.application_menus.main_app import StartupWidget
 
 
-def main() -> None:
-    # Auto-load the motile tracker
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--mode",
+        choices=["all", "tracking", "editing"],
+        default="all",
+    )
+
+    args = parser.parse_args()
+
     viewer = napari.Viewer()
-    main_app = MainApp(viewer)
-    viewer.window.add_dock_widget(main_app, name="Motile Tracker")
+    StartupWidget(viewer, mode=args.mode)
 
-    # Start napari event loop
     napari.run()
 
 

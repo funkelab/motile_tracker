@@ -1,3 +1,5 @@
+import contextlib
+
 import napari
 from qtpy.QtCore import QTimer
 from qtpy.QtWidgets import (
@@ -93,7 +95,8 @@ class StartupWidget(QWidget):
 
     def _remove_self(self) -> None:
         """Remove the widget from the napari viewer.window.dock_widgets"""
-        self.viewer.window.remove_dock_widget(self)
+        with contextlib.suppress(LookupError):
+            self.viewer.window.remove_dock_widget(self)
 
 
 # Grouped Widgets
