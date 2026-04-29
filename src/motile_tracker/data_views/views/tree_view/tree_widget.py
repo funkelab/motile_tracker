@@ -114,7 +114,6 @@ class TreePlot(pg.PlotWidget):
         super().__init__(viewBox=CustomViewBox())
 
         self.setFocusPolicy(Qt.StrongFocus)
-        self.setTitle("Lineage Tree")
 
         self._pos = []
         self.adj = []
@@ -824,6 +823,10 @@ class TreeWidget(QWidget):
 
     def _update_lineage_df(self) -> None:
         """Subset dataframe to include only nodes belonging to the current lineage"""
+
+        if self.tracks_viewer.tracks is None:
+            self.lineage_df = pd.DataFrame()  # nothing to plot, set empty dataframe
+            return
 
         if len(self.selected_nodes) == 0 and not self.lineage_df.empty:
             # try to restore lineage df based on previous selection, even if those nodes
