@@ -9,6 +9,7 @@ from funtracks.utils.tracksdata_utils import create_empty_graphview_graph
 from motile_tracker.data_views.views.tree_view.tree_widget_utils import (
     extract_sorted_tracks,
     get_tracklets,
+    get_features_from_tracks,
 )
 
 
@@ -38,6 +39,29 @@ def test_track_df(solution_tracks_2d):
     assert isinstance(track_df, pd.DataFrame)
     assert track_df.loc[track_df["node_id"] == 1, "custom_attr"].values[0] == 10
     assert track_df.loc[track_df["node_id"] == 2, "custom_attr"].values[0] == 0
+
+
+def test_get_features_from_tracks_individual_pos_attrs():
+    """get_features_from_tracks must not crash when pos_attr is a list.
+
+    When SolutionTracks is built with pos_attr=["y", "x"], funtracks registers
+    each axis as a Feature without a display_name key (NotRequired per the TypedDict).
+    The function must fall back to the dict key instead of raising KeyError.
+    """
+    graph = create_empty_graphview_graph(
+        node_attributes=["y", "x"],
+        ndim=3,
+    )
+    graph.bulk_add_nodes(
+        nodes=[{"t": 0, "y": 10.0, "x": 20.0, "solution": 1}],
+        indices=[1],
+    )
+    tracks = SolutionTracks(graph=graph, ndim=3, time_attr="t", pos_attr=["y", "x"])
+
+    features = get_features_from_tracks(tracks)
+
+    assert "y" in features
+    assert "x" in features
 
 
 def test_extract_sorted_tracks_incomplete_lineage():
