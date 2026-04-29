@@ -8,8 +8,8 @@ from funtracks.utils.tracksdata_utils import create_empty_graphview_graph
 
 from motile_tracker.data_views.views.tree_view.tree_widget_utils import (
     extract_sorted_tracks,
-    get_tracklets,
     get_features_from_tracks,
+    get_tracklets,
 )
 
 
