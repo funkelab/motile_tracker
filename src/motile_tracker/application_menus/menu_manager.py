@@ -90,25 +90,46 @@ class MenuManager:
                     continue
         return None
 
-    def _set_tabs_north(self) -> None:
-        """Move the tabbar to the top of the dockwidgets"""
+    def set_tabbar_location(self, location: str = "North") -> None:
+        """Set tabbar location.
+        Args:
+            location (str, one of (North, East, South, West) to map the tabbar to)
+        """
 
         qt_window = self.viewer.window._qt_window
 
-        qt_window.setTabPosition(
-            Qt.DockWidgetArea.RightDockWidgetArea, QTabWidget.TabPosition.North
-        )
+        pos_map = {
+            "North": QTabWidget.TabPosition.North,
+            "South": QTabWidget.TabPosition.South,
+            "East": QTabWidget.TabPosition.East,
+            "West": QTabWidget.TabPosition.West,
+        }
 
-        for tb in self.viewer.window._qt_window.findChildren(QTabBar):
-            if tb.height() > tb.width():
-                tb.setUsesScrollButtons(True)
-                tb.setExpanding(False)
-                tb.setStyleSheet("""
-                    QTabBar::tab {
-                        min-width: 50px;
-                        min-height: 20px;
-                    }
-                """)
+        style_map = {
+            "North": """
+                QTabBar::tab { min-width: 50px; min-height: 15px; }
+            """,
+            "South": """
+                QTabBar::tab { min-width: 50px; min-height: 15px; }
+            """,
+            "East": """
+                QTabBar::tab { min-width: 15px; min-height: 50px; }
+            """,
+            "West": """
+                QTabBar::tab { min-width: 20px; min-height: 15px; }
+            """,
+        }
+
+        tab_position = pos_map.get(location, QTabWidget.TabPosition.North)
+        style = style_map.get(location, style_map["North"])
+
+        qt_window.setTabPosition(Qt.DockWidgetArea.RightDockWidgetArea, tab_position)
+
+        for tb in qt_window.findChildren(QTabBar):
+            tb.setUsesScrollButtons(True)
+            tb.setExpanding(False)
+            tb.setStyleSheet(style)
+            tb.setElideMode(Qt.ElideNone)
 
     def _create_scroll_wrapper(self, widget: QWidget) -> QScrollArea:
         """Wrap a widget in a QScrollArea to make it scrollable."""
