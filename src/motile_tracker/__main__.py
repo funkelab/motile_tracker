@@ -14,7 +14,7 @@ def main():
         default="all",
     )
 
-    args = parser.parse_args()
+    args, _ = parser.parse_known_args()
 
     viewer = napari.Viewer()
     StartupWidget(viewer, mode=args.mode)
