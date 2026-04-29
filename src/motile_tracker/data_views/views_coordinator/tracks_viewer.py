@@ -266,6 +266,9 @@ class TracksViewer:
         # emit the update signal
         self.tracks_updated.emit(True)
 
+        # Update visualization widget
+        self.mode_updated.emit()
+
     def toggle_display_mode(self, event=None) -> None:
         """Toggle the display mode between available options"""
 

@@ -10,6 +10,7 @@ from qtpy.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
     QRadioButton,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -33,17 +34,25 @@ class VisualizationConfigWidget(QWidget):
     ):
         super().__init__()
 
+        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+
         box = QGroupBox(label)
+        box.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+
         box_layout = QVBoxLayout(box)
+        box_layout.setContentsMargins(8, 6, 8, 6)
+        box_layout.setSpacing(6)
 
         self.opacity = QLabeledDoubleSlider()
         self.opacity.setValue(default_opacity)
         self.opacity.setSingleStep(0.1)
         self.opacity.setRange(0, 1)
         self.opacity.setDecimals(2)
+        self.opacity.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.opacity.valueChanged.connect(self.update_visualization)
         box_layout.addWidget(self.opacity)
 
+        self.contour = None
         if use_contour:
             self.contour = QCheckBox("Fill")
             self.contour.setChecked(default_contour)
@@ -53,28 +62,45 @@ class VisualizationConfigWidget(QWidget):
             self.contour.setToolTip(
                 "When checked, will fill labels instead of showing contours only"
             )
+            self.contour.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
             box_layout.addWidget(self.contour)
 
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(6, 6, 6, 6)
+        layout.setSpacing(6)
         layout.addWidget(box)
+        layout.addStretch(0)
 
 
 class ModeWidget(QWidget):
-    """Radio buttons for changing display mode"""
+    """Compact radio buttons for display mode."""
 
     update_mode = Signal(str)
 
     def __init__(self):
         super().__init__()
 
+        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+
         box = QGroupBox("Display Mode")
+        box.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
 
         self.radio_group = QButtonGroup(self)
         box_layout = QHBoxLayout(box)
+        box_layout.setContentsMargins(12, 8, 12, 8)
+        box_layout.setSpacing(14)
 
         for text, mode in [("All", "all"), ("Lineage", "lineage"), ("Group", "group")]:
             btn = QRadioButton(text)
             btn.setProperty("mode", mode)
+            btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+
+            btn.setStyleSheet("""
+                QRadioButton {
+                    padding: 3px 8px;
+                }
+            """)
+
             self.radio_group.addButton(btn)
             box_layout.addWidget(btn)
 
@@ -83,7 +109,9 @@ class ModeWidget(QWidget):
 
         self.radio_group.buttonToggled.connect(self._on_toggled)
 
-        layout = QHBoxLayout(self)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(8)
         layout.addWidget(box)
 
     @property
@@ -109,9 +137,13 @@ class LabelVisualizationWidget(QWidget):
         super().__init__()
 
         self.viewer = viewer
-
         self.tracks_viewer = TracksViewer.get_instance(viewer)
-        layout = QVBoxLayout(self)
+
+        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(10, 10, 10, 10)
+        main_layout.setSpacing(10)
 
         self.tracks_viewer.mode_updated.connect(self._update_widget_availability)
 
@@ -119,16 +151,13 @@ class LabelVisualizationWidget(QWidget):
         self.mode_widget.update_mode.connect(self._update_mode)
 
         self.highlight_widget = VisualizationConfigWidget(
-            "Highlight opacity", default_opacity=1.0, default_contour=True
+            "Highlight opacity", 1.0, True
         )
         self.foreground_widget = VisualizationConfigWidget(
-            "Foreground opacity", default_opacity=0.6, default_contour=True
+            "Foreground opacity", 0.6, True
         )
         self.background_widget = VisualizationConfigWidget(
-            "Background opacity",
-            default_opacity=0.3,
-            default_contour=True,
-            use_contour=False,
+            "Background opacity", 0.3, True, use_contour=False
         )
 
         self.highlight_widget.update_visualization.connect(self._update_visualization)
@@ -137,16 +166,19 @@ class LabelVisualizationWidget(QWidget):
 
         self.background_widget.setEnabled(False)  # initially disabled
 
-        self.show_ortho_views = QCheckBox("Show orthogonal views")
+        main_layout.addWidget(self.mode_widget)
+        main_layout.addWidget(self.highlight_widget)
+        main_layout.addWidget(self.foreground_widget)
+        main_layout.addWidget(self.background_widget)
+
+        self.show_ortho_views = QCheckBox("Orthogonal views")
         self.show_ortho_views.stateChanged.connect(self.initialize_ortho_views)
+        self.show_ortho_views.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
 
-        layout.addWidget(self.mode_widget)
-        layout.addWidget(self.highlight_widget)
-        layout.addWidget(self.foreground_widget)
-        layout.addWidget(self.background_widget)
-        layout.addWidget(self.show_ortho_views)
+        main_layout.addWidget(self.show_ortho_views)
+        main_layout.addStretch(1)
 
-        self.setMaximumHeight(450)
+        self.setMaximumHeight(360)
 
     def initialize_ortho_views(self, checked: bool):
         """Initializes the ortho views."""
