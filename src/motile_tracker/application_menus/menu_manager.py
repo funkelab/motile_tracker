@@ -90,13 +90,13 @@ class MenuManager:
                     continue
         return None
 
-    def _set_right_tabs_vertical(self) -> None:
-        """Set the tab bar vertically"""
+    def _set_tabs_north(self) -> None:
+        """Move the tabbar to the top of the dockwidgets"""
 
         qt_window = self.viewer.window._qt_window
 
         qt_window.setTabPosition(
-            Qt.DockWidgetArea.RightDockWidgetArea, QTabWidget.TabPosition.East
+            Qt.DockWidgetArea.RightDockWidgetArea, QTabWidget.TabPosition.North
         )
 
         for tb in self.viewer.window._qt_window.findChildren(QTabBar):
@@ -105,8 +105,8 @@ class MenuManager:
                 tb.setExpanding(False)
                 tb.setStyleSheet("""
                     QTabBar::tab {
-                        min-width: 15px;
-                        min-height: 50px;
+                        min-width: 50px;
+                        min-height: 20px;
                     }
                 """)
 

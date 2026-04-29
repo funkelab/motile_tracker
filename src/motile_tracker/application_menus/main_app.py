@@ -45,14 +45,21 @@ class MainAppWidget(QWidget):
             self.menu_manager = MenuManager(napari_viewer)
         for name, config in MENU_WIDGETS.items():
             self.menu_manager.initialize_menu({name: config})
+
         # make sure the 'Getting started' tab is the active foreground tab.
-        QTimer.singleShot(
-            0,
-            lambda: tracks_viewer.menu_manager.set_foreground_tabs(["Getting Started"]),
-        )
+        QTimer.singleShot(0, self._finalize_ui)
+
+        # Now safely remove the widget, since everything we need is docked
         QTimer.singleShot(0, self._remove_self)
 
+    def _finalize_ui(self):
+        """Set the 'Getting started' tab as active foreground tab, and move tabbar to the
+        top"""
+        self.menu_manager._set_tabs_north()
+        self.menu_manager.set_foreground_tabs(["Getting Started"])
+
     def _remove_self(self):
+        """Remove the widget from the napari viewer.window.dock_widgets"""
         self.viewer.window.remove_dock_widget(self)
 
 
