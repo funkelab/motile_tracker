@@ -108,11 +108,30 @@ class TracksViewer:
         self.track_id_color = [0, 0, 0, 0]
         self.force = False
 
-        self.collection_widget = CollectionWidget(self)
+        self.collection_widget = None
 
         self.set_keybinds()
 
         self.viewer.dims.events.ndisplay.connect(self.update_selection)
+
+    def get_collection_widget(self) -> CollectionWidget:
+        """Return a reference to the groups widget"""
+        if self.collection_widget is None or getattr(
+            self.collection_widget, "_is_deleted", False
+        ):
+            self.collection_widget = CollectionWidget(self)
+            if self.tracks is not None:
+                self.collection_widget.retrieve_existing_groups()
+
+            # track destruction
+            self.collection_widget.destroyed.connect(
+                lambda: self._on_collection_widget_destroyed()
+            )
+
+        return self.collection_widget
+
+    def _on_collection_widget_destroyed(self):
+        self.collection_widget = None
 
     def set_colormap_to_trackslist(self):
         """Set the current colormap on the TracksList, so that it can be exported."""
@@ -201,7 +220,8 @@ class TracksViewer:
         updated. Restore the selected_nodes, if possible
         """
 
-        self.collection_widget._refresh()
+        if self.collection_widget is not None:
+            self.collection_widget._refresh()
 
         if len(self.selected_nodes) > 0 and any(
             not self.tracks.graph.has_node(node) for node in self.selected_nodes
@@ -252,7 +272,8 @@ class TracksViewer:
                 layer.visible = False
 
         # retrieve existing groups
-        self.collection_widget.retrieve_existing_groups()
+        if self.collection_widget is not None:
+            self.collection_widget.retrieve_existing_groups()
 
         self.set_display_mode("all")
         self.tracking_layers.set_tracks(tracks, name)
@@ -325,7 +346,10 @@ class TracksViewer:
                 for node in self.selected_nodes:
                     self.visible += extract_lineage_tree(self.tracks.graph, node)
         elif self.mode == "group":
-            if self.collection_widget.selected_collection is not None:
+            if (
+                self.collection_widget is not None
+                and self.collection_widget.selected_collection is not None
+            ):
                 self.visible = list(
                     self.collection_widget.selected_collection.collection
                 )
