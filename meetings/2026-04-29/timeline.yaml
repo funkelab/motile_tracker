@@ -1,0 +1,86 @@
+title: Development Timeline
+
+people:
+  Caroline:
+    color: "#4a9eff"
+  Teun:
+    color: "#ff9e66"
+  Anniek:
+    color: "#76fcd8"
+  Human Technopole:
+    color: "#888888"
+
+milestones:
+  - name: V2 release
+    date: 2026-05-01
+  - name: V3 release
+    date: 2026-08-01
+  - name: Paper Draft
+    date: 2026-09-01
+  - name: I2K Conference
+    date: 2026-09-27
+
+sections:
+  - name: Core
+    tasks:
+      - name: "Persistent candidate graph (#293)"
+        person: Teun
+        start: 2026-04-29
+        end: 2026-05-15
+
+  - name: Big Data
+    tasks:
+      - name: "View subset of large graphs (#398)"
+        person: Teun
+        start: 2026-05-15
+        end: 2026-06-15
+      - name: "Performant lineage tree view (#75)"
+        person: Teun
+        start: 2026-06-15
+        end: 2026-07-15
+      - name: "Lazy loading of image data (#187)"
+        person: Caroline
+        start: 2026-07-01
+        end: 2026-07-31
+
+  - name: Tracking Methods
+    tasks:
+      - name: "Custom features in tracking (#139)"
+        person: Caroline
+        start: 2026-05-01
+        end: 2026-05-31
+      - name: "Pin and re-solve (#175)"
+        person: Caroline
+        start: 2026-06-01
+        end: 2026-06-30
+      - name: "TrackastraAnnotator (funtracks#174)"
+        person: Human Technopole
+        start: 2026-05-01
+        end: 2026-06-01
+      - name: "Suggestor/Proofreader API (#182)"
+        person: Human Technopole
+        start: 2026-06-01
+        end: 2026-06-30
+      - name: "TrainableAnnotator API + SVMAnnotator (funtracks#20,#21)"
+        person: Human Technopole
+        start: 2026-07-01
+        end: 2026-07-31
+
+  - name: Manual Annotation
+    tasks:
+      - name: "Intensity features (#256)"
+        person: Anniek
+        start: 2026-05-01
+        end: 2026-05-31
+      - name: "Tracking from scratch (#221)"
+        person: Anniek
+        start: 2026-06-01
+        end: 2026-06-30
+      - name: "InstanSeg segmentation"
+        person: Teun
+        start: 2026-07-15
+        end: 2026-08-01
+      - name: "More UserActions (#265)"
+        person: Anniek
+        start: 2026-07-01
+        end: 2026-07-31
