@@ -84,6 +84,7 @@ def build_candidate_graph(
     input_data: np.ndarray,
     solver_params: SolverParams,
     scale: list | None = None,
+    time_offset: int = 0,
 ) -> td.graph.GraphView:
     """Build the candidate graph from input data."""
     if input_data.ndim == 2:
@@ -97,6 +98,17 @@ def build_candidate_graph(
             iou=solver_params.iou_cost is not None,
             scale=scale,
         )
+        if time_offset > 0:
+            node_ids = list(cand_graph.node_ids())
+            if node_ids:
+                df = cand_graph.node_attrs(
+                    attr_keys=[td.DEFAULT_ATTR_KEYS.NODE_ID, "t"]
+                )
+                shifted_t = [t + time_offset for t in df["t"].to_list()]
+                cand_graph.update_node_attrs(
+                    node_ids=df[td.DEFAULT_ATTR_KEYS.NODE_ID].to_list(),
+                    attrs={"t": shifted_t},
+                )
     logger.debug("Cand graph has %d nodes", cand_graph.num_nodes())
     return cand_graph
 
@@ -218,22 +230,9 @@ def _solve_single_window(
         # Segmentation: numpy slice is a view (no copy)
         sliced_input = input_data[window_start:window_end]
 
-    cand_graph = build_candidate_graph(sliced_input, solver_params, scale)
-
-    # For segmentation, compute_graph_from_seg assigns t as range(len(seg)) — shift to absolute
-    if input_data.ndim != 2 and window_start > 0:
-        node_ids = list(cand_graph.node_ids())
-        if node_ids:
-            df = cand_graph.node_attrs(attr_keys=[td.DEFAULT_ATTR_KEYS.NODE_ID, "t"])
-            t_by_id = dict(
-                zip(
-                    df[td.DEFAULT_ATTR_KEYS.NODE_ID].to_list(),
-                    df["t"].to_list(),
-                    strict=True,
-                )
-            )
-            shifted_times = [t_by_id[nid] + window_start for nid in node_ids]
-            cand_graph.update_node_attrs(node_ids=node_ids, attrs={"t": shifted_times})
+    cand_graph = build_candidate_graph(
+        sliced_input, solver_params, scale, time_offset=window_start
+    )
 
     start_time = time.time()
     solution = _solve_window(cand_graph, solver_params, on_solver_update)
