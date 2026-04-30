@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 
 from qtpy.QtWidgets import QDockWidget, QScrollArea, QTabBar, QWidget
 
+from motile_tracker.application_menus.main_app import StartupWidget
 from motile_tracker.application_menus.menu_manager import MenuManager
 
 
@@ -170,6 +171,8 @@ def test_toggle_menu_hide_and_restore(make_napari_viewer):
 def test_set_foreground_tabs_raises_correct_widget(make_napari_viewer):
     viewer = make_napari_viewer()
     manager = MenuManager(viewer)
+
+    StartupWidget(viewer)
 
     qt_window = viewer.window._qt_window
     dock_widgets = qt_window.findChildren(QDockWidget)
