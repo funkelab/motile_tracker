@@ -55,13 +55,7 @@ class RunViewer(QGroupBox):
         run_name_view = f"{run.run_name} ({run_time})"
         self.setTitle("Run Viewer: " + run_name_view)
         self.solver_event_update()
-        # Imported runs (CSV/geff) have no solver_params — hide the params
-        # display rather than emit None into widgets that can't render it.
-        if run.solver_params is None:
-            self.params_widget.hide()
-        else:
-            self.params_widget.show()
-            self.params_widget.new_params.emit(run.solver_params)
+        self.params_widget.new_params.emit(run.solver_params)
 
     def _back_to_edit_widget(self) -> QWidget:
         """Create a widget for navigating back to the run editor with different

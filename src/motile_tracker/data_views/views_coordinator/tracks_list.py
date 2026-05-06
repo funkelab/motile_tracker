@@ -136,21 +136,7 @@ class TracksList(QGroupBox):
             tracks = dialog.tracks
             name = dialog.name
             if tracks is not None:
-                # Wrap the imported SolutionTracks in a MotileRun so the list
-                # invariant (every item is a MotileRun) holds. solver_params is
-                # None because these tracks never went through the solver.
-                run = MotileRun(
-                    graph=tracks.graph,
-                    run_name=name,
-                    solver_params=None,
-                    pos_attr=tracks.features.position_key,
-                    time_attr=tracks.features.time_key,
-                    scale=tracks.scale,
-                    ndim=tracks.ndim,
-                    _features=tracks.features,
-                    _segmentation=tracks.segmentation,
-                )
-                self.add_tracks(run, name, select=True)
+                self.add_tracks(tracks, name, select=True)
 
     def _selection_changed(self):
         selected = self.tracks_list.selectedItems()
@@ -158,7 +144,7 @@ class TracksList(QGroupBox):
             tracks_button = self.tracks_list.itemWidget(selected[0])
             self.view_tracks.emit(tracks_button.tracks, tracks_button.name.text())
 
-    def add_tracks(self, tracks: MotileRun, name: str, select=True):
+    def add_tracks(self, tracks: Tracks, name: str, select=True):
         """Add a run to the list and optionally select it. Will make a new
         row in the list UI representing the given run.
 
@@ -166,18 +152,11 @@ class TracksList(QGroupBox):
         the list.
 
         Args:
-            tracks (MotileRun): the run to add to the results list. Must be a
-                MotileRun (importers wrap their SolutionTracks output before
-                calling this) so save_tracks can rely on tracks.save().
+            tracks (Tracks): the tracks object to add to the results list
             name (str): the name of the tracks to display
             select (bool, optional): Whether or not to select the new tracks item in the
                 list (and thus display it in the tracks viewer). Defaults to True.
         """
-        if not isinstance(tracks, MotileRun):
-            raise TypeError(
-                f"TracksList only holds MotileRun objects, got {type(tracks).__name__}. "
-                "Wrap imported SolutionTracks in a MotileRun before calling add_tracks."
-            )
         item = QListWidgetItem(self.tracks_list)
         tracks_row = TracksButton(tracks, name)
         self.tracks_list.setItemWidget(item, tracks_row)
