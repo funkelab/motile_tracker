@@ -97,18 +97,8 @@ def build_candidate_graph(
             solver_params.max_edge_distance,
             iou=solver_params.iou_cost is not None,
             scale=scale,
+            t_start=time_offset,
         )
-        if time_offset > 0:
-            node_ids = list(cand_graph.node_ids())
-            if node_ids:
-                df = cand_graph.node_attrs(
-                    attr_keys=[td.DEFAULT_ATTR_KEYS.NODE_ID, "t"]
-                )
-                shifted_t = [t + time_offset for t in df["t"].to_list()]
-                cand_graph.update_node_attrs(
-                    node_ids=df[td.DEFAULT_ATTR_KEYS.NODE_ID].to_list(),
-                    attrs={"t": shifted_t},
-                )
     logger.debug("Cand graph has %d nodes", cand_graph.num_nodes())
     return cand_graph
 
