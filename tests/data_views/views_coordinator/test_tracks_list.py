@@ -91,7 +91,7 @@ class TestTracksListAddRemove:
 
 
 class TestTracksListSave:
-    def test_save_tracks_calls_save_when_dialog_accepted(
+    def test_save_tracks_writes_run_dir_when_dialog_accepted(
         self, tracks_list, tracks, tmp_path
     ):
         tracks_list.add_tracks(tracks, "run1", select=False)
@@ -100,19 +100,63 @@ class TestTracksListSave:
         tracks_list.save_dialog.exec_ = MagicMock(return_value=True)
         tracks_list.save_dialog.selectedFiles = MagicMock(return_value=[str(tmp_path)])
 
-        with patch.object(tracks, "save") as mock_save:
-            tracks_list.save_tracks(item)
-            mock_save.assert_called_once_with(tmp_path)
+        tracks_list.save_tracks(item)
 
-    def test_save_tracks_does_nothing_when_dialog_rejected(self, tracks_list, tracks):
+        saved_dirs = [p for p in tmp_path.iterdir() if p.is_dir()]
+        assert len(saved_dirs) == 1
+
+    def test_save_tracks_does_nothing_when_dialog_rejected(
+        self, tracks_list, tracks, tmp_path
+    ):
         tracks_list.add_tracks(tracks, "run1", select=False)
         item = tracks_list.tracks_list.item(0)
 
         tracks_list.save_dialog.exec_ = MagicMock(return_value=False)
 
-        with patch.object(tracks, "save") as mock_save:
-            tracks_list.save_tracks(item)
-            mock_save.assert_not_called()
+        tracks_list.save_tracks(item)
+
+        assert list(tmp_path.iterdir()) == []
+
+
+# ---------------------------------------------------------------------------
+# TracksList — imported (non-MotileRun) tracks must be saveable
+# ---------------------------------------------------------------------------
+
+
+class TestTracksListSaveImported:
+    def test_imported_solution_tracks_can_be_saved(
+        self, tracks_list, solution_tracks_2d, tmp_path
+    ):
+        """Tracks loaded via ImportDialog (a SolutionTracks, not a MotileRun)
+        must still be saveable via the save button.
+
+        Reproduces the AttributeError seen when saving CSV-imported tracks:
+        the import path must wrap the SolutionTracks in a MotileRun so
+        save_tracks → tracks.save(directory) works.
+        """
+        mock_dialog = MagicMock()
+        mock_dialog.exec_.return_value = QDialog.Accepted
+        mock_dialog.tracks = solution_tracks_2d
+        mock_dialog.name = "imported"
+
+        with patch(
+            "motile_tracker.data_views.views_coordinator.tracks_list.ImportDialog",
+            return_value=mock_dialog,
+        ):
+            tracks_list._load_tracks("csv")
+
+        item = tracks_list.tracks_list.item(0)
+        widget = tracks_list.tracks_list.itemWidget(item)
+        assert isinstance(widget.tracks, MotileRun)
+        assert widget.tracks.solver_params is None
+
+        tracks_list.save_dialog.exec_ = MagicMock(return_value=True)
+        tracks_list.save_dialog.selectedFiles = MagicMock(return_value=[str(tmp_path)])
+
+        tracks_list.save_tracks(item)
+
+        saved_dirs = [p for p in tmp_path.iterdir() if p.is_dir()]
+        assert len(saved_dirs) == 1
 
 
 # ---------------------------------------------------------------------------

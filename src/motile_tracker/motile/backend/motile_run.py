@@ -183,33 +183,35 @@ class MotileRun(SolutionTracks):
 
     def _save_params(self, run_dir: Path):
         """Save the run parameters in the provided run directory. Currently
-        dumps the parameters dict into a json file.
+        dumps the parameters dict into a json file. Skips writing if there are
+        no params (e.g. tracks imported from CSV/geff that never went through
+        the solver).
 
         Args:
             run_dir (Path): A directory in which to save the parameters file.
         """
+        if self.solver_params is None:
+            return
         params_file = run_dir / PARAMS_FILENAME
         with open(params_file, "w") as f:
             json.dump(self.solver_params.__dict__, f)
 
     @staticmethod
-    def _load_params(run_dir: Path) -> SolverParams:
+    def _load_params(run_dir: Path) -> SolverParams | None:
         """Load parameters from the parameters json file in the provided
-        directory.
+        directory. Returns None if the file is absent — runs imported from
+        CSV/geff are saved without solver params.
 
         Args:
             run_dir (Path): The directory in which to find the parameters file.
 
-        Raises:
-            FileNotFoundError: If the parameters file is not found in the
-                provided directory.
-
         Returns:
-            SolverParams: The solver parameters loaded from disk.
+            SolverParams | None: The solver parameters, or None if no params
+                file exists in the run directory.
         """
         params_file = run_dir / PARAMS_FILENAME
         if not params_file.is_file():
-            raise FileNotFoundError(f"Parameters not found at {params_file}")
+            return None
         with open(params_file) as f:
             params_dict = json.load(f)
         return SolverParams(**params_dict)
@@ -325,7 +327,8 @@ class MotileRun(SolutionTracks):
         """
         base_path = Path(base_path)
         run_dir = base_path / self._make_id()
-        # Lets be safe and remove the expected files and then the directory
-        (run_dir / PARAMS_FILENAME).unlink()
-        (run_dir / GAPS_FILENAME).unlink()
+        # Lets be safe and remove the expected files and then the directory.
+        # Both files are optional (params for imported runs, gaps when None).
+        (run_dir / PARAMS_FILENAME).unlink(missing_ok=True)
+        (run_dir / GAPS_FILENAME).unlink(missing_ok=True)
         super().delete(run_dir)
