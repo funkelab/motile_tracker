@@ -250,6 +250,75 @@ def test_data_setitem_empty_indices_does_not_raise(
         seg_layer.data_setitem(empty_indices, 1)
 
 
+def test_paint_with_preserve_labels_paints_into_background(
+    viewer, solution_tracks_3d_with_division
+):
+    """Brush + preserve_labels=True on read-only GraphArrayView must paint
+    background pixels.
+
+    Regression: pre-fix, GraphArrayView fancy-indexing returned a view rather
+    than values, keep_coords collapsed to False, and the brush silently
+    no-oped under preserve_labels. The ContourLabels._paint_indices override
+    materializes per-time-frame to compute keep_coords correctly.
+    """
+    tracks_viewer = TracksViewer.get_instance(viewer)
+    tracks_viewer.update_tracks(tracks=solution_tracks_3d_with_division, name="test")
+    seg_layer = tracks_viewer.tracking_layers.seg_layer
+
+    step = list(viewer.dims.current_step)
+    step[0] = 0  # node 1 lives at t=0, bbox 45-54^3
+    viewer.dims.current_step = step
+
+    new_label(seg_layer)
+    new_value = seg_layer.selected_label
+
+    seg_layer.preserve_labels = True
+    seg_layer.brush_size = 3
+
+    nodes_before = tracks_viewer.tracks.graph.num_nodes()
+
+    # Pure background: far from node 1
+    seg_layer.paint(np.array([0, 50, 80, 80]), new_value)
+
+    # Segmentation: painted pixel shows new_value
+    assert int(np.asarray(seg_layer.data[0, 50, 80, 80])) == new_value
+    # Existing node 1 untouched
+    assert int(np.asarray(seg_layer.data[0, 50, 50, 50])) == 1
+    # Graph: new node added
+    assert tracks_viewer.tracks.graph.num_nodes() == nodes_before + 1
+
+
+def test_paint_with_preserve_labels_does_not_overwrite_existing(
+    viewer, solution_tracks_3d_with_division
+):
+    """Brush + preserve_labels=True must not overwrite existing labels.
+
+    Same override path as the background test, but keep_coords excludes every
+    candidate pixel, so neither segmentation nor graph should change.
+    """
+    tracks_viewer = TracksViewer.get_instance(viewer)
+    tracks_viewer.update_tracks(tracks=solution_tracks_3d_with_division, name="test")
+    seg_layer = tracks_viewer.tracking_layers.seg_layer
+
+    step = list(viewer.dims.current_step)
+    step[0] = 0
+    viewer.dims.current_step = step
+
+    new_label(seg_layer)
+    new_value = seg_layer.selected_label
+
+    seg_layer.preserve_labels = True
+    seg_layer.brush_size = 3
+
+    nodes_before = tracks_viewer.tracks.graph.num_nodes()
+
+    # Center of node 1
+    seg_layer.paint(np.array([0, 50, 50, 50]), new_value)
+
+    assert int(np.asarray(seg_layer.data[0, 50, 50, 50])) == 1
+    assert tracks_viewer.tracks.graph.num_nodes() == nodes_before
+
+
 def test_undo_on_readonly_data_does_not_fire_paint_event(
     viewer, solution_tracks_3d_with_division
 ):
