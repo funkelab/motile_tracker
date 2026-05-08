@@ -12,6 +12,60 @@ from tracksdata.constants import DEFAULT_ATTR_KEYS
 from motile_tracker.data_views.node_type import NodeType
 
 
+def get_tracklets(
+    parent_to_children: dict[int, list[int]],
+    child_to_parent: dict[int, int],
+    node_ids: list[int],
+    dividing_node_set: set[int],
+    node_to_track_id: dict[int, int],
+) -> list[set[int]]:
+    """Group nodes into tracklets by BFS, cutting at division nodes.
+
+    A tracklet is a maximal linear segment of the track graph — it does not
+    cross a division point. The returned sets contain node IDs; callers are
+    responsible for sorting by time if needed.
+
+    Args:
+        parent_to_children: maps each parent node_id to its list of child node_ids.
+        child_to_parent: maps each child node_id to its single parent node_id.
+        node_ids: all node IDs to partition.
+        dividing_node_set: set of node IDs that have ≥2 children (division nodes).
+        node_to_track_id: maps each node_id to its pre-computed tracklet ID.
+
+    Returns:
+        List of sets, one set of node IDs per tracklet.
+    """
+    visited: set[int] = set()
+    tracklets: list[set[int]] = []
+    for start_node in node_ids:
+        if start_node in visited:
+            continue
+        component: set[int] = set()
+        queue = [start_node]
+        while queue:
+            node = queue.pop()
+            if node in visited:
+                continue
+            visited.add(node)
+            component.add(node)
+            pred = child_to_parent.get(node)
+            if (
+                pred is not None
+                and pred not in visited
+                and pred not in dividing_node_set
+                and node_to_track_id.get(pred) == node_to_track_id.get(node)
+            ):
+                queue.append(pred)
+            if node not in dividing_node_set:
+                for succ in parent_to_children.get(node, []):
+                    if succ not in visited and node_to_track_id.get(
+                        succ
+                    ) == node_to_track_id.get(node):
+                        queue.append(succ)
+        tracklets.append(component)
+    return tracklets
+
+
 def extract_sorted_tracks(
     tracks: Tracks,
     colormap: napari.utils.CyclicLabelColormap,
@@ -87,28 +141,13 @@ def extract_sorted_tracks(
     end_nodes = [n for n in node_ids_list if n not in parent_to_children]
 
     # BFS to collect tracklets, cutting edges at division (parent) nodes
-    parent_node_set = set(parent_nodes)
-    visited: set = set()
-    tracklets: list[set] = []
-    for start_node in node_ids_list:
-        if start_node in visited:
-            continue
-        component: set = set()
-        queue = [start_node]
-        while queue:
-            node = queue.pop()
-            if node in visited:
-                continue
-            visited.add(node)
-            component.add(node)
-            pred = child_to_parent.get(node)
-            if pred is not None and pred not in visited and pred not in parent_node_set:
-                queue.append(pred)
-            if node not in parent_node_set:
-                for succ in parent_to_children.get(node, []):
-                    if succ not in visited:
-                        queue.append(succ)
-        tracklets.append(component)
+    tracklets = get_tracklets(
+        parent_to_children,
+        child_to_parent,
+        node_ids_list,
+        set(parent_nodes),
+        node_to_track_id,
+    )
 
     for node_set in tracklets:
         # Sort nodes in each tracklet by time using the precomputed dict
@@ -311,23 +350,27 @@ def get_sorted_track_ids(
 def extract_lineage_tree(graph: td.GraphView, node_id: str) -> list[str]:
     """Extract the entire lineage tree including horizontal relations for a given node"""
 
-    # go up the tree to identify the root node
+    # Walk up to root — one SQL call per step (unavoidable for linear parent chains)
     root_node = int(node_id)
     while True:
-        predecessors = list(graph.predecessors(root_node))
-        if not predecessors:
+        preds = graph.predecessors(root_node)
+        if not preds:
             break
-        root_node = int(predecessors[0])
+        root_node = int(preds[0])
 
-    # BFS to collect all descendants
-    nodes = set()
-    queue = [root_node]
-    while queue:
-        node = queue.pop()
-        if node in nodes:
-            continue
-        nodes.add(node)
-        queue.extend(int(n) for n in graph.successors(node))
+    # BFS downward batched by level — O(num_levels) SQL calls instead of O(N_descendants)
+    nodes: set[int] = set()
+    level = [root_node]
+    while level:
+        nodes.update(level)
+        children_map: dict[int, list[int]] = graph.successors(level)
+        next_level = [
+            int(child)
+            for children in children_map.values()
+            for child in children
+            if int(child) not in nodes
+        ]
+        level = next_level
 
     return list(nodes)
 
@@ -349,11 +392,11 @@ def get_features_from_tracks(
         features_to_ignore = []
     features_to_plot = []
     if tracks is not None:
-        for feature in tracks.features.values():
+        for key, feature in tracks.features.items():
             # Skip edge features - only show node features in dropdown
             if feature["feature_type"] == "edge":
                 continue
-            name = feature["display_name"]
+            name = feature.get("display_name", key)
             if feature["value_type"] in ("float", "int"):
                 if feature["num_values"] > 1:
                     value_names = feature.get("value_names", None)

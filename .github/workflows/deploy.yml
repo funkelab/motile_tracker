@@ -26,7 +26,7 @@ jobs:
           password: ${{ secrets.PYPI_API_TOKEN }}
           skip-existing: true
       - name: Create release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           draft: ${{ contains(github.ref_name, '-dev') }}
           prerelease: ${{ contains(github.ref_name, '-rc') }}

@@ -494,69 +494,41 @@ class StandardFieldMapWidget(QWidget):
     def get_name_map(self) -> dict[str, str]:
         """Return a mapping from standard field name to source property name.
 
-        Includes both standard fields (time, x, y, etc.) and any Custom/Group
-        features selected in optional features.
+        Includes standard fields (time, x, y, etc.), Custom/Group features,
+        and non-recompute regionprops features selected in optional features.
         """
         name_map = {
             attribute: combo.currentText()
             for attribute, combo in self.mapping_widgets.items()
         }
 
-        # Add Custom and Group features to name_map
         for attr, widgets in self.optional_features.items():
-            if widgets["attr_checkbox"].isChecked():
-                selected = widgets["feature_option"].currentText()
-                if selected in ("Custom", "Group"):
-                    key = (
-                        f"custom_{attr}" if attr.lower() in self.reserved_keys else attr
-                    )
-                    name_map[key] = attr
+            if not widgets["attr_checkbox"].isChecked():
+                continue
+            selected = widgets["feature_option"].currentText()
+            if selected in ("Custom", "Group"):
+                key = f"custom_{attr}" if attr.lower() in self.reserved_keys else attr
+                name_map[key] = attr
+            elif not widgets["recompute"].isChecked():
+                # Regionprops feature loaded from data (not recomputed)
+                default_key = self.display_name_to_default_key[selected]
+                name_map[default_key] = attr
 
         return name_map
 
-    def get_features(self) -> dict[str, str]:
-        """Get features dict for tracks_from_df (CSV import).
+    def get_recompute_keys(self) -> list[str]:
+        """Get feature keys that should be recomputed from segmentation.
 
-        Returns dict mapping feature default key to either:
-        - Column name (to load from that column)
-        - "Recompute" (to compute from segmentation)
-
-        Custom and Group features are NOT included here — they are registered
-        via get_name_map() through the enable_features_from_name_map path.
+        Returns a list of default feature keys for which the user checked
+        the 'Recompute' checkbox.
         """
-        features = {}
-        for attr, widgets in self.optional_features.items():
-            if widgets["attr_checkbox"].isChecked():
-                selected = widgets["feature_option"].currentText()
-                recompute = widgets["recompute"].isChecked()
-
-                if selected in ("Custom", "Group"):
-                    continue  # handled by get_name_map()
-                else:
-                    default_key = self.display_name_to_default_key[selected]
-                    if recompute:
-                        features[default_key] = "Recompute"
-                    else:
-                        features[default_key] = attr  # column name
-        return features
-
-    def get_node_features(self) -> dict[str, bool]:
-        """Get node_features dict for import_from_geff (GEFF import).
-
-        Returns dict mapping feature default key to recompute boolean.
-
-        Custom and Group features are NOT included here — they are registered
-        via get_name_map() through the enable_features_from_name_map path.
-        """
-        node_features = {}
+        recompute_keys = []
         for _attr, widgets in self.optional_features.items():
             if widgets["attr_checkbox"].isChecked():
                 selected = widgets["feature_option"].currentText()
-                recompute = widgets["recompute"].isChecked()
-
                 if selected in ("Custom", "Group"):
-                    continue  # handled by get_name_map()
-                else:
+                    continue
+                if widgets["recompute"].isChecked():
                     default_key = self.display_name_to_default_key[selected]
-                    node_features[default_key] = recompute
-        return node_features
+                    recompute_keys.append(default_key)
+        return recompute_keys
