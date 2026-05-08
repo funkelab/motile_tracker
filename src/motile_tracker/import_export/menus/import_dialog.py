@@ -336,10 +336,7 @@ class ImportDialog(QDialog):
                 name_map = self.prop_map_widget.get_name_map()
                 # Remove entries with "None" value - funtracks doesn't accept None mappings
                 name_map = {k: v for k, v in name_map.items() if v != "None"}
-                node_features = self.prop_map_widget.get_node_features()
-                recompute_keys = [
-                    k for k, recompute in node_features.items() if recompute
-                ]
+                recompute_keys = self.prop_map_widget.get_recompute_keys()
 
                 # When embedded segmentation is present (mask + bbox in graph) and no
                 # external segmentation file is provided, ensure those attributes are
@@ -384,15 +381,7 @@ class ImportDialog(QDialog):
                 node_name_map = self.prop_map_widget.get_name_map()
                 # Remove entries with "None" value - funtracks doesn't accept None mappings
                 node_name_map = {k: v for k, v in node_name_map.items() if v != "None"}
-                features = self.prop_map_widget.get_features()
-
-                # Fold column-load features into name_map; collect recompute-only keys
-                recompute_keys = []
-                for key, val in features.items():
-                    if val == "Recompute":
-                        recompute_keys.append(key)
-                    else:
-                        node_name_map[key] = val
+                recompute_keys = self.prop_map_widget.get_recompute_keys()
 
                 try:
                     self.tracks = tracks_from_df(
