@@ -13,6 +13,7 @@ from funtracks.user_actions import (
     UserSwapPredecessors,
 )
 from psygnal import Signal
+from qtpy.QtWidgets import QMessageBox
 
 from motile_tracker.data_views.keybindings_config import (
     KEYMAP,
@@ -371,6 +372,15 @@ class TracksViewer:
                 node1, node2 = node2, node1
 
             node1, node2 = int(node1), int(node2)
+
+            if self.tracks.graph.out_degree(node1) >= 2:
+                QMessageBox.warning(
+                    None,
+                    "Cannot add edge",
+                    f"Node {node1} already has 2 children. Delete one of the "
+                    "existing daughter edges before adding a new one.",
+                )
+                return
 
             try:
                 UserAddEdge(self.tracks, (node1, node2), force=self.force)
