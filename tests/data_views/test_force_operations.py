@@ -398,3 +398,61 @@ def test_invalid_edge_force(
         assert not solution_tracks_3d_with_division.graph.has_edge(5, 4)
         assert solution_tracks_3d_with_division.graph.has_edge(2, 4)
     assert tracks_viewer.force == confirm_response[1]
+
+
+def test_create_edge_third_daughter_blocked(
+    viewer,
+    solution_tracks_3d_with_division,
+    monkeypatch,
+    click_node,
+):
+    r"""Adding a third daughter to a parent that already has 2 children
+    should pop up a QMessageBox.warning and not call funtracks.
+
+    TP
+    0      1                       1
+           |                       |
+    1      2          ->           2          (5 painted at t=2 as new track)
+          / \                     / \
+    2    3   4                   3   4    5
+
+    Selecting 2 (parent, out_degree=2) and 5 and pressing "Add edge" should
+    show a popup and leave the graph unchanged — funtracks is never called,
+    so the merge-then-fail partial-mutation path is unreachable.
+    """
+    tracks_viewer = TracksViewer.get_instance(viewer)
+    tracks_viewer.update_tracks(tracks=solution_tracks_3d_with_division, name="test")
+
+    # Paint a new disconnected node 5 at t=2 (new track_id)
+    tracks_viewer.tracking_layers.seg_layer.mode = "paint"
+    step = list(viewer.dims.current_step)
+    step[0] = 2
+    viewer.dims.current_step = step
+    tracks_viewer.selected_track = None
+
+    event_val = create_event_val(
+        tp=2, z=(15, 17), y=(45, 47), x=(75, 78), old_val=0, target_val=5
+    )
+    tracks_viewer.tracking_layers.seg_layer._on_paint(MockEvent(event_val))
+    assert tracks_viewer.tracks.graph.num_nodes() == 5
+    assert tracks_viewer.tracks.graph.out_degree(2) == 2
+
+    # Select parent (2) and would-be third daughter (5)
+    tracks_viewer.selected_nodes.reset()
+    click_node(tracks_viewer, 2)
+    click_node(tracks_viewer, 5, append=True)
+
+    warning_mock = MagicMock(return_value=QMessageBox.Ok)
+    monkeypatch.setattr(QMessageBox, "warning", warning_mock)
+
+    num_edges_before = tracks_viewer.tracks.graph.num_edges()
+
+    tracks_viewer.create_edge()
+
+    warning_mock.assert_called_once()
+    assert "Cannot add edge" in warning_mock.call_args.args[1]
+    assert tracks_viewer.tracks.graph.num_edges() == num_edges_before
+    assert not tracks_viewer.tracks.graph.has_edge(2, 5)
+    # Existing daughter edges are still intact
+    assert tracks_viewer.tracks.graph.has_edge(2, 3)
+    assert tracks_viewer.tracks.graph.has_edge(2, 4)
