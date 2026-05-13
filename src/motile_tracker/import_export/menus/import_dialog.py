@@ -363,6 +363,11 @@ class ImportDialog(QDialog):
                         segmentation_path=segmentation_path,
                         scale=scale,
                     )
+                    if (
+                        self.tracks.segmentation is not None
+                        and "area" not in self.tracks.features
+                    ):
+                        self.tracks.enable_features(["area"])
                     if recompute_keys:
                         self.tracks.enable_features(recompute_keys, recompute=True)
                 except Exception as e:  # noqa: BLE001
@@ -390,6 +395,11 @@ class ImportDialog(QDialog):
                         scale=scale,
                         node_name_map=node_name_map,
                     )
+                    if (
+                        self.tracks.segmentation is not None
+                        and "area" not in self.tracks.features
+                    ):
+                        self.tracks.enable_features(["area"])
                     if recompute_keys:
                         self.tracks.enable_features(recompute_keys, recompute=True)
                 except Exception as e:  # noqa: BLE001

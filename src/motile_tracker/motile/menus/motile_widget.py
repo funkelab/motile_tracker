@@ -13,6 +13,7 @@ from qtpy.QtWidgets import (
     QWidget,
 )
 from superqt.utils import thread_worker
+from tracksdata.array import GraphArrayView
 
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 from motile_tracker.motile.backend import MotileRun, build_candidate_graph, solve
@@ -153,13 +154,14 @@ class MotileWidget(QWidget):
             ndim=run.ndim,
         )
         if "mask" in run.graph.node_attr_keys():
-            from tracksdata.array import GraphArrayView
-
             seg_shape = run.graph.metadata.get("segmentation_shape")
             if seg_shape is not None:
                 run.segmentation = GraphArrayView(
                     graph=run.graph, shape=seg_shape, attr_key="node_id", offset=0
                 )
+
+        if run.segmentation is not None:
+            run.enable_features(["area"])
 
         if run.graph.num_nodes() == 0:
             show_warning(
