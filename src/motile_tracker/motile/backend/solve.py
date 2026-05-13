@@ -84,6 +84,7 @@ def build_candidate_graph(
     input_data: np.ndarray,
     solver_params: SolverParams,
     scale: list | None = None,
+    time_offset: int = 0,
 ) -> td.graph.GraphView:
     """Build the candidate graph from input data."""
     if input_data.ndim == 2:
@@ -96,6 +97,7 @@ def build_candidate_graph(
             solver_params.max_edge_distance,
             iou=solver_params.iou_cost is not None,
             scale=scale,
+            t_start=time_offset,
         )
     logger.debug("Cand graph has %d nodes", cand_graph.num_nodes())
     return cand_graph
@@ -209,18 +211,21 @@ def _solve_single_window(
         window_end,
     )
 
-    cand_graph = build_candidate_graph(input_data, solver_params, scale)
+    # Slice input to window frames only — avoids building full candidate graph
+    if input_data.ndim == 2:
+        # Points list: filter rows where time column (col 0) is in [window_start, window_end)
+        row_mask = (input_data[:, 0] >= window_start) & (input_data[:, 0] < window_end)
+        sliced_input = input_data[row_mask]
+    else:
+        # Segmentation: numpy slice is a view (no copy)
+        sliced_input = input_data[window_start:window_end]
 
-    # Filter candidate graph to window frames (times are already correct)
-    nodes_in_window = [
-        n
-        for n in cand_graph.node_ids()
-        if window_start <= cand_graph.nodes[n]["t"] < window_end
-    ]
-    window_subgraph = cand_graph.filter(node_ids=nodes_in_window).subgraph()
+    cand_graph = build_candidate_graph(
+        sliced_input, solver_params, scale, time_offset=window_start
+    )
 
     start_time = time.time()
-    solution = _solve_window(window_subgraph, solver_params, on_solver_update)
+    solution = _solve_window(cand_graph, solver_params, on_solver_update)
     logger.info("Single window solution took %.2f seconds", time.time() - start_time)
 
     if solution is None:
