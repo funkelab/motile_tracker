@@ -6,8 +6,7 @@ import zarr
 from appdirs import AppDirs
 from napari.utils.theme import _themes
 
-from motile_tracker.application_menus import MainApp
-from motile_tracker.data_views import TreeWidget
+from motile_tracker.application_menus import StartupWidget
 
 logging.basicConfig(
     level=logging.INFO,
@@ -34,8 +33,7 @@ viewer.add_image(zarr_group["01"][:], name="01 Raw")
 viewer.add_labels(zarr_group["01_ST"][:], name="01 ST")
 
 # Add your custom widget
-widget = MainApp(viewer)
-viewer.window.add_dock_widget(widget, name="Motile")
+StartupWidget(viewer)
 
 # Start the Napari GUI event loop
 napari.run()

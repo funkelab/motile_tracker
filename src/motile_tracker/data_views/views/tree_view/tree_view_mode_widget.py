@@ -24,7 +24,7 @@ class TreeViewModeWidget(QWidget):
         display_box = QGroupBox("Display [Q]")
         display_layout = QHBoxLayout()
         button_group = QButtonGroup()
-        self.show_all_radio = QRadioButton("All cells")
+        self.show_all_radio = QRadioButton("All objects")
         self.show_all_radio.setChecked(True)
         self.show_all_radio.clicked.connect(lambda: self._set_mode("all"))
         self.show_lineage_radio = QRadioButton("Current lineage(s)")

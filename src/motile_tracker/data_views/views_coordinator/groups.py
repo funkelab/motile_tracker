@@ -26,10 +26,32 @@ from superqt.fonticon import icon as qticon
 if TYPE_CHECKING:
     from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
+import napari
+
 from motile_tracker.data_views.views.tree_view.tree_widget_utils import (
     extract_lineage_tree,
 )
 from motile_tracker.import_export.menus.export_dialog import ExportDialog
+
+
+class GroupWidget(QWidget):
+    """Creates or finds a TracksViewer and displays its Collection widget.
+    This is only used in case the user wants to open the groups from the plugins
+    menu.
+    """
+
+    def __init__(self, viewer: napari.Viewer):
+        super().__init__()
+
+        from motile_tracker.data_views.views_coordinator.tracks_viewer import (
+            TracksViewer,
+        )
+
+        tracks_viewer = TracksViewer.get_instance(viewer)
+        layout = QVBoxLayout()
+        layout.addWidget(tracks_viewer.get_collection_widget())
+
+        self.setLayout(layout)
 
 
 class CollectionButton(QWidget):
@@ -102,6 +124,8 @@ class CollectionWidget(QWidget):
         self.collection_list.itemSelectionChanged.connect(self._selection_changed)
         self.selected_collection = None
 
+        self._is_deleted = False
+
         # edit layout
         edit_widget = QGroupBox("Edit group")
         edit_layout = QVBoxLayout()
@@ -156,6 +180,20 @@ class CollectionWidget(QWidget):
     def _update_buttons_and_node_count(self, update_counts: bool = True) -> None:
         """Enable or disable selection and edit buttons depending on whether a group is
         selected, nodes are selected, and whether the group contains any nodes"""
+
+        # Guard against widget deletion
+        if self._is_deleted:
+            self.tracks_viewer.node_selection_updated.disconnect(
+                self._update_buttons_and_node_count
+            )
+            return
+
+        try:
+            selected = self.collection_list.selectedItems()
+        except RuntimeError as e:
+            if "has been deleted" in e:
+                self._is_deleted = True
+                return  # underlying Qt object already gone
 
         selected = self.collection_list.selectedItems()
         if selected and len(self.tracks_viewer.selected_nodes) > 0:

@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Optional
 
 import napari
+import pandas as pd
 from funtracks.actions import AddNode, BasicAction, DeleteNode
 from funtracks.data_model import SolutionTracks
 from funtracks.exceptions import InvalidActionError
@@ -24,6 +25,7 @@ from motile_tracker.data_views.views.layers.track_labels import new_label
 from motile_tracker.data_views.views.layers.tracks_layer_group import TracksLayerGroup
 from motile_tracker.data_views.views.tree_view.tree_widget_utils import (
     extract_lineage_tree,
+    extract_sorted_tracks,
 )
 from motile_tracker.data_views.views_coordinator.groups import (
     CollectionWidget,
@@ -68,6 +70,10 @@ class TracksViewer:
         viewer: napari.Viewer,
     ):
         self.viewer = viewer
+        self.viewer.mouse_double_click_callbacks.clear()  # no double click to zoom
+        self.menu_manager = None  # will be set by MenuManager after initialization
+        self.tree_widget_present = False
+        self.table_widget_present = False
 
         def _clear_if_current():
             if hasattr(TracksViewer, "_instance") and TracksViewer._instance is self:
@@ -93,6 +99,9 @@ class TracksViewer:
         self.selected_nodes = NodeSelectionHistory()
         self.selected_nodes.selection_updated.connect(self.update_selection)
 
+        self.track_df = pd.DataFrame()  # initialize empty dataframe
+        self.axis_order: list[int] = []
+
         self.tracks_list = TracksList()
         self.tracks_list.view_tracks.connect(self.update_tracks)
         self.tracks_list.request_colormap.connect(self.set_colormap_to_trackslist)
@@ -100,11 +109,30 @@ class TracksViewer:
         self.track_id_color = [0, 0, 0, 0]
         self.force = False
 
-        self.collection_widget = CollectionWidget(self)
+        self.collection_widget = None
 
         self.set_keybinds()
 
         self.viewer.dims.events.ndisplay.connect(self.update_selection)
+
+    def get_collection_widget(self) -> CollectionWidget:
+        """Return a reference to the groups widget"""
+        if self.collection_widget is None or getattr(
+            self.collection_widget, "_is_deleted", False
+        ):
+            self.collection_widget = CollectionWidget(self)
+            if self.tracks is not None:
+                self.collection_widget.retrieve_existing_groups()
+
+            # track destruction
+            self.collection_widget.destroyed.connect(
+                lambda: self._on_collection_widget_destroyed()
+            )
+
+        return self.collection_widget
+
+    def _on_collection_widget_destroyed(self):
+        self.collection_widget = None
 
     def set_colormap_to_trackslist(self):
         """Set the current colormap on the TracksList, so that it can be exported."""
@@ -139,12 +167,62 @@ class TracksViewer:
             [0, 0, 0, 0] if track_id is None else self.colormap.map(track_id)
         )
 
+    def update_track_df(
+        self, initialization: bool | None = False, refresh_view: bool | None = False
+    ) -> None:
+        """Create or update the pandas dataframe used by the TreeWidget and TableWidget.
+        The track_df should be updated when:
+            - a tree or table widget is being initialized (initialization=True) and no
+                tree or table widget exists yet
+            - a normal update event happens (initialization = False) AND a tree widget
+            and/or table widget exists on menu_manager
+
+        Args:
+            initialization (bool | None = False): whether or not this is called by a tree
+            or table widget that is initializing.
+            refresh_view (bool | None = False): whether or not we should not pass on the
+            previous axis_order. Should be False if we want to use the previous axis order
+             (current tracks got updated). Should be True if we have a new tracks object
+             and should therefore recompute the axis_order.
+
+        """
+
+        if self.tracks is None:
+            return
+
+        if not initialization and (
+            self.tree_widget_present is False and self.table_widget_present is False
+        ):
+            # no need to update if there are no tracks or there is no widget that needs
+            # the dataframe
+            return
+
+        if initialization and (self.tree_widget_present or self.table_widget_present):
+            # no need to call for update, since we already should have it for the existing
+            # table or tree widget
+            return
+
+        # in the case menu_manager was never initialized, we cannot directly check if
+        # widgets exist, so we always update the track_df if self.tracks is not None.
+
+        if refresh_view:
+            self.track_df, self.axis_order = extract_sorted_tracks(
+                self.tracks, self.colormap
+            )
+        else:
+            self.track_df, self.axis_order = extract_sorted_tracks(
+                self.tracks,
+                self.colormap,
+                self.axis_order,
+            )
+
     def _refresh(self, node: str | None = None, refresh_view: bool = False) -> None:
         """Call refresh function on napari layers and the submit signal that tracks are
         updated. Restore the selected_nodes, if possible
         """
 
-        self.collection_widget._refresh()
+        if self.collection_widget is not None:
+            self.collection_widget._refresh()
 
         if len(self.selected_nodes) > 0 and any(
             not self.tracks.graph.has_node(node) for node in self.selected_nodes
@@ -152,6 +230,8 @@ class TracksViewer:
             self.selected_nodes.reset()
 
         self.tracking_layers._refresh()
+
+        self.update_track_df(initialization=False, refresh_view=refresh_view)
 
         self.tracks_updated.emit(refresh_view)
 
@@ -193,7 +273,8 @@ class TracksViewer:
                 layer.visible = False
 
         # retrieve existing groups
-        self.collection_widget.retrieve_existing_groups()
+        if self.collection_widget is not None:
+            self.collection_widget.retrieve_existing_groups()
 
         self.set_display_mode("all")
         self.tracking_layers.set_tracks(tracks, name)
@@ -202,8 +283,13 @@ class TracksViewer:
         # ensure a valid track is selected from the start
         self.request_new_track()
 
+        self.update_track_df(initialization=False, refresh_view=True)
+
         # emit the update signal
         self.tracks_updated.emit(True)
+
+        # Update visualization widget
+        self.mode_updated.emit()
 
     def toggle_display_mode(self, event=None) -> None:
         """Toggle the display mode between available options"""
@@ -261,7 +347,10 @@ class TracksViewer:
                 for node in self.selected_nodes:
                     self.visible += extract_lineage_tree(self.tracks.graph, node)
         elif self.mode == "group":
-            if self.collection_widget.selected_collection is not None:
+            if (
+                self.collection_widget is not None
+                and self.collection_widget.selected_collection is not None
+            ):
                 self.visible = list(
                     self.collection_widget.selected_collection.collection
                 )
@@ -408,34 +497,8 @@ class TracksViewer:
     def hide_panels(self, event=None):
         """Show/hide menu and tree view panels without destroying"""
 
-        if "All (Motile Tracker)" in self.viewer.window.dock_widgets:
-            main_app = self.viewer.window.dock_widgets["All (Motile Tracker)"]
-            visible = main_app.isVisible()
-
-            if visible:
-                main_app.parent().close()
-            else:
-                main_app.parent().show()
-
-        if "Menus (Motile Tracker)" in self.viewer.window.dock_widgets:
-            menus_app = self.viewer.window.dock_widgets["Menus (Motile Tracker)"]
-            visible = menus_app.isVisible()
-
-            if visible:
-                menus_app.parent().close()
-            else:
-                menus_app.parent().show()
-
-        # if the tree view is docked, also show/hide it
-        if "Lineage View (Motile Tracker)" in self.viewer.window.dock_widgets:
-            tree_view = self.viewer.window.dock_widgets["Lineage View (Motile Tracker)"]
-            if not tree_view.parent().isFloating():
-                visible = tree_view.isVisible()
-
-                if visible:
-                    tree_view.parent().close()
-                else:
-                    tree_view.parent().show()
+        if self.menu_manager is not None:
+            self.menu_manager.toggle_menu_panel_visibility()
 
     def deselect(self, event=None):
         self.selected_nodes.reset()

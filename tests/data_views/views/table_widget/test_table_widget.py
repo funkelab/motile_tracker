@@ -26,7 +26,7 @@ def setup_tracks_viewer(viewer, solution_tracks_2d):
 
 @pytest.fixture
 def colored_table_widget(qtbot, setup_tracks_viewer):
-    _, tracks_viewer = setup_tracks_viewer
+    viewer, tracks_viewer = setup_tracks_viewer
 
     # Build dataframe from tracks
     nodes = tracks_viewer.tracks.graph.node_ids()
@@ -38,7 +38,9 @@ def colored_table_widget(qtbot, setup_tracks_viewer):
         }
     )
 
-    widget = ColoredTableWidget(tracks_viewer, df)
+    tracks_viewer.track_df = df
+
+    widget = ColoredTableWidget(viewer)
     qtbot.addWidget(widget)
 
     return widget, tracks_viewer
