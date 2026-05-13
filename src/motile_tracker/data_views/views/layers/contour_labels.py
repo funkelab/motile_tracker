@@ -8,7 +8,9 @@ from napari.layers.labels._labels_constants import (
 from napari.layers.labels._labels_mouse_bindings import draw, pick
 from napari.layers.labels._labels_utils import (
     expand_slice,
+    indices_in_shape,
 )
+from napari.layers.labels.labels import _coerce_indices_for_vectorization
 from napari.utils import DirectLabelColormap
 from napari.utils._indexing import elements_in_slice, index_in_slice
 from napari.utils.events import Event
@@ -172,6 +174,60 @@ class ContourLabels(napari.layers.Labels):
         """Refresh the label colormap by setting its dictionary"""
 
         self.colormap = DirectLabelColormap(color_dict=self.colormap.color_dict)
+
+    def _paint_indices(
+        self,
+        mask_indices,
+        new_label,
+        shape,
+        dims_to_paint,
+        slice_coord=None,
+        refresh=True,
+    ):
+        """Paint variant that supports read-only data (e.g. GraphArrayView).
+
+        Only diverges from napari's default for the one case it can't handle:
+        a read-only array with `preserve_labels=True`, where the upstream
+        path does fancy indexing (`self.data[slice_coord]`) that tracksdata's
+        lazy view doesn't support. In that case we materialize per-time-frame
+        via `_read_old_values`. All other cases delegate to super.
+        """
+        if hasattr(self.data, "__setitem__") or not self.preserve_labels:
+            return super()._paint_indices(
+                mask_indices, new_label, shape, dims_to_paint, slice_coord, refresh
+            )
+
+        # Read-only + preserve_labels: mirror napari's setup, then build
+        # keep_coords from materialized frame values instead of fancy-indexing
+        # self.data.
+        dims_not_painted = sorted(self._slice_input.order[: -self.n_edit_dimensions])
+        mask_indices = indices_in_shape(mask_indices, shape)
+
+        slice_coord_temp = list(mask_indices.T)
+        if self.n_edit_dimensions < self.ndim:
+            for j, i in enumerate(dims_to_paint):
+                slice_coord[i] = slice_coord_temp[j]
+            for i in dims_not_painted:
+                slice_coord[i] = slice_coord[i] * np.ones(
+                    mask_indices.shape[0], dtype=int
+                )
+        else:
+            slice_coord = slice_coord_temp
+
+        slice_coord = _coerce_indices_for_vectorization(self.data, slice_coord)
+
+        current_values = self._read_old_values(slice_coord)
+        if new_label == self.colormap.background_value:
+            keep_coords = current_values == (
+                self._prev_selected_label
+                if self._prev_selected_label
+                else self.selected_label
+            )
+        else:
+            keep_coords = current_values == self.colormap.background_value
+        slice_coord = tuple(sc[keep_coords] for sc in slice_coord)
+
+        self.data_setitem(slice_coord, new_label, refresh)
 
     def data_setitem(self, indices, value, refresh=True):
         """Override to handle read-only data (e.g. GraphArrayView).
