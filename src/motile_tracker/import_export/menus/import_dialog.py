@@ -367,7 +367,7 @@ class ImportDialog(QDialog):
                         self.tracks.segmentation is not None
                         and "area" not in self.tracks.features
                     ):
-                        self.tracks.enable_features(["area"])
+                        self.tracks.enable_features(["area"], recompute=False)
                     if recompute_keys:
                         self.tracks.enable_features(recompute_keys, recompute=True)
                 except Exception as e:  # noqa: BLE001
@@ -399,7 +399,7 @@ class ImportDialog(QDialog):
                         self.tracks.segmentation is not None
                         and "area" not in self.tracks.features
                     ):
-                        self.tracks.enable_features(["area"])
+                        self.tracks.enable_features(["area"], recompute=False)
                     if recompute_keys:
                         self.tracks.enable_features(recompute_keys, recompute=True)
                 except Exception as e:  # noqa: BLE001

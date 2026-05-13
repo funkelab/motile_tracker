@@ -161,7 +161,7 @@ class MotileWidget(QWidget):
                 )
 
         if run.segmentation is not None:
-            run.enable_features(["area"])
+            run.enable_features(["area"], recompute=False)
 
         if run.graph.num_nodes() == 0:
             show_warning(
