@@ -206,10 +206,16 @@ class TracksViewer:
         self.tracks_updated.emit(True)
 
     def toggle_display_mode(self, event=None) -> None:
-        """Toggle the display mode between available options"""
+        """Toggle the display mode between available options.
+
+        Skips 'group' mode when no groups exist, alternating only between
+        'all' and 'lineage' in that case.
+        """
+
+        has_groups = self.collection_widget.collection_list.count() > 0
 
         if self.mode == "lineage":
-            self.set_display_mode("group")
+            self.set_display_mode("group" if has_groups else "all")
         elif self.mode == "group":
             self.set_display_mode("all")
         else:
