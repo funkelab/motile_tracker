@@ -365,6 +365,12 @@ class ImportDialog(QDialog):
                     )
                     if recompute_keys:
                         self.tracks.enable_features(recompute_keys, recompute=True)
+                    if (
+                        self.tracks.segmentation is not None
+                        and "area" not in self.tracks.features
+                    ):
+                        recompute = "area" not in self.tracks.graph.node_attr_keys()
+                        self.tracks.enable_features(["area"], recompute=recompute)
                 except Exception as e:  # noqa: BLE001
                     QMessageBox.critical(self, "Error", f"Failed to load tracks: {e}")
                     return
@@ -392,6 +398,12 @@ class ImportDialog(QDialog):
                     )
                     if recompute_keys:
                         self.tracks.enable_features(recompute_keys, recompute=True)
+                    if (
+                        self.tracks.segmentation is not None
+                        and "area" not in self.tracks.features
+                    ):
+                        recompute = "area" not in self.tracks.graph.node_attr_keys()
+                        self.tracks.enable_features(["area"], recompute=recompute)
                 except Exception as e:  # noqa: BLE001
                     QMessageBox.critical(self, "Error", f"Failed to load tracks: {e}")
                     return
