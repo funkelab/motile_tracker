@@ -436,6 +436,12 @@ class CollectionWidget(QWidget):
         if group_name in self.tracks_viewer.tracks.graph.node_attr_keys():
             self.tracks_viewer.tracks.graph.remove_node_attr_key(group_name)
 
+        # If we removed the last group while in 'group' mode, fall back to 'all'
+        # so the viewer doesn't stay stuck on an empty group view.
+        if self.collection_list.count() == 0 and self.tracks_viewer.mode == "group":
+            self.tracks_viewer.set_display_mode("all")
+            self.tracks_viewer.mode_updated.emit()
+
     def _show_export_dialog(self, item: QListWidgetItem) -> None:
         """Prompt user to choose export format (csv or geff), then export the nodes
          belonging to this group.

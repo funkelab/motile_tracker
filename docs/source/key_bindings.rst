@@ -27,9 +27,9 @@ Napari viewer and layer key bindings and mouse functions
    * - N / Mouse button 5 (Forward)
      - Restore next node set
    * - Q
-     - | Toggle between viewing all nodes in the
-       | points/labels or only those for the currently
-       | selected lineages
+     - | Cycle display mode: All → Lineage → Group → All.
+       | When no groups exist, alternates only between
+       | All and Lineage.
    * - /
      - | Toggle between hiding/showing the side menu and the docked treeview
 
