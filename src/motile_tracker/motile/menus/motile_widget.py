@@ -161,6 +161,8 @@ class MotileWidget(QWidget):
                 )
 
         if run.segmentation is not None:
+            # recompute=False: area values are already on the graph nodes
+            # because compute_graph_from_seg computes area during node extraction.
             run.enable_features(["area"], recompute=False)
 
         if run.graph.num_nodes() == 0:
