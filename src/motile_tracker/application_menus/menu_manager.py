@@ -167,8 +167,8 @@ class MenuManager:
         return {
             name
             for name in self.initialized_menu_widgets
-            if self._find_dock_widget_by_name(name) is not None
-            and self._find_dock_widget_by_name(name).isVisible()
+            if (dock_widget := self._find_dock_widget_by_name(name)) is not None
+            and dock_widget.isVisible()
         }
 
     def toggle_menu_panel_visibility(self) -> None:

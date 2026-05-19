@@ -9,17 +9,17 @@ from qtpy.QtWidgets import (
 from motile_tracker.application_menus.editing_selection_menu import (
     EditingSelectionWidget,
 )
+from motile_tracker.application_menus.group_widget import GroupWidget
 from motile_tracker.application_menus.menu_manager import MenuManager
+from motile_tracker.application_menus.track_list_widget import TrackListWidget
 from motile_tracker.application_menus.visualization_widget import (
     LabelVisualizationWidget,
 )
 from motile_tracker.application_menus.welcome_widget import WelcomeWidget
-from motile_tracker.data_views.views.tree_view.custom_table_widget import (
+from motile_tracker.data_views.views.table.custom_table_widget import (
     ColoredTableWidget,
 )
 from motile_tracker.data_views.views.tree_view.tree_widget import TreeWidget
-from motile_tracker.data_views.views_coordinator.groups import GroupWidget
-from motile_tracker.data_views.views_coordinator.tracks_list import TrackListWidget
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 from motile_tracker.motile.menus.motile_widget import MotileWidget
 
@@ -85,10 +85,9 @@ class StartupWidget(QWidget):
         QTimer.singleShot(0, self._remove_self)
 
     def _finalize_ui(self, active_tab: str) -> None:
-        """Set the 'Getting started' tab as active foreground tab, and move tabbar to the
-        top.
-            Args:
-                active_tab (str): name of the tab to be set to the foreground (active).
+        """Set the active foreground tab, and move tabbar to the top.
+        Args:
+            active_tab (str): name of the tab to be set to the foreground (active).
         """
         self.menu_manager.set_tabbar_location(location="North")
         self.menu_manager.set_foreground_tabs([active_tab])

@@ -1,4 +1,4 @@
-"""Tests for TracksList, TracksButton, and TrackListWidget.
+"""Tests for TracksList and TracksButton.
 
 Covers add/remove/select tracks, save/load/export dialogs, and the
 load_motile_run bug fix (must call MotileRun.load, not Tracks.load).
@@ -11,11 +11,9 @@ import pytest
 from qtpy.QtWidgets import QDialog
 
 from motile_tracker.data_views.views_coordinator.tracks_list import (
-    TrackListWidget,
     TracksButton,
     TracksList,
 )
-from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 from motile_tracker.motile.backend.motile_run import MotileRun, SolverParams
 
 
@@ -293,15 +291,3 @@ class TestTracksListExport:
             tracks_list.show_export_dialog(item)
 
         assert len(emitted) == 1
-
-
-# ---------------------------------------------------------------------------
-# TrackListWidget
-# ---------------------------------------------------------------------------
-
-
-class TestTrackListWidget:
-    def test_init_contains_tracks_list(self, viewer):
-        widget = TrackListWidget(viewer)
-        tracks_viewer = TracksViewer.get_instance(viewer)
-        assert widget.layout().itemAt(0).widget() is tracks_viewer.tracks_list
