@@ -121,6 +121,7 @@ def _make_single_menu_widget_class(widget_name):
             super().__init__(napari_viewer, mode=widget_name)
 
     _SingleMenuWidget.__name__ = widget_name.replace(" ", "") + "Widget"
+    _SingleMenuWidget.__qualname__ = _SingleMenuWidget.__name__
     return _SingleMenuWidget
 
 
