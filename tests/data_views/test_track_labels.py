@@ -78,6 +78,9 @@ def test_paint_event(viewer, solution_tracks_3d_with_division):
     # Create example tracks
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=solution_tracks_3d_with_division, name="test")
+    tracks_viewer.tracks.enable_features(
+        ["area"]
+    )  # ensure this is active when testing undo
 
     # Test selecting a new label
     new_label(tracks_viewer.tracking_layers.seg_layer)
