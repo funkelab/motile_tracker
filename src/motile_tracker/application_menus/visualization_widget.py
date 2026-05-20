@@ -143,6 +143,10 @@ class VisualizationWidget(QWidget):
 
         self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
 
+        # Initialize ortho-views attributes
+        self.orth_views_connection = None
+        self.orth_view_manager = None
+
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(10, 10, 10, 10)
         main_layout.setSpacing(10)
