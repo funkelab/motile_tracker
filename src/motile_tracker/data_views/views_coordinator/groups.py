@@ -172,6 +172,8 @@ class CollectionWidget(QWidget):
             if "has been deleted" in str(e):
                 self._is_deleted = True
                 return  # underlying Qt object already gone
+            else:
+                raise
 
         if selected and len(self.tracks_viewer.selected_nodes) > 0:
             self.add_nodes_btn.setEnabled(True)

@@ -475,3 +475,62 @@ def test_export_button_shows_dialog(
     assert call_args.kwargs["tracks"] == solution_tracks_2d
     assert 1 in call_args.kwargs["nodes_to_keep"]
     assert 2 in call_args.kwargs["nodes_to_keep"]
+
+
+def test_is_deleted_flag_prevents_updates(viewer, solution_tracks_2d):
+    """Test that _is_deleted flag prevents further updates when widget is deleted."""
+    tracks_viewer = TracksViewer.get_instance(viewer)
+    tracks_viewer.update_tracks(tracks=solution_tracks_2d, name="test")
+
+    widget = CollectionWidget(tracks_viewer)
+
+    # Mock selectedItems to raise RuntimeError with "has been deleted" message
+    with patch.object(widget.collection_list, "selectedItems") as mock_selected:
+        mock_selected.side_effect = RuntimeError(
+            "wrapped C/C++ object of type QListWidget has been deleted"
+        )
+
+        # Call _update_buttons_and_node_count which should catch this
+        widget._update_buttons_and_node_count()
+
+        # Verify _is_deleted flag was set
+        assert widget._is_deleted is True
+
+    # Call _update_buttons_and_node_count which should return early
+    # when _is_deleted is True. If it raises, the test fails.
+    widget._update_buttons_and_node_count()
+
+    # Verify _is_deleted flag is still True
+    assert widget._is_deleted is True
+
+
+def test_node_count_accounting_for_deleted_items(
+    viewer, solution_tracks_2d, qtbot, click_node
+):
+    """Test node count correctly excludes deleted items."""
+    tracks_viewer = TracksViewer.get_instance(viewer)
+    tracks_viewer.update_tracks(tracks=solution_tracks_2d, name="test")
+
+    widget = CollectionWidget(tracks_viewer)
+
+    # Create a group and add nodes
+    widget.group_name.setText("test_group")
+    qtbot.mouseClick(widget.new_group_button, Qt.MouseButton.LeftButton)
+
+    click_node(tracks_viewer, 1)
+    click_node(tracks_viewer, 2, append=True)
+    click_node(tracks_viewer, 3, append=True)
+    qtbot.mouseClick(widget.add_nodes_btn, Qt.MouseButton.LeftButton)
+
+    # Verify initial count
+    assert widget.selected_collection.node_count.text() == "3 node(s)"
+
+    # Mark some nodes as deleted
+    tracks_viewer.selected_nodes.deleted_items.add(1)
+    tracks_viewer.selected_nodes.deleted_items.add(2)
+
+    # Update counts
+    widget._update_buttons_and_node_count(update_counts=True)
+
+    # Verify count is reduced (only node 3 remains)
+    assert widget.selected_collection.node_count.text() == "1 node(s)"
