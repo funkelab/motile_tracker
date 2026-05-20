@@ -39,7 +39,7 @@ class StartupWidget(QWidget):
     """Initialize multiple widgets at once, by group"""
 
     def __init__(self, napari_viewer: napari.Viewer, mode: str = "all"):
-        """Initializs groups of widgets at once, docks them to viewer.window, then remove
+        """Initializes groups of widgets at once, docks them to viewer.window, then remove
         itself.
             Args:
                 napari_viewer (napari.Viewer): napari viewer to get/initialize
