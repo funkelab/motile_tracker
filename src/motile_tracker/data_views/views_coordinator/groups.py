@@ -169,11 +169,10 @@ class CollectionWidget(QWidget):
         try:
             selected = self.collection_list.selectedItems()
         except RuntimeError as e:
-            if "has been deleted" in e:
+            if "has been deleted" in str(e):
                 self._is_deleted = True
                 return  # underlying Qt object already gone
 
-        selected = self.collection_list.selectedItems()
         if selected and len(self.tracks_viewer.selected_nodes) > 0:
             self.add_nodes_btn.setEnabled(True)
             self.add_track_btn.setEnabled(True)
