@@ -32,6 +32,7 @@ class MenuManager:
         """Initialize the menu by creating and adding the specified widgets, with robust
         handling for closed/deleted dock widgets."""
 
+        self.hidden = False  # reset hidden state when initializing a new menu
         for name, config in menu.items():
             widget_exists = False
             dock_widget = self._find_dock_widget_by_name(name)
