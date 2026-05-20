@@ -15,8 +15,10 @@ TUTORIAL_URL = "https://github.com/funkelab/motile_tracker/blob/main/assets/moti
 class WelcomeWidget(QWidget):
     """Getting started widget with links and basic information to get started with the tool."""
 
-    def __init__(self, viewer: napari.Viewer):
-        super().__init__()
+    def __init__(self, _viewer: napari.Viewer):
+
+        super().__init__()  # viewer is actually not used for this widget, but kept in to
+        # match the expected signature for menu widgets.
 
         content_widget = QWidget()
         layout = QVBoxLayout(content_widget)
