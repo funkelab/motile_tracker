@@ -16,28 +16,28 @@ contributions:
       python_name: motile_tracker.application_menus.main_app:EditingGroupWidget
       title: "Open editing widgets"
     - id: motile-tracker.getting_started
-      python_name: motile_tracker.application_menus.main_app:GettingStartedWidget
+      python_name: motile_tracker.application_menus.main_app:GettingStarted_LauncherWidget
       title: "Open Getting started menu"
     - id: motile-tracker.tracking
-      python_name: motile_tracker.application_menus.main_app:TrackingWidget
+      python_name: motile_tracker.application_menus.main_app:Tracking_LauncherWidget
       title: "Open Tracking menu"
     - id: motile-tracker.tracks_list
-      python_name: motile_tracker.application_menus.main_app:TracksListWidget
+      python_name: motile_tracker.application_menus.main_app:TrackList_LauncherWidget
       title: "Open Tracks List menu"
     - id: motile-tracker.editing_selection
-      python_name: motile_tracker.application_menus.main_app:EditingSelectionWidget
+      python_name: motile_tracker.application_menus.main_app:EditingSelection_LauncherWidget
       title: "Open Editing && Selection menu"
     - id: motile-tracker.visualization
-      python_name: motile_tracker.application_menus.main_app:VisualizationWidget
+      python_name: motile_tracker.application_menus.main_app:Visualization_LauncherWidget
       title: "Open Visualization menu"
     - id: motile-tracker.groups
-      python_name: motile_tracker.application_menus.main_app:GroupsWidget
+      python_name: motile_tracker.application_menus.main_app:Groups_LauncherWidget
       title: "Open Groups menu"
     - id: motile-tracker.table
-      python_name: motile_tracker.application_menus.main_app:TableWidget
+      python_name: motile_tracker.application_menus.main_app:Table_LauncherWidget
       title: "Open Table menu"
     - id: motile-tracker.lineage_view
-      python_name: motile_tracker.application_menus.main_app:LineageViewWidget
+      python_name: motile_tracker.application_menus.main_app:LineageView_LauncherWidget
       title: "Open Lineage View menu"
     - id: motile-tracker.solve
       python_name: motile_tracker.motile.backend.solve:solve

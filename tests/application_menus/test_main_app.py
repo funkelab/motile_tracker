@@ -5,17 +5,17 @@ from qtpy.QtWidgets import QWidget
 from motile_tracker.application_menus.main_app import (
     MENU_WIDGETS,
     EditingGroupWidget,
-    EditingSelectionWidget,
-    GettingStartedWidget,
-    GroupsWidget,
-    LineageViewWidget,
+    EditingSelection_LauncherWidget,
+    GettingStarted_LauncherWidget,
+    Groups_LauncherWidget,
+    LineageView_LauncherWidget,
     MainAppWidget,
     StartupWidget,
-    TableWidget,
+    Table_LauncherWidget,
+    Tracking_LauncherWidget,
     TrackingGroupWidget,
-    TrackingWidget,
-    TracksListWidget,
-    VisualizationWidget,
+    TrackList_LauncherWidget,
+    Visualization_LauncherWidget,
 )
 
 
@@ -37,14 +37,14 @@ def test_main_widget(make_napari_viewer):
 def test_single_menu_widgets(qtbot, make_napari_viewer):
     # Each single menu widget should only initialize one docked widget
     for WidgetClass in [
-        GettingStartedWidget,
-        TrackingWidget,
-        TracksListWidget,
-        EditingSelectionWidget,
-        VisualizationWidget,
-        GroupsWidget,
-        TableWidget,
-        LineageViewWidget,
+        GettingStarted_LauncherWidget,
+        Tracking_LauncherWidget,
+        TrackList_LauncherWidget,
+        EditingSelection_LauncherWidget,
+        Visualization_LauncherWidget,
+        Groups_LauncherWidget,
+        Table_LauncherWidget,
+        LineageView_LauncherWidget,
     ]:
         n_docked_widgets = 0
         viewer = make_napari_viewer()

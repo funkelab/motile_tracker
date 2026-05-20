@@ -132,7 +132,7 @@ class ModeWidget(QWidget):
             self.update_mode.emit(button.property("mode"))
 
 
-class LabelVisualizationWidget(QWidget):
+class VisualizationWidget(QWidget):
     """Widget to adjust opacity and contour display in different TrackLabels layer display modes."""
 
     def __init__(self, viewer: napari.Viewer):

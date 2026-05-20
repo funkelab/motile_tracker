@@ -13,7 +13,7 @@ from motile_tracker.application_menus.group_widget import GroupWidget
 from motile_tracker.application_menus.menu_manager import MenuManager
 from motile_tracker.application_menus.track_list_widget import TrackListWidget
 from motile_tracker.application_menus.visualization_widget import (
-    LabelVisualizationWidget,
+    VisualizationWidget,
 )
 from motile_tracker.application_menus.welcome_widget import WelcomeWidget
 from motile_tracker.data_views.views.table.custom_table_widget import (
@@ -28,7 +28,7 @@ MENU_WIDGETS = {
     "Tracking": {"widget": MotileWidget, "location": "right"},
     "Tracks List": {"widget": TrackListWidget, "location": "right"},
     "Editing && Selection": {"widget": EditingSelectionWidget, "location": "right"},
-    "Visualization": {"widget": LabelVisualizationWidget, "location": "right"},
+    "Visualization": {"widget": VisualizationWidget, "location": "right"},
     "Groups": {"widget": GroupWidget, "location": "right"},
     "Table": {"widget": ColoredTableWidget, "location": "right"},
     "Lineage View": {"widget": TreeWidget, "location": "bottom"},
@@ -125,11 +125,11 @@ def _make_single_menu_widget_class(widget_name):
 
 
 # Export one class per single widget menu item
-GettingStartedWidget = _make_single_menu_widget_class("Getting Started")
-TrackingWidget = _make_single_menu_widget_class("Tracking")
-TracksListWidget = _make_single_menu_widget_class("Tracks List")
-EditingSelectionWidget = _make_single_menu_widget_class("Editing && Selection")
-VisualizationWidget = _make_single_menu_widget_class("Visualization")
-GroupsWidget = _make_single_menu_widget_class("Groups")
-TableWidget = _make_single_menu_widget_class("Table")
-LineageViewWidget = _make_single_menu_widget_class("Lineage View")
+GettingStarted_LauncherWidget = _make_single_menu_widget_class("Getting Started")
+Tracking_LauncherWidget = _make_single_menu_widget_class("Tracking")
+TrackList_LauncherWidget = _make_single_menu_widget_class("Tracks List")
+EditingSelection_LauncherWidget = _make_single_menu_widget_class("Editing && Selection")
+Visualization_LauncherWidget = _make_single_menu_widget_class("Visualization")
+Groups_LauncherWidget = _make_single_menu_widget_class("Groups")
+Table_LauncherWidget = _make_single_menu_widget_class("Table")
+LineageView_LauncherWidget = _make_single_menu_widget_class("Lineage View")
