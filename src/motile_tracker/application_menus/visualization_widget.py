@@ -35,6 +35,8 @@ class VisualizationConfigWidget(QWidget):
         super().__init__()
 
         self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+        self.orth_views_connection = None
+        self.orth_view_manager = None
 
         box = QGroupBox(label)
         box.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
