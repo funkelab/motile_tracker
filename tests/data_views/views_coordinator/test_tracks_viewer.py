@@ -199,9 +199,33 @@ class TestEdgeOperations:
 class TestDisplayModes:
     """Tests for display mode switching and filtering."""
 
-    def test_toggle_display_mode_cycles_modes(self, tracks_viewer_setup):
-        """Test toggle_display_mode cycles through modes."""
+    def test_toggle_display_mode_skips_group_when_empty(self, tracks_viewer_setup):
+        """Test toggle_display_mode alternates between 'all' and 'lineage' when no
+        groups exist, skipping 'group' mode."""
         viewer, tracks_viewer, tracks = tracks_viewer_setup
+
+        # No groups exist
+        assert tracks_viewer.collection_widget.collection_list.count() == 0
+
+        # Start in "all" mode
+        tracks_viewer.set_display_mode("all")
+        assert tracks_viewer.mode == "all"
+
+        # Toggle to lineage
+        tracks_viewer.toggle_display_mode()
+        assert tracks_viewer.mode == "lineage"
+
+        # Without groups, lineage goes straight back to all (skipping group)
+        tracks_viewer.toggle_display_mode()
+        assert tracks_viewer.mode == "all"
+
+    def test_toggle_display_mode_cycles_with_groups(self, tracks_viewer_setup):
+        """Test toggle_display_mode cycles through all three modes when groups exist."""
+        viewer, tracks_viewer, tracks = tracks_viewer_setup
+
+        # Create a group so the 'group' mode is available
+        tracks_viewer.collection_widget._add_group(name="test_group", select=True)
+        assert tracks_viewer.collection_widget.collection_list.count() == 1
 
         # Start in "all" mode
         tracks_viewer.set_display_mode("all")
@@ -218,6 +242,39 @@ class TestDisplayModes:
         # Toggle back to all
         tracks_viewer.toggle_display_mode()
         assert tracks_viewer.mode == "all"
+
+    def test_removing_last_group_in_group_mode_falls_back_to_all(
+        self, tracks_viewer_setup
+    ):
+        """Removing the last group while in 'group' mode should auto-switch to 'all'."""
+        viewer, tracks_viewer, tracks = tracks_viewer_setup
+        collection_widget = tracks_viewer.collection_widget
+
+        collection_widget._add_group(name="test_group", select=True)
+        tracks_viewer.set_display_mode("group")
+        assert tracks_viewer.mode == "group"
+
+        # Remove the only group
+        item = collection_widget.collection_list.item(0)
+        collection_widget._remove_group(item)
+
+        assert collection_widget.collection_list.count() == 0
+        assert tracks_viewer.mode == "all"
+
+    def test_removing_group_in_other_mode_does_not_change_mode(
+        self, tracks_viewer_setup
+    ):
+        """Removing a group while not in 'group' mode should leave the mode untouched."""
+        viewer, tracks_viewer, tracks = tracks_viewer_setup
+        collection_widget = tracks_viewer.collection_widget
+
+        collection_widget._add_group(name="test_group", select=True)
+        tracks_viewer.set_display_mode("lineage")
+
+        item = collection_widget.collection_list.item(0)
+        collection_widget._remove_group(item)
+
+        assert tracks_viewer.mode == "lineage"
 
     def test_display_modes(self, tracks_viewer_setup, click_node):
         """Test all display modes and filtering behavior."""
