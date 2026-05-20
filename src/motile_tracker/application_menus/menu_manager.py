@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 import napari
 from qtpy.QtCore import Qt
 from qtpy.QtWidgets import QDockWidget, QScrollArea, QTabBar, QTabWidget, QWidget
@@ -26,7 +28,7 @@ class MenuManager:
         self.visible_menus: set[str] = set()  # names of widgets currently visible
         self.active_tabs: list[str] = []  # names of foreground tabs
 
-    def initialize_menu(self, menu: dict[str, dict[str, any]]) -> None:
+    def initialize_menu(self, menu: dict[str, dict[str, Any]]) -> None:
         """Initialize the menu by creating and adding the specified widgets, with robust
         handling for closed/deleted dock widgets."""
 
