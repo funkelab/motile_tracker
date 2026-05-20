@@ -1,7 +1,7 @@
 import pytest
 
 from motile_tracker.application_menus.visualization_widget import (
-    LabelVisualizationWidget,
+    VisualizationWidget,
 )
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
@@ -18,7 +18,7 @@ def visualization_widget(viewer, solution_tracks_3d, qtbot):
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=solution_tracks_3d, name="test")
 
-    widget = LabelVisualizationWidget(viewer)
+    widget = VisualizationWidget(viewer)
     qtbot.addWidget(widget)
 
     assert tracks_viewer.tracking_layers.seg_layer is not None
