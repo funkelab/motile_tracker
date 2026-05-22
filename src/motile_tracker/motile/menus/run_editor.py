@@ -171,12 +171,13 @@ class RunEditor(QGroupBox):
             warn("No input layer selected", stacklevel=2)
             return None
         if isinstance(input_layer, napari.layers.Labels):
-            if isinstance(input_layer.data, da.core.Array):
+            data = input_layer.data[0] if input_layer.multiscale else input_layer.data
+            if isinstance(data, da.core.Array):
                 input_seg = self._convert_da_to_np_array(
-                    input_layer.data
+                    data
                 )  # silently convert to in-memory array
             else:
-                input_seg = input_layer.data
+                input_seg = np.asarray(data)
             ndim = input_seg.ndim
             if ndim > 4:
                 raise ValueError(
