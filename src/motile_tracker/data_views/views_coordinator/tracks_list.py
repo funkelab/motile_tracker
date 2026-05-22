@@ -148,9 +148,9 @@ class TracksList(QGroupBox):
         """Add a run to the list and optionally select it. Will make a new
         row in the list UI representing the given run.
 
-        Accepts any Tracks object. Plain Tracks/SolutionTracks are wrapped in
-        a MotileRun (with solver_params=None) so the list internally always
-        holds MotileRun and save_tracks can rely on tracks.save().
+        Accepts any Tracks object (including NucMemTracks and other
+        subclasses) and stores it as-is, preserving subclass-specific
+        attributes such as nuclear_segmentation.
 
         Note: selecting the run will also emit the selection changed event on
         the list.
@@ -161,18 +161,6 @@ class TracksList(QGroupBox):
             select (bool, optional): Whether or not to select the new tracks item in the
                 list (and thus display it in the tracks viewer). Defaults to True.
         """
-        if not isinstance(tracks, MotileRun):
-            tracks = MotileRun(
-                graph=tracks.graph,
-                run_name=name,
-                solver_params=None,
-                pos_attr=tracks.features.position_key,
-                time_attr=tracks.features.time_key,
-                scale=tracks.scale,
-                ndim=tracks.ndim,
-                _features=tracks.features,
-                _segmentation=tracks.segmentation,
-            )
         item = QListWidgetItem(self.tracks_list)
         tracks_row = TracksButton(tracks, name)
         self.tracks_list.setItemWidget(item, tracks_row)
@@ -214,6 +202,13 @@ class TracksList(QGroupBox):
                 contains the TracksButton that represents a set of tracks.
         """
         tracks: Tracks = self.tracks_list.itemWidget(item).tracks
+        if not hasattr(tracks, "save"):
+            warn(
+                "Saving is only supported for MotileRun tracks. "
+                "Use the Export button to export as CSV or geff.",
+                stacklevel=2,
+            )
+            return
         if self.save_dialog.exec_():
             directory = Path(self.save_dialog.selectedFiles()[0])
             tracks.save(directory)
