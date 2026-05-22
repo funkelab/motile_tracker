@@ -91,8 +91,10 @@ class TrackLabels(ContourLabels):
         opacity: float,
         scale: tuple,
         tracks_viewer: TracksViewer,
+        seg_name: str = "segmentation",
     ):
         self.tracks_viewer = tracks_viewer
+        self._seg_name = seg_name
         colormap = self._get_colormap()
 
         super().__init__(
@@ -334,7 +336,7 @@ class TrackLabels(ContourLabels):
 
     def _refresh(self):
         """Refresh the data in the labels layer"""
-        self.data = self.tracks_viewer.tracks.segmentation
+        self.data = self.tracks_viewer.tracks.segmentations[self._seg_name]
         self.colormap = self._get_colormap()
         self.refresh()
 

@@ -28,24 +28,29 @@ class TracksLayerGroup:
         self.name = name
         self.tracks_layer: TrackGraph | None = None
         self.points_layer: TrackPoints | None = None
-        self.seg_layer: TrackLabels | None = None
+        self.seg_layers: dict[str, TrackLabels] = {}
+
+    @property
+    def seg_layer(self) -> TrackLabels | None:
+        return self.seg_layers.get("segmentation")
 
     def set_tracks(self, tracks, name):
         self.remove_napari_layers()
         self.tracks = tracks
         self.name = name
-        # Create new layers
-        if self.tracks is not None and self.tracks.segmentation is not None:
-            self.seg_layer = TrackLabels(
-                viewer=self.viewer,
-                data=self.tracks.segmentation,
-                name=self.name + "_seg",
-                opacity=0.9,
-                scale=self.tracks.scale,
-                tracks_viewer=self.tracks_viewer,
-            )
-        else:
-            self.seg_layer = None
+        # Create segmentation layers from tracks.segmentations dict
+        self.seg_layers = {}
+        if self.tracks is not None:
+            for seg_name, seg_data in self.tracks.segmentations.items():
+                self.seg_layers[seg_name] = TrackLabels(
+                    viewer=self.viewer,
+                    data=seg_data,
+                    name=f"{seg_name}",
+                    opacity=0.9,
+                    scale=self.tracks.scale,
+                    tracks_viewer=self.tracks_viewer,
+                    seg_name=seg_name,
+                )
 
         if (
             self.tracks is not None
@@ -74,7 +79,8 @@ class TracksLayerGroup:
     def remove_napari_layers(self) -> None:
         """Remove all tracking layers from the viewer"""
         self.remove_napari_layer(self.tracks_layer)
-        self.remove_napari_layer(self.seg_layer)
+        for seg_layer in self.seg_layers.values():
+            self.remove_napari_layer(seg_layer)
         self.remove_napari_layer(self.points_layer)
 
     def add_napari_layers(self) -> None:
@@ -84,49 +90,49 @@ class TracksLayerGroup:
             self.viewer.add_layer(self.tracks_layer)
         if self.points_layer is not None:
             self.viewer.add_layer(self.points_layer)
-        if self.seg_layer is not None:
-            self.viewer.add_layer(self.seg_layer)
+        # Add seg layers in reversed order so the primary seg is on top
+        for seg_layer in reversed(list(self.seg_layers.values())):
+            self.viewer.add_layer(seg_layer)
 
         # self.link_experimental_clipping_planes()
+
+    def _all_layers(self) -> list[napari.layers.Layer]:
+        """Return all non-None tracking layers."""
+        return [
+            layer
+            for layer in [
+                self.tracks_layer,
+                *self.seg_layers.values(),
+                self.points_layer,
+            ]
+            if layer is not None
+        ]
 
     def link_experimental_clipping_planes(self):
         """Link the clipping planes of all tracking layers"""
 
-        track_layers = []
-        if self.tracks_layer is not None:
-            track_layers.append(self.tracks_layer)
-        if self.seg_layer is not None:
-            track_layers.append(self.seg_layer)
-        if self.points_layer is not None:
-            track_layers.append(self.points_layer)
-
+        track_layers = self._all_layers()
         if all(layer.ndim >= 3 for layer in track_layers):
             link_layers(track_layers, ("experimental_clipping_planes",))
 
     def unlink_experimental_clipping_planes(self):
         """Unlink the clipping planes of all tracking layers"""
 
-        track_layers = []
-        if self.tracks_layer is not None:
-            track_layers.append(self.tracks_layer)
-        if self.seg_layer is not None:
-            track_layers.append(self.seg_layer)
-        if self.points_layer is not None:
-            track_layers.append(self.points_layer)
+        track_layers = self._all_layers()
         unlink_layers(track_layers, ("experimental_clipping_planes",))
 
     def _refresh(self) -> None:
         """Refresh the tracking layers with new tracks info"""
         if self.tracks_layer is not None:
             self.tracks_layer._refresh()
-        if self.seg_layer is not None:
-            self.seg_layer._refresh()
+        for seg_layer in self.seg_layers.values():
+            seg_layer._refresh()
         if self.points_layer is not None:
             self.points_layer._refresh()
 
     def update_visible(self, visible_nodes: list[int] | str):
-        if self.seg_layer is not None:
-            self.seg_layer.update_label_colormap(visible_nodes)
+        for seg_layer in self.seg_layers.values():
+            seg_layer.update_label_colormap(visible_nodes)
         if self.points_layer is not None:
             self.points_layer.update_point_outline(visible_nodes)
         if self.tracks_layer is not None:
