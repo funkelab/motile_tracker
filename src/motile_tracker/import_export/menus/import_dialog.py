@@ -319,6 +319,16 @@ class ImportDialog(QDialog):
         geff_metadata["axes"] = [ax.model_dump(exclude_none=True) for ax in axes]
         self.import_widget.root.attrs["geff"] = geff_metadata
 
+    def _ensure_area_enabled(self) -> None:
+        """Enable the area feature when segmentation is present.
+
+        Recomputes only when area is missing from the graph schema (e.g. a GEFF
+        imported without an area attribute); otherwise reuses existing values.
+        """
+        if self.tracks.segmentation is not None and "area" not in self.tracks.features:
+            recompute = "area" not in self.tracks.graph.node_attr_keys()
+            self.tracks.enable_features(["area"], recompute=recompute)
+
     def _finish(self) -> None:
         """Tries to read the csv/geff file and optional segmentation image and apply the
         attribute to column mapping to construct a Tracks object"""
@@ -365,12 +375,7 @@ class ImportDialog(QDialog):
                     )
                     if recompute_keys:
                         self.tracks.enable_features(recompute_keys, recompute=True)
-                    if (
-                        self.tracks.segmentation is not None
-                        and "area" not in self.tracks.features
-                    ):
-                        recompute = "area" not in self.tracks.graph.node_attr_keys()
-                        self.tracks.enable_features(["area"], recompute=recompute)
+                    self._ensure_area_enabled()
                 except Exception as e:  # noqa: BLE001
                     QMessageBox.critical(self, "Error", f"Failed to load tracks: {e}")
                     return
@@ -398,12 +403,7 @@ class ImportDialog(QDialog):
                     )
                     if recompute_keys:
                         self.tracks.enable_features(recompute_keys, recompute=True)
-                    if (
-                        self.tracks.segmentation is not None
-                        and "area" not in self.tracks.features
-                    ):
-                        recompute = "area" not in self.tracks.graph.node_attr_keys()
-                        self.tracks.enable_features(["area"], recompute=recompute)
+                    self._ensure_area_enabled()
                 except Exception as e:  # noqa: BLE001
                     QMessageBox.critical(self, "Error", f"Failed to load tracks: {e}")
                     return
