@@ -102,6 +102,8 @@ class CollectionWidget(QWidget):
         self.collection_list.itemSelectionChanged.connect(self._selection_changed)
         self.selected_collection = None
 
+        self._is_deleted = False
+
         # edit layout
         edit_widget = QGroupBox("Edit group")
         edit_layout = QVBoxLayout()
@@ -157,7 +159,22 @@ class CollectionWidget(QWidget):
         """Enable or disable selection and edit buttons depending on whether a group is
         selected, nodes are selected, and whether the group contains any nodes"""
 
-        selected = self.collection_list.selectedItems()
+        # Guard against widget deletion
+        if self._is_deleted:
+            self.tracks_viewer.node_selection_updated.disconnect(
+                self._update_buttons_and_node_count
+            )
+            return
+
+        try:
+            selected = self.collection_list.selectedItems()
+        except RuntimeError as e:
+            if "has been deleted" in str(e):
+                self._is_deleted = True
+                return  # underlying Qt object already gone
+            else:
+                raise
+
         if selected and len(self.tracks_viewer.selected_nodes) > 0:
             self.add_nodes_btn.setEnabled(True)
             self.add_track_btn.setEnabled(True)
@@ -435,6 +452,12 @@ class CollectionWidget(QWidget):
             del self.tracks_viewer.tracks.features[group_name]
         if group_name in self.tracks_viewer.tracks.graph.node_attr_keys():
             self.tracks_viewer.tracks.graph.remove_node_attr_key(group_name)
+
+        # If we removed the last group while in 'group' mode, fall back to 'all'
+        # so the viewer doesn't stay stuck on an empty group view.
+        if self.collection_list.count() == 0 and self.tracks_viewer.mode == "group":
+            self.tracks_viewer.set_display_mode("all")
+            self.tracks_viewer.mode_updated.emit()
 
     def _show_export_dialog(self, item: QListWidgetItem) -> None:
         """Prompt user to choose export format (csv or geff), then export the nodes

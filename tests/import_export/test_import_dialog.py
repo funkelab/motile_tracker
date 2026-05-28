@@ -132,29 +132,9 @@ class TestPropMapWidgetKeys:
         dialog._update_field_map_and_scale(not include_seg)
         return dialog
 
-    def test_get_node_features_uses_default_keys(self, qtbot, small_csv):
-        """When a computed feature is selected, get_node_features should use
-        the annotator's default key (e.g. 'area'), not the source property name."""
-        dialog = self._setup_dialog(qtbot, small_csv, include_seg=True)
-        prop_map = dialog.prop_map_widget
-        optional = prop_map.optional_features
-
-        # "area" column exists and is mapped to the "Area" regionprops feature
-        assert "area" in optional
-        combo = optional["area"]["feature_option"]
-        # Select "Area" (first regionprops option)
-        combo.setCurrentIndex(0)
-        assert combo.currentText() == "Area"
-        optional["area"]["attr_checkbox"].setChecked(True)
-
-        result = prop_map.get_node_features()
-        # Key should be the default key "area", not the source property name
-        assert "area" in result
-        assert isinstance(result["area"], bool)
-
-    def test_get_features_uses_default_keys(self, qtbot, small_csv):
-        """When a computed feature is selected, get_features should use
-        the annotator's default key, not the display name."""
+    def test_recompute_keys_uses_default_keys(self, qtbot, small_csv):
+        """When a computed feature is selected with recompute, get_recompute_keys
+        should use the annotator's default key (e.g. 'area')."""
         dialog = self._setup_dialog(qtbot, small_csv, include_seg=True)
         prop_map = dialog.prop_map_widget
         optional = prop_map.optional_features
@@ -166,14 +146,13 @@ class TestPropMapWidgetKeys:
         optional["area"]["attr_checkbox"].setChecked(True)
         optional["area"]["recompute"].setChecked(True)
 
-        result = prop_map.get_features()
+        result = prop_map.get_recompute_keys()
         # Key should be "area" (default key), not "Area" (display name)
         assert "area" in result
-        assert result["area"] == "Recompute"
 
-    def test_get_features_load_from_column(self, qtbot, small_csv):
-        """When loading a computed feature from a column, get_features should
-        map default_key -> column_name."""
+    def test_load_from_column_in_name_map(self, qtbot, small_csv):
+        """When loading a computed feature from a column (no recompute),
+        it should appear in get_name_map as default_key -> column_name."""
         dialog = self._setup_dialog(qtbot, small_csv, include_seg=True)
         prop_map = dialog.prop_map_widget
         optional = prop_map.optional_features
@@ -184,13 +163,16 @@ class TestPropMapWidgetKeys:
         optional["area"]["attr_checkbox"].setChecked(True)
         optional["area"]["recompute"].setChecked(False)
 
-        result = prop_map.get_features()
-        assert "area" in result
-        assert result["area"] == "area"  # column name
+        name_map = prop_map.get_name_map()
+        assert "area" in name_map
+        assert name_map["area"] == "area"  # column name
+
+        # Not recomputing, so should not be in recompute_keys
+        assert "area" not in prop_map.get_recompute_keys()
 
     def test_custom_feature_no_collision(self, qtbot, small_csv):
         """Custom feature with a name that doesn't collide uses its own name
-        in get_name_map, and is excluded from get_features/get_node_features."""
+        in get_name_map, and is excluded from get_recompute_keys."""
         dialog = self._setup_dialog(qtbot, small_csv, include_seg=True)
         prop_map = dialog.prop_map_widget
         optional = prop_map.optional_features
@@ -205,9 +187,8 @@ class TestPropMapWidgetKeys:
         assert "group" in name_map
         assert name_map["group"] == "group"
 
-        # Custom features are only in name_map, not in features/node_features
-        assert "group" not in prop_map.get_node_features()
-        assert "group" not in prop_map.get_features()
+        # Custom features are only in name_map, not in recompute_keys
+        assert "group" not in prop_map.get_recompute_keys()
 
     def test_custom_feature_collision_gets_prefixed(self, qtbot, small_csv):
         """Custom feature whose name collides with a default key gets
@@ -227,9 +208,8 @@ class TestPropMapWidgetKeys:
         assert name_map["custom_area"] == "area"
         assert "area" not in name_map or name_map.get("area") != "area"
 
-        # Custom features are only in name_map, not in features/node_features
-        assert "custom_area" not in prop_map.get_node_features()
-        assert "custom_area" not in prop_map.get_features()
+        # Custom features are only in name_map, not in recompute_keys
+        assert "custom_area" not in prop_map.get_recompute_keys()
 
 
 def test_csv_import_2d_with_segmentation(

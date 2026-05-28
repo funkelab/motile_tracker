@@ -336,7 +336,7 @@ class ImportDialog(QDialog):
                 name_map = self.prop_map_widget.get_name_map()
                 # Remove entries with "None" value - funtracks doesn't accept None mappings
                 name_map = {k: v for k, v in name_map.items() if v != "None"}
-                node_features = self.prop_map_widget.get_node_features()
+                recompute_keys = self.prop_map_widget.get_recompute_keys()
 
                 # When embedded segmentation is present (mask + bbox in graph) and no
                 # external segmentation file is provided, ensure those attributes are
@@ -361,9 +361,10 @@ class ImportDialog(QDialog):
                         geff_dir,
                         name_map,
                         segmentation_path=segmentation_path,
-                        node_features=node_features,
                         scale=scale,
                     )
+                    if recompute_keys:
+                        self.tracks.enable_features(recompute_keys, recompute=True)
                 except Exception as e:  # noqa: BLE001
                     QMessageBox.critical(self, "Error", f"Failed to load tracks: {e}")
                     return
@@ -380,16 +381,17 @@ class ImportDialog(QDialog):
                 node_name_map = self.prop_map_widget.get_name_map()
                 # Remove entries with "None" value - funtracks doesn't accept None mappings
                 node_name_map = {k: v for k, v in node_name_map.items() if v != "None"}
-                features = self.prop_map_widget.get_features()
+                recompute_keys = self.prop_map_widget.get_recompute_keys()
 
                 try:
                     self.tracks = tracks_from_df(
                         self.df,
                         segmentation=segmentation,
                         scale=scale,
-                        features=features,
                         node_name_map=node_name_map,
                     )
+                    if recompute_keys:
+                        self.tracks.enable_features(recompute_keys, recompute=True)
                 except Exception as e:  # noqa: BLE001
                     QMessageBox.critical(self, "Error", f"Failed to load tracks: {e}")
                     return

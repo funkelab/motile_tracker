@@ -307,7 +307,10 @@ class TrackPoints(ZOnlyPoints):
             1: NodeType.CONTINUE,
             2: NodeType.SPLIT,
         }
-        symbols = [symbolmap[statemap[degree]] for degree in tracks.graph.out_degree()]
+        symbols = [
+            symbolmap[statemap[degree]]
+            for degree in tracks.graph.out_degree(self.nodes)
+        ]
         return symbols
 
     def update_point_outline(self, visible_nodes: list[int] | str) -> None:

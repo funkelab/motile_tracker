@@ -2,15 +2,19 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import napari
 from fonticon_fa6 import FA6S
 from qtpy.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
+    QLabel,
     QPushButton,
     QVBoxLayout,
     QWidget,
 )
 from superqt.fonticon import icon as qticon
+
+from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
 if TYPE_CHECKING:
     from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
@@ -138,6 +142,130 @@ class SelectionWidget(QWidget):
     def _invert_selection(self) -> None:
         """Invert the current selection"""
 
-        all_nodes = set(self.tracks_viewer.tracks.graph.node_ids())
-        inverted = list(all_nodes - set(self.tracks_viewer.selected_nodes))
+        all_nodes = set(self.tracks_viewer.tracks.nodes())
+        inverted = list(all_nodes - set(self.tracks_viewer.selected_nodes.as_list))
         self.tracks_viewer.selected_nodes.add_list(inverted, append=False)
+
+
+class EditingMenu(QWidget):
+    def __init__(self, viewer: napari.Viewer):
+        super().__init__()
+
+        self.tracks_viewer = TracksViewer.get_instance(viewer)
+        self.tracks_viewer.node_selection_updated.connect(self.update_buttons)
+
+        box = QGroupBox("Editing")
+        box_layout = QVBoxLayout()
+
+        self.label = QLabel(f"Current Track ID: {self.tracks_viewer.selected_track}")
+        self.tracks_viewer.update_track_id.connect(self.update_track_id_color)
+
+        self.new_track_btn = QPushButton("Start new")
+        self.new_track_btn.clicked.connect(self.tracks_viewer.request_new_track)
+        track_layout = QHBoxLayout()
+        track_layout.addWidget(self.label)
+        track_layout.addWidget(self.new_track_btn)
+        box_layout.addLayout(track_layout)
+
+        node_box = QGroupBox("Edit Node(s)")
+        node_box.setMaximumHeight(120)
+        node_box_layout = QVBoxLayout()
+
+        self.delete_node_btn = QPushButton("Delete [D]")
+        self.delete_node_btn.clicked.connect(self.tracks_viewer.delete_node)
+        self.delete_node_btn.setEnabled(False)
+        self.swap_nodes_btn = QPushButton("Swap [S]")
+        self.swap_nodes_btn.clicked.connect(self.tracks_viewer.swap_nodes)
+        self.swap_nodes_btn.setEnabled(False)
+
+        node_box_layout.addWidget(self.delete_node_btn)
+        node_box_layout.addWidget(self.swap_nodes_btn)
+
+        node_box.setLayout(node_box_layout)
+
+        edge_box = QGroupBox("Edit Edge(s)")
+        edge_box.setMaximumHeight(120)
+        edge_box_layout = QVBoxLayout()
+
+        self.delete_edge_btn = QPushButton("Break [B]")
+        self.delete_edge_btn.clicked.connect(self.tracks_viewer.delete_edge)
+        self.delete_edge_btn.setEnabled(False)
+        self.create_edge_btn = QPushButton("Add [A]")
+        self.create_edge_btn.clicked.connect(self.tracks_viewer.create_edge)
+        self.create_edge_btn.setEnabled(False)
+
+        edge_box_layout.addWidget(self.delete_edge_btn)
+        edge_box_layout.addWidget(self.create_edge_btn)
+
+        edge_box.setLayout(edge_box_layout)
+
+        self.undo_btn = QPushButton("Undo (Z)")
+        self.undo_btn.clicked.connect(self.tracks_viewer.undo)
+
+        self.redo_btn = QPushButton("Redo (R)")
+        self.redo_btn.clicked.connect(self.tracks_viewer.redo)
+
+        box_layout.addWidget(node_box)
+        box_layout.addWidget(edge_box)
+        box_layout.addWidget(self.undo_btn)
+        box_layout.addWidget(self.redo_btn)
+
+        box.setLayout(box_layout)
+
+        main_layout = QVBoxLayout()
+        main_layout.addWidget(box)
+        self.setLayout(main_layout)
+        self.setMaximumHeight(450)
+
+    def update_track_id_color(self):
+        """Display track ID value and color"""
+
+        color = self.tracks_viewer.track_id_color
+        r, g, b, a = [int(c * 255) if i < 3 else c for i, c in enumerate(color)]
+        css_color = f"rgba({r}, {g}, {b}, {a})"
+        self.label.setText(f"Current Track ID: {self.tracks_viewer.selected_track}")
+        self.label.setStyleSheet(
+            f"""
+            color: white;
+            border: 2px solid {css_color};
+            padding: 5px;
+            """
+        )
+
+    def update_buttons(self):
+        """Set the buttons to enabled/disabled depending on the selected nodes"""
+
+        n_selected = len(self.tracks_viewer.selected_nodes)
+        if n_selected == 0:
+            self.delete_node_btn.setEnabled(False)
+            self.delete_edge_btn.setEnabled(False)
+            self.create_edge_btn.setEnabled(False)
+            self.swap_nodes_btn.setEnabled(False)
+
+        elif n_selected == 2:
+            self.delete_node_btn.setEnabled(True)
+            self.delete_edge_btn.setEnabled(True)
+            self.create_edge_btn.setEnabled(True)
+            self.swap_nodes_btn.setEnabled(True)
+
+        else:
+            self.delete_node_btn.setEnabled(True)
+            self.delete_edge_btn.setEnabled(False)
+            self.create_edge_btn.setEnabled(False)
+
+
+class EditingSelectionWidget(QWidget):
+    """Combined widget for editing and selection controls"""
+
+    def __init__(self, viewer: napari.Viewer):
+        super().__init__()
+
+        self.tracks_viewer = TracksViewer.get_instance(viewer)
+        editing_widget = EditingMenu(viewer)
+        selection_widget = SelectionWidget(self.tracks_viewer)
+        selection_editing_layout = QVBoxLayout()
+        selection_editing_layout.addWidget(editing_widget)
+        selection_editing_layout.addWidget(selection_widget)
+        selection_editing_layout.setContentsMargins(0, 0, 0, 0)
+        self.setLayout(selection_editing_layout)
+        self.setMaximumHeight(600)

@@ -210,20 +210,35 @@ class StandardFieldMapWidget(QWidget):
         self.setVisible(True)
 
     def _update_props_left(self) -> None:
-        """Update the list of columns that have not been mapped yet"""
+        """Update the list of columns that have not been mapped yet
 
+        Remove attributes from optional features if they are mapped in the mandatory
+        mapping.
+        """
+
+        # Get all mapped values from the mandatory mapping
+        mapped_mandatory = {
+            combo.currentText()
+            for combo in self.mapping_widgets.values()
+            if combo.currentText() != "None"
+        }
+
+        # Remove from optional features if mapped in mandatory mapping
         self.props_left = [
-            attr for attr in self.node_attrs if attr not in self.get_name_map().values()
+            attr for attr in self.node_attrs if attr not in mapped_mandatory
         ]
 
         optional_features = list(self.optional_features.keys())
         for attribute in optional_features:
-            if attribute not in self.props_left:
+            if attribute not in self.props_left and attribute in mapped_mandatory:
                 self._remove_optional_prop(attribute)
 
         for attribute in self.props_left:
             if attribute not in self.optional_features:
                 self._add_optional_prop(attribute)
+
+        # update duplicate check
+        self._check_for_duplicates()
 
     def _get_initial_mapping(self) -> dict[str, str]:
         """Make an initial guess for mapping of geff columns to fields"""
@@ -288,7 +303,13 @@ class StandardFieldMapWidget(QWidget):
             attribute (str): The attribute name to add as an optional feature
         """
 
-        row_idx = len(self.optional_features) + 1  # +1 for header row
+        # Compute the row index based on the current state of the layout, skipping already
+        # present widgets and header row, to prevent stacking widgets on top of each other.
+        row_idx = 1
+        for i, attr in enumerate(self.props_left):
+            if attr == attribute:
+                row_idx = i + 1  # +1 for header row
+                break
 
         # Prop checkbox
         attr_checkbox = QCheckBox(attribute)
@@ -494,69 +515,41 @@ class StandardFieldMapWidget(QWidget):
     def get_name_map(self) -> dict[str, str]:
         """Return a mapping from standard field name to source property name.
 
-        Includes both standard fields (time, x, y, etc.) and any Custom/Group
-        features selected in optional features.
+        Includes standard fields (time, x, y, etc.), Custom/Group features,
+        and non-recompute regionprops features selected in optional features.
         """
         name_map = {
             attribute: combo.currentText()
             for attribute, combo in self.mapping_widgets.items()
         }
 
-        # Add Custom and Group features to name_map
         for attr, widgets in self.optional_features.items():
-            if widgets["attr_checkbox"].isChecked():
-                selected = widgets["feature_option"].currentText()
-                if selected in ("Custom", "Group"):
-                    key = (
-                        f"custom_{attr}" if attr.lower() in self.reserved_keys else attr
-                    )
-                    name_map[key] = attr
+            if not widgets["attr_checkbox"].isChecked():
+                continue
+            selected = widgets["feature_option"].currentText()
+            if selected in ("Custom", "Group"):
+                key = f"custom_{attr}" if attr.lower() in self.reserved_keys else attr
+                name_map[key] = attr
+            elif not widgets["recompute"].isChecked():
+                # Regionprops feature loaded from data (not recomputed)
+                default_key = self.display_name_to_default_key[selected]
+                name_map[default_key] = attr
 
         return name_map
 
-    def get_features(self) -> dict[str, str]:
-        """Get features dict for tracks_from_df (CSV import).
+    def get_recompute_keys(self) -> list[str]:
+        """Get feature keys that should be recomputed from segmentation.
 
-        Returns dict mapping feature default key to either:
-        - Column name (to load from that column)
-        - "Recompute" (to compute from segmentation)
-
-        Custom and Group features are NOT included here — they are registered
-        via get_name_map() through the enable_features_from_name_map path.
+        Returns a list of default feature keys for which the user checked
+        the 'Recompute' checkbox.
         """
-        features = {}
-        for attr, widgets in self.optional_features.items():
-            if widgets["attr_checkbox"].isChecked():
-                selected = widgets["feature_option"].currentText()
-                recompute = widgets["recompute"].isChecked()
-
-                if selected in ("Custom", "Group"):
-                    continue  # handled by get_name_map()
-                else:
-                    default_key = self.display_name_to_default_key[selected]
-                    if recompute:
-                        features[default_key] = "Recompute"
-                    else:
-                        features[default_key] = attr  # column name
-        return features
-
-    def get_node_features(self) -> dict[str, bool]:
-        """Get node_features dict for import_from_geff (GEFF import).
-
-        Returns dict mapping feature default key to recompute boolean.
-
-        Custom and Group features are NOT included here — they are registered
-        via get_name_map() through the enable_features_from_name_map path.
-        """
-        node_features = {}
+        recompute_keys = []
         for _attr, widgets in self.optional_features.items():
             if widgets["attr_checkbox"].isChecked():
                 selected = widgets["feature_option"].currentText()
-                recompute = widgets["recompute"].isChecked()
-
                 if selected in ("Custom", "Group"):
-                    continue  # handled by get_name_map()
-                else:
+                    continue
+                if widgets["recompute"].isChecked():
                     default_key = self.display_name_to_default_key[selected]
-                    node_features[default_key] = recompute
-        return node_features
+                    recompute_keys.append(default_key)
+        return recompute_keys

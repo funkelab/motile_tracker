@@ -2,7 +2,6 @@ from functools import partial
 from pathlib import Path
 from warnings import warn
 
-import napari
 from fonticon_fa6 import FA6S
 from funtracks.data_model import Tracks
 from napari._qt.qt_resources import QColoredSVGIcon
@@ -28,26 +27,6 @@ from motile_tracker.import_export.menus.import_dialog import (
     ImportDialog,
 )
 from motile_tracker.motile.backend.motile_run import MotileRun
-
-
-class TrackListWidget(QWidget):
-    """Creates or finds a TracksViewer and displays its TrackList widget.
-    This is only used in case the user wants to open the trackslist from the plugins
-    menu.
-    """
-
-    def __init__(self, viewer: napari.Viewer):
-        super().__init__()
-
-        from motile_tracker.data_views.views_coordinator.tracks_viewer import (
-            TracksViewer,
-        )
-
-        tracks_viewer = TracksViewer.get_instance(viewer)
-        layout = QVBoxLayout()
-        layout.addWidget(tracks_viewer.tracks_list)
-
-        self.setLayout(layout)
 
 
 class TracksButton(QWidget):
@@ -148,15 +127,31 @@ class TracksList(QGroupBox):
         """Add a run to the list and optionally select it. Will make a new
         row in the list UI representing the given run.
 
+        Accepts any Tracks object. Plain Tracks/SolutionTracks are wrapped in
+        a MotileRun (with solver_params=None) so the list internally always
+        holds MotileRun and save_tracks can rely on tracks.save().
+
         Note: selecting the run will also emit the selection changed event on
         the list.
 
         Args:
-            tracks (Tracks): the tracks object to add to the results list
+            tracks (Tracks): the tracks object to add to the results list.
             name (str): the name of the tracks to display
             select (bool, optional): Whether or not to select the new tracks item in the
                 list (and thus display it in the tracks viewer). Defaults to True.
         """
+        if not isinstance(tracks, MotileRun):
+            tracks = MotileRun(
+                graph=tracks.graph,
+                run_name=name,
+                solver_params=None,
+                pos_attr=tracks.features.position_key,
+                time_attr=tracks.features.time_key,
+                scale=tracks.scale,
+                ndim=tracks.ndim,
+                _features=tracks.features,
+                _segmentation=tracks.segmentation,
+            )
         item = QListWidgetItem(self.tracks_list)
         tracks_row = TracksButton(tracks, name)
         self.tracks_list.setItemWidget(item, tracks_row)
