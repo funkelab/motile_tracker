@@ -272,6 +272,11 @@ def test_csv_import_2d_with_segmentation(
     assert dialog.tracks.graph.num_edges() == solution_tracks_2d.graph.num_edges()
     assert dialog.tracks.ndim == 3
 
+    # Area should be enabled and computed even though it was not in the CSV
+    assert "area" in dialog.tracks.features
+    for node_id in dialog.tracks.graph.node_ids():
+        assert dialog.tracks.graph.nodes[node_id]["area"] > 0
+
 
 def test_csv_import_3d_with_segmentation(
     qtbot, tmp_path, solution_tracks_3d, monkeypatch
@@ -442,6 +447,11 @@ def test_geff_import_2d_with_segmentation(qtbot, tmp_path, graph_2d, monkeypatch
     for node_id in dialog.tracks.graph.node_ids():
         dialog.tracks.get_time(node_id)
 
+    # Area should be enabled and computed when segmentation is present
+    assert "area" in dialog.tracks.features
+    for node_id in dialog.tracks.graph.node_ids():
+        assert dialog.tracks.graph.nodes[node_id]["area"] > 0
+
 
 def test_geff_import_3d_with_segmentation(
     qtbot, tmp_path, solution_tracks_3d, monkeypatch
@@ -494,6 +504,54 @@ def test_geff_import_3d_with_segmentation(
     assert dialog.tracks.ndim == 4
     for node_id in dialog.tracks.graph.node_ids():
         dialog.tracks.get_time(node_id)
+
+
+def test_geff_import_without_area_computes_area(
+    qtbot, tmp_path, graph_2d_without_segmentation, segmentation_2d, monkeypatch
+):
+    """Test that area is computed on import when the GEFF has no area attribute.
+
+    Exports a graph that has no area and no mask/bbox, then imports it with
+    external segmentation. Area should be computed from the segmentation.
+    """
+    monkeypatch.setattr(ImportDialog, "_resize_dialog", lambda self: None)
+
+    graph_2d_without_segmentation.remove_node_attr_key("area")
+    tracks = Tracks(graph_2d_without_segmentation, ndim=3, time_attr="t")
+    geff_path = tmp_path / "test_no_area.zarr"
+    export_to_geff(tracks, geff_path)
+
+    dialog = ImportDialog(import_type="geff")
+    qtbot.addWidget(dialog)
+    dialog.import_widget._load_geff(geff_path)
+    assert dialog.import_widget.root is not None
+
+    # Provide external segmentation
+    dialog.segmentation_widget.external_segmentation_radio.setChecked(True)
+    seg_path = tmp_path / "segmentation.tif"
+    tifffile.imwrite(seg_path, segmentation_2d)
+    dialog.segmentation_widget.segmentation_widget.image_path_line.setText(
+        str(seg_path)
+    )
+    dialog.segmentation_widget.segmentation_widget.valid = True
+    dialog.segmentation_widget.segmentation_widget.seg_path_updated.emit()
+
+    assert dialog.finish_button.isEnabled()
+
+    prop_map = dialog.prop_map_widget
+    seg_combo = prop_map.mapping_widgets["seg_id"]
+    seg_combo.setCurrentText("None")
+    prop_map._update_props_left()
+
+    dialog._finish()
+
+    assert dialog.tracks is not None
+    assert dialog.tracks.graph.num_nodes() == graph_2d_without_segmentation.num_nodes()
+
+    # Area must be in features and computed (positive values, not defaults)
+    assert "area" in dialog.tracks.features
+    for node_id in dialog.tracks.graph.node_ids():
+        assert dialog.tracks.graph.nodes[node_id]["area"] > 0
 
 
 def test_geff_import_without_segmentation(

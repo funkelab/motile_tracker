@@ -129,6 +129,11 @@ def test_solve_with_motile(make_napari_viewer, segmentation_2d):
     for node in result.graph.node_ids():
         assert result.get_track_id(node) is not None
 
+    # Test 1b: Area feature is enabled and computed for all nodes
+    assert "area" in result.features
+    for node in result.graph.node_ids():
+        assert result.graph.nodes[node]["area"] > 0
+
     # Test 2: Raises ValueError without input data
     run2 = MotileRun(
         graph=create_empty_graphview_graph(),
