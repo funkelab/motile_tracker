@@ -102,6 +102,8 @@ class CollectionWidget(QWidget):
         self.collection_list.itemSelectionChanged.connect(self._selection_changed)
         self.selected_collection = None
 
+        self._is_deleted = False
+
         # edit layout
         edit_widget = QGroupBox("Edit group")
         edit_layout = QVBoxLayout()
@@ -157,7 +159,22 @@ class CollectionWidget(QWidget):
         """Enable or disable selection and edit buttons depending on whether a group is
         selected, nodes are selected, and whether the group contains any nodes"""
 
-        selected = self.collection_list.selectedItems()
+        # Guard against widget deletion
+        if self._is_deleted:
+            self.tracks_viewer.node_selection_updated.disconnect(
+                self._update_buttons_and_node_count
+            )
+            return
+
+        try:
+            selected = self.collection_list.selectedItems()
+        except RuntimeError as e:
+            if "has been deleted" in str(e):
+                self._is_deleted = True
+                return  # underlying Qt object already gone
+            else:
+                raise
+
         if selected and len(self.tracks_viewer.selected_nodes) > 0:
             self.add_nodes_btn.setEnabled(True)
             self.add_track_btn.setEnabled(True)

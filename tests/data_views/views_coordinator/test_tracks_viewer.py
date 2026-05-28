@@ -205,7 +205,7 @@ class TestDisplayModes:
         viewer, tracks_viewer, tracks = tracks_viewer_setup
 
         # No groups exist
-        assert tracks_viewer.collection_widget.collection_list.count() == 0
+        assert tracks_viewer.get_collection_widget().collection_list.count() == 0
 
         # Start in "all" mode
         tracks_viewer.set_display_mode("all")
@@ -224,8 +224,8 @@ class TestDisplayModes:
         viewer, tracks_viewer, tracks = tracks_viewer_setup
 
         # Create a group so the 'group' mode is available
-        tracks_viewer.collection_widget._add_group(name="test_group", select=True)
-        assert tracks_viewer.collection_widget.collection_list.count() == 1
+        tracks_viewer.get_collection_widget()._add_group(name="test_group", select=True)
+        assert tracks_viewer.get_collection_widget().collection_list.count() == 1
 
         # Start in "all" mode
         tracks_viewer.set_display_mode("all")
@@ -248,7 +248,7 @@ class TestDisplayModes:
     ):
         """Removing the last group while in 'group' mode should auto-switch to 'all'."""
         viewer, tracks_viewer, tracks = tracks_viewer_setup
-        collection_widget = tracks_viewer.collection_widget
+        collection_widget = tracks_viewer.get_collection_widget()
 
         collection_widget._add_group(name="test_group", select=True)
         tracks_viewer.set_display_mode("group")
@@ -266,7 +266,7 @@ class TestDisplayModes:
     ):
         """Removing a group while not in 'group' mode should leave the mode untouched."""
         viewer, tracks_viewer, tracks = tracks_viewer_setup
-        collection_widget = tracks_viewer.collection_widget
+        collection_widget = tracks_viewer.get_collection_widget()
 
         collection_widget._add_group(name="test_group", select=True)
         tracks_viewer.set_display_mode("lineage")

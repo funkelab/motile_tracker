@@ -46,7 +46,7 @@ def test_tree_plot_initialization_and_update(viewer, solution_tracks_2d):
     assert hasattr(tree_plot, "nodes_selected")
 
     # Test 3: Update with all parameters
-    track_df = tree_widget.track_df
+    track_df = tree_widget.tracks_viewer.track_df
     tree_widget.tree_widget.update(
         track_df=track_df,
         view_direction="horizontal",
@@ -223,7 +223,7 @@ def test_tree_widget_initialization(viewer, solution_tracks_2d):
 
     tree_widget_with_tracks = TreeWidget(viewer)
 
-    assert not tree_widget_with_tracks.track_df.empty
+    assert not tree_widget_with_tracks.tracks_viewer.track_df.empty
     assert tree_widget_with_tracks.graph is not None
 
 
@@ -412,13 +412,13 @@ def test_tree_widget_integration(viewer, solution_tracks_2d):
 
     # Test 1: TreeWidget responds to tracks_updated signal
     tree_widget = TreeWidget(viewer)
-    assert tree_widget.track_df.empty
+    assert tree_widget.tracks_viewer.track_df.empty
 
     # Update tracks
     tracks_viewer.update_tracks(tracks=solution_tracks_2d, name="test")
 
     # Verify track_df was updated
-    assert not tree_widget.track_df.empty
+    assert not tree_widget.tracks_viewer.track_df.empty
 
     # Test 2: flip_axes toggles between horizontal and vertical
     # Start with vertical
@@ -449,7 +449,7 @@ def test_update_track_data_without_reset(viewer, solution_tracks_2d):
     tree_widget._update_track_data(reset_view=False)
 
     # axis_order should have been passed through
-    assert hasattr(tree_widget, "axis_order")
+    assert hasattr(tree_widget.tracks_viewer, "axis_order")
 
 
 def test_update_track_data_with_none_tracks(viewer):
@@ -459,5 +459,5 @@ def test_update_track_data_with_none_tracks(viewer):
     # Update with no tracks
     tree_widget._update_track_data(reset_view=True)
 
-    assert tree_widget.track_df.empty
+    assert tree_widget.tracks_viewer.track_df.empty
     assert tree_widget.graph is None
