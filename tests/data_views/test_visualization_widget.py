@@ -1,7 +1,9 @@
+from unittest.mock import MagicMock, patch
+
 import pytest
 
 from motile_tracker.application_menus.visualization_widget import (
-    LabelVisualizationWidget,
+    VisualizationWidget,
 )
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
@@ -18,7 +20,7 @@ def visualization_widget(viewer, solution_tracks_3d, qtbot):
     tracks_viewer = TracksViewer.get_instance(viewer)
     tracks_viewer.update_tracks(tracks=solution_tracks_3d, name="test")
 
-    widget = LabelVisualizationWidget(viewer)
+    widget = VisualizationWidget(viewer)
     qtbot.addWidget(widget)
 
     assert tracks_viewer.tracking_layers.seg_layer is not None
@@ -181,3 +183,184 @@ def test_update_label_colormap_when_selecting(
         )  # highlighted
 
         assert set(seg_layer.filled_labels) == {k1, k2}
+
+
+# Ortho-views integration tests
+class TestOrthoViewsIntegration:
+    """Tests for orthogonal views checkbox and initialization."""
+
+    def test_ortho_views_checkbox_initially_unchecked(self, visualization_widget):
+        """Test that the ortho views checkbox starts unchecked."""
+        widget, _ = visualization_widget
+        assert not widget.show_ortho_views.isChecked()
+
+    @patch("motile_tracker.application_menus.visualization_widget._VIEWER_MANAGERS", {})
+    @patch(
+        "motile_tracker.application_menus.visualization_widget.initialize_ortho_views"
+    )
+    def test_initialize_ortho_views_viewer_not_in_managers(
+        self, mock_init, visualization_widget
+    ):
+        """Test ortho views initialization when viewer is not already in _VIEWER_MANAGERS."""
+        widget, _ = visualization_widget
+
+        mock_manager = MagicMock()
+        mock_manager.main_controls_widget.show_orth_views.connect = MagicMock(
+            return_value=MagicMock()
+        )
+        mock_init.return_value = mock_manager
+
+        # Trigger checkbox
+        widget.show_ortho_views.setChecked(True)
+
+        # verify initialize_ortho_views was called
+        mock_init.assert_called_once_with(widget.viewer)
+
+        # verify manager was stored
+        assert widget.orth_view_manager is not None
+        assert widget.orth_views_connection is not None
+
+    def test_initialize_ortho_views_with_existing_manager(self, visualization_widget):
+        """Test ortho views when viewer is already in _VIEWER_MANAGERS."""
+        widget, _ = visualization_widget
+
+        mock_manager = MagicMock()
+        mock_manager.show = MagicMock()
+        mock_manager.hide = MagicMock()
+
+        # Mock the _VIEWER_MANAGERS to already contain this viewer
+        with patch(
+            "motile_tracker.application_menus.visualization_widget._VIEWER_MANAGERS",
+            {widget.viewer: mock_manager},
+        ):
+            widget.show_ortho_views.setChecked(True)
+
+            # verify manager.show() was called
+            mock_manager.show.assert_called_once()
+
+    def test_ortho_views_hide_when_unchecked(self, visualization_widget):
+        """Test that ortho views are hidden and resized when checkbox is unchecked."""
+        widget, _ = visualization_widget
+
+        mock_manager = MagicMock()
+        mock_manager.show = MagicMock()
+        mock_manager.hide = MagicMock()
+        mock_manager.set_splitter_sizes = MagicMock()
+
+        with patch(
+            "motile_tracker.application_menus.visualization_widget._VIEWER_MANAGERS",
+            {widget.viewer: mock_manager},
+        ):
+            # Check the box first
+            widget.show_ortho_views.setChecked(True)
+            mock_manager.show.assert_called_once()
+
+            # Uncheck the box
+            widget.show_ortho_views.setChecked(False)
+
+            # Verify hide and set_splitter_sizes were called
+            mock_manager.hide.assert_called_once()
+            mock_manager.set_splitter_sizes.assert_called_once_with(0.0, 0.0)
+
+    @patch(
+        "motile_tracker.application_menus.visualization_widget.initialize_ortho_views"
+    )
+    def test_ortho_views_signal_connection(self, mock_init, visualization_widget):
+        """Test that the ortho view manager's signal is connected to the widget."""
+        widget, _ = visualization_widget
+
+        mock_manager = MagicMock()
+        mock_signal = MagicMock()
+        mock_manager.main_controls_widget.show_orth_views = mock_signal
+        mock_manager.main_controls_widget.destroyed = MagicMock()
+        mock_signal.connect = MagicMock(return_value=MagicMock())
+
+        mock_init.return_value = mock_manager
+
+        widget.show_ortho_views.setChecked(True)
+
+        # Verify signal was connected to initialize_ortho_views
+        mock_signal.connect.assert_called_once()
+        call_args = mock_signal.connect.call_args[0]
+        assert call_args[0] == widget.initialize_ortho_views
+
+    @patch(
+        "motile_tracker.application_menus.visualization_widget.initialize_ortho_views"
+    )
+    def test_on_ortho_cleanup(self, mock_init, visualization_widget):
+        """Test cleanup when ortho view manager is destroyed."""
+        widget, _ = visualization_widget
+
+        mock_manager = MagicMock()
+        mock_manager.main_controls_widget.show_orth_views = MagicMock()
+        mock_manager.main_controls_widget.destroyed = MagicMock()
+        mock_manager.main_controls_widget.show_orth_views.connect = MagicMock(
+            return_value=MagicMock()
+        )
+
+        mock_init.return_value = mock_manager
+
+        widget.show_ortho_views.setChecked(True)
+
+        # Simulate widget destruction
+        widget._on_ortho_cleanup()
+
+        # Verify checkbox is unchecked and disconnected
+        assert not widget.show_ortho_views.isChecked()
+        assert widget.orth_view_manager is None
+        assert widget.orth_views_connection is None
+
+    @patch(
+        "motile_tracker.application_menus.visualization_widget.initialize_ortho_views"
+    )
+    def test_disconnect_ortho_views_with_valid_connection(
+        self, mock_init, visualization_widget
+    ):
+        """Test _disconnect_ortho_views with valid connection."""
+        widget, _ = visualization_widget
+
+        mock_manager = MagicMock()
+        mock_signal = MagicMock()
+        mock_manager.main_controls_widget.show_orth_views = mock_signal
+        mock_manager.main_controls_widget.destroyed = MagicMock()
+        mock_signal.connect = MagicMock(return_value=MagicMock())
+        mock_signal.disconnect = MagicMock()
+
+        mock_init.return_value = mock_manager
+
+        widget.show_ortho_views.setChecked(True)
+
+        # Disconnect
+        widget._disconnect_ortho_views()
+
+        # Verify disconnect was called and connection is cleared
+        mock_signal.disconnect.assert_called_once()
+        assert widget.orth_views_connection is None
+        assert widget.orth_view_manager is None
+
+        # No-op, should not raise
+        widget._disconnect_ortho_views()
+
+        assert widget.orth_views_connection is None
+        assert widget.orth_view_manager is None
+
+    def test_initialize_ortho_views_syncs_checkbox_state(self, visualization_widget):
+        """Test that initialize_ortho_views syncs checkbox state."""
+        widget, _ = visualization_widget
+
+        mock_manager = MagicMock()
+        mock_manager.main_controls_widget.show_orth_views = MagicMock()
+        mock_manager.main_controls_widget.destroyed = MagicMock()
+        mock_manager.main_controls_widget.show_orth_views.connect = MagicMock(
+            return_value=MagicMock()
+        )
+
+        with patch(
+            "motile_tracker.application_menus.visualization_widget._VIEWER_MANAGERS",
+            {widget.viewer: mock_manager},
+        ):
+            # Manually call with checked=False (simulating external unchecking)
+            widget.initialize_ortho_views(False)
+
+            # Verify checkbox state is synced
+            assert not widget.show_ortho_views.isChecked()
