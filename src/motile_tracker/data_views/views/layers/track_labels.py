@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 
 import napari
 import numpy as np
-import tracksdata as td
 from funtracks.exceptions import InvalidActionError
 from funtracks.user_actions import UserUpdateSegmentation
 from napari.layers import Labels
@@ -57,22 +56,15 @@ def _new_label(layer: TrackLabels, new_track_id=True):
             it to the selected_track attribute. Defaults to True.
     """
 
-    if isinstance(layer.data, td.array.GraphArrayView):
-        new_selected_label = (
-            max(layer.tracks_viewer.tracks.graph.node_ids(), default=0) + 1
-        )
-        if new_track_id or layer.tracks_viewer.selected_track is None:
-            layer.tracks_viewer.set_new_track_id()
-        layer.selected_label = new_selected_label
-        layer.colormap.color_dict[new_selected_label] = (
-            layer.tracks_viewer.track_id_color
-        )
-        # to refresh, otherwise you paint with a transparent label until you
-        # release the mouse
-        with layer.events.selected_label.blocker():
-            layer.colormap = DirectLabelColormap(color_dict=layer.colormap.color_dict)
-    else:
-        show_info("Calculating empty label on non-numpy array is not supported")
+    new_selected_label = max(layer.tracks_viewer.tracks.graph.node_ids(), default=0) + 1
+    if new_track_id or layer.tracks_viewer.selected_track is None:
+        layer.tracks_viewer.set_new_track_id()
+    layer.selected_label = new_selected_label
+    layer.colormap.color_dict[new_selected_label] = layer.tracks_viewer.track_id_color
+    # to refresh, otherwise you paint with a transparent label until you
+    # release the mouse
+    with layer.events.selected_label.blocker():
+        layer.colormap = DirectLabelColormap(color_dict=layer.colormap.color_dict)
 
 
 class TrackLabels(ContourLabels):
