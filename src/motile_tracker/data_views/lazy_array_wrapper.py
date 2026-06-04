@@ -69,6 +69,9 @@ class LazyArrayWrapper:
         underlying array, which is fast when the array has an internal
         cache (e.g. GraphArrayView's NDChunkCache).
         """
+        # O(n) Python loop of scalar lookups: fine for brush strokes (few
+        # pixels), but a large preserve_labels op (e.g. a bucket-fill over a
+        # big region) iterates over every candidate pixel and may be slow.
         arrays = tuple(np.asarray(i) for i in index)
         n = len(arrays[0])
         result = np.empty(n, dtype=self._data.dtype)
@@ -78,6 +81,12 @@ class LazyArrayWrapper:
         return result
 
     def __getattr__(self, name):
+        # Guard against infinite recursion if _data is missing (e.g. during
+        # copy/pickle, which build the instance without calling __init__).
+        # (only matters if in the future we make the segLayer copyable/picklable/deepcopyable,
+        # which we currently don't, but this is a good safeguard in case we do)
+        if name == "_data":
+            raise AttributeError(name)
         return getattr(self._data, name)
 
     def __repr__(self):
