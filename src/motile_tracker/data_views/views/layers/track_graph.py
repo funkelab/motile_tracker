@@ -92,6 +92,8 @@ class TrackGraph(napari.layers.Tracks):
     """Extended tracks layer that holds the track information and emits and responds
     to dynamics visualization signals"""
 
+    _type_string = "tracks"
+
     def __init__(
         self,
         name: str,
