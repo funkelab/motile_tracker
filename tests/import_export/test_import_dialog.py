@@ -393,7 +393,9 @@ def test_csv_import_without_segmentation(
     assert dialog.tracks.ndim == 3
 
 
-def test_geff_import_2d_with_segmentation(qtbot, tmp_path, graph_2d, monkeypatch):
+def test_geff_import_2d_with_segmentation(
+    qtbot, tmp_path, graph_2d_without_segmentation, segmentation_2d, monkeypatch
+):
     """Test exporting and re-importing 2D tracks with segmentation.
     This tests whether the full workflow works end-to-end.
     """
@@ -401,10 +403,11 @@ def test_geff_import_2d_with_segmentation(qtbot, tmp_path, graph_2d, monkeypatch
     monkeypatch.setattr(ImportDialog, "_resize_dialog", lambda self: None)
 
     # Create tracks and export to GEFF (as motile_tracker does in tracks_list.py:237)
-    tracks = Tracks(graph_2d, ndim=3, time_attr="t")
+    tracks = Tracks(
+        graph_2d_without_segmentation, ndim=3, time_attr="t", tracklet_attr="track_id"
+    )
     geff_path = tmp_path / "test_tracks.zarr"
     export_to_geff(tracks, geff_path)
-
     # Create import dialog and load the GEFF file
     dialog = ImportDialog(import_type="geff")
     qtbot.addWidget(dialog)
@@ -418,7 +421,7 @@ def test_geff_import_2d_with_segmentation(qtbot, tmp_path, graph_2d, monkeypatch
     # Select "Use external segmentation" option and set path
     dialog.segmentation_widget.external_segmentation_radio.setChecked(True)
     seg_path = tmp_path / "segmentation.zarr"
-    zarr.save_array(seg_path, np.asarray(tracks.segmentation))
+    zarr.save_array(seg_path, segmentation_2d)
     dialog.segmentation_widget.segmentation_widget.image_path_line.setText(
         str(seg_path)
     )
@@ -441,8 +444,8 @@ def test_geff_import_2d_with_segmentation(qtbot, tmp_path, graph_2d, monkeypatch
     # Verify tracks were imported successfully
     assert hasattr(dialog, "tracks"), "Dialog should have tracks attribute after import"
     assert dialog.tracks is not None, "Tracks should not be None"
-    assert dialog.tracks.graph.num_nodes() == graph_2d.num_nodes()
-    assert dialog.tracks.graph.num_edges() == graph_2d.num_edges()
+    assert dialog.tracks.graph.num_nodes() == graph_2d_without_segmentation.num_nodes()
+    assert dialog.tracks.graph.num_edges() == graph_2d_without_segmentation.num_edges()
     assert dialog.tracks.ndim == 3
     for node_id in dialog.tracks.graph.node_ids():
         dialog.tracks.get_time(node_id)
@@ -600,7 +603,9 @@ def test_geff_import_without_segmentation(
         dialog.tracks.get_time(node_id)
 
 
-def test_geff_import_without_axes_metadata(qtbot, tmp_path, graph_2d, monkeypatch):
+def test_geff_import_without_axes_metadata(
+    qtbot, tmp_path, graph_2d_without_segmentation, segmentation_2d, monkeypatch
+):
     """Test importing a geff that has no axes metadata.
     This tests the automatic axes generation when metadata is missing.
     """
@@ -608,7 +613,9 @@ def test_geff_import_without_axes_metadata(qtbot, tmp_path, graph_2d, monkeypatc
     monkeypatch.setattr(ImportDialog, "_resize_dialog", lambda self: None)
 
     # Create tracks and export to GEFF (this creates valid axes metadata)
-    tracks = Tracks(graph_2d, ndim=3, time_attr="t")
+    tracks = Tracks(
+        graph_2d_without_segmentation, ndim=3, time_attr="t", tracklet_attr="track_id"
+    )
     geff_path = tmp_path / "test_tracks_no_axes.zarr"
     export_to_geff(tracks, geff_path)
 
@@ -635,7 +642,7 @@ def test_geff_import_without_axes_metadata(qtbot, tmp_path, graph_2d, monkeypatc
     # Select "Use external segmentation" option and set path
     dialog.segmentation_widget.external_segmentation_radio.setChecked(True)
     seg_path = tmp_path / "segmentation.zarr"
-    zarr.save_array(seg_path, np.asarray(tracks.segmentation))
+    zarr.save_array(seg_path, segmentation_2d)
     dialog.segmentation_widget.segmentation_widget.image_path_line.setText(
         str(seg_path)
     )
@@ -656,8 +663,8 @@ def test_geff_import_without_axes_metadata(qtbot, tmp_path, graph_2d, monkeypatc
     # Verify tracks were imported successfully
     assert hasattr(dialog, "tracks"), "Dialog should have tracks attribute after import"
     assert dialog.tracks is not None, "Tracks should not be None"
-    assert dialog.tracks.graph.num_nodes() == graph_2d.num_nodes()
-    assert dialog.tracks.graph.num_edges() == graph_2d.num_edges()
+    assert dialog.tracks.graph.num_nodes() == graph_2d_without_segmentation.num_nodes()
+    assert dialog.tracks.graph.num_edges() == graph_2d_without_segmentation.num_edges()
     assert dialog.tracks.ndim == 3
 
     # Verify axes metadata was generated
@@ -774,7 +781,7 @@ def test_geff_import_with_related_data(qtbot, tmp_path, graph_2d, monkeypatch):
     geff_path = tmp_path / "old_geff_with_related.zarr"
     # save_segmentation=True writes segmentation + adds related_objects to geff metadata.
     # seg_label_attr=None preserves node IDs as pixel values (consistent with other tests).
-    export_to_geff(tracks, geff_path, save_segmentation=True, seg_label_attr=None)
+    export_to_geff(tracks, geff_path, save_segmentation=True, seg_relabel=None)
 
     # Remove segmentation_shape to simulate old funtracks export
     root = zarr.open_group(geff_path / "tracks.geff", mode="r+")
