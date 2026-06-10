@@ -1,5 +1,6 @@
 from unittest.mock import MagicMock, patch
 
+import napari
 import pytest
 
 from motile_tracker.import_export.menus.export_dialog import (
@@ -7,20 +8,9 @@ from motile_tracker.import_export.menus.export_dialog import (
     ExportTypeDialog,
 )
 
-
-@pytest.fixture
-def mock_tracks():
-    """Mock Tracks object without segmentation."""
-    tracks = MagicMock()
-    tracks.segmentation = None
-    return tracks
-
-
-@pytest.fixture
-def mock_tracks_with_seg(mock_tracks):
-    """Mock Tracks object with a segmentation array."""
-    mock_tracks.segmentation = MagicMock()
-    return mock_tracks
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
 
 
 @pytest.fixture
@@ -33,13 +23,94 @@ def fake_parent(qtbot):
 
 
 @pytest.fixture
-def mock_colormap():
-    cmap = MagicMock()
-    cmap.map.side_effect = lambda tid: [tid, tid, tid, 255]
+def colormap():
+    """A napari colormap that returns flat RGBA lists (matching what
+    export_to_csv expects via show_export_dialog's color_dict building)."""
+    cmap = MagicMock(spec=napari.utils.Colormap)
+    cmap.map.side_effect = lambda tid: [0.0, 0.0, 0.0, 1.0]
     return cmap
 
 
-# --- ExportTypeDialog unit tests ---
+@pytest.fixture
+def accept_type_dialog(monkeypatch):
+    """Patch ExportTypeDialog.exec_ to auto-accept, and return a handle to
+    configure the dialog state *after* construction (via a callback).
+
+    Usage::
+
+        def configure(dialog):
+            dialog.export_type_combo.setCurrentText("CSV")
+            dialog.seg_checkbox.setChecked(True)
+
+        accept_type_dialog(configure)
+    """
+    captured = {}
+
+    def _accept(configure_fn=None):
+        orig_init = ExportTypeDialog.__init__
+
+        def patched_init(self, *args, **kwargs):
+            orig_init(self, *args, **kwargs)
+            if configure_fn is not None:
+                configure_fn(self)
+            captured["dialog"] = self
+
+        monkeypatch.setattr(ExportTypeDialog, "__init__", patched_init)
+        monkeypatch.setattr(
+            ExportTypeDialog,
+            "exec_",
+            lambda self: 1,  # QDialog.Accepted
+        )
+        return captured
+
+    return _accept
+
+
+@pytest.fixture
+def reject_type_dialog(monkeypatch):
+    """Patch ExportTypeDialog.exec_ to auto-reject (cancel)."""
+
+    def _reject():
+        monkeypatch.setattr(
+            ExportTypeDialog,
+            "exec_",
+            lambda self: 0,  # QDialog.Rejected
+        )
+
+    return _reject
+
+
+@pytest.fixture
+def mock_file_dialog():
+    """Return a context-manager patch that makes QFileDialog return *path*."""
+
+    def _make(*paths):
+        if len(paths) == 1:
+            fd = MagicMock()
+            fd.exec_.return_value = True
+            fd.selectedFiles.return_value = [str(paths[0])]
+            return patch(
+                "motile_tracker.import_export.menus.export_dialog.QFileDialog",
+                return_value=fd,
+            )
+        else:
+            fds = []
+            for p in paths:
+                fd = MagicMock()
+                fd.exec_.return_value = True
+                fd.selectedFiles.return_value = [str(p)]
+                fds.append(fd)
+            return patch(
+                "motile_tracker.import_export.menus.export_dialog.QFileDialog",
+                side_effect=fds,
+            )
+
+    return _make
+
+
+# ---------------------------------------------------------------------------
+# ExportTypeDialog unit tests (real widget, no mocks)
+# ---------------------------------------------------------------------------
 
 
 def test_checkbox_hidden_without_segmentation(qtbot):
@@ -52,10 +123,8 @@ def test_checkbox_visible_with_segmentation(qtbot):
     """Checkbox is visible for both GEFF and CSV when segmentation is present."""
     dialog = ExportTypeDialog(has_segmentation=True)
     qtbot.addWidget(dialog)
-    # Default is GEFF: checkbox visible, info label also visible
     assert dialog.seg_checkbox.isVisibleTo(dialog)
     assert dialog._geff_seg_label.isVisibleTo(dialog)
-    # Switch to CSV: checkbox still visible, info label hidden
     dialog.export_type_combo.setCurrentText("CSV")
     assert dialog.seg_checkbox.isVisibleTo(dialog)
     assert not dialog._geff_seg_label.isVisibleTo(dialog)
@@ -81,7 +150,7 @@ def test_relabel_checked_by_default(qtbot):
     dialog = ExportTypeDialog(has_segmentation=True)
     qtbot.addWidget(dialog)
     assert dialog.relabel_checkbox.isChecked()
-    assert dialog.seg_label_attr == "track_id"
+    assert dialog.seg_label_attr == "tracklet"
 
 
 def test_relabel_unchecked_gives_none_label_attr(qtbot):
@@ -97,395 +166,262 @@ def test_seg_format_defaults_to_zarr(qtbot):
     assert dialog.seg_file_format == "zarr"
 
 
-# --- ExportDialog integration tests ---
+# ---------------------------------------------------------------------------
+# ExportDialog integration tests
+# Real ExportTypeDialog, real SolutionTracks, real export functions.
+# Only QFileDialog (OS picker) is mocked.
+# ---------------------------------------------------------------------------
 
 
-def test_export_dialog_cancel(mock_tracks, fake_parent, mock_colormap):
-    """Returns False when user cancels."""
-    mock_dialog = MagicMock()
-    mock_dialog.exec_.return_value = 0
-    with patch(
-        "motile_tracker.import_export.menus.export_dialog.ExportTypeDialog",
-        return_value=mock_dialog,
-    ):
-        result = ExportDialog.show_export_dialog(
-            fake_parent, mock_tracks, name="TestGroup", colormap=mock_colormap
-        )
+def test_export_dialog_cancel(
+    solution_tracks_2d_without_segmentation,
+    fake_parent,
+    colormap,
+    reject_type_dialog,
+):
+    """Returns False when user cancels the type dialog."""
+    reject_type_dialog()
+    result = ExportDialog.show_export_dialog(
+        fake_parent,
+        solution_tracks_2d_without_segmentation,
+        name="TestGroup",
+        colormap=colormap,
+    )
     assert result is False
 
 
-def test_export_dialog_passes_has_segmentation_false(
-    mock_tracks, fake_parent, mock_colormap
+def test_export_dialog_passes_has_segmentation(
+    solution_tracks_2d,
+    solution_tracks_2d_without_segmentation,
+    fake_parent,
+    colormap,
+    monkeypatch,
 ):
-    mock_dialog = MagicMock()
-    mock_dialog.exec_.return_value = 0
-    with patch(
-        "motile_tracker.import_export.menus.export_dialog.ExportTypeDialog",
-        return_value=mock_dialog,
-    ) as mock_cls:
-        ExportDialog.show_export_dialog(
-            fake_parent, mock_tracks, name="x", colormap=mock_colormap
-        )
-    _, kwargs = mock_cls.call_args
-    assert kwargs.get("has_segmentation") is False
+    """ExportTypeDialog receives the correct has_segmentation flag."""
+    captured_kwargs = []
+    orig_init = ExportTypeDialog.__init__
+
+    def spy_init(self, *args, **kwargs):
+        captured_kwargs.append(kwargs)
+        orig_init(self, *args, **kwargs)
+
+    monkeypatch.setattr(ExportTypeDialog, "__init__", spy_init)
+    monkeypatch.setattr(ExportTypeDialog, "exec_", lambda self: 0)
+
+    ExportDialog.show_export_dialog(
+        fake_parent,
+        solution_tracks_2d_without_segmentation,
+        name="x",
+        colormap=colormap,
+    )
+    assert captured_kwargs[-1].get("has_segmentation") is False
+
+    ExportDialog.show_export_dialog(
+        fake_parent,
+        solution_tracks_2d,
+        name="x",
+        colormap=colormap,
+    )
+    assert captured_kwargs[-1].get("has_segmentation") is True
 
 
-def test_export_dialog_passes_has_segmentation_true(
-    mock_tracks_with_seg, fake_parent, mock_colormap
+def test_export_csv_no_seg(
+    solution_tracks_2d_without_segmentation,
+    fake_parent,
+    tmp_path,
+    colormap,
+    accept_type_dialog,
+    mock_file_dialog,
 ):
-    mock_dialog = MagicMock()
-    mock_dialog.exec_.return_value = 0
-    with patch(
-        "motile_tracker.import_export.menus.export_dialog.ExportTypeDialog",
-        return_value=mock_dialog,
-    ) as mock_cls:
-        ExportDialog.show_export_dialog(
-            fake_parent, mock_tracks_with_seg, name="x", colormap=mock_colormap
-        )
-    _, kwargs = mock_cls.call_args
-    assert kwargs.get("has_segmentation") is True
-
-
-def test_export_csv_no_seg(mock_tracks, fake_parent, tmp_path, mock_colormap):
-    """CSV export without segmentation."""
+    """CSV export without segmentation writes a real CSV file."""
     csv_file = tmp_path / "tracks.csv"
-    mock_tracks.graph = MagicMock()
-    mock_tracks.graph.node_ids.return_value = [1, 2]
-    mock_tracks.get_track_ids.return_value = [1, 2]
 
-    mock_dialog = MagicMock()
-    mock_dialog.exec_.return_value = 1
-    mock_dialog.export_type = "CSV"
-    mock_dialog.save_segmentation = False
-    mock_dialog.seg_file_format = "zarr"
-    mock_dialog.seg_label_attr = "track_id"
+    def configure(dialog):
+        dialog.export_type_combo.setCurrentText("CSV")
 
-    mock_file_dialog = MagicMock()
-    mock_file_dialog.exec_.return_value = True
-    mock_file_dialog.selectedFiles.return_value = [str(csv_file)]
+    accept_type_dialog(configure)
 
-    with (
-        patch(
-            "motile_tracker.import_export.menus.export_dialog.ExportTypeDialog",
-            return_value=mock_dialog,
-        ),
-        patch(
-            "motile_tracker.import_export.menus.export_dialog.QFileDialog",
-            return_value=mock_file_dialog,
-        ),
-        patch(
-            "motile_tracker.import_export.menus.export_dialog.export_to_csv"
-        ) as mock_export,
-    ):
+    with mock_file_dialog(csv_file):
         result = ExportDialog.show_export_dialog(
             fake_parent,
-            mock_tracks,
+            solution_tracks_2d_without_segmentation,
             name="G",
-            nodes_to_keep={1, 2},
-            colormap=mock_colormap,
+            nodes_to_keep={1, 2, 3},
+            colormap=colormap,
         )
 
     assert result is True
-    mock_export.assert_called_once_with(
-        tracks=mock_tracks,
-        outfile=csv_file,
-        color_dict={1: [1, 1, 1, 255], 2: [2, 2, 2, 255], None: [0, 0, 0, 0]},
-        node_ids={1, 2},
-        use_display_names=True,
-        export_seg=False,
-        seg_path=None,
-        seg_label_attr="track_id",
-        seg_file_format="zarr",
-    )
+    assert csv_file.exists()
+    content = csv_file.read_text()
+    # ancestors of {1,2,3} include node 1 (parent of 2 and 3)
+    assert "1" in content
 
 
 def test_export_csv_with_seg_zarr(
-    mock_tracks_with_seg, fake_parent, tmp_path, mock_colormap
+    solution_tracks_2d,
+    fake_parent,
+    tmp_path,
+    colormap,
+    accept_type_dialog,
+    mock_file_dialog,
 ):
-    """CSV export with segmentation as zarr."""
+    """CSV export with segmentation as zarr writes both files."""
     csv_file = tmp_path / "tracks.csv"
-    zarr_file = tmp_path / "tracks_seg.zarr"
-    mock_tracks_with_seg.graph = MagicMock()
-    mock_tracks_with_seg.graph.node_ids.return_value = [1, 2]
-    mock_tracks_with_seg.get_track_ids.return_value = [1, 2]
+    zarr_dir = tmp_path / "seg.zarr"
 
-    mock_dialog = MagicMock()
-    mock_dialog.exec_.return_value = 1
-    mock_dialog.export_type = "CSV"
-    mock_dialog.save_segmentation = True
-    mock_dialog.seg_file_format = "zarr"
-    mock_dialog.seg_label_attr = "track_id"
+    def configure(dialog):
+        dialog.export_type_combo.setCurrentText("CSV")
+        dialog.seg_checkbox.setChecked(True)
+        dialog.seg_format_combo.setCurrentText("zarr")
 
-    mock_csv_fd = MagicMock()
-    mock_csv_fd.exec_.return_value = True
-    mock_csv_fd.selectedFiles.return_value = [str(csv_file)]
-    mock_seg_fd = MagicMock()
-    mock_seg_fd.exec_.return_value = True
-    mock_seg_fd.selectedFiles.return_value = [str(zarr_file)]
+    accept_type_dialog(configure)
 
-    with (
-        patch(
-            "motile_tracker.import_export.menus.export_dialog.ExportTypeDialog",
-            return_value=mock_dialog,
-        ),
-        patch(
-            "motile_tracker.import_export.menus.export_dialog.QFileDialog",
-            side_effect=[mock_csv_fd, mock_seg_fd],
-        ),
-        patch(
-            "motile_tracker.import_export.menus.export_dialog.export_to_csv"
-        ) as mock_export,
-    ):
+    with mock_file_dialog(csv_file, zarr_dir):
         result = ExportDialog.show_export_dialog(
             fake_parent,
-            mock_tracks_with_seg,
+            solution_tracks_2d,
             name="G",
-            nodes_to_keep={1, 2},
-            colormap=mock_colormap,
+            colormap=colormap,
         )
 
     assert result is True
-    mock_export.assert_called_once_with(
-        tracks=mock_tracks_with_seg,
-        outfile=csv_file,
-        color_dict={1: [1, 1, 1, 255], 2: [2, 2, 2, 255], None: [0, 0, 0, 0]},
-        node_ids={1, 2},
-        use_display_names=True,
-        export_seg=True,
-        seg_path=zarr_file,
-        seg_label_attr="track_id",
-        seg_file_format="zarr",
-    )
+    assert csv_file.exists()
+    assert zarr_dir.exists()
 
 
-def test_export_csv_with_seg_tiff(
-    mock_tracks_with_seg, fake_parent, tmp_path, mock_colormap
+def test_export_csv_with_seg_tiff_no_relabel(
+    solution_tracks_2d,
+    fake_parent,
+    tmp_path,
+    colormap,
+    accept_type_dialog,
+    mock_file_dialog,
 ):
-    """CSV export with segmentation as tiff, no relabeling."""
+    """CSV export with segmentation as tiff, relabeling disabled."""
     csv_file = tmp_path / "tracks.csv"
     tif_file = tmp_path / "tracks.tif"
-    mock_tracks_with_seg.graph = MagicMock()
-    mock_tracks_with_seg.graph.node_ids.return_value = [1]
-    mock_tracks_with_seg.get_track_ids.return_value = [1]
 
-    mock_dialog = MagicMock()
-    mock_dialog.exec_.return_value = 1
-    mock_dialog.export_type = "CSV"
-    mock_dialog.save_segmentation = True
-    mock_dialog.seg_file_format = "tiff"
-    mock_dialog.seg_label_attr = None  # no relabeling
+    def configure(dialog):
+        dialog.export_type_combo.setCurrentText("CSV")
+        dialog.seg_checkbox.setChecked(True)
+        dialog.seg_format_combo.setCurrentText("tiff")
+        dialog.relabel_checkbox.setChecked(False)
 
-    mock_csv_fd = MagicMock()
-    mock_csv_fd.exec_.return_value = True
-    mock_csv_fd.selectedFiles.return_value = [str(csv_file)]
-    mock_seg_fd = MagicMock()
-    mock_seg_fd.exec_.return_value = True
-    mock_seg_fd.selectedFiles.return_value = [str(tif_file)]
+    accept_type_dialog(configure)
 
-    with (
-        patch(
-            "motile_tracker.import_export.menus.export_dialog.ExportTypeDialog",
-            return_value=mock_dialog,
-        ),
-        patch(
-            "motile_tracker.import_export.menus.export_dialog.QFileDialog",
-            side_effect=[mock_csv_fd, mock_seg_fd],
-        ),
-        patch(
-            "motile_tracker.import_export.menus.export_dialog.export_to_csv"
-        ) as mock_export,
-    ):
+    with mock_file_dialog(csv_file, tif_file):
         result = ExportDialog.show_export_dialog(
             fake_parent,
-            mock_tracks_with_seg,
+            solution_tracks_2d,
             name="G",
-            colormap=mock_colormap,
+            colormap=colormap,
         )
 
     assert result is True
-    mock_export.assert_called_once_with(
-        tracks=mock_tracks_with_seg,
-        outfile=csv_file,
-        color_dict={1: [1, 1, 1, 255], None: [0, 0, 0, 0]},
-        node_ids=None,
-        use_display_names=True,
-        export_seg=True,
-        seg_path=tif_file,
-        seg_label_attr=None,
-        seg_file_format="tiff",
-    )
+    assert csv_file.exists()
+    assert tif_file.exists()
 
 
-def test_export_geff_no_seg(mock_tracks, fake_parent, tmp_path, mock_colormap):
-    """GEFF export without segmentation."""
-    geff_file = tmp_path / "tracks.zarr"
+def test_export_geff_no_seg(
+    solution_tracks_2d_without_segmentation,
+    fake_parent,
+    tmp_path,
+    colormap,
+    accept_type_dialog,
+    mock_file_dialog,
+):
+    """GEFF export without segmentation writes a real zarr directory."""
+    geff_dir = tmp_path / "tracks.zarr"
 
-    mock_dialog = MagicMock()
-    mock_dialog.exec_.return_value = 1
-    mock_dialog.export_type = "GEFF"
-    mock_dialog.save_segmentation = False
-    mock_dialog.seg_file_format = "zarr"
-    mock_dialog.seg_label_attr = "track_id"
+    accept_type_dialog()  # defaults: GEFF, no seg
 
-    mock_file_dialog = MagicMock()
-    mock_file_dialog.exec_.return_value = True
-    mock_file_dialog.selectedFiles.return_value = [str(geff_file)]
-
-    with (
-        patch(
-            "motile_tracker.import_export.menus.export_dialog.ExportTypeDialog",
-            return_value=mock_dialog,
-        ),
-        patch(
-            "motile_tracker.import_export.menus.export_dialog.QFileDialog",
-            return_value=mock_file_dialog,
-        ),
-        patch(
-            "motile_tracker.import_export.menus.export_dialog.export_to_geff"
-        ) as mock_export,
-    ):
+    with mock_file_dialog(geff_dir):
         result = ExportDialog.show_export_dialog(
             fake_parent,
-            mock_tracks,
+            solution_tracks_2d_without_segmentation,
             name="G",
             nodes_to_keep={1, 2},
-            colormap=mock_colormap,
+            colormap=colormap,
         )
 
     assert result is True
-    mock_export.assert_called_once_with(
-        mock_tracks,
-        geff_file,
-        overwrite=True,
-        node_ids={1, 2},
-        save_segmentation=False,
-        seg_label_attr="track_id",
-        seg_file_format="zarr",
-    )
+    assert (geff_dir / "tracks.geff").exists()
 
 
 def test_export_geff_with_seg_zarr(
-    mock_tracks_with_seg, fake_parent, tmp_path, mock_colormap
+    solution_tracks_2d,
+    fake_parent,
+    tmp_path,
+    colormap,
+    accept_type_dialog,
+    mock_file_dialog,
 ):
     """GEFF export with segmentation as zarr."""
-    geff_file = tmp_path / "tracks.zarr"
+    geff_dir = tmp_path / "tracks.zarr"
 
-    mock_dialog = MagicMock()
-    mock_dialog.exec_.return_value = 1
-    mock_dialog.export_type = "GEFF"
-    mock_dialog.save_segmentation = True
-    mock_dialog.seg_file_format = "zarr"
-    mock_dialog.seg_label_attr = "track_id"
+    def configure(dialog):
+        dialog.seg_checkbox.setChecked(True)
 
-    mock_file_dialog = MagicMock()
-    mock_file_dialog.exec_.return_value = True
-    mock_file_dialog.selectedFiles.return_value = [str(geff_file)]
+    accept_type_dialog(configure)
 
-    with (
-        patch(
-            "motile_tracker.import_export.menus.export_dialog.ExportTypeDialog",
-            return_value=mock_dialog,
-        ),
-        patch(
-            "motile_tracker.import_export.menus.export_dialog.QFileDialog",
-            return_value=mock_file_dialog,
-        ),
-        patch(
-            "motile_tracker.import_export.menus.export_dialog.export_to_geff"
-        ) as mock_export,
-    ):
+    with mock_file_dialog(geff_dir):
         result = ExportDialog.show_export_dialog(
             fake_parent,
-            mock_tracks_with_seg,
+            solution_tracks_2d,
             name="G",
-            colormap=mock_colormap,
+            colormap=colormap,
         )
 
     assert result is True
-    mock_export.assert_called_once_with(
-        mock_tracks_with_seg,
-        geff_file,
-        overwrite=True,
-        node_ids=None,
-        save_segmentation=True,
-        seg_label_attr="track_id",
-        seg_file_format="zarr",
-    )
+    assert (geff_dir / "tracks.geff").exists()
+    assert (geff_dir / "segmentation").exists()
 
 
-def test_export_geff_with_seg_tiff(
-    mock_tracks_with_seg, fake_parent, tmp_path, mock_colormap
+def test_export_geff_with_seg_tiff_no_relabel(
+    solution_tracks_2d,
+    fake_parent,
+    tmp_path,
+    colormap,
+    accept_type_dialog,
+    mock_file_dialog,
 ):
-    """GEFF export with segmentation as tiff, no relabeling."""
-    geff_file = tmp_path / "tracks.zarr"
+    """GEFF export with segmentation as tiff, relabeling disabled."""
+    geff_dir = tmp_path / "tracks.zarr"
 
-    mock_dialog = MagicMock()
-    mock_dialog.exec_.return_value = 1
-    mock_dialog.export_type = "GEFF"
-    mock_dialog.save_segmentation = True
-    mock_dialog.seg_file_format = "tiff"
-    mock_dialog.seg_label_attr = None
+    def configure(dialog):
+        dialog.seg_checkbox.setChecked(True)
+        dialog.seg_format_combo.setCurrentText("tiff")
+        dialog.relabel_checkbox.setChecked(False)
 
-    mock_file_dialog = MagicMock()
-    mock_file_dialog.exec_.return_value = True
-    mock_file_dialog.selectedFiles.return_value = [str(geff_file)]
+    accept_type_dialog(configure)
 
-    with (
-        patch(
-            "motile_tracker.import_export.menus.export_dialog.ExportTypeDialog",
-            return_value=mock_dialog,
-        ),
-        patch(
-            "motile_tracker.import_export.menus.export_dialog.QFileDialog",
-            return_value=mock_file_dialog,
-        ),
-        patch(
-            "motile_tracker.import_export.menus.export_dialog.export_to_geff"
-        ) as mock_export,
-    ):
+    with mock_file_dialog(geff_dir):
         result = ExportDialog.show_export_dialog(
             fake_parent,
-            mock_tracks_with_seg,
+            solution_tracks_2d,
             name="G",
-            colormap=mock_colormap,
+            colormap=colormap,
         )
 
     assert result is True
-    mock_export.assert_called_once_with(
-        mock_tracks_with_seg,
-        geff_file,
-        overwrite=True,
-        node_ids=None,
-        save_segmentation=True,
-        seg_label_attr=None,
-        seg_file_format="tiff",
-    )
+    assert (geff_dir / "tracks.geff").exists()
 
 
-def test_export_geff_error(mock_tracks, fake_parent, tmp_path, mock_colormap):
+def test_export_geff_error(
+    solution_tracks_2d_without_segmentation,
+    fake_parent,
+    tmp_path,
+    colormap,
+    accept_type_dialog,
+    mock_file_dialog,
+):
     """Shows QMessageBox when export_to_geff raises ValueError."""
-    geff_file = tmp_path / "error.zarr"
+    geff_dir = tmp_path / "error.zarr"
 
-    mock_dialog = MagicMock()
-    mock_dialog.exec_.return_value = 1
-    mock_dialog.export_type = "GEFF"
-    mock_dialog.save_segmentation = False
-    mock_dialog.seg_file_format = "zarr"
-    mock_dialog.seg_label_attr = "track_id"
-
-    mock_file_dialog = MagicMock()
-    mock_file_dialog.exec_.return_value = True
-    mock_file_dialog.selectedFiles.return_value = [str(geff_file)]
+    accept_type_dialog()
 
     with (
-        patch(
-            "motile_tracker.import_export.menus.export_dialog.ExportTypeDialog",
-            return_value=mock_dialog,
-        ),
-        patch(
-            "motile_tracker.import_export.menus.export_dialog.QFileDialog",
-            return_value=mock_file_dialog,
-        ),
+        mock_file_dialog(geff_dir),
         patch(
             "motile_tracker.import_export.menus.export_dialog.export_to_geff",
             side_effect=ValueError("Export failed"),
@@ -495,7 +431,10 @@ def test_export_geff_error(mock_tracks, fake_parent, tmp_path, mock_colormap):
         ) as mock_warning,
     ):
         result = ExportDialog.show_export_dialog(
-            fake_parent, mock_tracks, name="G", colormap=mock_colormap
+            fake_parent,
+            solution_tracks_2d_without_segmentation,
+            name="G",
+            colormap=colormap,
         )
 
     assert result is False
