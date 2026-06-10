@@ -216,6 +216,8 @@ class TracksViewer:
                 self.axis_order,
             )
 
+        self.tracks_updated.emit(False)
+
     def _refresh(self, node: str | None = None, refresh_view: bool = False) -> None:
         """Call refresh function on napari layers and the submit signal that tracks are
         updated. Restore the selected_nodes, if possible
