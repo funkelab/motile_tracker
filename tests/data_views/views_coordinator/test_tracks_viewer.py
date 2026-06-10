@@ -118,13 +118,13 @@ class TestEdgeOperations:
                     "area": 100.0,
                     "track_id": 5,
                     "lineage_id": 2,
-                    "solution": 1,
+                    "solution": True,
                 }
             ],
             indices=[7],
         )
         graph_2d_without_segmentation.bulk_add_edges(
-            [{"source_id": 7, "target_id": 6, "solution": 1}]
+            [{"source_id": 7, "target_id": 6, "solution": True}]
         )
 
         tracks = SolutionTracks(
