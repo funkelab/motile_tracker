@@ -393,21 +393,30 @@ def test_csv_import_without_segmentation(
     assert dialog.tracks.ndim == 3
 
 
-def test_geff_import_2d_with_segmentation(
-    qtbot, tmp_path, graph_2d_without_segmentation, segmentation_2d, monkeypatch
+@pytest.mark.parametrize(
+    "graph_fixture, seg_fixture, ndim",
+    [
+        ("graph_2d_without_segmentation", "segmentation_2d", 3),
+        ("graph_3d_without_segmentation", "segmentation_3d", 4),
+    ],
+)
+def test_geff_import_with_segmentation(
+    qtbot, tmp_path, graph_fixture, seg_fixture, ndim, monkeypatch, request
 ):
-    """Test exporting and re-importing 2D tracks with segmentation.
-    This tests whether the full workflow works end-to-end.
+    """Test exporting and re-importing tracks with external segmentation.
+    This tests whether the full workflow works end-to-end for 2D and 3D.
     """
+    graph = request.getfixturevalue(graph_fixture)
+    segmentation = request.getfixturevalue(seg_fixture)
+
     # Mock _resize_dialog to avoid screen access in headless CI
     monkeypatch.setattr(ImportDialog, "_resize_dialog", lambda self: None)
 
     # Create tracks and export to GEFF (as motile_tracker does in tracks_list.py:237)
-    tracks = Tracks(
-        graph_2d_without_segmentation, ndim=3, time_attr="t", tracklet_attr="track_id"
-    )
+    tracks = Tracks(graph, ndim=ndim, time_attr="t", tracklet_attr="track_id")
     geff_path = tmp_path / "test_tracks.zarr"
     export_to_geff(tracks, geff_path)
+
     # Create import dialog and load the GEFF file
     dialog = ImportDialog(import_type="geff")
     qtbot.addWidget(dialog)
@@ -421,67 +430,7 @@ def test_geff_import_2d_with_segmentation(
     # Select "Use external segmentation" option and set path
     dialog.segmentation_widget.external_segmentation_radio.setChecked(True)
     seg_path = tmp_path / "segmentation.zarr"
-    zarr.save_array(seg_path, segmentation_2d)
-    dialog.segmentation_widget.segmentation_widget.image_path_line.setText(
-        str(seg_path)
-    )
-    dialog.segmentation_widget.segmentation_widget.seg_path_updated.emit()
-
-    # Verify finish button is enabled
-    assert dialog.finish_button.isEnabled() is True, (
-        "Finish button should be enabled with valid GEFF and segmentation"
-    )
-
-    # Set seg_id mapping to "None" since node id == seg_id (automapping is incorrect)
-    prop_map = dialog.prop_map_widget
-    seg_combo = prop_map.mapping_widgets["seg_id"]
-    seg_combo.setCurrentText("None")
-    prop_map._update_props_left()
-
-    # Import the tracks
-    dialog._finish()
-
-    # Verify tracks were imported successfully
-    assert hasattr(dialog, "tracks"), "Dialog should have tracks attribute after import"
-    assert dialog.tracks is not None, "Tracks should not be None"
-    assert dialog.tracks.graph.num_nodes() == graph_2d_without_segmentation.num_nodes()
-    assert dialog.tracks.graph.num_edges() == graph_2d_without_segmentation.num_edges()
-    assert dialog.tracks.ndim == 3
-    for node_id in dialog.tracks.graph.node_ids():
-        dialog.tracks.get_time(node_id)
-
-    # Area should be enabled and computed when segmentation is present
-    assert "area" in dialog.tracks.features
-    for node_id in dialog.tracks.graph.node_ids():
-        assert dialog.tracks.graph.nodes[node_id]["area"] > 0
-
-
-def test_geff_import_3d_with_segmentation(
-    qtbot, tmp_path, solution_tracks_3d, monkeypatch
-):
-    """Test exporting and re-importing 3D tracks with segmentation."""
-    # Mock _resize_dialog to avoid screen access in headless CI
-    monkeypatch.setattr(ImportDialog, "_resize_dialog", lambda self: None)
-
-    # Create tracks and export to GEFF
-    tracks = solution_tracks_3d
-    geff_path = tmp_path / "test_tracks_3d.zarr"
-    export_to_geff(tracks, geff_path)
-
-    # Create import dialog and load the GEFF file
-    dialog = ImportDialog(import_type="geff")
-    qtbot.addWidget(dialog)
-
-    # Load the geff file
-    dialog.import_widget._load_geff(geff_path)
-
-    # Verify geff root was loaded
-    assert dialog.import_widget.root is not None, "Failed to load GEFF root"
-
-    # Select "Use external segmentation" option and set path
-    dialog.segmentation_widget.external_segmentation_radio.setChecked(True)
-    seg_path = tmp_path / "segmentation_3d.zarr"
-    zarr.save_array(seg_path, np.asarray(tracks.segmentation))
+    zarr.save_array(seg_path, segmentation)
     dialog.segmentation_widget.segmentation_widget.image_path_line.setText(
         str(seg_path)
     )
@@ -502,11 +451,16 @@ def test_geff_import_3d_with_segmentation(
     # Verify tracks were imported successfully
     assert hasattr(dialog, "tracks"), "Dialog should have tracks attribute after import"
     assert dialog.tracks is not None, "Tracks should not be None"
-    assert dialog.tracks.graph.num_nodes() == solution_tracks_3d.graph.num_nodes()
-    assert dialog.tracks.graph.num_edges() == solution_tracks_3d.graph.num_edges()
-    assert dialog.tracks.ndim == 4
+    assert dialog.tracks.graph.num_nodes() == graph.num_nodes()
+    assert dialog.tracks.graph.num_edges() == graph.num_edges()
+    assert dialog.tracks.ndim == ndim
     for node_id in dialog.tracks.graph.node_ids():
         dialog.tracks.get_time(node_id)
+
+    # Area should be enabled and computed when segmentation is present
+    assert "area" in dialog.tracks.features
+    for node_id in dialog.tracks.graph.node_ids():
+        assert dialog.tracks.graph.nodes[node_id]["area"] > 0
 
 
 def test_geff_import_without_area_computes_area(
@@ -780,12 +734,30 @@ def test_geff_import_with_related_data(qtbot, tmp_path, graph_2d, monkeypatch):
     tracks = Tracks(graph_2d, ndim=3, time_attr="t")
     geff_path = tmp_path / "old_geff_with_related.zarr"
     # save_segmentation=True writes segmentation + adds related_objects to geff metadata.
-    # seg_label_attr=None preserves node IDs as pixel values (consistent with other tests).
+    # seg_relabel=None preserves node IDs as pixel values (consistent with other tests).
     export_to_geff(tracks, geff_path, save_segmentation=True, seg_relabel=None)
 
-    # Remove segmentation_shape to simulate old funtracks export
+    # Simulate an old GEFF that has related_objects but no embedded mask/bbox
+    # or FeatureDict (these are features of newer funtracks exports).
+    import shutil
+
     root = zarr.open_group(geff_path / "tracks.geff", mode="r+")
     del root.attrs["segmentation_shape"]
+
+    geff_meta = dict(root.attrs["geff"])
+    node_props_meta = dict(geff_meta["node_props_metadata"])
+    for key in ("mask", "bbox"):
+        node_props_meta.pop(key, None)
+    geff_meta["node_props_metadata"] = node_props_meta
+    extra = dict(geff_meta.get("extra", {}))
+    extra.pop("funtracks", None)
+    geff_meta["extra"] = extra
+    root.attrs["geff"] = geff_meta
+
+    for key in ("mask", "bbox"):
+        prop_path = geff_path / "tracks.geff" / "nodes" / "props" / key
+        if prop_path.exists():
+            shutil.rmtree(prop_path)
 
     dialog = ImportDialog(import_type="geff")
     qtbot.addWidget(dialog)
@@ -793,11 +765,12 @@ def test_geff_import_with_related_data(qtbot, tmp_path, graph_2d, monkeypatch):
 
     assert dialog.import_widget.root is not None
 
-    # Old GEFF warning visible; related radio buttons populated
-    assert not dialog.segmentation_widget._old_geff_warning_label.isHidden()
+    # Old GEFF warning should NOT be shown (no mask/bbox columns)
+    assert dialog.segmentation_widget._old_geff_warning_label.isHidden()
+    # Related radio buttons populated from related_objects metadata
     assert len(dialog.segmentation_widget.related_object_radio_buttons) > 0
 
-    # Related radio is auto-checked → include_seg() is True
+    # Related radio is auto-checked -> include_seg() is True
     assert dialog.segmentation_widget.include_seg() is True
 
     # Resolved path must exist on disk

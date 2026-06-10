@@ -203,6 +203,15 @@ def graph_3d() -> td.graph.GraphView:
 
 
 @pytest.fixture
+def graph_3d_without_segmentation(graph_3d: td.graph.GraphView) -> td.graph.GraphView:
+    """Return a copy of graph_3d without segmentation-related node attributes."""
+    graph_without_seg = graph_3d.detach().filter().subgraph()
+    graph_without_seg.remove_node_attr_key(td.DEFAULT_ATTR_KEYS.MASK)
+    graph_without_seg.remove_node_attr_key(td.DEFAULT_ATTR_KEYS.BBOX)
+    return graph_without_seg
+
+
+@pytest.fixture
 def graph_2d_without_segmentation(graph_2d: td.graph.GraphView) -> td.graph.GraphView:
     """Return a copy of graph_2d without segmentation-related node attributes."""
     graph_without_seg = graph_2d.detach().filter().subgraph()
