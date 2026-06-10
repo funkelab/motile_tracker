@@ -108,7 +108,7 @@ def graph_2d() -> td.graph.GraphView:
             "area": 1681.0,
             "track_id": 1,
             "lineage_id": 1,
-            "solution": 1,
+            "solution": True,
         },
         {
             "t": 1,
@@ -116,7 +116,7 @@ def graph_2d() -> td.graph.GraphView:
             "area": 441.0,
             "track_id": 2,
             "lineage_id": 1,
-            "solution": 1,
+            "solution": True,
         },
         {
             "t": 1,
@@ -124,7 +124,7 @@ def graph_2d() -> td.graph.GraphView:
             "area": 961.0,
             "track_id": 3,
             "lineage_id": 1,
-            "solution": 1,
+            "solution": True,
         },
         {
             "t": 2,
@@ -132,7 +132,7 @@ def graph_2d() -> td.graph.GraphView:
             "area": 16.0,
             "track_id": 3,
             "lineage_id": 1,
-            "solution": 1,
+            "solution": True,
         },
         {
             "t": 4,
@@ -140,7 +140,7 @@ def graph_2d() -> td.graph.GraphView:
             "area": 16.0,
             "track_id": 3,
             "lineage_id": 1,
-            "solution": 1,
+            "solution": True,
         },
         {
             "t": 4,
@@ -148,7 +148,7 @@ def graph_2d() -> td.graph.GraphView:
             "area": 16.0,
             "track_id": 5,
             "lineage_id": 2,
-            "solution": 1,
+            "solution": True,
         },
     ]
     for node, bbox in zip(nodes, bboxes, strict=True):
@@ -157,10 +157,10 @@ def graph_2d() -> td.graph.GraphView:
     graph.bulk_add_nodes(nodes=nodes, indices=[1, 2, 3, 4, 5, 6])
     graph.bulk_add_edges(
         [
-            {"source_id": 1, "target_id": 2, "iou": 0.0, "solution": 1},
-            {"source_id": 1, "target_id": 3, "iou": 0.395, "solution": 1},
-            {"source_id": 3, "target_id": 4, "iou": 0.0, "solution": 1},
-            {"source_id": 4, "target_id": 5, "iou": 1.0, "solution": 1},
+            {"source_id": 1, "target_id": 2, "iou": 0.0, "solution": True},
+            {"source_id": 1, "target_id": 3, "iou": 0.395, "solution": True},
+            {"source_id": 3, "target_id": 4, "iou": 0.0, "solution": True},
+            {"source_id": 4, "target_id": 5, "iou": 1.0, "solution": True},
         ]
     )
     graph._update_metadata(segmentation_shape=(5, 100, 100))
@@ -184,9 +184,9 @@ def graph_3d() -> td.graph.GraphView:
         [45, 35, 30, 76, 66, 61],  # node 3, t=1: sphere center=(60,50,45) r=15
     ]
     nodes = [
-        {"t": 0, "pos": [50.0, 50.0, 50.0], "solution": 1},
-        {"t": 1, "pos": [20.0, 50.0, 80.0], "solution": 1},
-        {"t": 1, "pos": [60.0, 50.0, 45.0], "solution": 1},
+        {"t": 0, "pos": [50.0, 50.0, 50.0], "solution": True},
+        {"t": 1, "pos": [20.0, 50.0, 80.0], "solution": True},
+        {"t": 1, "pos": [60.0, 50.0, 45.0], "solution": True},
     ]
     for node, bbox in zip(nodes, bboxes, strict=True):
         node[td.DEFAULT_ATTR_KEYS.MASK] = _make_mask(bbox)
@@ -194,8 +194,8 @@ def graph_3d() -> td.graph.GraphView:
     graph.bulk_add_nodes(nodes=nodes, indices=[1, 2, 3])
     graph.bulk_add_edges(
         [
-            {"source_id": 1, "target_id": 2, "solution": 1},
-            {"source_id": 1, "target_id": 3, "solution": 1},
+            {"source_id": 1, "target_id": 2, "solution": True},
+            {"source_id": 1, "target_id": 3, "solution": True},
         ]
     )
     graph._update_metadata(segmentation_shape=(2, 100, 100, 100))
@@ -241,7 +241,7 @@ def graph_3d_with_division() -> td.graph.GraphView:
                 "area": 1000.0,
                 td.DEFAULT_ATTR_KEYS.MASK: _make_mask(bboxes[0]),
                 td.DEFAULT_ATTR_KEYS.BBOX: np.array(bboxes[0], dtype=np.int64),
-                "solution": 1,
+                "solution": True,
             },
             {
                 "t": 1,
@@ -249,7 +249,7 @@ def graph_3d_with_division() -> td.graph.GraphView:
                 "area": 1000.0,
                 td.DEFAULT_ATTR_KEYS.MASK: _make_mask(bboxes[1]),
                 td.DEFAULT_ATTR_KEYS.BBOX: np.array(bboxes[1], dtype=np.int64),
-                "solution": 1,
+                "solution": True,
             },
             {
                 "t": 2,
@@ -257,7 +257,7 @@ def graph_3d_with_division() -> td.graph.GraphView:
                 "area": 1000.0,
                 td.DEFAULT_ATTR_KEYS.MASK: _make_mask(bboxes[2]),
                 td.DEFAULT_ATTR_KEYS.BBOX: np.array(bboxes[2], dtype=np.int64),
-                "solution": 1,
+                "solution": True,
             },
             {
                 "t": 2,
@@ -265,16 +265,16 @@ def graph_3d_with_division() -> td.graph.GraphView:
                 "area": 1000.0,
                 td.DEFAULT_ATTR_KEYS.MASK: _make_mask(bboxes[3]),
                 td.DEFAULT_ATTR_KEYS.BBOX: np.array(bboxes[3], dtype=np.int64),
-                "solution": 1,
+                "solution": True,
             },
         ],
         indices=[1, 2, 3, 4],
     )
     graph.bulk_add_edges(
         [
-            {"source_id": 1, "target_id": 2, "solution": 1},
-            {"source_id": 2, "target_id": 3, "solution": 1},
-            {"source_id": 2, "target_id": 4, "solution": 1},
+            {"source_id": 1, "target_id": 2, "solution": True},
+            {"source_id": 2, "target_id": 3, "solution": True},
+            {"source_id": 2, "target_id": 4, "solution": True},
         ]
     )
     graph._update_metadata(segmentation_shape=(5, 100, 100, 100))

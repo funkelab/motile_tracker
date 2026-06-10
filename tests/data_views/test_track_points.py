@@ -182,7 +182,7 @@ def test_create_node_attrs(viewer, solution_tracks_2d):
     # Verify attributes
     assert "pos" in attrs
     assert "t" in attrs
-    assert "track_id" in attrs
+    assert "tracklet_id" in attrs
     assert attrs["t"] == 1
     assert np.array_equal(attrs["pos"], [50, 50])
     # Test 2: Activates new track_id if none selected

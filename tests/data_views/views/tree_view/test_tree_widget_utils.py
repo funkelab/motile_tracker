@@ -53,7 +53,7 @@ def test_get_features_from_tracks_individual_pos_attrs():
         ndim=3,
     )
     graph.bulk_add_nodes(
-        nodes=[{"t": 0, "y": 10.0, "x": 20.0, "solution": 1}],
+        nodes=[{"t": 0, "y": 10.0, "x": 20.0, "solution": True}],
         indices=[1],
     )
     tracks = SolutionTracks(graph=graph, ndim=3, time_attr="t", pos_attr=["y", "x"])
@@ -80,19 +80,25 @@ def test_extract_sorted_tracks_incomplete_lineage():
     )
     graph.bulk_add_nodes(
         nodes=[
-            {"t": 0, "pos": [0.0, 0.0], "track_id": 1, "solution": 1},  # A, node 1
-            {"t": 1, "pos": [0.0, 0.0], "track_id": 1, "solution": 1},  # B, node 2
-            {"t": 2, "pos": [0.0, 0.0], "track_id": 2, "solution": 1},  # C, node 3
+            {"t": 0, "pos": [0.0, 0.0], "track_id": 1, "solution": True},  # A, node 1
+            {"t": 1, "pos": [0.0, 0.0], "track_id": 1, "solution": True},  # B, node 2
+            {"t": 2, "pos": [0.0, 0.0], "track_id": 2, "solution": True},  # C, node 3
         ],
         indices=[1, 2, 3],
     )
     graph.bulk_add_edges(
         [
-            {"source_id": 1, "target_id": 2, "solution": 1},  # A -> B
-            {"source_id": 2, "target_id": 3, "solution": 1},  # B -> C (cross boundary)
+            {"source_id": 1, "target_id": 2, "solution": True},  # A -> B
+            {
+                "source_id": 2,
+                "target_id": 3,
+                "solution": True,
+            },  # B -> C (cross boundary)
         ]
     )
-    tracks = SolutionTracks(graph=graph, ndim=3, time_attr="t")
+    tracks = SolutionTracks(
+        graph=graph, ndim=3, time_attr="t", tracklet_attr="track_id"
+    )
 
     colormap = napari.utils.colormaps.label_colormap(49, seed=0.5, background_value=0)
     track_df, _ = extract_sorted_tracks(tracks, colormap)
