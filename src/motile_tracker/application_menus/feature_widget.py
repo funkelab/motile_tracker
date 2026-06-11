@@ -54,6 +54,8 @@ class FeatureWidget(QWidget):
         self.layout.addStretch()
 
     def _clear_layout(self) -> None:
+        """Remove all checkboxes from the layout"""
+
         while self.layout.count():
             item = self.layout.takeAt(0)
 
@@ -62,6 +64,8 @@ class FeatureWidget(QWidget):
                 widget.deleteLater()
 
     def _discover_features(self) -> dict[str, Feature]:
+        """Find all features available for the current tracks (excluding position)"""
+
         tracks = self.tracks_viewer.tracks
 
         features = RegionpropsAnnotator.get_available_features(ndim=tracks.ndim)
@@ -71,6 +75,13 @@ class FeatureWidget(QWidget):
         return features
 
     def _on_toggled(self, feature_key: str, checked: bool) -> None:
+        """Enable/disable features on tracks
+
+        Args:
+            feature_key (str): the feature the enable/disable
+            checked (bool): whether to enable (True) or disable (False)
+        """
+
         tracks = self.tracks_viewer.tracks
 
         if checked:
