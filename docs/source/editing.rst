@@ -3,7 +3,7 @@ Editing Tracks
 
 Usage Overview
 **************
-Predicted tracks can be corrected by deleting, adding, or modifying nodes and/or edges, using the buttons in the 'Edit Tracks' widget or their corresponding keyboard shortcuts, or by editing the napari Points and Segmentation layers directly.
+Predicted tracks can be corrected by deleting, adding, or modifying nodes and/or edges, using the buttons in the 'Editing & Selection' widget or their corresponding keyboard shortcuts, or by editing the napari Points and Segmentation layers directly.
 
 Editing nodes
 *************
@@ -12,7 +12,7 @@ Editing nodes
 
 Deleting nodes
 ---------------
-Nodes can be deleted by selecting one or multiple nodes and clicking the 'Delete' button in the Edit Tracks menu or pressing ``D`` or ``Delete`` on the keyboard.
+Nodes can be deleted by selecting one or multiple nodes and clicking the 'Delete' button in the Editing & Selection menu or pressing ``D`` or ``Delete`` on the keyboard.
 Deletion of a node results in its removal from the tree view and removal of its corresponding point and segmentation label in the Points and Segmentation napari layers.
 If the node was connected to a predecessor and a successor, a new skip edge will be formed between the predecessor and successor nodes, leaving the remaining track intact.
 If one of the two children of a dividing node is deleted, the nodes of the remaining sibling are relabeled to match the track ID of the parent.
@@ -31,6 +31,7 @@ New nodes can be added in two ways, depending on what type of detections you use
     - By painting on the Segmentation layer, if it exists. To continue an existing track, select a node in the track and scroll to a new time frame. The label ID will automatically be updated to create a new node using the same track ID. To start a new track, press "m" to generate a new label with a new track ID.
 
     - By adding a new point in the Points layer, if there are only point detections. A new, non-connected endpoint node will be created at the clicked position.
+
 .. figure:: images/add_node.png
    :width: 600px
    :align: center
@@ -67,6 +68,16 @@ since a node in a lineage tree cannot have two incoming edges. Note that new edg
    :align: center
 
    Adding an edge between two nodes, creating a new division point.
+
+Swapping nodes
+--------------
+The incoming edges of two nodes at the same time point can be swapped with the 'Swap' button (``S`` key). This essentially breaks two incoming edges and creates two new ones in one action.
+
+.. figure:: images/swap_edges.png
+   :width: 600px
+   :align: center
+
+   Swapping the incoming edges between two nodes at the same time point.
 
 Undoing and redoing actions
 ***************************

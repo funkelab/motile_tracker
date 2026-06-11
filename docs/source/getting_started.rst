@@ -1,5 +1,5 @@
-Getting started with the Motile Tracker
-======================================
+Getting started with Motile Tracker
+===================================
 
 Installation
 ************
@@ -48,10 +48,11 @@ covering most of the same information as the rest of this getting started guide.
 
   <iframe src="https://drive.google.com/file/d/1zHvO9inHw0Hlbwq5zmRX4qUnVuO21neo/preview" width="640" height="480" allow="autoplay"></iframe>
 
+You can also follow this `tutorial`_.
 
 Input data
 **********
-The motile tracker does not perform detection: you must provide a Labels layer or a Points layer
+Motile Tracker does not perform detection: you must provide a Labels layer or a Points layer
 containing the objects you want to track.
 The Labels layer must have time as the
 first dimension followed by the spatial dimensions (no channels).
@@ -59,7 +60,7 @@ The Points layer must have the point locations with time as the first number,
 followed by the spatial dimensions. While source images are
 nice to qualitatively evaluate results, they are not necessary to run tracking.
 
-There are two example datasets provided in ``File`` -> ``Open Sample`` -> ``Motile``.
+There are two example datasets provided in ``File`` -> ``Open Sample`` -> ``Motile Tracker``.
 A 2D HeLa dataset from the `Cell Tracking Challenge`_ is provided, both in full and a cropped subset for testing features on smaller data, and has both a Labels layer and Points layer.
 There is also a 3D dataset of images and segmentations of a membrane-labeled developing early mouse embryo (4-26 cells)
 from `Fabrèges et al (2024)`_, automatically downloaded from `zenodo`_.
@@ -70,24 +71,24 @@ for bounding box tracking) - please react to
 of shape linking you want.
 
 Tracker widgets
-**************
-You can open the Main Motile Widget via ``Plugins`` -> ``Motile`` -> ``Motile Main Widget``.
-This will open a tab widget containing a ``Motile``, ``Edit Tracks``, and ``Results List`` widget, as well
-as an empty ``Lineage View`` widget at the bottom of the screen. Alternatively, you can open the Tree View
-and the Menus widgets individually under ``Plugins`` -> ``Motile`` and dock them manually.
+***************
+Motile Tracker comes with several widgets for tracking, viewing, and editing. You can open all widgets via ``Plugins`` -> ``Motile Tracker`` -> ``Open all widgets``,
+or select individual from the same dropdown menu. You can optionally close or hide widgets via the close (x) button, or via right mouse-click on the 'eye' button.
+Optionally, you can float individual widgets and place them somewhere else (for example, you can move the lineage view to a secondary monitor).
+If you press the `/` key, you can hide/show all Tracker widgets.
 
 Running tracking
 ****************
-The ``Motile`` tab by default opens to the ``Run Editor`` view. In this view,
+The ``Tracking`` tab by default opens to the ``Run Editor`` view. In this view,
 you can pick a name for your run, select an input layer, set
 hyperparameters, and start a motile run. Hovering over the title of each
 element in the widget will make a tooltip appear describing the purpose
 of the element. All hyperparameters are explained in the :doc:`tracking with motile <motile>` docs page.
-When you are ready, click the ``Run Tracking`` button to start tracking.
+When you are ready, click the ``Run Tracking (SCIP)`` button to start tracking.
 
 Viewing and editing run results
 *******************************
-Clicking the ``Run Tracking`` button will automatically take you to the motile ``Run Viewer``
+Clicking the ``Run Tracking (SCIP)`` button will automatically take you to the motile ``Run Viewer``
 menu, display a points and a tracks layer in the napari viewer, and populate the Lineage Tree view. If your input was a segmentation, there will also be
 a new segmentation layer where the IDs have been relabeled to match across time, and the input segmentation layer will be hidden to avoid confusion.
 
@@ -95,26 +96,25 @@ You can :doc:`view the results <tree_view>` using the synchronized napari layers
 if you select the new labels/points layer as input: our next major feature to add
 is incorporating the detection and linking corrections into the optimization task in a more principled manner.
 
-Each ``Tracking Run`` will be stored in the ``Results List`` widget.
+Each ``Tracking Run`` will be stored in the ``Tracks List`` widget.
 These are the runs that are stored in memory - if you run tracking multiple
 times with different inputs or parameters, you can click back and forth
 between the results here. Here you can also save any runs that you want to store for later,
-or export the tracks to a csv file. If your input was a Labels layer, the
-``node_id`` will be determined by segmentation label id. If your original segmentation
+or export the tracks to `geff`_ or csv, optionally including the (relabeled) segmentation.
+If your input was a Labels layer, the ``node_id`` will be determined by segmentation label id. If your original segmentation
 repeated labels across time, the application will relabel them all to be unique, and
 the new label id will be used as the node id.
 If your input was a Points layer, the ``node_id`` is simply the index of the
 node in the list of points.
-Note: This does not save the output segmentation. If you want to save
-the relabeled segmentation, you can do so through napari by selecting the
-layer and then selecting ``File``-> ``Save selected layers``
 Deleting runs you do not want to keep viewing is a good idea, since these are stored in memory.
 Runs that were saved in previous sessions do not appear here until you load them from disk with the ``Load Tracks`` button.
 The tracking results can also be visualized as a lineage tree.
-You can open the lineage tree widget via ``Plugins`` > ``Motile`` > ``Lineage View``.
+You can open the lineage tree widget via ``Plugins`` > ``Motile Tracker`` > ``Widget - Lineage View``.
 For more details, go to the :doc:`Tree View <tree_view>` documentation.
 
 .. _Issue #48: https://github.com/funkelab/motile_tracker/issues/48
 .. _Cell Tracking Challenge: https://celltrackingchallenge.net/
 .. _Fabrèges et al (2024): https://www.science.org/doi/10.1126/science.adh1145
 .. _zenodo: https://zenodo.org/records/13903500
+.. _geff: https://github.com/live-image-tracking-tools/geff
+.. _tutorial: https://github.com/funkelab/motile_tracker/blob/main/assets/motile-tracker_tutorial.pdf
