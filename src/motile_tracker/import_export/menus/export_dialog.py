@@ -85,7 +85,7 @@ class ExportTypeDialog(QDialog):
 
     @property
     def seg_label_attr(self) -> str | None:
-        return "track_id" if self.relabel_checkbox.isChecked() else None
+        return "tracklet" if self.relabel_checkbox.isChecked() else None
 
 
 class ExportDialog:
@@ -186,7 +186,7 @@ class ExportDialog:
                 use_display_names=True,
                 export_seg=save_segmentation,
                 seg_path=seg_path,
-                seg_label_attr=seg_label_attr,
+                seg_relabel=seg_label_attr,
                 seg_file_format=seg_file_format,
             )
             return True
@@ -210,7 +210,7 @@ class ExportDialog:
                     overwrite=True,
                     node_ids=nodes_to_keep,
                     save_segmentation=save_segmentation,
-                    seg_label_attr=seg_label_attr,
+                    seg_relabel=seg_label_attr,
                     seg_file_format=seg_file_format,
                 )
                 return True
