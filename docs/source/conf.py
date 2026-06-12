@@ -4,6 +4,7 @@ author = "Caroline Malin-Mayor"
 
 extensions = [
     "sphinx.ext.autodoc",
+    "sphinx.ext.napoleon",
     "myst_parser",
     "autoapi.extension",
     "sphinx_rtd_theme",
@@ -12,6 +13,10 @@ extensions = [
 autoapi_dirs = ["../../src/motile_tracker"]
 
 exclude_patterns = []
+
+suppress_warnings = [
+    "ref.python",  # re-exports in __init__.py create duplicate cross-reference targets
+]
 
 
 # -- Options for HTML output -------------------------------------------------

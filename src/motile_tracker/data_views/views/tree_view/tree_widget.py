@@ -272,7 +272,8 @@ class TreePlot(pg.PlotWidget):
         self._create_pyqtgraph_content(track_df, plot_type, feature)
 
     def _update_viewed_data(self, view_direction: str):
-        """Set the data according to the view direction
+        """Set the data according to the view direction.
+
         Args:
             view_direction (str): direction to plot the data, either 'horizontal' or
                 'vertical'

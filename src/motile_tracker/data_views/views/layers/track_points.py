@@ -162,11 +162,13 @@ class TrackPoints(ZOnlyPoints):
 
     def set_point_size(self, size: int) -> None:
         """Sets a new default point size.
+
         NOTE: This function call is triggered by the current_size event, which is emitted
         when the user moves the 'point size' slider in the layer controls. However, this
         event is also emitted in the 'add' and 'select' functions, so we have to block the
-         signals there to avoid increasing the point size by accident, since new or
-        selected points are displayed at a 30% bigger size."""
+        signals there to avoid increasing the point size by accident, since new or
+        selected points are displayed at a 30% bigger size.
+        """
 
         self.default_size = size
         self._refresh()
