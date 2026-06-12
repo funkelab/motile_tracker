@@ -3,12 +3,11 @@ Getting started with Motile Tracker
 
 Installation
 ************
-The Motile Tracker depends on ``ilpy``, which must be installed via conda.::
+Install from PyPI in the environment of your choice (e.g. ``venv``, ``conda``)::
 
-    conda create -n motile-tracker python=3.10
-    conda activate motile-tracker
-    conda install -c conda-forge -c funkelab -c gurobi ilpy
     pip install motile-tracker
+
+Currently, motile_tracker requires Python >=3.11.
 
 If this is successful, you can then run ``napari`` from your command line, and
 the motile tracker should be visible in the ``Plugins`` drop down menu.
