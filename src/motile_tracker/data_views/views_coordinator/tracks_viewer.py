@@ -43,8 +43,9 @@ BASE_TEXT = "Click: select node\nShift+Click: append to selection\nCtrl/Cmd+Clic
 
 class TracksViewer:
     """Purposes of the TracksViewer:
+
     - Emit signals that all widgets should use to update selection or update
-        the currently displayed Tracks object
+      the currently displayed Tracks object
     - Storing the currently displayed tracks
     - Store shared rendering information like colormaps (or symbol maps)
     """
@@ -171,20 +172,21 @@ class TracksViewer:
         self, initialization: bool | None = False, refresh_view: bool | None = False
     ) -> None:
         """Create or update the pandas dataframe used by the TreeWidget and TableWidget.
+
         The track_df should be updated when:
-            - a tree or table widget is being initialized (initialization=True) and no
-                tree or table widget exists yet
-            - a normal update event happens (initialization = False) AND a tree widget
-            and/or table widget exists on menu_manager
+
+        - a tree or table widget is being initialized (initialization=True) and no
+          tree or table widget exists yet
+        - a normal update event happens (initialization = False) AND a tree widget
+          and/or table widget exists on menu_manager
 
         Args:
             initialization (bool | None = False): whether or not this is called by a tree
-            or table widget that is initializing.
+                or table widget that is initializing.
             refresh_view (bool | None = False): whether or not we should not pass on the
-            previous axis_order. Should be False if we want to use the previous axis order
-             (current tracks got updated). Should be True if we have a new tracks object
-             and should therefore recompute the axis_order.
-
+                previous axis_order. Should be False if we want to use the previous axis
+                order (current tracks got updated). Should be True if we have a new tracks
+                object and should therefore recompute the axis_order.
         """
 
         if self.tracks is None:

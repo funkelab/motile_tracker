@@ -99,15 +99,14 @@ class ExportDialog:
         colormap: napari.utils.Colormap,
         nodes_to_keep: set[int] | None = None,
     ):
-        """
-        Export tracks to CSV or geff, with the option to export a subset of nodes only.
+        """Export tracks to CSV or geff, with the option to export a subset of nodes only.
 
         Args:
             tracks (Tracks): to be exported Tracks object.
             name (str): filename for exporting
             nodes_to_keep (set[int], optional): list of nodes to be exported. Ancestor
-                nodes will automatically be included to make sure the graph has no missing
-                  parent nodes.
+                nodes will automatically be included to make sure the graph has no
+                missing parent nodes.
         """
         if nodes_to_keep is None:
             label = "Choose tracks export format:"

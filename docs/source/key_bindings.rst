@@ -13,8 +13,8 @@ Napari viewer and layer key bindings and mouse functions
    * - Click on a point or label
      - Select this node (centers view if only one node selected)
    * - SHIFT + click on point or label
-     - Add this node to selection (does not center view)
-   * - CTRL + click on point or label
+     - Add/remove this node to/from selection (does not center view)
+   * - CTRL/CMD + click on point or label
      - Center view on this node (does not change selection)
    * - Mouse drag with point layer selection tool active
      - Select multiple nodes at once
@@ -31,7 +31,7 @@ Napari viewer and layer key bindings and mouse functions
        | When no groups exist, alternates only between
        | All and Lineage.
    * - /
-     - | Toggle between hiding/showing the side menu and the docked treeview
+     - | Toggle between hiding/showing all currently active widgets
 
 Tree view key and mouse functions
 *********************************
@@ -44,7 +44,7 @@ Tree view key and mouse functions
    * - Click on a node
      - Select this node (centers view if only one node selected)
    * - SHIFT + click on a node
-     - Add this node to selection (does not center view)
+     - Add/remove this node to/from selection (does not center view)
    * - CTRL/CMD + click on a node
      - Center view on this node (does not change selection)
    * - Scroll
@@ -86,7 +86,7 @@ Tree view key and mouse functions
        | lineages) or the previous adjacent lineage
        | (horizontal view of selected lineage)
    * - /
-     - | Toggle between hiding/showing the side menu and the docked treeview
+     - | Toggle between hiding/showing all currently active widgets
 
 Key bindings for editing the tracks
 ***********************************
@@ -102,18 +102,9 @@ Key bindings for editing the tracks
      - Break edge between two selected nodes, if existing
    * - A
      - Create edge between two selected nodes, if valid
+   * - S
+     - Swap the incoming edges of two horizontal nodes
    * - Z
      - Undo last editing action
    * - R
      - Redo last editing action
-
-
-Key bindings tutorial video
-***************************
-This `video`_ shows how to use the different mouse and key functions, as well as their corresponding buttons, in the napari layers and the Tree View.
-
-.. raw:: html
-
-  <iframe src="https://drive.google.com/file/d/1cv5FbYqc5RbkNbh0YyWAL64A3tm-ugTs/preview" width="640" height="480" allow="autoplay"></iframe>
-
-.. _video: https://drive.google.com/file/d/1cv5FbYqc5RbkNbh0YyWAL64A3tm-ugTs/preview
