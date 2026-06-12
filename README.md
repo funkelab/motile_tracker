@@ -14,7 +14,7 @@ for more details on the concepts and method.
 
 ----------------------------------
 
-## Installation
+## Installation blablabla
 
 Users can download and install an executable application from the github release, or
 install from `pypi` in the environment of their choice (e.g. `venv`, `conda`) with the command
