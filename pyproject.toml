@@ -30,7 +30,7 @@ classifiers = [
 ]
 
 dependencies =[
-    "napari>=0.6.2,<0.7.0",
+    "napari>=0.6.2,<0.8.0",
     "funtracks>=2,<3",
     "appdirs>=1,<2",
     "numpy>=2,<3",
