@@ -4,6 +4,7 @@ from warnings import warn
 
 from fonticon_fa6 import FA6S
 from funtracks.data_model import Tracks
+from funtracks.import_export import export_to_geff, import_from_geff
 from napari._qt.qt_resources import QColoredSVGIcon
 from qtpy.QtCore import Signal
 from qtpy.QtWidgets import (
@@ -73,6 +74,8 @@ class TracksList(QGroupBox):
 
     view_tracks = Signal(Tracks, str)
     request_colormap = Signal()
+    tracks_saved = Signal(object, Path)  # (tracks, directory)
+    tracks_loaded = Signal(object, Path)  # (tracks, directory)
 
     def __init__(self):
         super().__init__(title="Results List")
@@ -95,7 +98,12 @@ class TracksList(QGroupBox):
         load_menu = QHBoxLayout()
         self.dropdown_menu = QComboBox()
         self.dropdown_menu.addItems(
-            ["Motile Run", "External tracks from CSV", "External tracks from geff"]
+            [
+                "Tracks (geff)",
+                "Motile Run",
+                "External tracks from CSV",
+                "External tracks from geff",
+            ]
         )
 
         load_button = QPushButton("Load")
@@ -116,6 +124,8 @@ class TracksList(QGroupBox):
             name = dialog.name
             if tracks is not None:
                 self.add_tracks(tracks, name, select=True)
+                if dialog.source_path is not None:
+                    self.tracks_loaded.emit(tracks, dialog.source_path)
 
     def _selection_changed(self):
         selected = self.tracks_list.selectedItems()
@@ -124,14 +134,12 @@ class TracksList(QGroupBox):
             self.view_tracks.emit(tracks_button.tracks, tracks_button.name.text())
 
     def add_tracks(self, tracks: Tracks, name: str, select=True):
-        """Add a run to the list and optionally select it. Will make a new
-        row in the list UI representing the given run.
+        """Add tracks to the list and optionally select them. Will make a new
+        row in the list UI representing the given tracks.
 
-        Accepts any Tracks object. Plain Tracks/SolutionTracks are wrapped in
-        a MotileRun (with solver_params=None) so the list internally always
-        holds MotileRun and save_tracks can rely on tracks.save().
+        Accepts any Tracks object directly (SolutionTracks, MotileRun, etc.).
 
-        Note: selecting the run will also emit the selection changed event on
+        Note: selecting the tracks will also emit the selection changed event on
         the list.
 
         Args:
@@ -140,18 +148,6 @@ class TracksList(QGroupBox):
             select (bool, optional): Whether or not to select the new tracks item in the
                 list (and thus display it in the tracks viewer). Defaults to True.
         """
-        if not isinstance(tracks, MotileRun):
-            tracks = MotileRun(
-                graph=tracks.graph,
-                run_name=name,
-                solver_params=None,
-                pos_attr=tracks.features.position_key,
-                time_attr=tracks.features.time_key,
-                scale=tracks.scale,
-                ndim=tracks.ndim,
-                _features=tracks.features,
-                _segmentation=tracks.segmentation,
-            )
         item = QListWidgetItem(self.tracks_list)
         tracks_row = TracksButton(tracks, name)
         self.tracks_list.setItemWidget(item, tracks_row)
@@ -188,6 +184,14 @@ class TracksList(QGroupBox):
         """Saves a tracks object from the list. You must pass the list item that
         represents the tracks, not the tracks object itself.
 
+        For MotileRun objects, delegates to MotileRun.save() which creates a
+        timestamped subdirectory and saves solver params alongside the tracks.
+        For plain Tracks/SolutionTracks, saves directly to the chosen directory
+        using export_to_geff with overwrite enabled.
+
+        After saving, emits the tracks_saved signal so that downstream code
+        can save additional data into the same directory.
+
         Args:
             item (QListWidgetItem): The list item to save. This list item
                 contains the TracksButton that represents a set of tracks.
@@ -195,7 +199,11 @@ class TracksList(QGroupBox):
         tracks: Tracks = self.tracks_list.itemWidget(item).tracks
         if self.save_dialog.exec_():
             directory = Path(self.save_dialog.selectedFiles()[0])
-            tracks.save(directory)
+            if isinstance(tracks, MotileRun):
+                directory = tracks.save(directory)
+            else:
+                export_to_geff(tracks, directory, overwrite=True)
+            self.tracks_saved.emit(tracks, directory)
 
     def remove_tracks(self, item: QListWidgetItem):
         """Remove a tracks object from the list. You must pass the list item that
@@ -209,27 +217,47 @@ class TracksList(QGroupBox):
         self.tracks_list.takeItem(row)
 
     def load_tracks(self):
-        """Call the function to load tracks from disk for a Motile Run or for externally
-        generated tracks (CSV file),  depending on the choice in the dropdown menu.
+        """Call the function to load tracks from disk, depending on the choice
+        in the dropdown menu.
         """
-
-        if self.dropdown_menu.currentText() == "Motile Run":
+        selection = self.dropdown_menu.currentText()
+        if selection == "Tracks (geff)":
+            self.load_geff_tracks()
+        elif selection == "Motile Run":
             self.load_motile_run()
-        elif self.dropdown_menu.currentText() == "External tracks from CSV":
+        elif selection == "External tracks from CSV":
             self._load_tracks(import_type="csv")
-        elif self.dropdown_menu.currentText() == "External tracks from geff":
+        elif selection == "External tracks from geff":
             self._load_tracks("geff")
 
-    def load_motile_run(self):
-        """Load a set of tracks from disk. The user selects the directory created
-        by calling save_tracks.
-        """
+    def load_geff_tracks(self):
+        """Load tracks saved in geff format. The user selects the parent
+        directory that contains a ``tracks.geff`` subdirectory (the layout
+        produced by :func:`export_to_geff`).
 
+        After loading, emits the tracks_loaded signal so that downstream code
+        can load additional data from the same directory.
+        """
+        if self.file_dialog.exec_():
+            directory = Path(self.file_dialog.selectedFiles()[0])
+            name = directory.stem
+            try:
+                tracks = import_from_geff(directory / "tracks.geff")
+                self.add_tracks(tracks, name, select=True)
+                self.tracks_loaded.emit(tracks, directory)
+            except (ValueError, FileNotFoundError) as e:
+                warn(f"Could not load tracks from {directory}: {e}", stacklevel=2)
+
+    def load_motile_run(self):
+        """Load a MotileRun from disk. The user selects the directory created
+        by MotileRun.save().
+        """
         if self.file_dialog.exec_():
             directory = Path(self.file_dialog.selectedFiles()[0])
             name = directory.stem
             try:
                 tracks = MotileRun.load(directory)
                 self.add_tracks(tracks, name, select=True)
+                self.tracks_loaded.emit(tracks, directory)
             except (ValueError, FileNotFoundError) as e:
                 warn(f"Could not load tracks from {directory}: {e}", stacklevel=2)
