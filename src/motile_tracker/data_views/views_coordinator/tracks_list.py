@@ -74,8 +74,16 @@ class TracksList(QGroupBox):
 
     view_tracks = Signal(Tracks, str)
     request_colormap = Signal()
-    tracks_saved = Signal(object, Path)  # (tracks, directory)
-    tracks_loaded = Signal(object, Path)  # (tracks, directory)
+
+    tracks_saved = Signal(object, Path)
+    """Emitted after tracks are saved to disk. Arguments: (tracks, path).
+    Dependent applications can connect to this signal to save additional
+    data (e.g. solver parameters) alongside the tracks."""
+
+    tracks_loaded = Signal(object, Path)
+    """Emitted after tracks are loaded from disk. Arguments: (tracks, path).
+    Dependent applications can connect to this signal to load additional
+    data (e.g. solver parameters) from the same location."""
 
     def __init__(self):
         super().__init__(title="Results List")
