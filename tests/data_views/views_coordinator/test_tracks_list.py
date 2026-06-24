@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from funtracks.data_model import SolutionTracks
-from funtracks.import_export import export_to_geff
+from funtracks.import_export import write_to_geff
 from qtpy.QtWidgets import QDialog
 
 from motile_tracker.data_views.views_coordinator.tracks_list import (
@@ -163,26 +163,25 @@ class TestTracksListSave:
 
 
 class TestTracksListSaveSolutionTracks:
-    def test_solution_tracks_saved_directly_to_directory(
+    def test_solution_tracks_saved_directly_to_path(
         self, tracks_list, solution_tracks_2d, tmp_path
     ):
-        """SolutionTracks should be saved directly via export_to_geff,
-        not wrapped in MotileRun. The geff data goes directly into the
-        chosen directory (no timestamped subdirectory).
+        """SolutionTracks should be saved directly via write_to_geff,
+        not wrapped in MotileRun. The geff store is written directly at
+        the user-chosen path (no timestamped subdirectory).
         """
         tracks_list.add_tracks(solution_tracks_2d, "imported", select=False)
         item = tracks_list.tracks_list.item(0)
 
-        save_dir = tmp_path / "my_tracks"
-        save_dir.mkdir()
+        save_path = tmp_path / "my_tracks.geff"
 
         tracks_list.save_dialog.exec_ = MagicMock(return_value=True)
-        tracks_list.save_dialog.selectedFiles = MagicMock(return_value=[str(save_dir)])
+        tracks_list.save_dialog.selectedFiles = MagicMock(return_value=[str(save_path)])
 
         tracks_list.save_tracks(item)
 
-        # Should have written geff data directly into save_dir (tracks.geff subdir)
-        assert (save_dir / "tracks.geff").exists()
+        # write_to_geff writes the geff store directly at the given path
+        assert save_path.exists()
 
     def test_solution_tracks_save_emits_signal(
         self, tracks_list, solution_tracks_2d, tmp_path
@@ -190,11 +189,10 @@ class TestTracksListSaveSolutionTracks:
         tracks_list.add_tracks(solution_tracks_2d, "imported", select=False)
         item = tracks_list.tracks_list.item(0)
 
-        save_dir = tmp_path / "my_tracks"
-        save_dir.mkdir()
+        save_path = tmp_path / "my_tracks.geff"
 
         tracks_list.save_dialog.exec_ = MagicMock(return_value=True)
-        tracks_list.save_dialog.selectedFiles = MagicMock(return_value=[str(save_dir)])
+        tracks_list.save_dialog.selectedFiles = MagicMock(return_value=[str(save_path)])
 
         emitted = []
         tracks_list.tracks_saved.connect(lambda t, p: emitted.append((t, p)))
@@ -203,28 +201,27 @@ class TestTracksListSaveSolutionTracks:
 
         assert len(emitted) == 1
         assert emitted[0][0] is solution_tracks_2d
-        assert emitted[0][1] == save_dir
+        assert emitted[0][1] == save_path
 
     def test_solution_tracks_save_overwrites(
         self, tracks_list, solution_tracks_2d, tmp_path
     ):
-        """Saving the same SolutionTracks twice to the same directory should
+        """Saving the same SolutionTracks twice to the same path should
         overwrite rather than fail.
         """
         tracks_list.add_tracks(solution_tracks_2d, "imported", select=False)
         item = tracks_list.tracks_list.item(0)
 
-        save_dir = tmp_path / "my_tracks"
-        save_dir.mkdir()
+        save_path = tmp_path / "my_tracks.geff"
 
         tracks_list.save_dialog.exec_ = MagicMock(return_value=True)
-        tracks_list.save_dialog.selectedFiles = MagicMock(return_value=[str(save_dir)])
+        tracks_list.save_dialog.selectedFiles = MagicMock(return_value=[str(save_path)])
 
         # Save twice — should not raise
         tracks_list.save_tracks(item)
         tracks_list.save_tracks(item)
 
-        assert (save_dir / "tracks.geff").exists()
+        assert save_path.exists()
 
 
 # ---------------------------------------------------------------------------
@@ -262,60 +259,60 @@ class TestTracksListLoadMotileRun:
 
 
 # ---------------------------------------------------------------------------
-# TracksList — load_geff_tracks
+# TracksList — load_internal_tracks
 # ---------------------------------------------------------------------------
 
 
 class TestTracksListLoadGeff:
-    def test_load_geff_tracks_success(self, tracks_list, solution_tracks_2d, tmp_path):
-        save_dir = tmp_path / "saved_tracks"
-        save_dir.mkdir()
-        export_to_geff(solution_tracks_2d, save_dir)
+    def test_load_internal_tracks_success(
+        self, tracks_list, solution_tracks_2d, tmp_path
+    ):
+        geff_path = tmp_path / "saved_tracks.geff"
+        write_to_geff(solution_tracks_2d, geff_path)
 
         tracks_list.file_dialog.exec_ = MagicMock(return_value=True)
-        tracks_list.file_dialog.selectedFiles = MagicMock(return_value=[str(save_dir)])
+        tracks_list.file_dialog.selectedFiles = MagicMock(return_value=[str(geff_path)])
 
-        tracks_list.load_geff_tracks()
+        tracks_list.load_internal_tracks()
 
         assert tracks_list.tracks_list.count() == 1
         item = tracks_list.tracks_list.item(0)
         widget = tracks_list.tracks_list.itemWidget(item)
         assert widget.name.text() == "saved_tracks"
 
-    def test_load_geff_tracks_emits_signal(
+    def test_load_internal_tracks_emits_signal(
         self, tracks_list, solution_tracks_2d, tmp_path
     ):
-        save_dir = tmp_path / "saved_tracks"
-        save_dir.mkdir()
-        export_to_geff(solution_tracks_2d, save_dir)
+        geff_path = tmp_path / "saved_tracks.geff"
+        write_to_geff(solution_tracks_2d, geff_path)
 
         tracks_list.file_dialog.exec_ = MagicMock(return_value=True)
-        tracks_list.file_dialog.selectedFiles = MagicMock(return_value=[str(save_dir)])
+        tracks_list.file_dialog.selectedFiles = MagicMock(return_value=[str(geff_path)])
 
         emitted = []
         tracks_list.tracks_loaded.connect(lambda t, p: emitted.append((t, p)))
 
-        tracks_list.load_geff_tracks()
+        tracks_list.load_internal_tracks()
 
         assert len(emitted) == 1
         assert isinstance(emitted[0][0], SolutionTracks)
-        assert emitted[0][1] == save_dir
+        assert emitted[0][1] == geff_path
 
-    def test_load_geff_tracks_bad_path_warns(self, tracks_list, tmp_path):
-        bad_path = tmp_path / "nonexistent"
+    def test_load_internal_tracks_bad_path_warns(self, tracks_list, tmp_path):
+        bad_path = tmp_path / "nonexistent.geff"
         tracks_list.file_dialog.exec_ = MagicMock(return_value=True)
         tracks_list.file_dialog.selectedFiles = MagicMock(return_value=[str(bad_path)])
 
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
-            tracks_list.load_geff_tracks()
+            tracks_list.load_internal_tracks()
 
         assert len(caught) == 1
         assert tracks_list.tracks_list.count() == 0
 
-    def test_load_geff_tracks_dialog_cancelled(self, tracks_list):
+    def test_load_internal_tracks_dialog_cancelled(self, tracks_list):
         tracks_list.file_dialog.exec_ = MagicMock(return_value=False)
-        tracks_list.load_geff_tracks()
+        tracks_list.load_internal_tracks()
         assert tracks_list.tracks_list.count() == 0
 
 
@@ -327,7 +324,7 @@ class TestTracksListLoadGeff:
 class TestTracksListLoadDispatch:
     def test_load_tracks_dispatches_geff_tracks(self, tracks_list):
         tracks_list.dropdown_menu.setCurrentText("Tracks (geff)")
-        with patch.object(tracks_list, "load_geff_tracks") as mock:
+        with patch.object(tracks_list, "load_internal_tracks") as mock:
             tracks_list.load_tracks()
             mock.assert_called_once()
 

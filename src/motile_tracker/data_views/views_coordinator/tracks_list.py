@@ -4,7 +4,7 @@ from warnings import warn
 
 from fonticon_fa6 import FA6S
 from funtracks.data_model import Tracks
-from funtracks.import_export import export_to_geff, import_from_geff
+from funtracks.import_export import import_from_geff, write_to_geff
 from napari._qt.qt_resources import QColoredSVGIcon
 from qtpy.QtCore import Signal
 from qtpy.QtWidgets import (
@@ -186,8 +186,8 @@ class TracksList(QGroupBox):
 
         For MotileRun objects, delegates to MotileRun.save() which creates a
         timestamped subdirectory and saves solver params alongside the tracks.
-        For plain Tracks/SolutionTracks, saves directly to the chosen directory
-        using export_to_geff with overwrite enabled.
+        For plain Tracks/SolutionTracks, saves directly to the chosen path
+        using write_to_geff with overwrite enabled.
 
         After saving, emits the tracks_saved signal so that downstream code
         can save additional data into the same directory.
@@ -202,7 +202,7 @@ class TracksList(QGroupBox):
             if isinstance(tracks, MotileRun):
                 directory = tracks.save(directory)
             else:
-                export_to_geff(tracks, directory, overwrite=True)
+                write_to_geff(tracks, directory, overwrite=True)
             self.tracks_saved.emit(tracks, directory)
 
     def remove_tracks(self, item: QListWidgetItem):
@@ -222,7 +222,7 @@ class TracksList(QGroupBox):
         """
         selection = self.dropdown_menu.currentText()
         if selection == "Tracks (geff)":
-            self.load_geff_tracks()
+            self.load_internal_tracks()
         elif selection == "Motile Run":
             self.load_motile_run()
         elif selection == "External tracks from CSV":
@@ -230,10 +230,9 @@ class TracksList(QGroupBox):
         elif selection == "External tracks from geff":
             self._load_tracks("geff")
 
-    def load_geff_tracks(self):
-        """Load tracks saved in geff format. The user selects the parent
-        directory that contains a ``tracks.geff`` subdirectory (the layout
-        produced by :func:`export_to_geff`).
+    def load_internal_tracks(self):
+        """Load tracks saved in internal format. The user selects the GEFF
+        store directly (the path written by :func:`write_to_geff`).
 
         After loading, emits the tracks_loaded signal so that downstream code
         can load additional data from the same directory.
@@ -242,7 +241,7 @@ class TracksList(QGroupBox):
             directory = Path(self.file_dialog.selectedFiles()[0])
             name = directory.stem
             try:
-                tracks = import_from_geff(directory / "tracks.geff")
+                tracks = import_from_geff(directory)
                 self.add_tracks(tracks, name, select=True)
                 self.tracks_loaded.emit(tracks, directory)
             except (ValueError, FileNotFoundError) as e:
