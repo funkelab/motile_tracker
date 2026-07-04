@@ -344,7 +344,7 @@ class TreePlot(pg.PlotWidget):
             self.adj = edges_df_mapped.to_numpy()
 
         self.outline_pen = np.array(
-            [pg.mkPen(QColor(150, 150, 150)) for i in range(len(self._pos))]
+            [pg.mkPen(QColor(150, 150, 150, 0)) for i in range(len(self._pos))]
         )
 
     def set_selection(self, selected_nodes: list[Any], plot_type: str) -> None:
