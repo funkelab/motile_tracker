@@ -186,7 +186,14 @@ class TrackLabels(ContourLabels):
         if tracks is not None:
             nodes = tracks.graph.node_ids()
             track_ids = tracks.get_track_ids(nodes)
-            colors = [self.tracks_viewer.colormap.map(tid) for tid in track_ids]
+            # Map each distinct track id once (there are far fewer tracks than
+            # nodes) and reuse per node; calling colormap.map per node is O(nodes)
+            # of redundant work when many nodes share a track id.
+            track_color: dict = {}
+            colors = [
+                track_color.setdefault(tid, self.tracks_viewer.colormap.map(tid))
+                for tid in track_ids
+            ]
         else:
             nodes = []
             colors = []
