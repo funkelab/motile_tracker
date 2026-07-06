@@ -181,7 +181,12 @@ class ContourLabels(napari.layers.Labels):
     def refresh_colormap(self):
         """Refresh the label colormap by setting its dictionary"""
 
-        self.colormap = DirectLabelColormap(color_dict=self.colormap.color_dict)
+        # Setting colormap emits selected_label, which triggers _ensure_valid_label
+        # and rebuilds the (large) colormap a second time. That validation is only
+        # needed when the painting label changes, not on a highlight/opacity refresh,
+        # so block it here to avoid the redundant rebuild.
+        with self.events.selected_label.blocker():
+            self.colormap = DirectLabelColormap(color_dict=self.colormap.color_dict)
 
     def data_setitem(self, indices, value, refresh=True):
         """Override to handle read-only data (e.g. GraphArrayView).
