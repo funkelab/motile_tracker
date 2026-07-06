@@ -28,6 +28,9 @@ from motile_tracker.data_views.views.layers.click_utils import (
 )
 from motile_tracker.data_views.views.tree_view.flip_axes_widget import FlipTreeWidget
 from motile_tracker.data_views.views.tree_view.navigation_widget import NavigationWidget
+from motile_tracker.data_views.views.tree_view.tree_plot_fpl import (
+    TreePlot as FplTreePlot,
+)
 from motile_tracker.data_views.views.tree_view.tree_view_feature_widget import (
     TreeViewFeatureWidget,
 )
@@ -494,7 +497,7 @@ class TreeWidget(QWidget):
         # Construct the tree view pyqtgraph widget
         layout = QVBoxLayout()
 
-        self.tree_widget: TreePlot = TreePlot()
+        self.tree_widget: FplTreePlot = FplTreePlot()
         self.tree_widget.update_selection.connect(
             self.tracks_viewer.select_node_set_from_history
         )
