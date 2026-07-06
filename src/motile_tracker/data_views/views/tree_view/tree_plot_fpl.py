@@ -6,6 +6,7 @@ from typing import Any
 import fastplotlib as fpl
 import numpy as np
 import pandas as pd
+import pygfx as gfx
 from psygnal import Signal
 from qtpy.QtCore import Qt
 from qtpy.QtWidgets import QVBoxLayout, QWidget
@@ -46,6 +47,10 @@ class TreePlot(QWidget):
         self._base_colors = np.empty((0, 4), dtype=np.float32)
         self._selected_rows: list[int] = []
 
+        # shift-drag rectangle (box-select) state
+        self._drag_start: tuple[float, float] | None = None
+        self._rubber = None
+
         # build the figure (Qt auto-detected; bitmap present method is dock-safe)
         # names=[[""]] suppresses the default subplot title (which otherwise shows
         # the grid position "(0, 0)" as a title bar above the plot)
@@ -60,6 +65,17 @@ class TreePlot(QWidget):
         self._subplot.title.font_size = 0
         self._scatter = None
         self._edges = None
+
+        # Axes: fastplotlib's default Axes overlay draws rulers at the *data* bbox
+        # edges (so the y-axis floats inset from the canvas and moves with the data)
+        # plus xy grids. The old pyqtgraph tree had no grid, no x-axis (in tree mode),
+        # and a time axis pinned to the far-left margin acting as a hard cutoff.
+        # Reproduce that with our own pygfx Rulers pinned to the viewport edges,
+        # updated each frame from the camera state (finn's approach).
+        self._subplot.axes.visible = False
+        self._ruler_time = gfx.Ruler(tick_side="left")
+        self._ruler_feature = gfx.Ruler(tick_side="left")
+        self._subplot.scene.add(self._ruler_time, self._ruler_feature)
 
         canvas_widget = self._figure.show()
         # The render canvas (and its inner QRenderWidget child) grab keyboard focus
@@ -78,9 +94,19 @@ class TreePlot(QWidget):
         layout.addWidget(canvas_widget)
         self.setLayout(layout)
 
-        # right-click anywhere resets/fits the view (replaces old CustomViewBox)
+        # keep the rulers pinned to the viewport edges every frame (they follow the
+        # camera as the user pans/zooms)
+        self._subplot.add_animations(self._update_rulers)
+
+        # canvas mouse handling: right-click reset + shift-drag box-select
         self._figure.renderer.add_event_handler(
             self._on_canvas_pointer_down, "pointer_down"
+        )
+        self._figure.renderer.add_event_handler(
+            self._on_canvas_pointer_move, "pointer_move"
+        )
+        self._figure.renderer.add_event_handler(
+            self._on_canvas_pointer_up, "pointer_up"
         )
 
     # ------------------------------------------------------------------ #
@@ -144,6 +170,61 @@ class TreePlot(QWidget):
         self._rebuild()
 
     # ------------------------------------------------------------------ #
+    # axis rulers (pinned to viewport edges, updated each frame)
+    # ------------------------------------------------------------------ #
+    def _update_rulers(self) -> None:
+        """Keep the time (and, in feature mode, feature) ruler pinned to the
+        viewport edges as the camera pans/zooms. Reproduces the old look: a time
+        axis pegged to the far-left margin and NO x-axis in tree mode."""
+        if self._scatter is None:
+            self._ruler_time.visible = False
+            self._ruler_feature.visible = False
+            return
+
+        cam = self._subplot.camera
+        state = cam.get_state()
+        px, py = state["position"][0], state["position"][1]
+        w, h = state["width"], state["height"]
+        left, right = px - w / 2, px + w / 2
+        bottom, top = py - h / 2, py + h / 2
+        logical = self._subplot.viewport.logical_size
+
+        self._ruler_time.visible = True
+        if self.view_direction == "vertical":
+            # time on the y-axis, pinned to the left edge. positions store -t, so
+            # the tick value at the top edge is -top (time increases downward).
+            self._ruler_time.tick_side = "right"
+            self._ruler_time.start_value = -top
+            self._ruler_time.start_pos = (left, top, 0)
+            self._ruler_time.end_pos = (left, bottom, 0)
+        else:
+            # time on the x-axis, pinned to the bottom edge
+            self._ruler_time.tick_side = "left"
+            self._ruler_time.start_value = left
+            self._ruler_time.start_pos = (left, bottom, 0)
+            self._ruler_time.end_pos = (right, bottom, 0)
+        self._ruler_time.update(cam, logical)
+
+        # feature axis only exists in feature mode; hidden entirely in tree mode
+        if self.plot_type == "feature":
+            self._ruler_feature.visible = True
+            if self.view_direction == "vertical":
+                # feature on the x-axis, pinned to the bottom edge
+                self._ruler_feature.tick_side = "left"
+                self._ruler_feature.start_value = left
+                self._ruler_feature.start_pos = (left, bottom, 0)
+                self._ruler_feature.end_pos = (right, bottom, 0)
+            else:
+                # feature on the y-axis (positions store -feature), pinned left
+                self._ruler_feature.tick_side = "right"
+                self._ruler_feature.start_value = -top
+                self._ruler_feature.start_pos = (left, top, 0)
+                self._ruler_feature.end_pos = (left, bottom, 0)
+            self._ruler_feature.update(cam, logical)
+        else:
+            self._ruler_feature.visible = False
+
+    # ------------------------------------------------------------------ #
     # rendering
     # ------------------------------------------------------------------ #
     def _axis_value_column(self) -> str:
@@ -170,6 +251,7 @@ class TreePlot(QWidget):
         self._subplot.clear()
         self._scatter = None
         self._edges = None
+        self._rubber = None  # cleared with the scene; recreated lazily on next drag
         self._selected_rows = []
 
         df = self.track_df
@@ -208,6 +290,8 @@ class TreePlot(QWidget):
             markers="circle",
             name="nodes",
         )
+        # match old pyqtgraph look: no marker outline (old outline pen was alpha 0)
+        self._scatter.edge_width = 0
         self._scatter.add_event_handler(self._on_click, "pointer_down")
 
     def _build_edges(self, df: pd.DataFrame, colors: np.ndarray):
@@ -271,9 +355,73 @@ class TreePlot(QWidget):
     def _on_canvas_pointer_down(self, ev) -> None:
         # any click on the canvas gives TreePlot keyboard focus so Q/X/Y work
         self.setFocus()
+        button = getattr(ev, "button", None)
         # right button (2) anywhere -> reset/fit view to all data
-        if getattr(ev, "button", None) == 2:
+        if button == 2:
             self._reset_view()
+            return
+        # left button + Shift -> start a rubber-band box-select (like the old tree).
+        # Disable the pan controller for the duration so the drag draws a box
+        # instead of panning.
+        if button == 1 and "Shift" in set(getattr(ev, "modifiers", ()) or ()):
+            world = self._subplot.map_screen_to_world(ev, allow_outside=True)
+            if world is not None:
+                self._drag_start = (float(world[0]), float(world[1]))
+                self._subplot.controller.enabled = False
+
+    def _on_canvas_pointer_move(self, ev) -> None:
+        if self._drag_start is None:
+            return
+        world = self._subplot.map_screen_to_world(ev, allow_outside=True)
+        if world is not None:
+            self._update_rubber(self._drag_start, (float(world[0]), float(world[1])))
+
+    def _on_canvas_pointer_up(self, ev) -> None:
+        if self._drag_start is None:
+            return
+        world = self._subplot.map_screen_to_world(ev, allow_outside=True)
+        x0, y0 = self._drag_start
+        self._drag_start = None
+        self._clear_rubber()
+        self._subplot.controller.enabled = True
+        if world is None:
+            return
+        x1, y1 = float(world[0]), float(world[1])
+        # ignore a plain shift-click (no drag) — that's handled as node append
+        if abs(x1 - x0) > 1e-9 or abs(y1 - y0) > 1e-9:
+            self.select_points_in_rect(x0, x1, y0, y1)
+
+    def _ensure_rubber(self):
+        if self._rubber is None:
+            self._rubber = self._subplot.add_line(
+                np.zeros((5, 3), dtype=np.float32),
+                colors="yellow",
+                thickness=1.0,
+                name="_rubber",
+            )
+            self._rubber.visible = False
+        return self._rubber
+
+    def _update_rubber(self, start: tuple, cur: tuple) -> None:
+        x0, y0 = start
+        x1, y1 = cur
+        r = self._ensure_rubber()
+        r.data[:] = np.array(
+            [[x0, y0, 0], [x1, y0, 0], [x1, y1, 0], [x0, y1, 0], [x0, y0, 0]],
+            dtype=np.float32,
+        )
+        r.visible = True
+        self._figure.canvas.request_draw()
+
+    def _clear_rubber(self) -> None:
+        if self._rubber is not None:
+            self._rubber.visible = False
+            # collapse to a single in-data point: auto_scale (used by _reset_view)
+            # includes even invisible graphics in its bounds, so a stale rubber
+            # rectangle far from the tree would otherwise break "fit to view".
+            if len(self._positions):
+                self._rubber.data[:] = np.tile(self._positions[0], (5, 1))
+            self._figure.canvas.request_draw()
 
     def _reset_view(self) -> None:
         """Fit the view to all data, filling the canvas (maintain_aspect=False so the
