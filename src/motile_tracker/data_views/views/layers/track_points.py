@@ -69,7 +69,7 @@ class TrackPoints(ZOnlyPoints):
         points = self.tracks_viewer.tracks.get_positions(self.nodes, incl_time=True)
 
         track_ids = self.tracks_viewer.tracks.get_track_ids(self.nodes)
-        colors = [self.tracks_viewer.colormap.map(track_id) for track_id in track_ids]
+        colors = self._map_track_colors(track_ids)
         symbols = self.get_symbols(
             self.tracks_viewer.tracks, self.tracks_viewer.symbolmap
         )
@@ -190,9 +190,7 @@ class TrackPoints(ZOnlyPoints):
         self.symbol = self.get_symbols(
             self.tracks_viewer.tracks, self.tracks_viewer.symbolmap
         )
-        self.face_color = [
-            self.tracks_viewer.colormap.map(track_id) for track_id in track_ids
-        ]
+        self.face_color = self._map_track_colors(track_ids)
         self.properties = {"node_id": self.nodes, "track_id": track_ids}
         self.size = self.default_size
         self.border_color = [1, 1, 1, 1]
@@ -302,6 +300,19 @@ class TrackPoints(ZOnlyPoints):
             for point in selected_points:
                 node_id = self.nodes[point]
                 self.tracks_viewer.selected_nodes.add(node_id, True)
+
+    def _map_track_colors(self, track_ids: list[int]) -> list:
+        """Map track ids to face colors, calling colormap.map once per unique track id.
+
+        Nodes sharing a track id share a color reference, which is safe because napari
+        copies face_color into its own (N, 4) array on assignment and only border_color
+        (not face_color) is mutated in place for selection highlighting.
+        """
+        track_color: dict = {}
+        return [
+            track_color.setdefault(tid, self.tracks_viewer.colormap.map(tid))
+            for tid in track_ids
+        ]
 
     def get_symbols(self, tracks: Tracks, symbolmap: dict[NodeType, str]) -> list[str]:
         statemap = {
