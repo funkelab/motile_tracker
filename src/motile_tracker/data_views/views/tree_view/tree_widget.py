@@ -657,10 +657,12 @@ class TreeWidget(QWidget):
 
         self.navigation_widget.view_direction = self.view_direction
         self.tree_widget._update_viewed_data(self.view_direction)
+        # flipping transposes x<->y, so the previous camera rect no longer matches
+        # the data — reframe to fit (matches the old pyqtgraph autoRange-on-flip).
         self.tree_widget.set_view(
             view_direction=self.view_direction,
             plot_type=self.tree_widget.plot_type,
-            reset_view=False,
+            reset_view=True,
         )
 
     def set_mouse_enabled(self, x: bool, y: bool):

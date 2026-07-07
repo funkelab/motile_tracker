@@ -8,12 +8,24 @@ import numpy as np
 import pandas as pd
 import pygfx as gfx
 from psygnal import Signal
+from pygfx.utils.enums import MarkerInt
 from qtpy.QtCore import Qt
 from qtpy.QtWidgets import QVBoxLayout, QWidget
 
 _SELECT_COLOR = np.array([0.0, 1.0, 1.0, 1.0], dtype=np.float32)  # cyan
 _BASE_SIZE = 8.0
-_SELECT_SIZE = 13.0
+_SELECT_BUMP = 5.0  # size increase for a selected node (matches old pyqtgraph +5)
+# a triangle marker has less visual weight than a circle/cross at the same size (the
+# size is the marker's bounding box), so scale up split (triangle) nodes to match.
+_TRIANGLE_SIZE_FACTOR = 1.9
+# node-type glyphs: track_df["symbol"] uses pyqtgraph names; map to pygfx per-vertex
+# marker codes. continue="o" (circle), split="t1" (triangle), end="x" (cross).
+_MARKER_CODES = {
+    "o": int(MarkerInt.circle),
+    "t1": int(MarkerInt.triangle_up),
+    "x": int(MarkerInt.cross),
+}
+_DEFAULT_MARKER = int(MarkerInt.circle)
 _AXIS_COLOR = (0.6, 0.6, 0.6, 1.0)  # grey axis lines/ticks/labels (like pyqtgraph)
 # Axes live in the subplot's docks (separate fixed-width viewports, like pyqtgraph's
 # AxisItem cells around a central ViewBox). The main plot area then clips its contents
@@ -65,6 +77,7 @@ class TreePlot(QWidget):
         self._id_to_row: dict[int, int] = {}
         self._positions = np.empty((0, 3), dtype=np.float32)
         self._base_colors = np.empty((0, 4), dtype=np.float32)
+        self._base_sizes = np.empty(0, dtype=np.float32)
         self._selected_rows: list[int] = []
 
         # shift-drag rectangle (box-select) state
@@ -97,6 +110,10 @@ class TreePlot(QWidget):
         self._dock_bottom = self._subplot.docks["bottom"]
         self._dock_left.camera.maintain_aspect = False
         self._dock_bottom.camera.maintain_aspect = False
+        # the tree fills a wide canvas non-uniformly — never preserve aspect on the
+        # MAIN camera (its default is True), else show_rect/reset letterboxes and the
+        # tree won't fill. Set persistently so pan/zoom/resize can't revert it.
+        self._subplot.camera.maintain_aspect = False
         self._ruler_time = gfx.Ruler(tick_side="left")
         self._ruler_feature = gfx.Ruler(tick_side="left")
         for ruler in (self._ruler_time, self._ruler_feature):
@@ -348,6 +365,7 @@ class TreePlot(QWidget):
         if df is None or df.empty:
             self._node_ids = np.empty(0, dtype=np.int64)
             self._id_to_row = {}
+            self._base_sizes = np.empty(0, dtype=np.float32)
             return
 
         self._node_ids = df["node_id"].to_numpy()
@@ -369,17 +387,28 @@ class TreePlot(QWidget):
                 name="edges",
             )
 
-        # nodes: single scatter, uniform circle markers (dots).
-        # NOTE: pygfx PointsMarkerMaterial.marker is a single per-material property,
-        # not per-vertex, so node-type shapes (division=triangle, end=x) would need
-        # separate scatters per shape (as finn did). Deferred — dots for all for now.
+        # nodes: single scatter with per-vertex marker shapes (node-type glyphs).
+        # A single scatter keeps selection surgical; per-vertex markers are enabled by
+        # setting the material's marker_mode to "vertex" + a geometry "markers" int
+        # buffer (pygfx's per-vertex marker path), so we avoid finn's 3-scatter split.
+        symbols = df["symbol"].to_numpy()
+        # per-vertex sizes: bump triangle (split) nodes so they read as big as the dots
+        self._base_sizes = np.where(
+            symbols == "t1", _BASE_SIZE * _TRIANGLE_SIZE_FACTOR, _BASE_SIZE
+        ).astype(np.float32)
         self._scatter = self._subplot.add_scatter(
             data=self._positions,
             colors=colors,
-            sizes=_BASE_SIZE,
+            sizes=self._base_sizes,
             markers="circle",
             name="nodes",
         )
+        codes = np.array(
+            [_MARKER_CODES.get(s, _DEFAULT_MARKER) for s in symbols], dtype=np.int32
+        )
+        wo = self._scatter.world_object
+        wo.material.marker_mode = "vertex"
+        wo.geometry.markers = gfx.Buffer(codes)
         # match old pyqtgraph look: no marker outline (old outline pen was alpha 0)
         self._scatter.edge_width = 0
         self._scatter.add_event_handler(self._on_click, "pointer_down")
@@ -422,17 +451,18 @@ class TreePlot(QWidget):
     def set_selection(self, selected_nodes: list[Any], plot_type: str) -> None:
         if self._scatter is None:
             return
-        # restore previously selected rows to their base color/size
+        # restore previously selected rows to their base color/size (per-vertex, so
+        # triangles keep their enlarged base size)
         for row in self._selected_rows:
             self._scatter.colors[row] = self._base_colors[row]
-            self._scatter.sizes[row] = _BASE_SIZE
+            self._scatter.sizes[row] = self._base_sizes[row]
 
         new_rows = []
         for node_id in selected_nodes:
             row = self._id_to_row.get(int(node_id))
             if row is not None:
                 self._scatter.colors[row] = _SELECT_COLOR
-                self._scatter.sizes[row] = _SELECT_SIZE
+                self._scatter.sizes[row] = self._base_sizes[row] + _SELECT_BUMP
                 new_rows.append(row)
         self._selected_rows = new_rows
 
@@ -449,6 +479,15 @@ class TreePlot(QWidget):
         # right button (2) anywhere -> reset/fit view to all data
         if button == 2:
             self._reset_view()
+            return
+        # mouse side buttons -> step through selection history (like browser back/fwd).
+        # back (4) = previous selection, forward (5) = next. TreeWidget connects
+        # update_selection -> tracks_viewer.select_node_set_from_history(previous=...).
+        if button == 4:
+            self.update_selection.emit(True)
+            return
+        if button == 5:
+            self.update_selection.emit(False)
             return
         # left button + Shift -> start a rubber-band box-select (like the old tree).
         # Disable the pan controller for the duration so the drag draws a box
@@ -531,6 +570,12 @@ class TreePlot(QWidget):
             cam = self._subplot.camera
             cam.maintain_aspect = False
             cam.show_rect(xmin - px, xmax + px, ymin - py, ymax + py, depth=1)
+            # drop any in-flight pan/zoom momentum, else the PanZoomController's
+            # per-frame tick() keeps driving the camera from its own cached target
+            # and overrides show_rect (reset would appear stuck at the drag position).
+            actions = getattr(self._subplot.controller, "_actions", None)
+            if actions:
+                actions.clear()
             self._figure.canvas.request_draw()
 
     def _on_click(self, ev) -> None:
@@ -589,3 +634,7 @@ class TreePlot(QWidget):
             new = dict(state)
             new["position"] = (cx, cy, state["position"][2])
             cam.set_state(new)
+            # clear in-flight momentum so the controller doesn't override the pan
+            actions = getattr(self._subplot.controller, "_actions", None)
+            if actions:
+                actions.clear()
