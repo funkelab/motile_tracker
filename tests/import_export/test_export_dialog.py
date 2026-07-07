@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 import napari
+import numpy as np
 import pytest
 
 from motile_tracker.import_export.menus.export_dialog import (
@@ -24,10 +25,12 @@ def fake_parent(qtbot):
 
 @pytest.fixture
 def colormap():
-    """A napari colormap that returns flat RGBA lists (matching what
-    export_to_csv expects via show_export_dialog's color_dict building)."""
+    """A napari colormap mock that vectorizes like the real one: map() is called
+    once with the whole track-id array and returns an (N, 4) RGBA array."""
     cmap = MagicMock(spec=napari.utils.Colormap)
-    cmap.map.side_effect = lambda tid: [0.0, 0.0, 0.0, 1.0]
+    cmap.map.side_effect = lambda tids: np.tile(
+        [0.0, 0.0, 0.0, 1.0], (len(np.atleast_1d(tids)), 1)
+    )
     return cmap
 
 
