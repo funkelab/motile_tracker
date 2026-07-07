@@ -185,6 +185,38 @@ def test_update_label_colormap_when_selecting(
         assert set(seg_layer.filled_labels) == {k1, k2}
 
 
+def test_selecting_node_does_not_highlight_same_track_nodes(
+    viewer,
+    solution_tracks_3d_with_division,
+):
+    """Highlighting one node must not change the opacity of other nodes that share
+    its track id.
+
+    Regression test for per-track color-array aliasing: _get_colormap must give
+    each node its own color array, because set_opacity mutates the alpha in place.
+    In solution_tracks_3d_with_division, nodes 1 and 2 share track id 1 (the
+    tracklet before the division). Selecting node 2 must leave node 1 at the
+    foreground opacity, not the highlight opacity.
+    """
+    tracks_viewer = TracksViewer.get_instance(viewer)
+    tracks_viewer.update_tracks(tracks=solution_tracks_3d_with_division, name="test")
+    seg_layer = tracks_viewer.tracking_layers.seg_layer
+
+    same_track_unselected, selected = 1, 2
+    assert tracks_viewer.tracks.get_track_id(
+        same_track_unselected
+    ) == tracks_viewer.tracks.get_track_id(selected)
+
+    tracks_viewer.selected_nodes.add(selected, append=False)
+    seg_layer.update_label_colormap("all")
+
+    color_dict = seg_layer.colormap.color_dict
+    assert color_dict[selected][-1] == pytest.approx(seg_layer.highlight_opacity)
+    assert color_dict[same_track_unselected][-1] == pytest.approx(
+        seg_layer.foreground_opacity
+    )
+
+
 # Ortho-views integration tests
 class TestOrthoViewsIntegration:
     """Tests for orthogonal views checkbox and initialization."""

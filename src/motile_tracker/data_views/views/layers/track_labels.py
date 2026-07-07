@@ -187,11 +187,13 @@ class TrackLabels(ContourLabels):
             nodes = tracks.graph.node_ids()
             track_ids = tracks.get_track_ids(nodes)
             # Map each distinct track id once (there are far fewer tracks than
-            # nodes) and reuse per node; calling colormap.map per node is O(nodes)
-            # of redundant work when many nodes share a track id.
+            # nodes); calling colormap.map per node is O(nodes) of redundant work
+            # when many nodes share a track id. Copy per node: set_opacity later
+            # mutates each color's alpha in place, so nodes must not share a color
+            # array (otherwise changing one node's opacity changes its whole track).
             track_color: dict = {}
             colors = [
-                track_color.setdefault(tid, self.tracks_viewer.colormap.map(tid))
+                track_color.setdefault(tid, self.tracks_viewer.colormap.map(tid)).copy()
                 for tid in track_ids
             ]
         else:
