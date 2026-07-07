@@ -14,6 +14,26 @@ from qtpy.QtWidgets import QVBoxLayout, QWidget
 _SELECT_COLOR = np.array([0.0, 1.0, 1.0, 1.0], dtype=np.float32)  # cyan
 _BASE_SIZE = 8.0
 _SELECT_SIZE = 13.0
+_AXIS_COLOR = (0.6, 0.6, 0.6, 1.0)  # grey axis lines/ticks/labels (like pyqtgraph)
+# Axes live in the subplot's docks (separate fixed-width viewports, like pyqtgraph's
+# AxisItem cells around a central ViewBox). The main plot area then clips its contents
+# at the dock boundary automatically, so panning the tree past the axis makes cells
+# disappear under it — material clipping planes have no effect on the marker material.
+_DOCK_LEFT_PX = 54.0  # left margin for a vertical axis (line + tick labels)
+_DOCK_BOTTOM_PX = 34.0  # bottom margin for a horizontal axis (line + tick labels)
+# thin margin for the minimal (tree-mode) perpendicular axis: just tick marks, no
+# numbers — keep it small so the tracks reach almost to the marks (no big empty bar)
+_DOCK_MINIMAL_PX = 2.0
+# world width assigned to a dock's own camera (arbitrary; the dock viewport is narrow)
+_DOCK_WORLD = 100.0
+# the axis line sits just inside the dock edge adjacent to the plot. It must NOT be
+# exactly at the edge (NDC ±1): pygfx's ruler treats a line lying on the clip boundary
+# as off-screen and then generates zero tick labels. Insetting also leaves room for the
+# inward-pointing tick marks to stay within the dock viewport.
+_AXIS_LINE = _DOCK_WORLD * 0.88
+# the perpendicular axis in tree mode is drawn "minimal": no axis line, no numbers,
+# just tick marks near the *outer* edge of the canvas (matching the old pyqtgraph look).
+_AXIS_EDGE = _DOCK_WORLD * 0.10
 
 
 class TreePlot(QWidget):
@@ -69,13 +89,28 @@ class TreePlot(QWidget):
         # Axes: fastplotlib's default Axes overlay draws rulers at the *data* bbox
         # edges (so the y-axis floats inset from the canvas and moves with the data)
         # plus xy grids. The old pyqtgraph tree had no grid, no x-axis (in tree mode),
-        # and a time axis pinned to the far-left margin acting as a hard cutoff.
-        # Reproduce that with our own pygfx Rulers pinned to the viewport edges,
-        # updated each frame from the camera state (finn's approach).
+        # and a grey time axis in a fixed left margin that clipped the tree.
+        # Reproduce that with pygfx Rulers living in the subplot's docks (separate
+        # fixed-width viewports); the main plot area then clips at the dock boundary.
         self._subplot.axes.visible = False
+        self._dock_left = self._subplot.docks["left"]
+        self._dock_bottom = self._subplot.docks["bottom"]
+        self._dock_left.camera.maintain_aspect = False
+        self._dock_bottom.camera.maintain_aspect = False
         self._ruler_time = gfx.Ruler(tick_side="left")
         self._ruler_feature = gfx.Ruler(tick_side="left")
-        self._subplot.scene.add(self._ruler_time, self._ruler_feature)
+        for ruler in (self._ruler_time, self._ruler_feature):
+            ruler.color = _AXIS_COLOR
+            ruler.tick_size = 6
+        # rotated "Time Point" axis title, lives in the time-axis dock
+        self._time_label = gfx.Text(
+            text="Time Point",
+            font_size=13,
+            screen_space=True,
+            anchor="middle-center",
+            material=gfx.TextMaterial(color=_AXIS_COLOR),
+        )
+        self._configure_docks()
 
         canvas_widget = self._figure.show()
         # The render canvas (and its inner QRenderWidget child) grab keyboard focus
@@ -146,6 +181,7 @@ class TreePlot(QWidget):
         self.feature = feature
         self.track_df = track_df if track_df is not None else pd.DataFrame()
 
+        self._configure_docks()
         self._rebuild()
         self.set_selection(selected_nodes, plot_type)
         if reset_view:
@@ -158,71 +194,125 @@ class TreePlot(QWidget):
         reset_view: bool | None = False,
         allow_flip: bool | None = True,
     ) -> None:
-        # axis labels/rulers styling: TODO match old look; for now just rescale
+        """Store the view direction / plot type. Axis rulers update themselves each
+        frame in ``_update_rulers``; ``allow_flip`` is accepted for interface parity
+        with the old pyqtgraph TreePlot but is not needed here (orientation is derived
+        from ``view_direction`` in ``_compute_positions``)."""
         self.view_direction = view_direction
         self.plot_type = plot_type
+        self._configure_docks()
         if reset_view:
             self._reset_view()
 
     def _update_viewed_data(self, view_direction: str) -> None:
         """Re-apply positions for the given view direction (used by flip_axes)."""
         self.view_direction = view_direction
+        self._configure_docks()
         self._rebuild()
 
     # ------------------------------------------------------------------ #
-    # axis rulers (pinned to viewport edges, updated each frame)
+    # axis rulers (hosted in dock viewports; synced to the main camera)
     # ------------------------------------------------------------------ #
+    def _configure_docks(self) -> None:
+        """Assign the two rulers to their docks and size both docks. Both axes are
+        always shown (the perpendicular axis shows tick marks even in tree mode; its
+        number labels are toggled per-mode in ``_update_rulers``). Time axis: left
+        dock (vertical) / bottom dock (horizontal); feature axis: the other dock."""
+        for obj in (self._ruler_time, self._ruler_feature, self._time_label):
+            if obj.parent is not None:
+                obj.parent.remove(obj)
+
+        # the perpendicular (feature) axis is minimal in tree mode -> a thin margin
+        minimal = _DOCK_MINIMAL_PX
+        if self.view_direction == "vertical":
+            self._dock_left.scene.add(self._ruler_time, self._time_label)
+            self._dock_bottom.scene.add(self._ruler_feature)
+            self._dock_left.size = _DOCK_LEFT_PX
+            self._dock_bottom.size = (
+                _DOCK_BOTTOM_PX if self.plot_type == "feature" else minimal
+            )
+        else:  # horizontal: time along the bottom
+            self._dock_bottom.scene.add(self._ruler_time, self._time_label)
+            self._dock_left.scene.add(self._ruler_feature)
+            self._dock_bottom.size = _DOCK_BOTTOM_PX
+            self._dock_left.size = (
+                _DOCK_LEFT_PX if self.plot_type == "feature" else minimal
+            )
+
     def _update_rulers(self) -> None:
-        """Keep the time (and, in feature mode, feature) ruler pinned to the
-        viewport edges as the camera pans/zooms. Reproduces the old look: a time
-        axis pegged to the far-left margin and NO x-axis in tree mode."""
+        """Each frame, sync both rulers' dock cameras to the main camera's matching
+        range and lay each ruler along its dock edge next to the plot. The dock is a
+        separate viewport, so the tree is clipped at the axis for free. Number labels
+        show on the time axis always, and on the feature axis only in feature mode
+        (tree mode shows the perpendicular axis as tick marks only, like pyqtgraph)."""
         if self._scatter is None:
             self._ruler_time.visible = False
             self._ruler_feature.visible = False
+            self._time_label.visible = False
             return
 
-        cam = self._subplot.camera
-        state = cam.get_state()
+        state = self._subplot.camera.get_state()
         px, py = state["position"][0], state["position"][1]
         w, h = state["width"], state["height"]
         left, right = px - w / 2, px + w / 2
         bottom, top = py - h / 2, py + h / 2
-        logical = self._subplot.viewport.logical_size
+        # tree mode: the perpendicular axis is "minimal" (edge tick marks only)
+        minimal = self.plot_type != "feature"
 
-        self._ruler_time.visible = True
         if self.view_direction == "vertical":
-            # time on the y-axis, pinned to the left edge. positions store -t, so
-            # the tick value at the top edge is -top (time increases downward).
-            self._ruler_time.tick_side = "right"
-            self._ruler_time.start_value = -top
-            self._ruler_time.start_pos = (left, top, 0)
-            self._ruler_time.end_pos = (left, bottom, 0)
+            self._sync_left(self._ruler_time, bottom, top, False, self._time_label)
+            self._sync_bottom(self._ruler_feature, left, right, minimal)
         else:
-            # time on the x-axis, pinned to the bottom edge
-            self._ruler_time.tick_side = "left"
-            self._ruler_time.start_value = left
-            self._ruler_time.start_pos = (left, bottom, 0)
-            self._ruler_time.end_pos = (right, bottom, 0)
-        self._ruler_time.update(cam, logical)
+            self._sync_bottom(self._ruler_time, left, right, False, self._time_label)
+            self._sync_left(self._ruler_feature, bottom, top, minimal)
 
-        # feature axis only exists in feature mode; hidden entirely in tree mode
-        if self.plot_type == "feature":
-            self._ruler_feature.visible = True
-            if self.view_direction == "vertical":
-                # feature on the x-axis, pinned to the bottom edge
-                self._ruler_feature.tick_side = "left"
-                self._ruler_feature.start_value = left
-                self._ruler_feature.start_pos = (left, bottom, 0)
-                self._ruler_feature.end_pos = (right, bottom, 0)
-            else:
-                # feature on the y-axis (positions store -feature), pinned left
-                self._ruler_feature.tick_side = "right"
-                self._ruler_feature.start_value = -top
-                self._ruler_feature.start_pos = (left, top, 0)
-                self._ruler_feature.end_pos = (left, bottom, 0)
-            self._ruler_feature.update(cam, logical)
-        else:
-            self._ruler_feature.visible = False
+    def _sync_left(self, ruler, bottom, top, minimal, label=None) -> None:
+        """Lay a vertical ruler in the left dock. Normal: axis line just inside the
+        right edge (next to the plot), tick marks toward the plot, numbers in the
+        margin to the left. Minimal (tree-mode perpendicular axis): no line, no
+        numbers, just tick marks near the far-left edge of the canvas."""
+        dock = self._dock_left
+        dv = dock.viewport.logical_size
+        if dv[0] < 1 or dv[1] < 1:
+            return  # transient degenerate size — keep last-good geometry, don't hide
+        dock.camera.show_rect(0, _DOCK_WORLD, bottom, top, depth=1)
+        axis = _AXIS_EDGE if minimal else _AXIS_LINE
+        ruler.visible = True
+        ruler.tick_side = "right"  # marks toward plot, numbers extend left into margin
+        ruler.start_value = -top
+        ruler.start_pos = (axis, top, 0)
+        ruler.end_pos = (axis, bottom, 0)
+        ruler.update(dock.camera, dv)
+        ruler._line.visible = not minimal
+        ruler._text.visible = not minimal
+        if label is not None:
+            label.visible = not minimal
+            label.local.rotation = (0.0, 0.0, 0.70710677, 0.70710677)  # +90°
+            label.local.position = (_DOCK_WORLD * 0.14, (top + bottom) / 2, 0)
+
+    def _sync_bottom(self, ruler, left, right, minimal, label=None) -> None:
+        """Lay a horizontal ruler in the bottom dock. Normal: axis line just inside
+        the top edge (next to the plot), tick marks toward the plot, numbers in the
+        margin below. Minimal (tree-mode perpendicular axis): no line, no numbers,
+        just tick marks near the bottom edge of the canvas."""
+        dock = self._dock_bottom
+        dv = dock.viewport.logical_size
+        if dv[0] < 1 or dv[1] < 1:
+            return  # transient degenerate size — keep last-good geometry, don't hide
+        dock.camera.show_rect(left, right, 0, _DOCK_WORLD, depth=1)
+        axis = _AXIS_EDGE if minimal else _AXIS_LINE
+        ruler.visible = True
+        ruler.tick_side = "right"  # marks toward plot, numbers extend down into margin
+        ruler.start_value = left
+        ruler.start_pos = (left, axis, 0)
+        ruler.end_pos = (right, axis, 0)
+        ruler.update(dock.camera, dv)
+        ruler._line.visible = not minimal
+        ruler._text.visible = not minimal
+        if label is not None:
+            label.visible = not minimal
+            label.local.rotation = (0.0, 0.0, 0.0, 1.0)  # horizontal
+            label.local.position = ((left + right) / 2, _DOCK_WORLD * 0.14, 0)
 
     # ------------------------------------------------------------------ #
     # rendering
@@ -416,25 +506,35 @@ class TreePlot(QWidget):
     def _clear_rubber(self) -> None:
         if self._rubber is not None:
             self._rubber.visible = False
-            # collapse to a single in-data point: auto_scale (used by _reset_view)
-            # includes even invisible graphics in its bounds, so a stale rubber
-            # rectangle far from the tree would otherwise break "fit to view".
-            if len(self._positions):
-                self._rubber.data[:] = np.tile(self._positions[0], (5, 1))
             self._figure.canvas.request_draw()
 
     def _reset_view(self) -> None:
-        """Fit the view to all data, filling the canvas (maintain_aspect=False so the
-        wide tree isn't letterboxed). The explicit request_draw is required — changing
-        the camera doesn't repaint on its own between interactions."""
-        if self._scatter is None:
+        """Fit the view to the node positions, filling the canvas.
+
+        Framed directly from the scatter data via ``camera.show_rect`` rather than
+        ``auto_scale``: auto_scale unions the bounds of *all* scene objects (the
+        rulers, the NaN-separated edge line, the idle rubber rectangle), so it can't
+        reliably tighten to the tree — e.g. when zoomed out, the rulers sit at the
+        wide viewport edges. Framing from ``self._positions`` ignores everything else.
+        maintain_aspect=False fills the wide canvas; request_draw is required because
+        a camera change doesn't repaint on its own between interactions."""
+        if len(self._positions) == 0:
             return
+        xs, ys = self._positions[:, 0], self._positions[:, 1]
+        xmin, xmax = float(np.min(xs)), float(np.max(xs))
+        ymin, ymax = float(np.min(ys)), float(np.max(ys))
+        px = (xmax - xmin) * 0.05 or 1.0
+        py = (ymax - ymin) * 0.05 or 1.0
+        # the axis lives in a dock outside the plot area, so no gutter compensation
+        # is needed here — fit the data to the full (already-inset) plot viewport.
         with contextlib.suppress(Exception):
-            self._subplot.auto_scale(maintain_aspect=False)
+            cam = self._subplot.camera
+            cam.maintain_aspect = False
+            cam.show_rect(xmin - px, xmax + px, ymin - py, ymax + py, depth=1)
             self._figure.canvas.request_draw()
 
     def _on_click(self, ev) -> None:
-        # left button only
+        # ignore middle/right buttons (0 = primary/left, 1 = left on some backends)
         if getattr(ev, "button", 1) not in (1, 0):
             return
         idx = ev.pick_info.get("vertex_index")
