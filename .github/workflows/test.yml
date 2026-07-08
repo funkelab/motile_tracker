@@ -77,6 +77,19 @@ jobs:
           if (Test-Path -Path "C:\Windows\system32\opengl32.dll" -PathType Leaf) {Exit 0} else {Exit 1}
         shell: powershell
 
+      # Diagnostic: vulkaninfo shows lavapipe is present, yet wgpu aborts in
+      # request_adapter without surfacing the Rust error. Request an adapter
+      # directly with Rust logging on so the real failure reason appears in the log.
+      - name: Diagnose wgpu adapter (Linux)
+        if: runner.os == 'Linux'
+        continue-on-error: true
+        uses: aganders3/headless-gui@v2
+        env:
+          RUST_BACKTRACE: "full"
+          RUST_LOG: "wgpu_core=info,wgpu_hal=info,naga=warn"
+        with:
+          run: uv run python -c "import wgpu; print('ADAPTERS:', [a.summary for a in wgpu.backends.wgpu_native.enumerate_adapters()])"
+
       - name: Test
         uses: aganders3/headless-gui@v2
         with:
