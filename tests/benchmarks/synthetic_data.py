@@ -259,6 +259,12 @@ def pick_nodes(tracks: SolutionTracks) -> dict:
     }
 
 
+def tracklet_nodes(tracks: SolutionTracks, node: int) -> list[int]:
+    """All node ids sharing the tracklet (track_id) of ``node`` -- a connected path."""
+    tid = tracks.get_track_id(node)
+    return [int(n) for n in tracks.graph.node_ids() if tracks.get_track_id(n) == tid]
+
+
 def _describe(tracks: SolutionTracks) -> dict:
     graph = tracks.graph
     src = graph.edge_attrs(attr_keys=[td.DEFAULT_ATTR_KEYS.EDGE_SOURCE])[

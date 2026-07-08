@@ -12,7 +12,7 @@ under the ``offscreen`` Qt platform, which lacks a real GL context.
 
 from __future__ import annotations
 
-from synthetic_data import pick_nodes
+from synthetic_data import pick_nodes, tracklet_nodes
 
 # ----------------------------------------------------------------------------------
 # Loading
@@ -144,6 +144,38 @@ def test_delete_node(benchmark, build_app, fresh_tracks):
         return (tv,), {}
 
     benchmark.pedantic(lambda tv: tv.delete_node(), setup=setup, rounds=1, iterations=1)
+
+
+def test_delete_nodes_bulk(benchmark, build_app, fresh_tracks):
+    """Delete a whole tracklet (many nodes) in a single action.
+
+    Exercises the multi-node UserDeleteNodes path. Since the refresh runs once
+    regardless of count, this vs test_delete_node shows fixed-refresh overhead vs
+    marginal per-node cost, and catches a regression to refresh-per-node.
+    """
+
+    def setup():
+        _, tv, _ = build_app(fresh_tracks)
+        nodes = tracklet_nodes(fresh_tracks, pick_nodes(fresh_tracks)["del_node"])
+        tv.selected_nodes.reset()
+        tv.selected_nodes.add_list(nodes)
+        return (tv,), {}
+
+    benchmark.pedantic(lambda tv: tv.delete_node(), setup=setup, rounds=1, iterations=1)
+
+
+def test_undo_bulk_delete(benchmark, build_app, fresh_tracks):
+    """Undo a bulk (whole-tracklet) delete -- restores many nodes in one action."""
+
+    def setup():
+        _, tv, _ = build_app(fresh_tracks)
+        nodes = tracklet_nodes(fresh_tracks, pick_nodes(fresh_tracks)["del_node"])
+        tv.selected_nodes.reset()
+        tv.selected_nodes.add_list(nodes)
+        tv.delete_node()
+        return (tv,), {}
+
+    benchmark.pedantic(lambda tv: tv.undo(), setup=setup, rounds=1, iterations=1)
 
 
 def test_delete_edge(benchmark, build_app, fresh_tracks):
