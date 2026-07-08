@@ -18,6 +18,9 @@ _SELECT_BUMP = 6.0  # size increase for a selected node
 # triangle (split) and cross (end) glyphs have less visual weight than a filled circle
 # at the same bounding-box size, so enlarge them to match and stay clickable/legible.
 _SYMBOL_SIZE_FACTOR = {"t1": 1.9, "x": 1.4}
+# a right-button press that moves <= this many pixels counts as a click (-> reset view);
+# a larger movement is a drag, which the pan/zoom controller uses to squeeze x/y.
+_RIGHT_CLICK_DRAG_PX = 4.0
 # node-type glyphs: track_df["symbol"] uses pyqtgraph names; map to pygfx per-vertex
 # marker codes. continue="o" (circle), split="t1" (triangle), end="x" (cross).
 _MARKER_CODES = {
@@ -83,6 +86,9 @@ class TreePlot(QWidget):
         # shift-drag rectangle (box-select) state
         self._drag_start: tuple[float, float] | None = None
         self._rubber = None
+        # right-button press position (screen px), to tell a click (reset) from a
+        # drag (axis squeeze/zoom, handled natively by the pan/zoom controller)
+        self._rpress_xy: tuple | None = None
 
         # build the figure (Qt auto-detected; bitmap present method is dock-safe)
         # names=[[""]] suppresses the default subplot title (which otherwise shows
@@ -507,9 +513,12 @@ class TreePlot(QWidget):
         # any click on the canvas gives TreePlot keyboard focus so Q/X/Y work
         self.setFocus()
         button = getattr(ev, "button", None)
-        # right button (2) anywhere -> reset/fit view to all data
+        # right button (2): a plain click resets the view; a drag squeezes/zooms the
+        # x or y axis (the controller's native mouse2 "zoom" drag). Only record the
+        # press here — resetting now would override the drag-zoom. pointer_up decides
+        # click vs drag. Do NOT disable the controller, so the drag-zoom still runs.
         if button == 2:
-            self._reset_view()
+            self._rpress_xy = (getattr(ev, "x", None), getattr(ev, "y", None))
             return
         # mouse side buttons -> step through selection history (like browser back/fwd).
         # back (4) = previous selection, forward (5) = next. TreeWidget connects
@@ -537,6 +546,17 @@ class TreePlot(QWidget):
             self._update_rubber(self._drag_start, (float(world[0]), float(world[1])))
 
     def _on_canvas_pointer_up(self, ev) -> None:
+        # right-button release: reset only if it was a click (moved <= threshold). A
+        # larger movement was a drag-zoom already applied by the controller.
+        if self._rpress_xy is not None:
+            x0, y0 = self._rpress_xy
+            self._rpress_xy = None
+            x1, y1 = getattr(ev, "x", None), getattr(ev, "y", None)
+            moved = abs(x1 - x0) + abs(y1 - y0) if None not in (x0, y0, x1, y1) else 0.0
+            if moved <= _RIGHT_CLICK_DRAG_PX:
+                self._reset_view()
+            return
+
         if self._drag_start is None:
             return
         world = self._subplot.map_screen_to_world(ev, allow_outside=True)
