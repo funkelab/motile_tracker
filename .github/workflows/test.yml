@@ -88,7 +88,7 @@ jobs:
           RUST_BACKTRACE: "full"
           RUST_LOG: "wgpu_core=info,wgpu_hal=info,naga=warn"
         with:
-          run: uv run python -c "import wgpu; print('ADAPTERS:', [a.summary for a in wgpu.backends.wgpu_native.enumerate_adapters()])"
+          run: uv run python -c "import wgpu; a = wgpu.gpu.request_adapter_sync(power_preference='high-performance'); print('ADAPTER:', a.summary)"
 
       - name: Test
         uses: aganders3/headless-gui@v2
