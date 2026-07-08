@@ -650,22 +650,47 @@ class TreePlot(QWidget):
         self._center_on_rows([row])
 
     def _center_on_rows(self, rows: list[int]) -> None:
-        """Pan the camera to the given rows if they're outside the current view."""
+        """Bring the given rows into view.
+
+        Keeps the current zoom if the rows already fit in the viewport; otherwise
+        zooms out *just enough* (per axis) to fit them, and never zooms in. Used for
+        single-node centering and for multi-node selection — e.g. the two endpoints of
+        a just-broken edge, which may now sit far apart: rather than pan to their
+        midpoint at the current zoom (leaving both off-screen), we widen the view so
+        both are visible.
+        """
         if not rows:
             return
         pts = self._positions[rows]
-        cx, cy = float(pts[:, 0].mean()), float(pts[:, 1].mean())
+        xmin, xmax = float(pts[:, 0].min()), float(pts[:, 0].max())
+        ymin, ymax = float(pts[:, 1].min()), float(pts[:, 1].max())
         with contextlib.suppress(Exception):
             cam = self._subplot.camera
             state = cam.get_state()
             x, y = state["position"][0], state["position"][1]
             w, h = state["width"], state["height"]
-            if (x - w / 2) <= cx <= (x + w / 2) and (y - h / 2) <= cy <= (y + h / 2):
-                return  # already visible
+            # already fully visible at the current zoom -> nothing to do
+            if (
+                (x - w / 2) <= xmin
+                and xmax <= (x + w / 2)
+                and (y - h / 2) <= ymin
+                and ymax <= (y + h / 2)
+            ):
+                return
+            # grow the view only if the rows don't fit (never shrink = never zoom in);
+            # dividing the span by 0.8 leaves a ~10% margin so nodes aren't flush to
+            # the edge. For a single row the span is 0, so the zoom is preserved and we
+            # simply pan to it.
             new = dict(state)
-            new["position"] = (cx, cy, state["position"][2])
+            new["position"] = (
+                (xmin + xmax) / 2,
+                (ymin + ymax) / 2,
+                state["position"][2],
+            )
+            new["width"] = max(w, (xmax - xmin) / 0.8)
+            new["height"] = max(h, (ymax - ymin) / 0.8)
             cam.set_state(new)
-            # clear in-flight momentum so the controller doesn't override the pan
+            # clear in-flight momentum so the controller doesn't override the change
             actions = getattr(self._subplot.controller, "_actions", None)
             if actions:
                 actions.clear()
