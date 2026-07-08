@@ -281,13 +281,26 @@ class TreePlot(QWidget):
             self._sync_bottom(self._ruler_feature, left, right, minimal)
         else:
             self._sync_bottom(self._ruler_time, left, right, False, self._time_label)
-            self._sync_left(self._ruler_feature, bottom, top, minimal)
+            # a numeric feature axis increases upward (not negated like tree lanes)
+            self._sync_left(
+                self._ruler_feature,
+                bottom,
+                top,
+                minimal,
+                negated=self.plot_type != "feature",
+            )
 
-    def _sync_left(self, ruler, bottom, top, minimal, label=None) -> None:
+    def _sync_left(self, ruler, bottom, top, minimal, label=None, negated=True) -> None:
         """Lay a vertical ruler in the left dock. Normal: axis line just inside the
         right edge (next to the plot), tick marks toward the plot, numbers in the
         margin to the left. Minimal (tree-mode perpendicular axis): no line, no
-        numbers, just tick marks near the far-left edge of the canvas."""
+        numbers, just tick marks near the far-left edge of the canvas.
+
+        The ruler's value always increases from ``start_pos`` toward ``end_pos``.
+        ``negated=True`` (time axis / tree lanes, whose world y = -value) lays it
+        top->bottom so values increase downward (parent-at-top). ``negated=False``
+        (a numeric feature axis, whose world y = +value) lays it bottom->top so
+        feature values increase upward."""
         dock = self._dock_left
         dv = dock.viewport.logical_size
         if dv[0] < 1 or dv[1] < 1:
@@ -295,10 +308,20 @@ class TreePlot(QWidget):
         dock.camera.show_rect(0, _DOCK_WORLD, bottom, top, depth=1)
         axis = _AXIS_EDGE if minimal else _AXIS_LINE
         ruler.visible = True
-        ruler.tick_side = "right"  # marks toward plot, numbers extend left into margin
-        ruler.start_value = -top
-        ruler.start_pos = (axis, top, 0)
-        ruler.end_pos = (axis, bottom, 0)
+        # tick_side is relative to the ruler's start->end direction. For the downward
+        # ruler "right" puts marks toward the plot and numbers in the left margin; for
+        # the upward ruler that same margin side is "left" (else numbers render into the
+        # clipped plot area and disappear).
+        if negated:  # world y = -value: lay top->bottom, value increases downward
+            ruler.tick_side = "right"
+            ruler.start_value = -top
+            ruler.start_pos = (axis, top, 0)
+            ruler.end_pos = (axis, bottom, 0)
+        else:  # world y = +value: lay bottom->top, value increases upward
+            ruler.tick_side = "left"
+            ruler.start_value = bottom
+            ruler.start_pos = (axis, bottom, 0)
+            ruler.end_pos = (axis, top, 0)
         ruler.update(dock.camera, dv)
         ruler._line.visible = not minimal
         ruler._text.visible = not minimal
@@ -338,7 +361,14 @@ class TreePlot(QWidget):
         return self.feature if self.plot_type == "feature" else "x_axis_pos"
 
     def _compute_positions(self, df: pd.DataFrame) -> np.ndarray:
-        """(N, 3) float32 positions. Vertical: (axis_value, -t). Horizontal swaps."""
+        """(N, 3) float32 positions. Vertical: (axis_value, -t). Horizontal swaps.
+
+        In horizontal view the perpendicular (y) axis is negated so tree lanes read
+        top-to-bottom like the old pyqtgraph tree. But for a numeric *feature* the
+        y-axis should increase upward (larger values higher), so feature positions are
+        NOT negated. Feature plots are always horizontal (see TreeWidget), so this only
+        affects the horizontal branch.
+        """
         axis_col = self._axis_value_column()
         a = df[axis_col].to_numpy(dtype=np.float32)
         t = df["t"].to_numpy(dtype=np.float32)
@@ -347,9 +377,9 @@ class TreePlot(QWidget):
         if self.view_direction == "vertical":
             pos[:, 0] = a
             pos[:, 1] = -t
-        else:  # horizontal: time along x, tracks along y
+        else:  # horizontal: time along x, perpendicular axis along y
             pos[:, 0] = t
-            pos[:, 1] = -a
+            pos[:, 1] = a if self.plot_type == "feature" else -a
         return pos
 
     def _rebuild(self) -> None:
