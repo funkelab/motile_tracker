@@ -46,7 +46,14 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y mesa-vulkan-drivers libgl1-mesa-dri
+          sudo apt-get install -y mesa-vulkan-drivers libvulkan1 vulkan-tools libgl1-mesa-dri
+          # Point the Vulkan loader straight at lavapipe (the software ICD) and force
+          # software GL, so wgpu's request_adapter finds an adapter instead of aborting.
+          # $GITHUB_ENV persists these to the later test step.
+          echo "VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.x86_64.json" >> "$GITHUB_ENV"
+          echo "LIBGL_ALWAYS_SOFTWARE=1" >> "$GITHUB_ENV"
+          # Diagnostic: show what the loader sees (never fails the job).
+          vulkaninfo --summary || true
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: astral-sh/setup-uv@v7
