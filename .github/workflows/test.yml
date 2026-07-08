@@ -38,23 +38,6 @@ jobs:
                      /etc/apt/sources.list.d/azure-cli.sources
       - uses: tlambert03/setup-qt-libs@v1
 
-      # The tree view renders via fastplotlib/pygfx/wgpu, which needs a graphics
-      # adapter. Headless Linux runners have no GPU, so install Mesa's software
-      # Vulkan driver (lavapipe); wgpu then finds an adapter under xvfb instead of
-      # aborting (SIGABRT in request_adapter). macOS (Metal) / Windows (DX12) are fine.
-      - name: Install software Vulkan (lavapipe) for headless wgpu
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y mesa-vulkan-drivers libvulkan1 vulkan-tools libgl1-mesa-dri
-          # Point the Vulkan loader straight at lavapipe (the software ICD) and force
-          # software GL, so wgpu's request_adapter finds an adapter instead of aborting.
-          # $GITHUB_ENV persists these to the later test step.
-          echo "VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.x86_64.json" >> "$GITHUB_ENV"
-          echo "LIBGL_ALWAYS_SOFTWARE=1" >> "$GITHUB_ENV"
-          # Diagnostic: show what the loader sees (never fails the job).
-          vulkaninfo --summary || true
-
       - name: Set up Python ${{ matrix.python-version }}
         uses: astral-sh/setup-uv@v7
         with:
@@ -76,19 +59,6 @@ jobs:
           powershell gl-ci-helpers/appveyor/install_opengl.ps1
           if (Test-Path -Path "C:\Windows\system32\opengl32.dll" -PathType Leaf) {Exit 0} else {Exit 1}
         shell: powershell
-
-      # Diagnostic: vulkaninfo shows lavapipe is present, yet wgpu aborts in
-      # request_adapter without surfacing the Rust error. Request an adapter
-      # directly with Rust logging on so the real failure reason appears in the log.
-      - name: Diagnose wgpu adapter (Linux)
-        if: runner.os == 'Linux'
-        continue-on-error: true
-        uses: aganders3/headless-gui@v2
-        env:
-          RUST_BACKTRACE: "full"
-          RUST_LOG: "wgpu_core=info,wgpu_hal=info,naga=warn"
-        with:
-          run: uv run python -c "import wgpu; a = wgpu.gpu.request_adapter_sync(power_preference='high-performance'); print('ADAPTER:', a.summary)"
 
       - name: Test
         uses: aganders3/headless-gui@v2

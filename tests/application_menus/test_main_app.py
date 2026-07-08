@@ -1,6 +1,17 @@
 """Tests for main_app.py: StartupWidget, MainAppWidget, and single menu widget classes."""
 
+import sys
+
+import pytest
 from qtpy.QtWidgets import QWidget
+
+# MainAppWidget builds the fastplotlib/wgpu tree view. On headless Linux CI wgpu
+# aborts (SIGABRT) constructing the Qt canvas figure, killing the whole pytest
+# process. These are covered on macOS (Metal) and Windows (DX12); skip on Linux.
+pytestmark = pytest.mark.skipif(
+    sys.platform == "linux",
+    reason="fastplotlib/wgpu can't build a Qt canvas on headless Linux CI",
+)
 
 from motile_tracker.application_menus.main_app import (
     MENU_WIDGETS,

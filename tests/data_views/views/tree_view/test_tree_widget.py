@@ -4,11 +4,20 @@ Tests cover TreePlot data display, node selection, keyboard shortcuts,
 mode switching, and integration with TracksViewer.
 """
 
+import sys
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
 from qtpy.QtCore import Qt
+
+# TreeWidget builds the fastplotlib/wgpu tree canvas. On headless Linux CI wgpu
+# aborts (SIGABRT) constructing the Qt canvas figure, killing the whole pytest
+# process. These are covered on macOS (Metal) and Windows (DX12); skip on Linux.
+pytestmark = pytest.mark.skipif(
+    sys.platform == "linux",
+    reason="fastplotlib/wgpu can't build a Qt canvas on headless Linux CI",
+)
 
 from motile_tracker.data_views.views.tree_view.navigation_widget import (
     NavigationWidget,
