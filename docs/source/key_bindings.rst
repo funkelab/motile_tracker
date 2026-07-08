@@ -55,6 +55,9 @@ Tree view key and mouse functions
      - Restrict zoom to the y-axis of the tree view
    * - Mouse drag
      - Pan
+   * - Right mouse drag
+     - | Squeeze/zoom the axes: drag horizontally to scale the
+       | x-axis, vertically to scale the y-axis
    * - SHIFT + Mouse drag
      - Rectangular selection of nodes
    * - ESC
