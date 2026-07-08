@@ -12,7 +12,15 @@ from pygfx.utils.enums import MarkerInt
 from qtpy.QtCore import Qt
 from qtpy.QtWidgets import QVBoxLayout, QWidget
 
-_SELECT_COLOR = np.array([0.0, 1.0, 1.0, 1.0], dtype=np.float32)  # cyan
+_SELECT_COLOR = np.array(
+    [0.0, 1.0, 1.0, 1.0], dtype=np.float32
+)  # cyan selection outline
+_EDGE_NONE = np.array(
+    [0.0, 0.0, 0.0, 0.0], dtype=np.float32
+)  # transparent (unselected)
+_SELECT_EDGE_WIDTH = (
+    2.0  # px outline around a selected node (fill keeps its track color)
+)
 _BASE_SIZE = 10.0  # bigger than the old 10 so nodes are easier to click and glyphs read
 _SELECT_BUMP = 6.0  # size increase for a selected node
 # triangle (split) and cross (end) glyphs have less visual weight than a filled circle
@@ -81,6 +89,9 @@ class TreePlot(QWidget):
         self._positions = np.empty((0, 3), dtype=np.float32)
         self._base_colors = np.empty((0, 4), dtype=np.float32)
         self._base_sizes = np.empty(0, dtype=np.float32)
+        self._edge_colors = (
+            None  # pygfx per-vertex edge-color buffer (selection outline)
+        )
         self._selected_rows: list[int] = []
 
         # shift-drag rectangle (box-select) state
@@ -394,6 +405,7 @@ class TreePlot(QWidget):
         self._subplot.clear()
         self._scatter = None
         self._edges = None
+        self._edge_colors = None
         self._rubber = None  # cleared with the scene; recreated lazily on next drag
         self._selected_rows = []
 
@@ -446,8 +458,16 @@ class TreePlot(QWidget):
         wo = self._scatter.world_object
         wo.material.marker_mode = "vertex"
         wo.geometry.markers = gfx.Buffer(codes)
-        # match old pyqtgraph look: no marker outline (old outline pen was alpha 0)
-        self._scatter.edge_width = 0
+        # Selection is shown as an OUTLINE (like the old pyqtgraph tree): a uniform
+        # edge that is transparent for unselected nodes and cyan for selected ones, so
+        # a selected node keeps its track-color fill. Per-vertex edge colors need
+        # edge_color_mode="vertex" + a geometry "edge_colors" buffer; edge_width is
+        # uniform (pygfx has no per-vertex width), transparent nodes just show no edge.
+        wo.material.edge_color_mode = "vertex"
+        wo.material.edge_width = _SELECT_EDGE_WIDTH
+        edge_colors = np.zeros((len(self._node_ids), 4), dtype=np.float32)
+        wo.geometry.edge_colors = gfx.Buffer(edge_colors)
+        self._edge_colors = wo.geometry.edge_colors
         self._scatter.add_event_handler(self._on_click, "pointer_down")
 
     def _build_edges(self, df: pd.DataFrame, colors: np.ndarray):
@@ -488,23 +508,32 @@ class TreePlot(QWidget):
     def set_selection(self, selected_nodes: list[Any], plot_type: str) -> None:
         if self._scatter is None:
             return
-        # restore previously selected rows to their base color/size (per-vertex, so
-        # triangles keep their enlarged base size)
+        # Selection = a cyan outline + a size bump; the fill keeps its track color so
+        # you can still tell which track a selected node belongs to (like the old tree).
+        # Surgical: only touch changed rows' edge-color buffer + size.
+        # restore previously selected rows: clear the outline and the size bump
         for row in self._selected_rows:
-            self._scatter.colors[row] = self._base_colors[row]
+            self._set_edge_color(row, _EDGE_NONE)
             self._scatter.sizes[row] = self._base_sizes[row]
 
         new_rows = []
         for node_id in selected_nodes:
             row = self._id_to_row.get(int(node_id))
             if row is not None:
-                self._scatter.colors[row] = _SELECT_COLOR
+                self._set_edge_color(row, _SELECT_COLOR)
                 self._scatter.sizes[row] = self._base_sizes[row] + _SELECT_BUMP
                 new_rows.append(row)
         self._selected_rows = new_rows
 
         if len(new_rows) > 1:
             self._center_on_rows(new_rows)
+
+    def _set_edge_color(self, row: int, rgba: np.ndarray) -> None:
+        """Set one node's per-vertex outline color and upload just that element."""
+        if self._edge_colors is None:
+            return
+        self._edge_colors.data[row] = rgba
+        self._edge_colors.update_range(row, 1)
 
     # ------------------------------------------------------------------ #
     # picking
