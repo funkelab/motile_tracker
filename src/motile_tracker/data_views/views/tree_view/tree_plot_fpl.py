@@ -13,11 +13,11 @@ from qtpy.QtCore import Qt
 from qtpy.QtWidgets import QVBoxLayout, QWidget
 
 _SELECT_COLOR = np.array([0.0, 1.0, 1.0, 1.0], dtype=np.float32)  # cyan
-_BASE_SIZE = 8.0
-_SELECT_BUMP = 5.0  # size increase for a selected node (matches old pyqtgraph +5)
-# a triangle marker has less visual weight than a circle/cross at the same size (the
-# size is the marker's bounding box), so scale up split (triangle) nodes to match.
-_TRIANGLE_SIZE_FACTOR = 1.9
+_BASE_SIZE = 10.0  # bigger than the old 10 so nodes are easier to click and glyphs read
+_SELECT_BUMP = 6.0  # size increase for a selected node
+# triangle (split) and cross (end) glyphs have less visual weight than a filled circle
+# at the same bounding-box size, so enlarge them to match and stay clickable/legible.
+_SYMBOL_SIZE_FACTOR = {"t1": 1.9, "x": 1.4}
 # node-type glyphs: track_df["symbol"] uses pyqtgraph names; map to pygfx per-vertex
 # marker codes. continue="o" (circle), split="t1" (triangle), end="x" (cross).
 _MARKER_CODES = {
@@ -422,10 +422,11 @@ class TreePlot(QWidget):
         # setting the material's marker_mode to "vertex" + a geometry "markers" int
         # buffer (pygfx's per-vertex marker path), so we avoid finn's 3-scatter split.
         symbols = df["symbol"].to_numpy()
-        # per-vertex sizes: bump triangle (split) nodes so they read as big as the dots
-        self._base_sizes = np.where(
-            symbols == "t1", _BASE_SIZE * _TRIANGLE_SIZE_FACTOR, _BASE_SIZE
-        ).astype(np.float32)
+        # per-vertex sizes: enlarge triangle/cross glyphs so they read as big as the dots
+        factors = np.array(
+            [_SYMBOL_SIZE_FACTOR.get(s, 1.0) for s in symbols], dtype=np.float32
+        )
+        self._base_sizes = (_BASE_SIZE * factors).astype(np.float32)
         self._scatter = self._subplot.add_scatter(
             data=self._positions,
             colors=colors,
