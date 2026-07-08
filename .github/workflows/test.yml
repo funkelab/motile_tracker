@@ -38,6 +38,16 @@ jobs:
                      /etc/apt/sources.list.d/azure-cli.sources
       - uses: tlambert03/setup-qt-libs@v1
 
+      # The tree view renders via fastplotlib/pygfx/wgpu, which needs a graphics
+      # adapter. Headless Linux runners have no GPU, so install Mesa's software
+      # Vulkan driver (lavapipe); wgpu then finds an adapter under xvfb instead of
+      # aborting (SIGABRT in request_adapter). macOS (Metal) / Windows (DX12) are fine.
+      - name: Install software Vulkan (lavapipe) for headless wgpu
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mesa-vulkan-drivers libgl1-mesa-dri
+
       - name: Set up Python ${{ matrix.python-version }}
         uses: astral-sh/setup-uv@v7
         with:
