@@ -11,10 +11,10 @@ from motile_tracker.motile.menus.run_editor import RunEditor
 
 
 def test_run_editor_initialization(make_napari_viewer, segmentation_2d):
-    """Test RunEditor widget initialization."""
-
-    # Test 1: RunEditor creates all UI elements correctly
+    """Test RunEditor widget initialization and layer dropdown population."""
     viewer = make_napari_viewer()
+
+    # RunEditor creates all UI elements correctly
     editor = RunEditor(viewer)
     assert editor.viewer is viewer
     assert editor.solver_params_widget is not None
@@ -22,7 +22,7 @@ def test_run_editor_initialization(make_napari_viewer, segmentation_2d):
     assert editor.layer_selection_box is not None
     assert editor.run_name.text() == "new_run"
 
-    # Test 2: RunEditor populates layer dropdown when layers exist
+    # RunEditor populates layer dropdown when layers exist
     viewer.add_labels(segmentation_2d, name="seg1")
     viewer.add_labels(segmentation_2d, name="seg2")
     editor2 = RunEditor(viewer)
@@ -34,24 +34,24 @@ def test_layer_management(make_napari_viewer, segmentation_2d, qtbot):
     """Test layer selection and management functionality."""
     viewer = make_napari_viewer()
 
-    # Test 1: update_labels_layers adds new Labels layers
+    # update_labels_layers adds new Labels layers
     editor = RunEditor(viewer)
     assert editor.layer_selection_box.count() == 0
     viewer.add_labels(segmentation_2d, name="seg1")
     assert editor.layer_selection_box.count() == 1
     assert editor.layer_selection_box.itemText(0) == "seg1"
 
-    # Test 2: update_labels_layers adds Points layers
+    # update_labels_layers adds Points layers
     points_data = np.array([[0, 10, 20], [1, 30, 40]])
     viewer.add_points(points_data, name="points1")
     assert editor.layer_selection_box.count() == 2
     assert "points1" in [editor.layer_selection_box.itemText(i) for i in range(2)]
 
-    # Test 3: update_labels_layers ignores Image layers
+    # update_labels_layers ignores Image layers
     viewer.add_image(segmentation_2d.astype(float), name="image1")
     assert editor.layer_selection_box.count() == 2
 
-    # Test 4: update_labels_layers preserves current selection
+    # update_labels_layers preserves current selection
     viewer.add_labels(segmentation_2d, name="seg2")
     editor2 = RunEditor(viewer)
     editor2.layer_selection_box.setCurrentText("seg2")
@@ -59,20 +59,20 @@ def test_layer_management(make_napari_viewer, segmentation_2d, qtbot):
     viewer.add_labels(segmentation_2d, name="seg3")
     assert editor2.layer_selection_box.currentText() == "seg2"
 
-    # Test 5: get_input_layer returns the selected layer
+    # get_input_layer returns the selected layer
     layer = viewer.add_labels(segmentation_2d, name="seg4")
     editor3 = RunEditor(viewer)
     editor3.layer_selection_box.setCurrentText("seg4")
     result = editor3.get_input_layer()
     assert result is layer
 
-    # Test 6: get_input_layer returns None when nothing selected
-    editor4 = RunEditor(make_napari_viewer())
+    # get_input_layer returns None when nothing selected
+    viewer2 = make_napari_viewer()
+    editor4 = RunEditor(viewer2)
     result = editor4.get_input_layer()
     assert result is None
 
-    # Test 7: update_layer_selection enables IoU cost for Labels layers
-    viewer2 = make_napari_viewer()
+    # update_layer_selection enables IoU cost for Labels layers
     viewer2.add_labels(segmentation_2d, name="seg_iou")
     editor5 = RunEditor(viewer2)
     qtbot.addWidget(editor5)
@@ -81,25 +81,22 @@ def test_layer_management(make_napari_viewer, segmentation_2d, qtbot):
     editor5.update_layer_selection()
     assert editor5.solver_params_widget.iou_row.isVisible()
 
-    # Test 8: update_layer_selection disables IoU cost for Points layers
-    viewer3 = make_napari_viewer()
-    viewer3.add_points(points_data, name="points_iou")
-    editor6 = RunEditor(viewer3)
-    qtbot.addWidget(editor6)
-    editor6.show()
-    editor6.layer_selection_box.setCurrentText("points_iou")
-    editor6.update_layer_selection()
-    assert not editor6.solver_params_widget.iou_row.isVisible()
+    # update_layer_selection disables IoU cost for Points layers
+    viewer2.add_points(points_data, name="points_iou")
+    editor5.layer_selection_box.setCurrentText("points_iou")
+    editor5.update_layer_selection()
+    assert not editor5.solver_params_widget.iou_row.isVisible()
 
 
 def test_run_creation(make_napari_viewer, segmentation_2d):
     """Test creating MotileRun objects from editor state."""
-    # Test 1: get_run creates run with Labels layer
     viewer = make_napari_viewer()
     viewer.add_labels(segmentation_2d, name="seg1", scale=(1, 2, 3))
     editor = RunEditor(viewer)
     editor.run_name.setText("test_run")
     editor.layer_selection_box.setCurrentText("seg1")
+
+    # get_run creates run with Labels layer
     run = editor.get_run()
     assert run is not None
     assert run.run_name == "test_run"
@@ -109,7 +106,7 @@ def test_run_creation(make_napari_viewer, segmentation_2d):
     assert tuple(run.scale) == (1, 2, 3)
     assert isinstance(run.graph, td.graph.GraphView)
 
-    # Test 2: get_run creates run with Points layer
+    # get_run creates run with Points layer
     points_data = np.array([[0, 10, 20], [1, 30, 40]])
     viewer.add_points(points_data, name="points1", scale=(1, 2, 3))
     editor.run_name.setText("points_run")
@@ -122,56 +119,7 @@ def test_run_creation(make_napari_viewer, segmentation_2d):
     assert np.array_equal(run2.input_points, points_data)
     assert tuple(run2.scale) == (1, 2, 3)
 
-    # Test 3: get_run returns None when no layer selected
-    viewer2 = make_napari_viewer()
-    editor2 = RunEditor(viewer2)
-    with pytest.warns(UserWarning, match="No input layer selected"):
-        run3 = editor2.get_run()
-    assert run3 is None
-
-    # Test 4: get_run raises error for 2D segmentation
-    viewer3 = make_napari_viewer()
-    seg_2d = np.zeros((100, 100), dtype="int32")
-    viewer3.add_labels(seg_2d, name="seg1")
-    editor3 = RunEditor(viewer3)
-    editor3.layer_selection_box.setCurrentText("seg1")
-    with pytest.raises(ValueError, match="Expected segmentation to be at least 3D"):
-        editor3.get_run()
-
-    # Test 5: get_run raises error for 5D segmentation
-    viewer4 = make_napari_viewer()
-    seg_5d = np.zeros((2, 2, 10, 100, 100), dtype="int32")
-    viewer4.add_labels(seg_5d, name="seg1")
-    editor4 = RunEditor(viewer4)
-    editor4.layer_selection_box.setCurrentText("seg1")
-    with pytest.raises(ValueError, match="Expected segmentation to be at most 4D"):
-        editor4.get_run()
-
-    # Test 6: get_run converts dask array to numpy
-    viewer6 = make_napari_viewer()
-    dask_seg = da.from_array(segmentation_2d, chunks=(1, 50, 50))
-    viewer6.add_labels(dask_seg, name="seg1")
-    editor6 = RunEditor(viewer6)
-    editor6.layer_selection_box.setCurrentText("seg1")
-    run7 = editor6.get_run()
-    assert run7 is not None
-    assert isinstance(run7.input_segmentation, np.ndarray)
-    assert not isinstance(run7.input_segmentation, da.Array)
-
-    # Test 6b: get_run extracts highest resolution from multiscale labels
-    viewer6b = make_napari_viewer()
-    level0 = segmentation_2d
-    level1 = segmentation_2d[:, ::2, ::2]
-    viewer6b.add_labels([level0, level1], name="multiscale_seg", multiscale=True)
-    editor6b = RunEditor(viewer6b)
-    editor6b.layer_selection_box.setCurrentText("multiscale_seg")
-    run7b = editor6b.get_run()
-    assert run7b is not None
-    assert isinstance(run7b.input_segmentation, np.ndarray)
-    assert run7b.input_segmentation.shape == level0.shape
-    assert np.array_equal(run7b.input_segmentation, level0)
-
-    # Test 7: get_run uses solver params from the editor
+    # get_run uses solver params from the editor
     viewer.add_labels(segmentation_2d, name="seg_params")
     editor7 = RunEditor(viewer)
     editor7.layer_selection_box.setCurrentText("seg_params")
@@ -181,11 +129,57 @@ def test_run_creation(make_napari_viewer, segmentation_2d):
     assert run8.solver_params.max_edge_distance == 123.0
 
 
+def test_run_creation_edge_cases(make_napari_viewer, segmentation_2d):
+    """Test get_run edge cases: no layer, wrong dimensions, dask, multiscale."""
+    viewer = make_napari_viewer()
+
+    # get_run returns None when no layer selected
+    editor = RunEditor(viewer)
+    with pytest.warns(UserWarning, match="No input layer selected"):
+        run = editor.get_run()
+    assert run is None
+
+    # get_run raises error for 2D segmentation
+    seg_2d = np.zeros((100, 100), dtype="int32")
+    viewer.add_labels(seg_2d, name="seg_2d")
+    editor2 = RunEditor(viewer)
+    editor2.layer_selection_box.setCurrentText("seg_2d")
+    with pytest.raises(ValueError, match="Expected segmentation to be at least 3D"):
+        editor2.get_run()
+
+    # get_run raises error for 5D segmentation
+    seg_5d = np.zeros((2, 2, 10, 100, 100), dtype="int32")
+    viewer.add_labels(seg_5d, name="seg_5d")
+    editor2.layer_selection_box.setCurrentText("seg_5d")
+    with pytest.raises(ValueError, match="Expected segmentation to be at most 4D"):
+        editor2.get_run()
+
+    # get_run converts dask array to numpy
+    dask_seg = da.from_array(segmentation_2d, chunks=(1, 50, 50))
+    viewer.add_labels(dask_seg, name="seg_dask")
+    editor2.layer_selection_box.setCurrentText("seg_dask")
+    run_dask = editor2.get_run()
+    assert run_dask is not None
+    assert isinstance(run_dask.input_segmentation, np.ndarray)
+    assert not isinstance(run_dask.input_segmentation, da.Array)
+
+    # get_run extracts highest resolution from multiscale labels
+    level0 = segmentation_2d
+    level1 = segmentation_2d[:, ::2, ::2]
+    viewer.add_labels([level0, level1], name="multiscale_seg", multiscale=True)
+    editor2.layer_selection_box.setCurrentText("multiscale_seg")
+    run_ms = editor2.get_run()
+    assert run_ms is not None
+    assert isinstance(run_ms.input_segmentation, np.ndarray)
+    assert run_ms.input_segmentation.shape == level0.shape
+    assert np.array_equal(run_ms.input_segmentation, level0)
+
+
 def test_signal_emission(make_napari_viewer, segmentation_2d, qtbot):
     """Test signal emission when starting runs."""
     viewer = make_napari_viewer()
 
-    # Test 1: emit_run emits start_run signal when run is valid
+    # emit_run emits start_run signal when run is valid
     viewer.add_labels(segmentation_2d, name="seg1")
     editor = RunEditor(viewer)
     editor.layer_selection_box.setCurrentText("seg1")
@@ -194,7 +188,7 @@ def test_signal_emission(make_napari_viewer, segmentation_2d, qtbot):
     run = blocker.args[0]
     assert isinstance(run, MotileRun)
 
-    # Test 2: emit_run doesn't emit signal when no layer selected
+    # emit_run doesn't emit signal when no layer selected
     viewer2 = make_napari_viewer()
     editor2 = RunEditor(viewer2)
     with qtbot.assertNotEmitted(editor2.start_run), pytest.warns(UserWarning):
@@ -206,7 +200,6 @@ def test_new_run(make_napari_viewer, segmentation_2d, qtbot):
     viewer = make_napari_viewer()
     editor = RunEditor(viewer)
 
-    # Test: new_run loads run name and solver params
     custom_params = SolverParams(max_edge_distance=999.0, max_children=5)
     existing_run = MotileRun(
         graph=create_empty_graphview_graph(),
@@ -227,7 +220,6 @@ def test_max_frames_update(make_napari_viewer, segmentation_2d):
     viewer = make_napari_viewer()
     viewer.add_labels(segmentation_2d, name="seg1")
 
-    # Test: _update_max_frames updates constraint based on viewer dims
     editor = RunEditor(viewer)
     editor._update_max_frames()
     max_frame = int(viewer.dims.range[0].stop)
