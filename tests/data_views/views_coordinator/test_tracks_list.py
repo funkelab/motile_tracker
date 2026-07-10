@@ -1,13 +1,15 @@
 """Tests for TracksList and TracksButton.
 
-Covers add/remove/select tracks, save/load/export dialogs, and the
-load_motile_run bug fix (must call MotileRun.load, not Tracks.load).
+Covers add/remove/select tracks, save/load/export dialogs, signal emission,
+and the load_motile_run bug fix (must call MotileRun.load, not Tracks.load).
 """
 
 import warnings
 from unittest.mock import MagicMock, patch
 
 import pytest
+from funtracks.data_model import SolutionTracks
+from funtracks.import_export import write_to_geff
 from qtpy.QtWidgets import QDialog
 
 from motile_tracker.data_views.views_coordinator.tracks_list import (
@@ -24,7 +26,7 @@ def clear_viewer_layers(viewer):
 
 
 @pytest.fixture
-def tracks(graph_2d):
+def motile_run(graph_2d):
     return MotileRun(graph=graph_2d, run_name="test", solver_params=SolverParams())
 
 
@@ -39,13 +41,13 @@ def tracks_list():
 
 
 class TestTracksButton:
-    def test_init_stores_tracks_and_name(self, tracks):
-        btn = TracksButton(tracks, "my_run")
-        assert btn.tracks is tracks
+    def test_init_stores_tracks_and_name(self, motile_run):
+        btn = TracksButton(motile_run, "my_run")
+        assert btn.tracks is motile_run
         assert btn.name.text() == "my_run"
 
-    def test_size_hint_height(self, tracks):
-        btn = TracksButton(tracks, "my_run")
+    def test_size_hint_height(self, motile_run):
+        btn = TracksButton(motile_run, "my_run")
         assert btn.sizeHint().height() == 30
 
 
@@ -55,32 +57,40 @@ class TestTracksButton:
 
 
 class TestTracksListAddRemove:
-    def test_add_tracks_appends_item(self, tracks_list, tracks):
-        tracks_list.add_tracks(tracks, "run1", select=False)
+    def test_add_tracks_appends_item(self, tracks_list, motile_run):
+        tracks_list.add_tracks(motile_run, "run1", select=False)
         assert tracks_list.tracks_list.count() == 1
 
-    def test_add_tracks_with_select(self, tracks_list, tracks):
-        tracks_list.add_tracks(tracks, "run1", select=True)
+    def test_add_tracks_with_select(self, tracks_list, motile_run):
+        tracks_list.add_tracks(motile_run, "run1", select=True)
         assert tracks_list.tracks_list.currentRow() == 0
 
-    def test_add_multiple_tracks(self, tracks_list, tracks):
-        tracks_list.add_tracks(tracks, "run1", select=False)
-        tracks_list.add_tracks(tracks, "run2", select=False)
+    def test_add_multiple_tracks(self, tracks_list, motile_run):
+        tracks_list.add_tracks(motile_run, "run1", select=False)
+        tracks_list.add_tracks(motile_run, "run2", select=False)
         assert tracks_list.tracks_list.count() == 2
 
-    def test_remove_tracks(self, tracks_list, tracks):
-        tracks_list.add_tracks(tracks, "run1", select=False)
+    def test_remove_tracks(self, tracks_list, motile_run):
+        tracks_list.add_tracks(motile_run, "run1", select=False)
         item = tracks_list.tracks_list.item(0)
         tracks_list.remove_tracks(item)
         assert tracks_list.tracks_list.count() == 0
 
-    def test_selection_changed_emits_signal(self, tracks_list, tracks):
+    def test_selection_changed_emits_signal(self, tracks_list, motile_run):
         emitted = []
         tracks_list.view_tracks.connect(lambda t, n: emitted.append((t, n)))
-        tracks_list.add_tracks(tracks, "run1", select=True)
+        tracks_list.add_tracks(motile_run, "run1", select=True)
         # Selecting the row triggers _selection_changed
         assert len(emitted) == 1
         assert emitted[0][1] == "run1"
+
+    def test_add_solution_tracks_not_wrapped(self, tracks_list, solution_tracks_2d):
+        """SolutionTracks added to the list should NOT be wrapped in MotileRun."""
+        tracks_list.add_tracks(solution_tracks_2d, "imported", select=False)
+        item = tracks_list.tracks_list.item(0)
+        widget = tracks_list.tracks_list.itemWidget(item)
+        assert isinstance(widget.tracks, SolutionTracks)
+        assert not isinstance(widget.tracks, MotileRun)
 
 
 # ---------------------------------------------------------------------------
@@ -89,10 +99,11 @@ class TestTracksListAddRemove:
 
 
 class TestTracksListSave:
-    def test_save_tracks_writes_run_dir_when_dialog_accepted(
-        self, tracks_list, tracks, tmp_path
+    def test_save_motile_run_creates_subdirectory(
+        self, tracks_list, motile_run, tmp_path
     ):
-        tracks_list.add_tracks(tracks, "run1", select=False)
+        """MotileRun.save() creates a timestamped subdirectory."""
+        tracks_list.add_tracks(motile_run, "run1", select=False)
         item = tracks_list.tracks_list.item(0)
 
         tracks_list.save_dialog.exec_ = MagicMock(return_value=True)
@@ -104,9 +115,9 @@ class TestTracksListSave:
         assert len(saved_dirs) == 1
 
     def test_save_tracks_does_nothing_when_dialog_rejected(
-        self, tracks_list, tracks, tmp_path
+        self, tracks_list, motile_run, tmp_path
     ):
-        tracks_list.add_tracks(tracks, "run1", select=False)
+        tracks_list.add_tracks(motile_run, "run1", select=False)
         item = tracks_list.tracks_list.item(0)
 
         tracks_list.save_dialog.exec_ = MagicMock(return_value=False)
@@ -115,46 +126,102 @@ class TestTracksListSave:
 
         assert list(tmp_path.iterdir()) == []
 
-
-# ---------------------------------------------------------------------------
-# TracksList — imported (non-MotileRun) tracks must be saveable
-# ---------------------------------------------------------------------------
-
-
-class TestTracksListSaveImported:
-    def test_imported_solution_tracks_can_be_saved(
-        self, tracks_list, solution_tracks_2d, tmp_path
-    ):
-        """Tracks loaded via ImportDialog (a SolutionTracks, not a MotileRun)
-        must still be saveable via the save button.
-
-        Reproduces the AttributeError seen when saving CSV-imported tracks:
-        the import path must wrap the SolutionTracks in a MotileRun so
-        save_tracks → tracks.save(directory) works.
-        """
-        mock_dialog = MagicMock()
-        mock_dialog.exec_.return_value = QDialog.Accepted
-        mock_dialog.tracks = solution_tracks_2d
-        mock_dialog.name = "imported"
-
-        with patch(
-            "motile_tracker.data_views.views_coordinator.tracks_list.ImportDialog",
-            return_value=mock_dialog,
-        ):
-            tracks_list._load_tracks("csv")
-
+    def test_save_emits_tracks_saved_signal(self, tracks_list, motile_run, tmp_path):
+        tracks_list.add_tracks(motile_run, "run1", select=False)
         item = tracks_list.tracks_list.item(0)
-        widget = tracks_list.tracks_list.itemWidget(item)
-        assert isinstance(widget.tracks, MotileRun)
-        assert widget.tracks.solver_params is None
 
         tracks_list.save_dialog.exec_ = MagicMock(return_value=True)
         tracks_list.save_dialog.selectedFiles = MagicMock(return_value=[str(tmp_path)])
 
+        emitted = []
+        tracks_list.tracks_saved.connect(lambda t, p: emitted.append((t, p)))
+
         tracks_list.save_tracks(item)
 
-        saved_dirs = [p for p in tmp_path.iterdir() if p.is_dir()]
-        assert len(saved_dirs) == 1
+        assert len(emitted) == 1
+        assert emitted[0][0] is motile_run
+
+    def test_save_does_not_emit_when_dialog_rejected(
+        self, tracks_list, motile_run, tmp_path
+    ):
+        tracks_list.add_tracks(motile_run, "run1", select=False)
+        item = tracks_list.tracks_list.item(0)
+
+        tracks_list.save_dialog.exec_ = MagicMock(return_value=False)
+
+        emitted = []
+        tracks_list.tracks_saved.connect(lambda t, p: emitted.append((t, p)))
+
+        tracks_list.save_tracks(item)
+
+        assert len(emitted) == 0
+
+
+# ---------------------------------------------------------------------------
+# TracksList — save SolutionTracks directly (not wrapped in MotileRun)
+# ---------------------------------------------------------------------------
+
+
+class TestTracksListSaveSolutionTracks:
+    def test_solution_tracks_saved_directly_to_path(
+        self, tracks_list, solution_tracks_2d, tmp_path
+    ):
+        """SolutionTracks should be saved directly via write_to_geff,
+        not wrapped in MotileRun. The geff store is written directly at
+        the user-chosen path (no timestamped subdirectory).
+        """
+        tracks_list.add_tracks(solution_tracks_2d, "imported", select=False)
+        item = tracks_list.tracks_list.item(0)
+
+        save_path = tmp_path / "my_tracks.geff"
+
+        tracks_list.save_dialog.exec_ = MagicMock(return_value=True)
+        tracks_list.save_dialog.selectedFiles = MagicMock(return_value=[str(save_path)])
+
+        tracks_list.save_tracks(item)
+
+        # write_to_geff writes the geff store directly at the given path
+        assert save_path.exists()
+
+    def test_solution_tracks_save_emits_signal(
+        self, tracks_list, solution_tracks_2d, tmp_path
+    ):
+        tracks_list.add_tracks(solution_tracks_2d, "imported", select=False)
+        item = tracks_list.tracks_list.item(0)
+
+        save_path = tmp_path / "my_tracks.geff"
+
+        tracks_list.save_dialog.exec_ = MagicMock(return_value=True)
+        tracks_list.save_dialog.selectedFiles = MagicMock(return_value=[str(save_path)])
+
+        emitted = []
+        tracks_list.tracks_saved.connect(lambda t, p: emitted.append((t, p)))
+
+        tracks_list.save_tracks(item)
+
+        assert len(emitted) == 1
+        assert emitted[0][0] is solution_tracks_2d
+        assert emitted[0][1] == save_path
+
+    def test_solution_tracks_save_overwrites(
+        self, tracks_list, solution_tracks_2d, tmp_path
+    ):
+        """Saving the same SolutionTracks twice to the same path should
+        overwrite rather than fail.
+        """
+        tracks_list.add_tracks(solution_tracks_2d, "imported", select=False)
+        item = tracks_list.tracks_list.item(0)
+
+        save_path = tmp_path / "my_tracks.geff"
+
+        tracks_list.save_dialog.exec_ = MagicMock(return_value=True)
+        tracks_list.save_dialog.selectedFiles = MagicMock(return_value=[str(save_path)])
+
+        # Save twice — should not raise
+        tracks_list.save_tracks(item)
+        tracks_list.save_tracks(item)
+
+        assert save_path.exists()
 
 
 # ---------------------------------------------------------------------------
@@ -163,8 +230,8 @@ class TestTracksListSaveImported:
 
 
 class TestTracksListLoadMotileRun:
-    def test_load_motile_run_success(self, tracks_list, tracks, tmp_path):
-        save_dir = tracks.save(tmp_path)
+    def test_load_motile_run_success(self, tracks_list, motile_run, tmp_path):
+        save_dir = motile_run.save(tmp_path)
 
         tracks_list.file_dialog.exec_ = MagicMock(return_value=True)
         tracks_list.file_dialog.selectedFiles = MagicMock(return_value=[str(save_dir)])
@@ -192,11 +259,75 @@ class TestTracksListLoadMotileRun:
 
 
 # ---------------------------------------------------------------------------
+# TracksList — load_internal_tracks
+# ---------------------------------------------------------------------------
+
+
+class TestTracksListLoadGeff:
+    def test_load_internal_tracks_success(
+        self, tracks_list, solution_tracks_2d, tmp_path
+    ):
+        geff_path = tmp_path / "saved_tracks.geff"
+        write_to_geff(solution_tracks_2d, geff_path)
+
+        tracks_list.file_dialog.exec_ = MagicMock(return_value=True)
+        tracks_list.file_dialog.selectedFiles = MagicMock(return_value=[str(geff_path)])
+
+        tracks_list.load_internal_tracks()
+
+        assert tracks_list.tracks_list.count() == 1
+        item = tracks_list.tracks_list.item(0)
+        widget = tracks_list.tracks_list.itemWidget(item)
+        assert widget.name.text() == "saved_tracks"
+
+    def test_load_internal_tracks_emits_signal(
+        self, tracks_list, solution_tracks_2d, tmp_path
+    ):
+        geff_path = tmp_path / "saved_tracks.geff"
+        write_to_geff(solution_tracks_2d, geff_path)
+
+        tracks_list.file_dialog.exec_ = MagicMock(return_value=True)
+        tracks_list.file_dialog.selectedFiles = MagicMock(return_value=[str(geff_path)])
+
+        emitted = []
+        tracks_list.tracks_loaded.connect(lambda t, p: emitted.append((t, p)))
+
+        tracks_list.load_internal_tracks()
+
+        assert len(emitted) == 1
+        assert isinstance(emitted[0][0], SolutionTracks)
+        assert emitted[0][1] == geff_path
+
+    def test_load_internal_tracks_bad_path_warns(self, tracks_list, tmp_path):
+        bad_path = tmp_path / "nonexistent.geff"
+        tracks_list.file_dialog.exec_ = MagicMock(return_value=True)
+        tracks_list.file_dialog.selectedFiles = MagicMock(return_value=[str(bad_path)])
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            tracks_list.load_internal_tracks()
+
+        assert len(caught) == 1
+        assert tracks_list.tracks_list.count() == 0
+
+    def test_load_internal_tracks_dialog_cancelled(self, tracks_list):
+        tracks_list.file_dialog.exec_ = MagicMock(return_value=False)
+        tracks_list.load_internal_tracks()
+        assert tracks_list.tracks_list.count() == 0
+
+
+# ---------------------------------------------------------------------------
 # TracksList — load_tracks dispatch
 # ---------------------------------------------------------------------------
 
 
 class TestTracksListLoadDispatch:
+    def test_load_tracks_dispatches_geff_tracks(self, tracks_list):
+        tracks_list.dropdown_menu.setCurrentText("Tracks (geff)")
+        with patch.object(tracks_list, "load_internal_tracks") as mock:
+            tracks_list.load_tracks()
+            mock.assert_called_once()
+
     def test_load_tracks_dispatches_motile_run(self, tracks_list):
         tracks_list.dropdown_menu.setCurrentText("Motile Run")
         with patch.object(tracks_list, "load_motile_run") as mock:
@@ -222,11 +353,12 @@ class TestTracksListLoadDispatch:
 
 
 class TestTracksListLoadExternal:
-    def test_load_tracks_accepted_adds_tracks(self, tracks_list, tracks):
+    def test_load_tracks_accepted_adds_tracks(self, tracks_list, motile_run, tmp_path):
         mock_dialog = MagicMock()
         mock_dialog.exec_.return_value = QDialog.Accepted
-        mock_dialog.tracks = tracks
+        mock_dialog.tracks = motile_run
         mock_dialog.name = "imported"
+        mock_dialog.source_path = tmp_path / "test.csv"
 
         with patch(
             "motile_tracker.data_views.views_coordinator.tracks_list.ImportDialog",
@@ -268,8 +400,8 @@ class TestTracksListLoadExternal:
 
 
 class TestTracksListExport:
-    def test_show_export_dialog_called(self, tracks_list, tracks):
-        tracks_list.add_tracks(tracks, "run1", select=False)
+    def test_show_export_dialog_called(self, tracks_list, motile_run):
+        tracks_list.add_tracks(motile_run, "run1", select=False)
         item = tracks_list.tracks_list.item(0)
 
         with patch(
@@ -278,8 +410,8 @@ class TestTracksListExport:
             tracks_list.show_export_dialog(item)
             mock_export.assert_called_once()
 
-    def test_show_export_dialog_emits_request_colormap(self, tracks_list, tracks):
-        tracks_list.add_tracks(tracks, "run1", select=False)
+    def test_show_export_dialog_emits_request_colormap(self, tracks_list, motile_run):
+        tracks_list.add_tracks(motile_run, "run1", select=False)
         item = tracks_list.tracks_list.item(0)
 
         emitted = []

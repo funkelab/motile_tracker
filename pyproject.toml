@@ -92,6 +92,10 @@ dev = [
 ]
 # For gurobi, install separately: uv pip install "gurobipy>=12,<13"
 
+[tool.uv.sources]
+# TODO: update to funtracks release version before merging
+funtracks = { git = "https://github.com/funkelab/funtracks.git", branch = "geff-export-refactor" }
+
 [tool.uv]
 # gurobi12 and gurobi13 conflict with each other (mutually exclusive version pins)
 conflicts = [
