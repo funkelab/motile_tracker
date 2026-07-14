@@ -166,9 +166,9 @@ def test_update_checkboxes_recreates_widgets(
 
     # layout should not accumulate duplicates (checkboxes + single stretch)
     widget_items = [
-        widget.layout.itemAt(i).widget()
-        for i in range(widget.layout.count())
-        if widget.layout.itemAt(i).widget() is not None
+        widget.checkbox_layout.itemAt(i).widget()
+        for i in range(widget.checkbox_layout.count())
+        if widget.checkbox_layout.itemAt(i).widget() is not None
     ]
 
     assert len(widget_items) == first_count

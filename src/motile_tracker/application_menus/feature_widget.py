@@ -6,8 +6,11 @@ from funtracks.annotators._regionprops_annotator import (
     RegionpropsAnnotator,
 )
 from funtracks.features._feature import Feature
+from qtpy.QtCore import Qt
 from qtpy.QtWidgets import (
     QCheckBox,
+    QGroupBox,
+    QLabel,
     QVBoxLayout,
     QWidget,
 )
@@ -26,7 +29,23 @@ class FeatureWidget(QWidget):
         self.tracks_viewer.tracks_updated.connect(self._update_checkboxes)
         self._checkboxes: dict[str, QCheckBox] = {}
 
+        label = QLabel()
+        label.setWordWrap(True)
+        label.setTextFormat(Qt.MarkdownText)
+        label.setText(
+            "*Activating the checkboxes will compute the selected feature. \n"
+            "You can see these measurements in the Lineage View (choose Plot > Feature) \n"
+            "and in the Table widget.*"
+        )
+
+        box = QGroupBox("Select features")
+        self.checkbox_layout = QVBoxLayout()
+        box.setLayout(self.checkbox_layout)
+
         self.layout = QVBoxLayout()
+        self.layout.addWidget(label)
+        self.layout.addWidget(box)
+        self.layout.addStretch()
         self.setLayout(self.layout)
 
     def _update_checkboxes(self):
@@ -49,15 +68,13 @@ class FeatureWidget(QWidget):
             )
 
             self._checkboxes[feature_key] = checkbox
-            self.layout.addWidget(checkbox)
-
-        self.layout.addStretch()
+            self.checkbox_layout.addWidget(checkbox)
 
     def _clear_layout(self) -> None:
         """Remove all checkboxes from the layout"""
 
-        while self.layout.count():
-            item = self.layout.takeAt(0)
+        while self.checkbox_layout.count():
+            item = self.checkbox_layout.takeAt(0)
 
             widget = item.widget()
             if widget is not None:
