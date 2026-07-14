@@ -29,22 +29,18 @@ class FeatureWidget(QWidget):
         self.tracks_viewer.tracks_updated.connect(self._update_checkboxes)
         self._checkboxes: dict[str, QCheckBox] = {}
 
-        label = QLabel()
-        label.setWordWrap(True)
-        label.setTextFormat(Qt.MarkdownText)
-        label.setText(
-            "*Activating the checkboxes will compute the selected feature. \n"
-            "You can see these measurements in the Lineage View (choose Plot > Feature) \n"
-            "and in the Table widget.*"
-        )
+        self.label = QLabel()
+        self.label.setWordWrap(True)
+        self.label.setTextFormat(Qt.MarkdownText)
 
-        box = QGroupBox("Select features")
+        self.box = QGroupBox("Select features")
         self.checkbox_layout = QVBoxLayout()
-        box.setLayout(self.checkbox_layout)
+        self.box.setLayout(self.checkbox_layout)
+        self.box.setVisible(False)
 
         self.layout = QVBoxLayout()
-        self.layout.addWidget(label)
-        self.layout.addWidget(box)
+        self.layout.addWidget(self.label)
+        self.layout.addWidget(self.box)
         self.layout.addStretch()
         self.setLayout(self.layout)
 
@@ -70,6 +66,8 @@ class FeatureWidget(QWidget):
             self._checkboxes[feature_key] = checkbox
             self.checkbox_layout.addWidget(checkbox)
 
+        self.box.setVisible(self.checkbox_layout.count() > 0)
+
     def _clear_layout(self) -> None:
         """Remove all checkboxes from the layout"""
 
@@ -85,9 +83,20 @@ class FeatureWidget(QWidget):
 
         tracks = self.tracks_viewer.tracks
 
-        features = RegionpropsAnnotator.get_available_features(ndim=tracks.ndim)
+        if tracks.segmentation is not None:
+            features = RegionpropsAnnotator.get_available_features(ndim=tracks.ndim)
+            features.pop(DEFAULT_POS_KEY, None)
+            self.label.setText(
+                "*Activating the checkboxes will compute the selected feature. \n"
+                "You can see these measurements in the Lineage View (choose Plot > Feature) \n"
+                "and in the Table widget.*"
+            )
 
-        features.pop(DEFAULT_POS_KEY, None)
+        else:
+            features = {}
+            self.label.setText(
+                "*Feature measurements are only supported if you are using a segmentation layer.*"
+            )
 
         return features
 
