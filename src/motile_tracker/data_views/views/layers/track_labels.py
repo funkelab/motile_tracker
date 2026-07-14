@@ -383,27 +383,33 @@ class TrackLabels(ContourLabels):
             )
 
     def _ensure_valid_label(self, event: Event | None = None):
-        """Make sure a valid label is selected, because it is not allowed to paint with a
-        label that already exists at a different timepoint.
+        """Make sure a valid label is selected, because it is not allowed to paint with
+        a label that already exists at a different timepoint.
+
         Scenarios:
+
         1. If a node with the selected label value (node id) exists at a different time
-            point, check if there is any node with the same track_id at the current time
-            point
-            1.a if there is a node with the same track id, select that one, so that it
-                can be used to update an existing node
-            1.b if there is no node with the same track id, create a new node id and
-                paint with the track_id of the selected label.
-              This can be used to add a new node with the same track id at a time point
-              where it does not (yet) exist (anymore).
-        2. if there is no existing node with this value in the graph, it is assume that
-            you want to add a node with the current track id
-        Retrieve the track_id from self.current_track_id and use it to find if there are
-        any nodes of this track id at current time point
+           point, check if there is any node with the same track_id at the current time
+           point.
+
+           a. If there is a node with the same track id, select that one, so that it
+              can be used to update an existing node.
+           b. If there is no node with the same track id, create a new node id and
+              paint with the track_id of the selected label. This can be used to add a
+              new node with the same track id at a time point where it does not (yet)
+              exist (anymore).
+
+        2. If there is no existing node with this value in the graph, it is assumed that
+           you want to add a node with the current track id. Retrieve the track_id from
+           self.current_track_id and use it to find if there are any nodes of this track
+           id at current time point.
+
         3. If no node with this label exists yet, it is valid and can be used to start a
-            new track id. Therefore, create a new node id and map a new color.
-            Add it to the dictionary.
+           new track id. Therefore, create a new node id and map a new color. Add it to
+           the dictionary.
+
         4. If a node with the label exists at the current time point, it is valid and
-            can be used to update the existing node in a paint event. No action is needed
+           can be used to update the existing node in a paint event. No action is needed.
         """
 
         update_colormap = False

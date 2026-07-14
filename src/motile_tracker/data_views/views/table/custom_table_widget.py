@@ -485,8 +485,9 @@ class ColoredTableWidget(QWidget):
 
     def _set_label_colors_to_rows(self) -> None:
         """Apply the colors of the napari label image to the table, and set the text color
-         depending on luminance (black test on light backgrounds, white text on dark
-        backgrounds)"""
+        depending on luminance (black text on light backgrounds, white text on dark
+        backgrounds).
+        """
 
         for i in range(self._table_widget.rowCount()):
             label = self._table["ID"][i]

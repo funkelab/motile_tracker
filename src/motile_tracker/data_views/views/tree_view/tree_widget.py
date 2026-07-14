@@ -272,7 +272,8 @@ class TreePlot(pg.PlotWidget):
         self._create_pyqtgraph_content(track_df, plot_type, feature)
 
     def _update_viewed_data(self, view_direction: str):
-        """Set the data according to the view direction
+        """Set the data according to the view direction.
+
         Args:
             view_direction (str): direction to plot the data, either 'horizontal' or
                 'vertical'
@@ -343,7 +344,7 @@ class TreePlot(pg.PlotWidget):
             self.adj = edges_df_mapped.to_numpy()
 
         self.outline_pen = np.array(
-            [pg.mkPen(QColor(150, 150, 150)) for i in range(len(self._pos))]
+            [pg.mkPen(QColor(150, 150, 150, 0)) for i in range(len(self._pos))]
         )
 
     def set_selection(self, selected_nodes: list[Any], plot_type: str) -> None:

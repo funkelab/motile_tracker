@@ -24,6 +24,7 @@ See the `motile documentation`_ for more details on the concepts and method.
    motile
    tree_view
    editing
+   view_external_tracks
    key_bindings
 
 .. _motile: https://github.com/funkelab/motile

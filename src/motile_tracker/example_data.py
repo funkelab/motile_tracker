@@ -17,7 +17,8 @@ logger = logging.getLogger(__name__)
 
 def Mouse_Embryo_Membrane() -> list[LayerData]:
     """Loads the Mouse Embryo Membrane raw data and segmentation data from
-    the appdir "user data dir". Will download it from the Zenodo DOI if it is not present already.
+    the appdir "user data dir". Will download it from the Zenodo DOI if not present.
+
     Returns:
         list[LayerData]: An image layer of raw data and a segmentation labels
             layer
@@ -35,6 +36,7 @@ def Fluo_N2DL_HeLa() -> list[LayerData]:
     """Loads the Fluo-N2DL-HeLa 01 training raw data and silver truth from
     the appdir "user data dir". Will download it from the CTC and convert it to
     zarr if it is not present already.
+
     Returns:
         list[LayerData]: An image layer of 01 training raw data and a labels
             layer of 01 training silver truth labels
@@ -50,6 +52,7 @@ def Fluo_N2DL_HeLa_crop() -> list[LayerData]:
     """Loads the Fluo-N2DL-HeLa 01 training raw data and silver truth from
     the appdir "user data dir". Will download it from the CTC and convert it to
     zarr if it is not present already.
+
     Returns:
         list[LayerData]: An image layer of 01 training raw data and a labels
             layer of 01 training silver truth labels

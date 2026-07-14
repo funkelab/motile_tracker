@@ -6,11 +6,13 @@ from qtpy.QtWidgets import (
 
 def find_geff_group(group: zarr.Group) -> zarr.Group | None:
     """Recursively search for a Zarr group with 'geff' in its .zattrs.
+
     Args:
         group (zarr.Group): The Zarr group to search within.
+
     Returns:
         zarr.Group | None: The first group found with 'geff' in its .zattrs, or None if
-        not found.
+            not found.
     """
 
     if "geff" in group.attrs:
@@ -27,6 +29,7 @@ def find_geff_group(group: zarr.Group) -> zarr.Group | None:
 
 def clear_layout(layout: QLayout) -> None:
     """Recursively clear all widgets and layouts in a QLayout.
+
     Args:
         layout (QLayout): The layout to clear.
     """

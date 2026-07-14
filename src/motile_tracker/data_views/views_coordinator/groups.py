@@ -460,13 +460,11 @@ class CollectionWidget(QWidget):
 
     def _show_export_dialog(self, item: QListWidgetItem) -> None:
         """Prompt user to choose export format (csv or geff), then export the nodes
-         belonging to this group.
-        You must pass the list item that represents the group.
+        belonging to this group. You must pass the list item that represents the group.
 
         Args:
-            item (QListWidgetItem):  The list item containing the CollectionButton that
+            item (QListWidgetItem): The list item containing the CollectionButton that
                 represents a group of nodes.
-
         """
 
         group_name = self.collection_list.itemWidget(item).name.text()
