@@ -66,7 +66,10 @@ class TrackPoints(ZOnlyPoints):
         self.nodes = tracks_viewer.tracks.graph.node_ids()
         self.node_index_dict = {node: idx for idx, node in enumerate(self.nodes)}
 
-        points = self.tracks_viewer.tracks.get_positions(self.nodes, incl_time=True)
+        if len(self.nodes) > 0:
+            points = self.tracks_viewer.tracks.get_positions(self.nodes, incl_time=True)
+        else:
+            points = np.empty((0, self.tracks_viewer.tracks.ndim))
 
         track_ids = self.tracks_viewer.tracks.get_track_ids(self.nodes)
         colors = [self.tracks_viewer.colormap.map(track_id) for track_id in track_ids]

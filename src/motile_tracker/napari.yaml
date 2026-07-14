@@ -21,6 +21,9 @@ contributions:
     - id: motile-tracker.tracking
       python_name: motile_tracker.application_menus.main_app:Tracking_LauncherWidget
       title: "Open Tracking menu"
+    - id: motile-tracker.tracking_from_scratch
+      python_name: motile_tracker.application_menus.main_app:TrackingFromScratch_LauncherWidget
+      title: "Start tracking from scratch"
     - id: motile-tracker.tracks_list
       python_name: motile_tracker.application_menus.main_app:TrackList_LauncherWidget
       title: "Open Tracks List menu"
@@ -62,6 +65,8 @@ contributions:
       display_name: Widget - Getting started
     - command: motile-tracker.tracking
       display_name: Widget - Tracking
+    - command: motile-tracker.tracking_from_scratch
+      display_name: Widget - Tracking from Scratch
     - command: motile-tracker.tracks_list
       display_name: Widget - Tracks List
     - command: motile-tracker.editing_selection

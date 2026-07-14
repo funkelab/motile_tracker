@@ -12,6 +12,9 @@ from motile_tracker.application_menus.editing_selection_menu import (
 from motile_tracker.application_menus.group_widget import GroupWidget
 from motile_tracker.application_menus.menu_manager import MenuManager
 from motile_tracker.application_menus.track_list_widget import TrackListWidget
+from motile_tracker.application_menus.tracking_from_scratch_widget import (
+    TrackingFromScratch,
+)
 from motile_tracker.application_menus.visualization_widget import (
     VisualizationWidget,
 )
@@ -26,6 +29,7 @@ from motile_tracker.motile.menus.motile_widget import MotileWidget
 MENU_WIDGETS = {
     "Getting Started": {"widget": WelcomeWidget, "location": "right"},
     "Tracking": {"widget": MotileWidget, "location": "right"},
+    "Tracking from scratch": {"widget": TrackingFromScratch, "location": "right"},
     "Tracks List": {"widget": TrackListWidget, "location": "right"},
     "Editing && Selection": {"widget": EditingSelectionWidget, "location": "right"},
     "Visualization": {"widget": VisualizationWidget, "location": "right"},
@@ -128,6 +132,9 @@ def _make_single_menu_widget_class(widget_name):
 # Export one class per single widget menu item
 GettingStarted_LauncherWidget = _make_single_menu_widget_class("Getting Started")
 Tracking_LauncherWidget = _make_single_menu_widget_class("Tracking")
+TrackingFromScratch_LauncherWidget = _make_single_menu_widget_class(
+    "Tracking from scratch"
+)
 TrackList_LauncherWidget = _make_single_menu_widget_class("Tracks List")
 EditingSelection_LauncherWidget = _make_single_menu_widget_class("Editing && Selection")
 Visualization_LauncherWidget = _make_single_menu_widget_class("Visualization")
