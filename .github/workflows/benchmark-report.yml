@@ -1,0 +1,47 @@
+name: Benchmark
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  deployments: write
+  contents: write
+
+jobs:
+  benchmark:
+    name: Report benchmarks on gh-pages
+    runs-on: ubuntu-latest
+    env:
+      UV_NO_SYNC: "1"
+    steps:
+      - uses: actions/checkout@v6
+      - uses: tlambert03/setup-qt-libs@v1
+
+      - name: Set up Python
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.13"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --no-dev --group testing
+
+      # tests/benchmarks is ignored by default pytest config; `-o addopts=` clears
+      # that. GUI benchmarks need a real GL context, hence aganders3/headless-gui.
+      - name: Run benchmarks
+        uses: aganders3/headless-gui@v2
+        with:
+          run: uv run pytest tests/benchmarks -o addopts= --benchmark-json output.json
+
+      - name: Store benchmark results
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          name: motile_tracker benchmarks (pytest-benchmark)
+          tool: "pytest"
+          output-file-path: output.json
+          benchmark-data-dir-path: benchmarks
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: true

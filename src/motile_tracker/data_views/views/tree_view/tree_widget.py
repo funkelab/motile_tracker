@@ -272,7 +272,8 @@ class TreePlot(pg.PlotWidget):
         self._create_pyqtgraph_content(track_df, plot_type, feature)
 
     def _update_viewed_data(self, view_direction: str):
-        """Set the data according to the view direction
+        """Set the data according to the view direction.
+
         Args:
             view_direction (str): direction to plot the data, either 'horizontal' or
                 'vertical'
@@ -343,7 +344,7 @@ class TreePlot(pg.PlotWidget):
             self.adj = edges_df_mapped.to_numpy()
 
         self.outline_pen = np.array(
-            [pg.mkPen(QColor(150, 150, 150)) for i in range(len(self._pos))]
+            [pg.mkPen(QColor(150, 150, 150, 0)) for i in range(len(self._pos))]
         )
 
     def set_selection(self, selected_nodes: list[Any], plot_type: str) -> None:
@@ -508,12 +509,14 @@ class TreeWidget(QWidget):
 
         # Add buttons to change which feature to display
         features_to_plot = get_features_from_tracks(
-            self.tracks_viewer.tracks, features_to_ignore=["Time", "Tracklet ID"]
+            self.tracks_viewer.tracks,
+            features_to_ignore=["Time", "Tracklet ID", "Bounding box"],
         )
         self.plot_type_widget = TreeViewFeatureWidget(
             features_to_plot,
             get_features=lambda: get_features_from_tracks(
-                self.tracks_viewer.tracks, features_to_ignore=["Time", "Tracklet ID"]
+                self.tracks_viewer.tracks,
+                features_to_ignore=["Time", "Tracklet ID", "Bounding box"],
             ),
         )
         self.plot_type_widget.change_plot_type.connect(self._set_plot_type)
@@ -701,7 +704,8 @@ class TreeWidget(QWidget):
         # check whether we have regionprop measurements and therefore should activate the
         # feature button
         features_to_plot = get_features_from_tracks(
-            self.tracks_viewer.tracks, features_to_ignore=["Time", "Tracklet ID"]
+            self.tracks_viewer.tracks,
+            features_to_ignore=["Time", "Tracklet ID", "Bounding box"],
         )
         self.plot_type_widget.update_feature_dropdown(features_to_plot)
 

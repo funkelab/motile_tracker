@@ -222,8 +222,8 @@ def paint_event_hook(orig_layer: TrackLabels, copied_layer: Labels) -> None:
 def colormap_hook(orig_layer: TrackLabels, copied_layer: Labels) -> None:
     """Hook to sync colormap changes from the original TrackLabels layer to the copied
     layers. We need a hook for the special case in which one of the views is showing a 3D
-     rendering in combination with partially filled contour labels. Since contours are not
-     rendered in 3D, we want to display the non-filled labels with full opacity instead.
+    rendering in combination with partially filled contour labels. Since contours are not
+    rendered in 3D, we want to display the non-filled labels with full opacity instead.
 
     Args:
         orig_layer (TrackLabels): TracksLabels layer from which the copied layer is
@@ -296,8 +296,10 @@ def track_layers_hook(
 
 def initialize_ortho_views(viewer: Viewer) -> OrthoViewManager:
     """Initialize orthoviews on the current napari Viewer and register hooks and filters.
+
     Args:
         viewer (napari.Viewer): viewer to set the orthogonal views for.
+
     Returns:
         OrthoViewManager: reference to the OrthoViewManager instance
     """

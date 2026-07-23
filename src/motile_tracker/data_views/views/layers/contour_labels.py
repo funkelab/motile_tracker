@@ -14,6 +14,8 @@ from napari.utils._indexing import elements_in_slice, index_in_slice
 from napari.utils.events import Event
 from scipy import ndimage as ndi
 
+from motile_tracker.data_views.lazy_array_wrapper import LazyArrayWrapper
+
 
 def left_only_draw(layer, event):
     if event.button != 1:
@@ -76,6 +78,12 @@ class ContourLabels(napari.layers.Labels):
     def _type_string(self) -> str:
         return "labels"  # to make sure that the layer is treated as labels layer for saving
 
+    @napari.layers.Labels.data.setter
+    def data(self, data):
+        if not isinstance(data, LazyArrayWrapper) and not hasattr(data, "__setitem__"):
+            data = LazyArrayWrapper(data)
+        napari.layers.Labels.data.fset(self, data)
+
     def __init__(
         self,
         data: np.array,
@@ -84,6 +92,8 @@ class ContourLabels(napari.layers.Labels):
         scale: tuple,
         colormap: DirectLabelColormap,
     ):
+        if not isinstance(data, LazyArrayWrapper) and not hasattr(data, "__setitem__"):
+            data = LazyArrayWrapper(data)
         super().__init__(
             data=data,
             name=name,
@@ -182,7 +192,7 @@ class ContourLabels(napari.layers.Labels):
         For writable arrays (numpy), fall back to the default implementation.
         """
         if not hasattr(self.data, "__setitem__"):
-            old_values = self._read_old_values(indices)
+            old_values = self.data[indices]
             atom = (indices, old_values, value)
             if self._block_history:
                 # During a drag, accumulate atoms; events.paint fires once on release
@@ -267,15 +277,3 @@ class ContourLabels(napari.layers.Labels):
             self.refresh()
         else:
             super().undo()
-
-    def _read_old_values(self, indices):
-        """Read current values at indices from a read-only array,
-        materializing one timepoint at a time (the only supported access pattern)."""
-        t_indices = indices[0]
-        spatial_indices = indices[1:]
-        old_values = np.zeros(len(t_indices), dtype=np.int64)
-        for t in np.unique(t_indices):
-            mask = t_indices == t
-            frame = np.asarray(self.data[int(t)])
-            old_values[mask] = frame[tuple(s[mask] for s in spatial_indices)]
-        return old_values

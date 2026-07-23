@@ -1,0 +1,106 @@
+name: benchmarks
+
+on:
+  pull_request: {}
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Needed for peter-evans/commit-comment to post the benchmark report on the commit.
+permissions:
+  contents: write
+
+jobs:
+  benchmark:
+    name: Benchmark (${{ matrix.platform }})
+    runs-on: ${{ matrix.platform }}
+    if: github.event_name == 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [ubuntu-latest, macos-latest, windows-latest]
+    env:
+      # disable resyncing on uv run so `git checkout <base>` keeps the head-synced env
+      UV_NO_SYNC: "1"
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 50
+      - uses: tlambert03/setup-qt-libs@v1
+
+      - name: Set up Python
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.13"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --no-dev --group testing
+
+      - name: Set Windows resolution
+        if: runner.os == 'Windows'
+        run: Set-DisplayResolution -Width 1920 -Height 1080 -Force
+        shell: powershell
+
+      - name: Install Windows OpenGL
+        if: runner.os == 'Windows'
+        run: |
+          git clone --depth 1 https://github.com/pyvista/gl-ci-helpers.git
+          powershell gl-ci-helpers/appveyor/install_opengl.ps1
+          if (Test-Path -Path "C:\Windows\system32\opengl32.dll" -PathType Leaf) {Exit 0} else {Exit 1}
+        shell: powershell
+
+      - name: Retrieve cached baseline if available
+        uses: actions/cache/restore@v5
+        id: cache_baseline
+        with:
+          path: baseline.json
+          key: benchmark-${{ matrix.platform }}-${{ github.event.pull_request.base.sha }}
+
+      # The benchmark suite lives under tests/benchmarks, which the default pytest
+      # config ignores; `-o addopts=` clears that so it is collected here. The GUI
+      # benchmarks need a real GL context, hence aganders3/headless-gui.
+      # Tolerant on purpose: the base commit may predate the benchmark suite (e.g.
+      # the first PR that introduces it), in which case there is no baseline to
+      # produce. The report step then falls back to HEAD-only numbers.
+      - name: Run baseline benchmark if not in cache
+        if: steps.cache_baseline.outputs.cache-hit != 'true'
+        continue-on-error: true
+        uses: aganders3/headless-gui@v2
+        with:
+          run: |
+            git checkout ${{ github.event.pull_request.base.sha }}
+            uv run pytest tests/benchmarks -o addopts= --benchmark-json baseline.json
+
+      - name: Cache baseline results
+        uses: actions/cache/save@v5
+        if: steps.cache_baseline.outputs.cache-hit != 'true' && hashFiles('baseline.json') != ''
+        with:
+          path: baseline.json
+          key: benchmark-${{ matrix.platform }}-${{ github.event.pull_request.base.sha }}
+
+      - name: Run benchmark on PR head
+        uses: aganders3/headless-gui@v2
+        with:
+          run: |
+            git checkout ${{ github.event.pull_request.head.sha }}
+            uv run pytest tests/benchmarks -o addopts= --benchmark-json pr.json
+
+      - name: Generate report
+        id: report
+        run: |
+          uv run --with pandas --with tabulate python .github/workflows/benchmark_pr.py baseline.json pr.json report.md "Benchmark: ${{ matrix.platform }}"
+        continue-on-error: true
+
+      - name: Comment on commit with report
+        uses: peter-evans/commit-comment@v3
+        if: github.event.pull_request.head.repo.fork == false
+        with:
+          body-path: report.md
+
+      - name: Fail if regression detected
+        if: steps.report.outcome == 'failure'
+        run: exit 1

@@ -274,7 +274,7 @@ class ColoredTableWidget(QWidget):
         """Update the displayed data based on the tracks_df on TracksViewer"""
 
         columns_to_display = ["node_id"] + get_features_from_tracks(
-            self.tracks_viewer.tracks
+            self.tracks_viewer.tracks, features_to_ignore=["Bounding box"]
         )
         self.set_data(self.tracks_viewer.track_df, columns_to_display)
 
@@ -485,8 +485,9 @@ class ColoredTableWidget(QWidget):
 
     def _set_label_colors_to_rows(self) -> None:
         """Apply the colors of the napari label image to the table, and set the text color
-         depending on luminance (black test on light backgrounds, white text on dark
-        backgrounds)"""
+        depending on luminance (black text on light backgrounds, white text on dark
+        backgrounds).
+        """
 
         for i in range(self._table_widget.rowCount()):
             label = self._table["ID"][i]

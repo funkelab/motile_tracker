@@ -76,9 +76,11 @@ class MotileWidget(QWidget):
     def edit_run(self, run: MotileRun | None):
         """Create or edit a new run in the run editor. Also removes solution layers
         from the napari viewer.
+
         Args:
-            run (MotileRun | None): Initialize the new run with the parameters and name
-                from this run. If not provided, uses the SolverParams default values.
+            run (MotileRun | None): Initialize the new run with the parameters and
+                name from this run. If not provided, uses the SolverParams default
+                values.
         """
         self.view_run_widget.hide()
         self.edit_run_widget.show()
@@ -87,7 +89,7 @@ class MotileWidget(QWidget):
 
     def _generate_tracks(self, run: MotileRun) -> None:
         """Called when we start solving a new run. Switches from run editor to run
-        viewer and starts solving of the new run in a separate thread to avoid blocking
+        viewer and starts solving of the new run in a separate thread to avoid blocking.
 
         Args:
             run (MotileRun): Start solving this motile run.

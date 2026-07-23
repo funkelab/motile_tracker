@@ -235,8 +235,7 @@ class CollectionWidget(QWidget):
             )  # update the count, but keep deleted nodes in the collection.
 
     def retrieve_existing_groups(self) -> None:
-        """Create collections based on the node attributes. Nodes assigned to a group
-        should have that group in their 'group' attribute"""
+        """Create collections based on the node attributes"""
 
         # first clear the entire list
         self.collection_list.clear()
@@ -246,7 +245,7 @@ class CollectionWidget(QWidget):
         group_features = [
             (group_name, group_dict)
             for group_name, group_dict in self.tracks_viewer.tracks.features.items()
-            if group_dict["value_type"] == "bool"
+            if group_dict["value_type"] == "bool" and group_name != "solution"
         ]
         group_dict = {}
         for group_name, _ in group_features:
@@ -461,13 +460,11 @@ class CollectionWidget(QWidget):
 
     def _show_export_dialog(self, item: QListWidgetItem) -> None:
         """Prompt user to choose export format (csv or geff), then export the nodes
-         belonging to this group.
-        You must pass the list item that represents the group.
+        belonging to this group. You must pass the list item that represents the group.
 
         Args:
-            item (QListWidgetItem):  The list item containing the CollectionButton that
+            item (QListWidgetItem): The list item containing the CollectionButton that
                 represents a group of nodes.
-
         """
 
         group_name = self.collection_list.itemWidget(item).name.text()

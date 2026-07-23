@@ -39,7 +39,7 @@ def _make_single_node_graph(
         database=str(tmp_path / "graph.db"),
     )
 
-    node: dict = {"t": 0, "pos": list(pos), "area": 1000.0, "solution": 1}
+    node: dict = {"t": 0, "pos": list(pos), "area": 1000.0, "solution": True}
     if seg_bbox is not None:
         bbox = np.array(seg_bbox, dtype=np.int64)
         mask_shape = tuple(int(bbox[i + 3] - bbox[i]) for i in range(3))

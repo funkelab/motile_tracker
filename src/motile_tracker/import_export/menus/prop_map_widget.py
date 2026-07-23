@@ -453,9 +453,10 @@ class StandardFieldMapWidget(QWidget):
         return self._wrap_tooltip(tooltips.get(attribute, ""))
 
     def update_mapping(self, seg: bool = False) -> None:
-        """Map graph spatiotemporal data and optionally the track and lineage attributes
-        Arg:
-            seg (bool = False): whether a segmentation is associated with this data
+        """Map graph spatiotemporal data and optionally the track and lineage attributes.
+
+        Args:
+            seg (bool): whether a segmentation is associated with this data
         """
 
         self.setVisible(False)

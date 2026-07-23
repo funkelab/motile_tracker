@@ -414,6 +414,9 @@ def get_features_from_tracks(
                     features_to_plot.append(name)
 
     features_to_plot = [
-        feature for feature in features_to_plot if feature not in features_to_ignore
+        feature
+        for feature in features_to_plot
+        if not any(ig in feature for ig in features_to_ignore)
     ]
+
     return features_to_plot
