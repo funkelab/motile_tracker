@@ -157,9 +157,11 @@ class MotileRun(SolutionTracks):
         else:
             tracks = import_from_geff(run_dir / "tracks")
         if attrs is not None:
-            seg_shape = attrs.get("segmentation_shape")
+            # New runs use the "shape" key; fall back to the legacy
+            # "segmentation_shape" key for runs saved by older versions.
+            seg_shape = attrs.get("shape", attrs.get("segmentation_shape"))
             if seg_shape is not None:
-                tracks.graph._update_metadata(segmentation_shape=tuple(seg_shape))
+                tracks.graph._update_metadata(shape=tuple(seg_shape))
             scale = attrs.get("scale") or tracks.scale
             time_attr = attrs.get("time_attr") or tracks.features.time_key
         else:
@@ -259,20 +261,20 @@ class MotileRun(SolutionTracks):
             return None
 
     def _save_attrs(self, directory: Path):
-        """Save the time_attr, pos_attr, scale, and segmentation_shape in a json file.
+        """Save the time_attr, pos_attr, scale, and shape in a json file.
 
         Args:
             directory (Path):  The directory in which to save the attributes
         """
         out_path = directory / ATTRS_FILENAME
-        seg_shape = self.graph.metadata.get("segmentation_shape")
+        seg_shape = self.graph.metadata.get("shape")
         scale = (
             self.scale
             if not isinstance(self.scale, np.ndarray)
             else self.scale.tolist()
         )
         attrs_dict = {
-            "segmentation_shape": list(seg_shape) if seg_shape is not None else None,
+            "shape": list(seg_shape) if seg_shape is not None else None,
             "scale": scale,
             "time_attr": self.features.time_key,
         }
