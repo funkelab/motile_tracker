@@ -329,6 +329,53 @@ class ImportDialog(QDialog):
             recompute = "area" not in self.tracks.graph.node_attr_keys()
             self.tracks.enable_features(["area"], recompute=recompute)
 
+    def _maybe_convert_legacy_masks(self, geff_dir: Path) -> bool:
+        """Offer to convert masks stored in an older, memory-heavy dtype.
+
+        Geff files written by older versions of tracksdata store segmentation
+        masks as ``uint64`` rather than ``bool``, which uses ~8x more memory
+        when read and can cause out-of-memory errors. If such masks are
+        detected, warn the user and offer a lossless, in-place conversion.
+
+        Returns:
+            bool: True to continue the import, False to abort.
+        """
+        try:
+            from tracksdata.io import convert_geff_masks_to_bool, geff_mask_dtype
+        except ImportError:
+            return True  # older tracksdata without the utility; import as before
+
+        try:
+            dtype = geff_mask_dtype(geff_dir)
+        except Exception:  # noqa: BLE001
+            return True  # detection failed; don't block the import
+
+        if dtype is None or dtype == "bool":
+            return True
+
+        answer = QMessageBox.question(
+            self,
+            "Old mask format detected",
+            f"This geff stores segmentation masks as '{dtype}' (an older format).\n\n"
+            "Loading them as-is uses about 8x more memory and may run out of memory "
+            "on large datasets. Convert the masks to boolean now? This edits the file "
+            "in place and is lossless.",
+            QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
+            QMessageBox.Yes,
+        )
+        if answer == QMessageBox.Cancel:
+            return False
+        if answer == QMessageBox.Yes:
+            QApplication.setOverrideCursor(Qt.WaitCursor)
+            try:
+                convert_geff_masks_to_bool(geff_dir)
+            except Exception as e:  # noqa: BLE001
+                QMessageBox.critical(self, "Error", f"Failed to convert masks: {e}")
+                return False
+            finally:
+                QApplication.restoreOverrideCursor()
+        return True
+
     def _finish(self) -> None:
         """Tries to read the csv/geff file and optional segmentation image and apply the
         attribute to column mapping to construct a Tracks object"""
@@ -338,6 +385,9 @@ class ImportDialog(QDialog):
                 store_path = self.import_widget.store_path
                 group_path = Path(self.import_widget.root.path)  # e.g. 'tracks'
                 geff_dir = store_path / group_path
+
+                if not self._maybe_convert_legacy_masks(geff_dir):
+                    return
 
                 self.name = self.import_widget.dir_name
                 scale = self.scale_widget.get_scale() if self.seg else None
