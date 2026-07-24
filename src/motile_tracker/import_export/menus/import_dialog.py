@@ -329,52 +329,64 @@ class ImportDialog(QDialog):
             recompute = "area" not in self.tracks.graph.node_attr_keys()
             self.tracks.enable_features(["area"], recompute=recompute)
 
-    def _maybe_convert_legacy_masks(self, geff_dir: Path) -> bool:
+    def _maybe_convert_legacy_masks(self, geff_dir: Path) -> Path | None:
         """Offer to convert masks stored in an older, memory-heavy dtype.
 
         Geff files written by older versions of tracksdata store segmentation
-        masks as ``uint64`` rather than ``bool``, which uses ~8x more memory
-        when read and can cause out-of-memory errors. If such masks are
-        detected, warn the user and offer a lossless, in-place conversion.
+        masks as integers (e.g. ``uint64``) rather than ``bool``, using ~8x more
+        memory when read. If such masks are detected, warn the user and offer a
+        lossless conversion. To keep the original (possibly shared) file
+        untouched, the conversion is written to a ``*_bool.geff`` copy next to
+        it, and that copy is loaded instead.
 
         Returns:
-            bool: True to continue the import, False to abort.
+            Path | None: the geff directory to import (the original, or the
+            converted copy), or None if the user cancelled.
         """
         try:
-            from tracksdata.io import convert_geff_masks_to_bool, geff_mask_dtype
+            from tracksdata.io import convert_geff_mask_to_bool, geff_mask_dtype
         except ImportError:
-            return True  # older tracksdata without the utility; import as before
+            return geff_dir  # older tracksdata without the utility; import as before
 
         try:
             dtype = geff_mask_dtype(geff_dir)
         except Exception:  # noqa: BLE001
-            return True  # detection failed; don't block the import
+            return geff_dir  # detection failed; don't block the import
 
         if dtype is None or dtype == "bool":
-            return True
+            return geff_dir
 
         answer = QMessageBox.question(
             self,
             "Old mask format detected",
-            f"This geff stores segmentation masks as '{dtype}' (an older format).\n\n"
-            "Loading them as-is uses about 8x more memory and may run out of memory "
-            "on large datasets. Convert the masks to boolean now? This edits the file "
-            "in place and is lossless.",
+            f"This geff stores segmentation masks as '{dtype}', an older format that "
+            "uses about 8x more memory when loaded.\n\n"
+            "Convert them to boolean now? A converted copy will be written next to the "
+            "original, which is left untouched.",
             QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
             QMessageBox.Yes,
         )
         if answer == QMessageBox.Cancel:
-            return False
-        if answer == QMessageBox.Yes:
-            QApplication.setOverrideCursor(Qt.WaitCursor)
-            try:
-                convert_geff_masks_to_bool(geff_dir)
-            except Exception as e:  # noqa: BLE001
-                QMessageBox.critical(self, "Error", f"Failed to convert masks: {e}")
-                return False
-            finally:
-                QApplication.restoreOverrideCursor()
-        return True
+            return None
+        if answer == QMessageBox.No:
+            return geff_dir  # load the original as-is
+
+        name = geff_dir.name
+        out_name = (
+            f"{name[:-5]}_bool.geff" if name.endswith(".geff") else f"{name}_bool"
+        )
+        out_path = geff_dir.parent / out_name
+
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        try:
+            if not out_path.exists():
+                convert_geff_mask_to_bool(geff_dir, output_path=out_path)
+        except Exception as e:  # noqa: BLE001
+            QMessageBox.critical(self, "Error", f"Failed to convert masks: {e}")
+            return None
+        finally:
+            QApplication.restoreOverrideCursor()
+        return out_path
 
     def _finish(self) -> None:
         """Tries to read the csv/geff file and optional segmentation image and apply the
@@ -386,7 +398,8 @@ class ImportDialog(QDialog):
                 group_path = Path(self.import_widget.root.path)  # e.g. 'tracks'
                 geff_dir = store_path / group_path
 
-                if not self._maybe_convert_legacy_masks(geff_dir):
+                geff_dir = self._maybe_convert_legacy_masks(geff_dir)
+                if geff_dir is None:
                     return
 
                 self.name = self.import_widget.dir_name
