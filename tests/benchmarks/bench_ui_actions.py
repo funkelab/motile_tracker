@@ -3,8 +3,10 @@
 Cover the common interactive actions at scale: loading, selection, display-mode
 switching, tree-view rendering, and editing. Each benchmark builds its own app in
 ``setup`` (not timed) and measures a single action with
-``benchmark.pedantic(..., rounds=1, iterations=1)`` -- the actions trigger a full
-refresh cascade that can take seconds at scale, so repeated rounds are impractical.
+``benchmark.pedantic(..., rounds=ROUNDS_FAST, iterations=1)``. Each action triggers a
+full refresh cascade that can take seconds at scale; we average over a few rounds
+(``ROUNDS``) to smooth per-run noise. pytest-benchmark re-runs ``setup`` before
+every round, so mutating benchmarks still start each round from fresh state.
 
 In CI these run under aganders3/headless-gui (Xvfb-backed GL). They will segfault
 under the ``offscreen`` Qt platform, which lacks a real GL context.
@@ -13,6 +15,13 @@ under the ``offscreen`` Qt platform, which lacks a real GL context.
 from __future__ import annotations
 
 from synthetic_data import pick_nodes, tracklet_nodes
+
+# Rounds pytest-benchmark averages each measurement over. The same-runner base/head
+# comparison is what removes machine-to-machine noise; averaging only pays off on the
+# cheap read-only actions (which are also the noisiest). The multi-second editing/bulk
+# actions are stable and setup-heavy, so we run them once to keep CI time down.
+ROUNDS_FAST = 3  # cheap read-only: clicks, lineage, colormap, flip, recolor
+ROUNDS_SLOW = 1  # multi-second editing/bulk actions
 
 # ----------------------------------------------------------------------------------
 # Loading
@@ -33,7 +42,7 @@ def test_add_tracks(benchmark, make_napari_viewer, shared_tracks):
     benchmark.pedantic(
         lambda tv, tracks: tv.tracks_list.add_tracks(tracks, "synthetic"),
         setup=setup,
-        rounds=1,
+        rounds=ROUNDS_SLOW,
         iterations=1,
     )
 
@@ -51,7 +60,7 @@ def test_click_node_treeview(benchmark, build_app, shared_tracks):
     benchmark.pedantic(
         lambda tree, node: tree.tree_widget.node_clicked.emit(node, False),
         setup=setup,
-        rounds=1,
+        rounds=ROUNDS_FAST,
         iterations=1,
     )
 
@@ -64,7 +73,7 @@ def test_click_node_canvas(benchmark, build_app, shared_tracks):
     benchmark.pedantic(
         lambda tv, node: tv.selected_nodes.add(node, False),
         setup=setup,
-        rounds=1,
+        rounds=ROUNDS_FAST,
         iterations=1,
     )
 
@@ -81,7 +90,7 @@ def test_set_display_mode_lineage(benchmark, build_app, shared_tracks):
     benchmark.pedantic(
         lambda tv: tv.set_display_mode("lineage"),
         setup=setup,
-        rounds=1,
+        rounds=ROUNDS_FAST,
         iterations=1,
     )
 
@@ -97,7 +106,7 @@ def test_tree_flip_axes(benchmark, build_app, shared_tracks):
         return (tree,), {}
 
     benchmark.pedantic(
-        lambda tree: tree.flip_axes(), setup=setup, rounds=1, iterations=1
+        lambda tree: tree.flip_axes(), setup=setup, rounds=ROUNDS_FAST, iterations=1
     )
 
 
@@ -111,7 +120,7 @@ def test_tree_feature_recolor(benchmark, build_app, shared_tracks):
     benchmark.pedantic(
         lambda tree: tree.toggle_feature_mode(),
         setup=setup,
-        rounds=1,
+        rounds=ROUNDS_FAST,
         iterations=1,
     )
 
@@ -126,7 +135,7 @@ def test_label_colormap_rebuild(benchmark, build_app, shared_tracks):
     benchmark.pedantic(
         lambda seg: seg._get_colormap(),
         setup=setup,
-        rounds=3,
+        rounds=ROUNDS_FAST,
         iterations=1,
     )
 
@@ -143,7 +152,9 @@ def test_delete_node(benchmark, build_app, fresh_tracks):
         tv.selected_nodes.add(pick_nodes(fresh_tracks)["del_node"], False)
         return (tv,), {}
 
-    benchmark.pedantic(lambda tv: tv.delete_node(), setup=setup, rounds=1, iterations=1)
+    benchmark.pedantic(
+        lambda tv: tv.delete_node(), setup=setup, rounds=ROUNDS_SLOW, iterations=1
+    )
 
 
 def test_delete_nodes_bulk(benchmark, build_app, fresh_tracks):
@@ -161,7 +172,9 @@ def test_delete_nodes_bulk(benchmark, build_app, fresh_tracks):
         tv.selected_nodes.add_list(nodes)
         return (tv,), {}
 
-    benchmark.pedantic(lambda tv: tv.delete_node(), setup=setup, rounds=1, iterations=1)
+    benchmark.pedantic(
+        lambda tv: tv.delete_node(), setup=setup, rounds=ROUNDS_SLOW, iterations=1
+    )
 
 
 def test_undo_bulk_delete(benchmark, build_app, fresh_tracks):
@@ -175,7 +188,9 @@ def test_undo_bulk_delete(benchmark, build_app, fresh_tracks):
         tv.delete_node()
         return (tv,), {}
 
-    benchmark.pedantic(lambda tv: tv.undo(), setup=setup, rounds=1, iterations=1)
+    benchmark.pedantic(
+        lambda tv: tv.undo(), setup=setup, rounds=ROUNDS_SLOW, iterations=1
+    )
 
 
 def test_delete_edge(benchmark, build_app, fresh_tracks):
@@ -187,7 +202,9 @@ def test_delete_edge(benchmark, build_app, fresh_tracks):
         tv.selected_nodes.add(v, True)
         return (tv,), {}
 
-    benchmark.pedantic(lambda tv: tv.delete_edge(), setup=setup, rounds=1, iterations=1)
+    benchmark.pedantic(
+        lambda tv: tv.delete_edge(), setup=setup, rounds=ROUNDS_SLOW, iterations=1
+    )
 
 
 def test_create_edge(benchmark, build_app, fresh_tracks):
@@ -206,7 +223,9 @@ def test_create_edge(benchmark, build_app, fresh_tracks):
         tv.selected_nodes.add(v, True)
         return (tv,), {}
 
-    benchmark.pedantic(lambda tv: tv.create_edge(), setup=setup, rounds=1, iterations=1)
+    benchmark.pedantic(
+        lambda tv: tv.create_edge(), setup=setup, rounds=ROUNDS_SLOW, iterations=1
+    )
 
 
 def test_undo(benchmark, build_app, fresh_tracks):
@@ -217,7 +236,9 @@ def test_undo(benchmark, build_app, fresh_tracks):
         tv.delete_node()
         return (tv,), {}
 
-    benchmark.pedantic(lambda tv: tv.undo(), setup=setup, rounds=1, iterations=1)
+    benchmark.pedantic(
+        lambda tv: tv.undo(), setup=setup, rounds=ROUNDS_SLOW, iterations=1
+    )
 
 
 def test_redo(benchmark, build_app, fresh_tracks):
@@ -229,4 +250,6 @@ def test_redo(benchmark, build_app, fresh_tracks):
         tv.undo()
         return (tv,), {}
 
-    benchmark.pedantic(lambda tv: tv.redo(), setup=setup, rounds=1, iterations=1)
+    benchmark.pedantic(
+        lambda tv: tv.redo(), setup=setup, rounds=ROUNDS_SLOW, iterations=1
+    )
