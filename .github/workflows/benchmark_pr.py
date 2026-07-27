@@ -3,7 +3,15 @@
 Usage:
     python benchmark_pr.py <old.json> <new.json> <output.md> [header]
 
-Exits with code 1 if any benchmark regresses by more than REGRESSION_THRESHOLD.
+The table reports mean ± standard deviation for human readability, but the
+pass/fail gate compares the *median*. Median is robust to a single outlier round
+in either direction: `min` is biased down by an accidentally-fast run, `mean` up
+by an unlucky-slow one (a transient OS/GC spike). With >=3 rounds the median
+ignores one such spike, which is what keeps the noisy single-action benchmarks
+from tripping the gate spuriously.
+
+Exits with code 1 if any benchmark's median regresses by more than
+REGRESSION_THRESHOLD percent.
 """
 
 import json
@@ -23,9 +31,21 @@ def load_stats(path):
 
     rows = []
     for d in data["benchmarks"]:
-        rows.append({"Benchmark": d["name"], "mean": d["stats"]["mean"]})
+        s = d["stats"]
+        rows.append(
+            {
+                "Benchmark": d["name"],
+                "median": s["median"],
+                "mean": s["mean"],
+                "stddev": s["stddev"],
+            }
+        )
 
     return commit, pd.DataFrame(rows)
+
+
+def _fmt(mean, std):
+    return f"{mean:.5f} ± {std:.5f}"
 
 
 def _write(out_file, report):
@@ -40,9 +60,13 @@ def make_report(old_path, new_path, out_file, header=None):
     # No baseline available (e.g. the first PR introducing benchmarks, or a run on
     # a base commit that predates the suite). Report HEAD-only numbers and pass.
     if not os.path.exists(old_path) or os.path.getsize(old_path) == 0:
-        df = new_df.rename(columns={"mean": f"Mean (s) HEAD {new_commit}"})
-        df[f"Mean (s) HEAD {new_commit}"] = df[f"Mean (s) HEAD {new_commit}"].map(
-            "{:.5f}".format
+        df = pd.DataFrame(
+            {
+                "Benchmark": new_df["Benchmark"],
+                f"Mean ± SD (s) HEAD {new_commit}": [
+                    _fmt(m, s) for m, s in zip(new_df["mean"], new_df["stddev"])
+                ],
+            }
         )
         report = df.to_markdown(index=False)
         note = "_No baseline found; showing HEAD results only (no comparison)._"
@@ -54,40 +78,36 @@ def make_report(old_path, new_path, out_file, header=None):
 
     old_commit, old_df = load_stats(old_path)
 
-    # Merge on benchmark name
-    df = old_df.merge(new_df, on="Benchmark", suffixes=("_old", "_new"))
-    old = (old_commit,)
-    new = (new_commit,)
+    # Merge on benchmark name (drops benchmarks present on only one side).
+    merged = old_df.merge(new_df, on="Benchmark", suffixes=("_old", "_new"))
 
-    pct_change = 100 * (df["mean_new"] - df["mean_old"]) / df["mean_old"]
-    df["Percent Change"] = pct_change.map("{:+.2f}".format)
+    # Gate on the median (see module docstring).
+    pct_change = (
+        100 * (merged["median_new"] - merged["median_old"]) / merged["median_old"]
+    )
 
-    # Format runtimes
-    df["mean_old"] = df["mean_old"].map("{:.5f}".format)
-    df["mean_new"] = df["mean_new"].map("{:.5f}".format)
-
-    # Change column names to commit ids
-    df = df.rename(
-        columns={
-            "mean_new": f"Mean (s) HEAD {new[0]}",
-            "mean_old": f"Mean (s) BASE {old[0]}",
+    df = pd.DataFrame(
+        {
+            "Benchmark": merged["Benchmark"],
+            f"Mean ± SD (s) BASE {old_commit}": [
+                _fmt(m, s) for m, s in zip(merged["mean_old"], merged["stddev_old"])
+            ],
+            f"Mean ± SD (s) HEAD {new_commit}": [
+                _fmt(m, s) for m, s in zip(merged["mean_new"], merged["stddev_new"])
+            ],
+            "Median Change": pct_change.map("{:+.2f}%".format),
         }
     )
 
     report = df.to_markdown(index=False)
     if header:
         report = f"## {header}\n\n{report}"
+    _write(out_file, report)
 
-    with open(out_file, "w") as f:
-        f.write(report)
-
-    # Print report to logs
-    print(report)  # noqa: T201
-
-    # Fail if any benchmark regressed beyond threshold
+    # Fail if any benchmark's median regressed beyond threshold
     if (pct_change > REGRESSION_THRESHOLD).any():
         print(  # noqa: T201
-            f"\nFAILED: Regression exceeds {REGRESSION_THRESHOLD}% threshold"
+            f"\nFAILED: median regression exceeds {REGRESSION_THRESHOLD}% threshold"
         )
         sys.exit(1)
 
