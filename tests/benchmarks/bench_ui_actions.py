@@ -14,7 +14,18 @@ under the ``offscreen`` Qt platform, which lacks a real GL context.
 
 from __future__ import annotations
 
+import sys
+
+import pytest
 from synthetic_data import pick_nodes, tracklet_nodes
+
+# These UI benchmarks build the fastplotlib/wgpu tree view, which aborts (SIGABRT) on
+# headless Linux CI (no usable GPU adapter for the Qt canvas). Run on macOS (Metal) and
+# Windows (DX12); skip on Linux — same as the tree-view tests in tests/data_views.
+pytestmark = pytest.mark.skipif(
+    sys.platform == "linux",
+    reason="fastplotlib/wgpu can't build a Qt canvas on headless Linux CI",
+)
 
 # Rounds pytest-benchmark averages each measurement over. The same-runner base/head
 # comparison is what removes machine-to-machine noise; averaging only pays off on the
