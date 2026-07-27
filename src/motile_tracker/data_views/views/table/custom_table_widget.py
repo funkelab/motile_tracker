@@ -286,7 +286,6 @@ class ColoredTableWidget(QWidget):
 
         self._table = {}
         self._id_to_row: dict[int, int] = {}
-        self.special_selection = []
         self.ascending = False  # for choosing whether to sort ascending or descending
         self._syncing = False
 
@@ -305,7 +304,7 @@ class ColoredTableWidget(QWidget):
         # Connect to single click in the header to sort the table.
         self._table_widget.horizontalHeader().sectionClicked.connect(self._sort_table)
 
-        # Instruction label to explain left and right mouse click.
+        # Instruction label to explain mouse and keyboard functions.
         label = QLabel(
             "Use left mouse click to select and center a label. Use Ctrl/CMD to center a node, Shift to append to selection. Use mouse drag to select a range."
         )
@@ -571,30 +570,21 @@ class ColoredTableWidget(QWidget):
         DirectLabelColormap.
         """
 
-        # in case of right-click on the table, we should only show the selected label(s)
-        if len(self.special_selection) != 0:
-            for _, color in self.colormap.color_dict.items():
-                color[-1] = 0
-            for key in self.special_selection:
-                if key in self.colormap.color_dict:
-                    self.colormap.color_dict[key][-1] = 1
-
         # find selected rows, and set highlight matching labels
-        else:
-            selected_rows = sorted(
-                {index.row() for index in self._table_widget.selectedIndexes()}
-            )
-            if not selected_rows:
-                self._reset_layer_colormap()
-                return
+        selected_rows = sorted(
+            {index.row() for index in self._table_widget.selectedIndexes()}
+        )
+        if not selected_rows:
+            self._reset_layer_colormap()
+            return
 
-            selected_labels = [self._table["ID"][row] for row in selected_rows]
-            for key, color in self.colormap.color_dict.items():
-                if key is not None and key != 0:
-                    color[-1] = 0.6
-            for key in selected_labels:
-                if key in self.colormap.color_dict:
-                    self.colormap.color_dict[key][-1] = 1
+        selected_labels = [self._table["ID"][row] for row in selected_rows]
+        for key, color in self.colormap.color_dict.items():
+            if key is not None and key != 0:
+                color[-1] = 0.6
+        for key in selected_labels:
+            if key in self.colormap.color_dict:
+                self.colormap.color_dict[key][-1] = 1
 
     def _sort_table(self, column_index: int) -> None:
         """Sorts the table in ascending or descending order
