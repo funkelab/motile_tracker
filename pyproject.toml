@@ -104,7 +104,7 @@ conflicts = [
 # TEMPORARY: pin funtracks to the segmentation-shape PR commit until it is merged
 # and released. Revert to the PyPI version (drop this source) once released.
 [tool.uv.sources]
-funtracks = { git = "https://github.com/funkelab/funtracks.git", rev = "c68931978a0a0d2ab235cd1712647e09fdb4f96b" }
+funtracks = { git = "https://github.com/funkelab/funtracks.git", rev = "204388f535f6f17d72c6415e3b8a3d48ece073a4" }
 
 [tool.pytest.ini_options]
 # Benchmarks are slow and run in a dedicated CI job; exclude them from the normal
