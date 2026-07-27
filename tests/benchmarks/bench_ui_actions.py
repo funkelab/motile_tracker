@@ -239,9 +239,7 @@ def test_undo(benchmark, build_app, fresh_tracks):
         tv.delete_node()
         return (tv,), {}
 
-    benchmark.pedantic(
-        lambda tv: tv.undo(), setup=setup, rounds=ROUNDS, iterations=1
-    )
+    benchmark.pedantic(lambda tv: tv.undo(), setup=setup, rounds=ROUNDS, iterations=1)
 
 
 def test_redo(benchmark, build_app, fresh_tracks):
@@ -253,6 +251,4 @@ def test_redo(benchmark, build_app, fresh_tracks):
         tv.undo()
         return (tv,), {}
 
-    benchmark.pedantic(
-        lambda tv: tv.redo(), setup=setup, rounds=ROUNDS, iterations=1
-    )
+    benchmark.pedantic(lambda tv: tv.redo(), setup=setup, rounds=ROUNDS, iterations=1)

@@ -64,7 +64,8 @@ def make_report(old_path, new_path, out_file, header=None):
             {
                 "Benchmark": new_df["Benchmark"],
                 f"Mean ± SD (s) HEAD {new_commit}": [
-                    _fmt(m, s) for m, s in zip(new_df["mean"], new_df["stddev"])
+                    _fmt(m, s)
+                    for m, s in zip(new_df["mean"], new_df["stddev"], strict=True)
                 ],
             }
         )
@@ -90,10 +91,12 @@ def make_report(old_path, new_path, out_file, header=None):
         {
             "Benchmark": merged["Benchmark"],
             f"Mean ± SD (s) BASE {old_commit}": [
-                _fmt(m, s) for m, s in zip(merged["mean_old"], merged["stddev_old"])
+                _fmt(m, s)
+                for m, s in zip(merged["mean_old"], merged["stddev_old"], strict=True)
             ],
             f"Mean ± SD (s) HEAD {new_commit}": [
-                _fmt(m, s) for m, s in zip(merged["mean_new"], merged["stddev_new"])
+                _fmt(m, s)
+                for m, s in zip(merged["mean_new"], merged["stddev_new"], strict=True)
             ],
             "Median Change": pct_change.map("{:+.2f}%".format),
         }
