@@ -137,6 +137,12 @@ class TrackGraph(napari.layers.Tracks):
             self.tracks_viewer.tracks,
         )
 
+        if len(track_data) == 0:
+            # napari's Tracks layer cannot handle empty data (it indexes the first
+            # timepoint), so keep a single dummy row when the graph becomes empty
+            # (e.g. after undoing the very first action). Same as in __init__.
+            track_data = np.zeros((1, track_data.shape[1]), dtype=float)
+
         self.data = track_data
         self.graph = track_edges
         self.tracks_layer_graph = copy.deepcopy(self.graph)
