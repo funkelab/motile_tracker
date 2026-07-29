@@ -142,27 +142,39 @@ class LayerDropdown(QComboBox):
 
         try:
             previous = self.currentText()
-            self.clear()
+            # Block signals while rebuilding: clear()/addItem() emit currentTextChanged
+            # for the transient empty/partial states, which would momentarily report a
+            # None/other selection and (e.g.) tear down a connected source layer just
+            # because an unrelated layer was added. Emit once at the end, only if the
+            # effective selection really changed.
+            self.blockSignals(True)
+            try:
+                self.clear()
 
-            layers = [
-                layer
-                for layer in self.viewer.layers
-                if isinstance(layer, self.layer_types)
-                and not isinstance(layer, self.exclude_types)
-            ]
+                layers = [
+                    layer
+                    for layer in self.viewer.layers
+                    if isinstance(layer, self.layer_types)
+                    and not isinstance(layer, self.exclude_types)
+                ]
 
-            names = []
-            if self.allow_none:
-                self.addItem("No selection")
-                names.append("No selection")
+                names = []
+                if self.allow_none:
+                    self.addItem("No selection")
+                    names.append("No selection")
 
-            for layer in layers:
-                self.addItem(layer.name)
-                names.append(layer.name)
+                for layer in layers:
+                    self.addItem(layer.name)
+                    names.append(layer.name)
 
-            # restore previous selection if still valid
-            if previous in names:
-                self.setCurrentText(previous)
+                # restore previous selection if still valid
+                if previous in names:
+                    self.setCurrentText(previous)
+            finally:
+                self.blockSignals(False)
+
+            if self.currentText() != previous:
+                self._emit_layer_changed()
         except (AttributeError, RuntimeError, TypeError):
             pass
 
@@ -454,21 +466,22 @@ class TrackingFromScratch(QWidget):
             )
 
     def _on_source_dropdown_changed(self, name=None) -> None:
-        """React to the user picking a different source layer. If a source is already
-        connected, switch the connection to the newly selected layer."""
+        """React to the user picking a different source layer. Selecting a layer other
+        than the currently connected one disconnects the old source and resets the chain
+        button to its unchecked state, so the user can connect the newly selected layer
+        with a fresh click."""
 
         self._update_source_controls()
-        if not self.chain_btn.isChecked():
-            return
 
         source = self.source_layer_dropdown.selected_layer
         if source is self._source_layer:
             return
-        self._teardown_source_connection()
-        if source is not None:
-            self._setup_source_connection(source)
-        else:
-            self._reset_chain()
+
+        # a different layer was picked: drop the stale connection and make the chain
+        # button available to connect the new selection again
+        if self._source_layer is not None:
+            self._teardown_source_connection()
+        self._reset_chain()
 
     def _on_chain_toggled(self, checked: bool) -> None:
         """Connect (closed chain) or disconnect (open chain) the selected source layer."""
