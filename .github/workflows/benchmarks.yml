@@ -22,7 +22,9 @@ jobs:
       matrix:
         platform: [ubuntu-latest, macos-latest, windows-latest]
     env:
-      # disable resyncing on uv run so `git checkout <base>` keeps the head-synced env
+      # Stop `uv run` from auto-resyncing (which would drop the `testing` group).
+      # Each benchmark step below runs its own explicit `uv sync` after checkout so
+      # base and head are each measured against *their own* locked dependencies.
       UV_NO_SYNC: "1"
 
     steps:
@@ -53,40 +55,40 @@ jobs:
           if (Test-Path -Path "C:\Windows\system32\opengl32.dll" -PathType Leaf) {Exit 0} else {Exit 1}
         shell: powershell
 
-      - name: Retrieve cached baseline if available
-        uses: actions/cache/restore@v5
-        id: cache_baseline
-        with:
-          path: baseline.json
-          key: benchmark-${{ matrix.platform }}-${{ github.event.pull_request.base.sha }}
-
       # The benchmark suite lives under tests/benchmarks, which the default pytest
       # config ignores; `-o addopts=` clears that so it is collected here. The GUI
       # benchmarks need a real GL context, hence aganders3/headless-gui.
-      # Tolerant on purpose: the base commit may predate the benchmark suite (e.g.
-      # the first PR that introduces it), in which case there is no baseline to
-      # produce. The report step then falls back to HEAD-only numbers.
-      - name: Run baseline benchmark if not in cache
-        if: steps.cache_baseline.outputs.cache-hit != 'true'
+      #
+      # Baseline and PR head are benchmarked back-to-back in this same job (no cached
+      # cross-run baseline) so both are measured on the *same* runner instance. This is
+      # essential: CI runners -- especially macOS/Windows -- vary enough machine-to-machine
+      # that comparing against a baseline cached from a different run produced spurious
+      # regressions larger than the real deltas.
+      #
+      # Each side re-syncs its OWN dependencies after checkout (`uv sync` after `git
+      # checkout`). This is what makes dependency-bump PRs (funtracks/tracksdata/...)
+      # measure the real base-vs-head delta: base runs against base's locked deps and
+      # head against head's. Without the per-checkout sync, base code would run against
+      # head's deps -- an apples-to-oranges comparison that reports fictional regressions
+      # whenever a dependency changes a shared contract. `git checkout -f` discards any
+      # uv.lock churn from the previous sync so the next checkout is clean.
+      # Tolerant on purpose: the base commit may predate the benchmark suite, in which
+      # case there is no baseline and the report falls back to HEAD-only numbers.
+      - name: Run baseline benchmark (same runner)
         continue-on-error: true
         uses: aganders3/headless-gui@v2
         with:
           run: |
-            git checkout ${{ github.event.pull_request.base.sha }}
+            git checkout -f ${{ github.event.pull_request.base.sha }}
+            uv sync --no-dev --group testing
             uv run pytest tests/benchmarks -o addopts= --benchmark-json baseline.json
-
-      - name: Cache baseline results
-        uses: actions/cache/save@v5
-        if: steps.cache_baseline.outputs.cache-hit != 'true' && hashFiles('baseline.json') != ''
-        with:
-          path: baseline.json
-          key: benchmark-${{ matrix.platform }}-${{ github.event.pull_request.base.sha }}
 
       - name: Run benchmark on PR head
         uses: aganders3/headless-gui@v2
         with:
           run: |
-            git checkout ${{ github.event.pull_request.head.sha }}
+            git checkout -f ${{ github.event.pull_request.head.sha }}
+            uv sync --no-dev --group testing
             uv run pytest tests/benchmarks -o addopts= --benchmark-json pr.json
 
       - name: Generate report
