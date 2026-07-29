@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import numpy as np
 from funtracks.import_export import import_from_geff, tracks_from_df
 from funtracks.import_export.magic_imread import magic_imread
 from geff_spec.utils import axes_from_lists
@@ -329,64 +330,61 @@ class ImportDialog(QDialog):
             recompute = "area" not in self.tracks.graph.node_attr_keys()
             self.tracks.enable_features(["area"], recompute=recompute)
 
-    def _maybe_convert_legacy_masks(self, geff_dir: Path) -> Path | None:
+    def _maybe_convert_legacy_masks(self, geff_dir: Path) -> bool:
         """Offer to convert masks stored in an older, memory-heavy dtype.
 
         Geff files written by older versions of tracksdata store segmentation
         masks as integers (e.g. ``uint64``) rather than ``bool``, using ~8x more
-        memory when read. If such masks are detected, warn the user and offer a
-        lossless conversion. To keep the original (possibly shared) file
-        untouched, the conversion is written to a ``*_bool.geff`` copy next to
-        it, and that copy is loaded instead.
+        memory when read, which can run out of memory on large datasets. If such
+        masks are detected, warn the user and offer a lossless, in-place
+        conversion of the mask buffer (the rest of the geff is untouched).
 
         Returns:
-            Path | None: the geff directory to import (the original, or the
-            converted copy), or None if the user cancelled.
+            bool: True to continue the import, False if the user cancelled or the
+            conversion failed.
         """
+        # TODO: the geff dtype helpers are only on tracksdata main
+        # (royerlab/tracksdata#319). Once released, add a tracksdata floor to
+        # pyproject.toml and import these at module level.
         try:
-            from tracksdata.io import convert_geff_mask_to_bool, geff_mask_dtype
+            from tracksdata.constants import DEFAULT_ATTR_KEYS
+            from tracksdata.io import convert_geff_prop_dtype, geff_prop_dtype
         except ImportError:
-            return geff_dir  # older tracksdata without the utility; import as before
+            return True  # older tracksdata without the utility; import as before
 
+        mask_key = DEFAULT_ATTR_KEYS.MASK
         try:
-            dtype = geff_mask_dtype(geff_dir)
+            dtype = geff_prop_dtype(geff_dir, mask_key)
         except Exception:  # noqa: BLE001
-            return geff_dir  # detection failed; don't block the import
+            return True  # detection failed; don't block the import
 
-        if dtype is None or dtype == "bool":
-            return geff_dir
+        if dtype is None or dtype == np.bool_:
+            return True
 
         answer = QMessageBox.question(
             self,
             "Old mask format detected",
             f"This geff stores segmentation masks as '{dtype}', an older format that "
             "uses about 8x more memory when loaded.\n\n"
-            "Convert them to boolean now? A converted copy will be written next to the "
-            "original, which is left untouched.",
+            "Convert them to boolean now? The conversion is lossless, but it edits "
+            f"{geff_dir.name} in place.",
             QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
             QMessageBox.Yes,
         )
         if answer == QMessageBox.Cancel:
-            return None
+            return False
         if answer == QMessageBox.No:
-            return geff_dir  # load the original as-is
-
-        name = geff_dir.name
-        out_name = (
-            f"{name[:-5]}_bool.geff" if name.endswith(".geff") else f"{name}_bool"
-        )
-        out_path = geff_dir.parent / out_name
+            return True  # load as-is
 
         QApplication.setOverrideCursor(Qt.WaitCursor)
         try:
-            if not out_path.exists():
-                convert_geff_mask_to_bool(geff_dir, output_path=out_path)
+            convert_geff_prop_dtype(geff_dir, mask_key, np.bool_)
         except Exception as e:  # noqa: BLE001
             QMessageBox.critical(self, "Error", f"Failed to convert masks: {e}")
-            return None
+            return False
         finally:
             QApplication.restoreOverrideCursor()
-        return out_path
+        return True
 
     def _finish(self) -> None:
         """Tries to read the csv/geff file and optional segmentation image and apply the
@@ -398,8 +396,7 @@ class ImportDialog(QDialog):
                 group_path = Path(self.import_widget.root.path)  # e.g. 'tracks'
                 geff_dir = store_path / group_path
 
-                geff_dir = self._maybe_convert_legacy_masks(geff_dir)
-                if geff_dir is None:
+                if not self._maybe_convert_legacy_masks(geff_dir):
                     return
 
                 self.name = self.import_widget.dir_name
