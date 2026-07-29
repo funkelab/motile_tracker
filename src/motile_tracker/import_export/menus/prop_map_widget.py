@@ -303,13 +303,10 @@ class StandardFieldMapWidget(QWidget):
             attribute (str): The attribute name to add as an optional feature
         """
 
-        # Compute the row index based on the current state of the layout, skipping already
-        # present widgets and header row, to prevent stacking widgets on top of each other.
-        row_idx = 1
-        for i, attr in enumerate(self.props_left):
-            if attr == attribute:
-                row_idx = i + 1  # +1 for header row
-                break
+        # Use the QGridLayout row count to assign a new row. Indices will keep counting up
+        # as widgets are removed and added back, but this does not leave holes, and
+        # ensures that two widgets will never collide together on the same row
+        row_idx = self.optional_mapping_layout.rowCount()
 
         # Prop checkbox
         attr_checkbox = QCheckBox(attribute)
@@ -385,7 +382,6 @@ class StandardFieldMapWidget(QWidget):
         self.optional_features[attribute]["recompute"].deleteLater()
 
         del self.optional_features[attribute]
-        self.row_idx = len(self.optional_features)
 
     def _check_for_duplicates(self) -> None:
         """Check if any regionprops property is assigned twice in optional_features
