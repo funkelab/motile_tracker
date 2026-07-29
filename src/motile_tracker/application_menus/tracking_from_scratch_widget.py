@@ -21,6 +21,7 @@ from qtpy.QtWidgets import (
     QWidget,
 )
 
+from motile_tracker.application_menus.editing_selection_menu import NewTrackWidget
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 from motile_tracker.data_views.views_coordinator.user_dialogs import (
     confirm_force_operation,
@@ -260,6 +261,9 @@ class TrackingFromScratch(QWidget):
         # source is connected and its layer (or its track layer) is the active layer.
         self.copy_controls_box = QGroupBox("Copy detections into tracks")
         copy_controls_layout = QVBoxLayout(self.copy_controls_box)
+        # current track id + "start new track" (same widget as in the Editing menu)
+        self.new_track_widget = NewTrackWidget(self.tracks_viewer)
+        copy_controls_layout.addWidget(self.new_track_widget)
         self.add_label_btn = QPushButton("Add selected label to track")
         self.add_label_btn.clicked.connect(self._add_selected_label)
         copy_controls_layout.addWidget(self.add_label_btn)
@@ -371,6 +375,11 @@ class TrackingFromScratch(QWidget):
                 layer._manual_switch_layer = self._switch_layer
                 layer.bind_key("\\", self._switch_layer_key, overwrite=True)
 
+        # color the 'add selected label' button border with the selected label color
+        if isinstance(source_layer, Labels):
+            source_layer.events.selected_label.connect(self._update_add_label_border)
+            self._update_add_label_border()
+
         # make the source layer active so its click callbacks receive events
         self.viewer.layers.selection.active = source_layer
         self._update_copy_controls_visibility()
@@ -378,6 +387,12 @@ class TrackingFromScratch(QWidget):
     def _teardown_source_connection(self) -> None:
         """Disconnect the right-click callback and shortcuts from the previously connected
         source and target layers."""
+
+        if isinstance(self._source_layer, Labels):
+            with contextlib.suppress(TypeError, RuntimeError):
+                self._source_layer.events.selected_label.disconnect(
+                    self._update_add_label_border
+                )
 
         for layer in (self._source_layer, self._target_layer):
             if layer is None:
@@ -603,6 +618,20 @@ class TrackingFromScratch(QWidget):
         """Keybinding handler ('\\' key) to switch between source and target layer."""
 
         self._switch_layer()
+
+    def _update_add_label_border(self, event=None) -> None:
+        """Color the 'add selected label' button border with the color of the currently
+        selected label in the source layer."""
+
+        layer = self._source_layer
+        if not isinstance(layer, Labels):
+            return
+        color = np.asarray(layer.colormap.map(layer.selected_label)).flatten()
+        r, g, b = (int(c * 255) for c in color[:3])
+        a = float(color[3])
+        self.add_label_btn.setStyleSheet(
+            f"QPushButton {{ border: 2px solid rgba({r}, {g}, {b}, {a}); padding: 5px; }}"
+        )
 
     def _add_selected_label(self, *args) -> None:
         """Copy the currently selected label (or selected point) from the source layer into

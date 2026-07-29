@@ -20,6 +20,45 @@ if TYPE_CHECKING:
     from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
 
+class NewTrackWidget(QWidget):
+    """Widget showing the current track ID (with a border colored by the tracklet id) and
+    a button to start a new track. Both the button and the "'" keybind trigger
+    tracks_viewer.request_new_track."""
+
+    def __init__(self, tracks_viewer: TracksViewer):
+        super().__init__()
+        self.tracks_viewer = tracks_viewer
+
+        self.label = QLabel(f"Current Track ID: {self.tracks_viewer.selected_track}")
+
+        self.new_track_btn = QPushButton("Start new [']")
+        self.new_track_btn.clicked.connect(self.tracks_viewer.request_new_track)
+
+        track_layout = QHBoxLayout()
+        track_layout.setContentsMargins(0, 0, 0, 0)
+        track_layout.addWidget(self.label)
+        track_layout.addWidget(self.new_track_btn)
+        self.setLayout(track_layout)
+
+        self.tracks_viewer.update_track_id.connect(self.update_track_id_color)
+        self.update_track_id_color()
+
+    def update_track_id_color(self):
+        """Display track ID value and color"""
+
+        color = self.tracks_viewer.track_id_color
+        r, g, b, a = [int(c * 255) if i < 3 else c for i, c in enumerate(color)]
+        css_color = f"rgba({r}, {g}, {b}, {a})"
+        self.label.setText(f"Current Track ID: {self.tracks_viewer.selected_track}")
+        self.label.setStyleSheet(
+            f"""
+            color: white;
+            border: 2px solid {css_color};
+            padding: 5px;
+            """
+        )
+
+
 class SelectionWidget(QWidget):
     """Widget with buttons to control selection of nodes on TracksViewer."""
 
@@ -157,15 +196,11 @@ class EditingMenu(QWidget):
         box = QGroupBox("Editing")
         box_layout = QVBoxLayout()
 
-        self.label = QLabel(f"Current Track ID: {self.tracks_viewer.selected_track}")
-        self.tracks_viewer.update_track_id.connect(self.update_track_id_color)
-
-        self.new_track_btn = QPushButton("Start new")
-        self.new_track_btn.clicked.connect(self.tracks_viewer.request_new_track)
-        track_layout = QHBoxLayout()
-        track_layout.addWidget(self.label)
-        track_layout.addWidget(self.new_track_btn)
-        box_layout.addLayout(track_layout)
+        self.new_track_widget = NewTrackWidget(self.tracks_viewer)
+        # expose the label and button (kept for backwards compatibility / tests)
+        self.label = self.new_track_widget.label
+        self.new_track_btn = self.new_track_widget.new_track_btn
+        box_layout.addWidget(self.new_track_widget)
 
         node_box = QGroupBox("Edit Node(s)")
         node_box.setMaximumHeight(120)
@@ -216,21 +251,6 @@ class EditingMenu(QWidget):
         main_layout.addWidget(box)
         self.setLayout(main_layout)
         self.setMaximumHeight(450)
-
-    def update_track_id_color(self):
-        """Display track ID value and color"""
-
-        color = self.tracks_viewer.track_id_color
-        r, g, b, a = [int(c * 255) if i < 3 else c for i, c in enumerate(color)]
-        css_color = f"rgba({r}, {g}, {b}, {a})"
-        self.label.setText(f"Current Track ID: {self.tracks_viewer.selected_track}")
-        self.label.setStyleSheet(
-            f"""
-            color: white;
-            border: 2px solid {css_color};
-            padding: 5px;
-            """
-        )
 
     def update_buttons(self):
         """Set the buttons to enabled/disabled depending on the selected nodes"""
