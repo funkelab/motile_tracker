@@ -31,7 +31,9 @@ classifiers = [
 
 dependencies =[
     "napari>=0.6.2,<0.8.0",
-    "funtracks>=2,<3",
+    # 2.0.4 fixes the in-place Mask.__isub__ misuse on erase, which corrupts the
+    # GraphArrayView cache with tracksdata >=0.1.0rc7 (funtracks#264)
+    "funtracks>=2.0.4,<3",
     "appdirs>=1,<2",
     "numpy>=2,<3",
     "magicgui>=0.10.1",
