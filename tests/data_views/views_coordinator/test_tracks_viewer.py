@@ -5,7 +5,6 @@ Tests cover node operations, edge operations, display modes, and selection manag
 
 from unittest.mock import patch
 
-import napari
 import pytest
 from funtracks.data_model import SolutionTracks
 
@@ -372,14 +371,14 @@ class TestSelectionManagement:
 class TestSingletonLifecycle:
     """Tests for TracksViewer singleton creation, reuse, and cleanup."""
 
-    def test_instance_cleared_after_viewer_close(self, qapp):
+    def test_instance_cleared_after_viewer_close(self, make_napari_viewer, qapp):
         """_instance must be cleared when the viewer's Qt window is destroyed.
 
         Regression: without the destroyed-signal connection, _instance survives
         viewer.close() and the next get_instance() call returns a stale wrapper,
         crashing with RuntimeError (wrapped C++ object deleted).
         """
-        v = napari.Viewer(show=False)
+        v = make_napari_viewer()
         TracksViewer.get_instance(v)
         assert hasattr(TracksViewer, "_instance")
 
@@ -391,7 +390,9 @@ class TestSingletonLifecycle:
             "A subsequent get_instance() call would return a stale, crashed wrapper."
         )
 
-    def test_get_instance_returns_new_instance_for_different_viewer(self, viewer, qapp):
+    def test_get_instance_returns_new_instance_for_different_viewer(
+        self, viewer, make_napari_viewer, qapp
+    ):
         """get_instance(v2) must return a fresh instance bound to v2.
 
         Regression: without the viewer-identity check, the existing _instance is
@@ -401,7 +402,7 @@ class TestSingletonLifecycle:
         tv1 = TracksViewer.get_instance(viewer)
         assert tv1.viewer is viewer
 
-        v2 = napari.Viewer(show=False)
+        v2 = make_napari_viewer()
         try:
             tv2 = TracksViewer.get_instance(v2)
             assert tv2 is not tv1, (
