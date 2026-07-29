@@ -111,7 +111,9 @@ class TrackGraph(napari.layers.Tracks):
         )
 
         if len(track_data) == 0:
-            track_data = np.array([[0, 0, 0, 0]], dtype=float)  # fake point is needed
+            # a single dummy row is needed for the empty layer, but its column count
+            # must match the tracks dimensionality (id, t, [z], y, x).
+            track_data = np.zeros((1, track_data.shape[1]), dtype=float)
 
         super().__init__(
             data=track_data,

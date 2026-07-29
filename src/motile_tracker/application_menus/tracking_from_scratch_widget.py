@@ -2,14 +2,13 @@ import contextlib
 import weakref
 
 import napari
-from funtracks.candidate_graph.utils import (
-    nodes_from_points_list,
-    nodes_from_segmentation,
-)
+import numpy as np
 from funtracks.data_model import SolutionTracks
-from funtracks.utils import ensure_unique_labels
+from funtracks.exceptions import InvalidActionError
+from funtracks.user_actions import UserAddNode
 from funtracks.utils.tracksdata_utils import create_empty_graphview_graph
 from napari.layers import Image, Labels, Points
+from napari.utils.notifications import show_info
 from psygnal import Signal
 from qtpy.QtCore import Qt
 from qtpy.QtWidgets import (
@@ -22,8 +21,10 @@ from qtpy.QtWidgets import (
     QWidget,
 )
 
-from motile_tracker.data_views.lazy_array_wrapper import LazyArrayWrapper
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
+from motile_tracker.data_views.views_coordinator.user_dialogs import (
+    confirm_force_operation,
+)
 
 
 class LayerDropdown(QComboBox):
@@ -200,6 +201,11 @@ class TrackingFromScratch(QWidget):
         self.tracks_viewer = TracksViewer.get_instance(viewer)
         self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
 
+        # the detections layer that is currently connected as a copy source, and the
+        # right-click callback attached to it (so we can disconnect it later)
+        self._source_layer = None
+        self._source_callback = None
+
         exp_manual = QLabel()
         exp_manual.setWordWrap(True)
         exp_manual.setTextFormat(Qt.MarkdownText)
@@ -228,9 +234,10 @@ class TrackingFromScratch(QWidget):
         exp_detection.setTextFormat(Qt.MarkdownText)
         exp_detection.setText(
             "**Manual tracking from detections**\n\n"
-            "*This will create a graph with only detections and no connections. "
-            "The type of input layer (Labels or Points) determines whether you will "
-            "get nodes from point detections or label detections.*"
+            "*This creates empty track layers that stay linked to the selected "
+            "detections layer. Right-click a label or point on the source layer to "
+            "copy that detection into the tracks with the current tracklet id. "
+            "Use the 'new track' action to start a new tracklet.*"
         )
 
         detections_box = QGroupBox("Manual tracking from detections")
@@ -282,27 +289,31 @@ class TrackingFromScratch(QWidget):
         self.tracks_viewer.set_new_track_id()
 
     def _start_from_detections(self):
-        """Create a graph with only detections (no edges), derived from the selected layer (either Points or Labels)"""
+        """Create an empty graph (with empty TrackLabels/TrackPoints layers) that stays
+        linked to the selected detections layer. Detections are copied into the tracks by
+        right-clicking on the source layer (see _copy_detection)."""
 
         layer = self.detections_layer_dropdown.selected_layer
+
+        # disconnect any previously connected source layer
+        self._teardown_source_connection()
+
         if isinstance(layer, Labels):
-            seg = layer.data
-            if isinstance(seg, LazyArrayWrapper):
-                seg = seg.__array__()
-            try:
-                graph, _ = nodes_from_segmentation(seg, scale=layer.scale)
-                graph._update_metadata(segmentation_shape=seg.shape)
-
-            except ValueError as e:
-                if "Duplicate values found among nodes" in str(e):
-                    seg = ensure_unique_labels(seg)
-                    graph, _ = nodes_from_segmentation(seg, scale=layer.scale)
-                    graph._update_metadata(segmentation_shape=seg.shape)
-                else:
-                    raise
-
+            # an empty segmentation-backed graph: registering the 'mask' attribute and
+            # the segmentation shape makes SolutionTracks expose an (empty) segmentation,
+            # so a TrackLabels layer is created and grows as labels are copied in.
+            graph = create_empty_graphview_graph(
+                node_attributes=["pos", "area", "mask", "bbox"],
+                position_attrs=["pos"],
+                ndim=layer.data.ndim,
+            )
+            graph._update_metadata(segmentation_shape=layer.data.shape)
         else:
-            graph, _ = nodes_from_points_list(layer.data, layer.scale)
+            graph = create_empty_graphview_graph(
+                node_attributes=["pos"],
+                position_attrs=["pos"],
+                ndim=layer.data.shape[1],
+            )
 
         tracks = SolutionTracks(
             graph=graph,
@@ -312,3 +323,142 @@ class TrackingFromScratch(QWidget):
             pos_attr="pos",
         )
         self.tracks_viewer.tracks_list.add_tracks(tracks, f"{layer.name}_manual_tracks")
+        self.tracks_viewer.set_new_track_id()
+
+        self._setup_source_connection(layer)
+
+    def _setup_source_connection(self, source_layer: Labels | Points) -> None:
+        """Keep the detections layer visible and attach a right-click callback that copies
+        the clicked detection into the tracks."""
+
+        self._source_layer = source_layer
+        # update_tracks hides all input Labels/Points layers, so re-show the source
+        source_layer.visible = True
+        if isinstance(source_layer, Labels):
+            source_layer.contour = 1
+        self._source_callback = self._make_source_callback()
+        source_layer.mouse_drag_callbacks.append(self._source_callback)
+        # make the source layer active so its click callbacks receive events
+        self.viewer.layers.selection.active = source_layer
+
+    def _teardown_source_connection(self) -> None:
+        """Disconnect the right-click callback from the previously connected source layer."""
+
+        if self._source_layer is not None and self._source_callback is not None:
+            with contextlib.suppress(ValueError):
+                self._source_layer.mouse_drag_callbacks.remove(self._source_callback)
+        self._source_layer = None
+        self._source_callback = None
+
+    def _make_source_callback(self) -> callable:
+        """Create the mouse callback that copies a detection on right-click."""
+
+        def callback(layer, event):
+            if event.type == "mouse_press" and event.button == 2:
+                self._copy_detection(layer, event)
+
+        return callback
+
+    def _copy_detection(self, layer: Labels | Points, event) -> None:
+        """Copy the label or point that was right-clicked on the source layer into the
+        tracks as a new node with the current tracklet id."""
+
+        if self.tracks_viewer.tracks is None:
+            return
+
+        if isinstance(layer, Labels):
+            self._copy_label(layer, event)
+        else:
+            self._copy_point(layer, event)
+
+    def _copy_label(self, layer: Labels, event) -> None:
+        """Copy the clicked label (in the clicked time point) into the tracks as a
+        segmentation node via an UserAddNode action."""
+
+        value = layer.get_value(
+            event.position,
+            view_direction=event.view_direction,
+            dims_displayed=event.dims_displayed,
+            world=True,
+        )
+        # ignore clicks on the background or outside the data
+        if not value:
+            return
+
+        coords = layer.world_to_data(event.position)
+        t = int(round(coords[0]))
+        frame = np.asarray(layer.data[t])
+        spatial_coords = np.where(frame == value)
+        if spatial_coords[0].size == 0:
+            return
+
+        t_array = np.full(spatial_coords[0].size, t, dtype=int)
+        pixels = (t_array, *spatial_coords)
+        self._add_node(t, pixels=pixels)
+
+    def _copy_point(self, layer: Points, event) -> None:
+        """Copy the clicked point into the tracks as a point node via an UserAddNode
+        action."""
+
+        index = layer.get_value(
+            event.position,
+            view_direction=event.view_direction,
+            dims_displayed=event.dims_displayed,
+            world=True,
+        )
+        if index is None:
+            return
+
+        point = np.asarray(layer.data[index])
+        t = int(round(point[0]))
+        # tracks store positions in world coordinates (see nodes_from_points_list)
+        position = point[1:] * np.asarray(layer.scale[1:])
+        self._add_node(t, position=position)
+
+    def _add_node(
+        self,
+        t: int,
+        position: np.ndarray | None = None,
+        pixels: tuple[np.ndarray, ...] | None = None,
+    ) -> None:
+        """Add a node to the tracks with the current tracklet id, from either a position
+        (points) or pixels (segmentation)."""
+
+        tracks = self.tracks_viewer.tracks
+
+        if self.tracks_viewer.selected_track is None:
+            self.tracks_viewer.set_new_track_id()
+        track_id = self.tracks_viewer.selected_track
+
+        features = tracks.features
+        attributes = {
+            features.time_key: t,
+            features.tracklet_key: track_id,
+        }
+        if position is not None:
+            attributes[features.position_key] = position
+
+        try:
+            node_id = tracks._get_new_node_ids(1)[0]
+            UserAddNode(
+                tracks,
+                node=node_id,
+                attributes=attributes,
+                pixels=pixels,
+                force=self.tracks_viewer.force,
+            )
+        except InvalidActionError as e:
+            if e.forceable:
+                force, always_force = confirm_force_operation(message=str(e))
+                self.tracks_viewer.force = always_force
+                if force:
+                    node_id = tracks._get_new_node_ids(1)[0]
+                    UserAddNode(
+                        tracks,
+                        node=node_id,
+                        attributes=attributes,
+                        pixels=pixels,
+                        force=True,
+                    )
+            else:
+                show_info(str(e))
