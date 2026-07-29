@@ -14,6 +14,7 @@ from napari.utils.notifications import show_info
 from psygnal import Signal
 from qtpy.QtCore import Qt
 from qtpy.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QGroupBox,
     QHBoxLayout,
@@ -305,6 +306,17 @@ class TrackingFromScratch(QWidget):
         self.add_label_btn = QPushButton("Copy selected label to track")
         self.add_label_btn.clicked.connect(self._add_selected_label)
         copy_controls_layout.addWidget(self.add_label_btn)
+        # When checked, copying a label onto a frame that already contains a node of the
+        # current tracklet starts a new track instead of growing the existing label.
+        self.new_track_on_copy_checkbox = QCheckBox(
+            "Copy as new track (don't grow existing tracklet)"
+        )
+        self.new_track_on_copy_checkbox.setToolTip(
+            "When checked, copying a label to a frame that already has an object with the "
+            "current tracklet id creates a new track. When unchecked, it grows the "
+            "existing label instead."
+        )
+        copy_controls_layout.addWidget(self.new_track_on_copy_checkbox)
         self.switch_layer_btn = QPushButton("Switch source / target layer [ \\ ]")
         self.switch_layer_btn.clicked.connect(self._switch_layer)
         copy_controls_layout.addWidget(self.switch_layer_btn)
@@ -714,9 +726,18 @@ class TrackingFromScratch(QWidget):
 
         # Target node to paint with: grow the current tracklet's node in this frame if
         # it exists, otherwise create a new node (still with the current tracklet id).
-        new_value = self._current_track_node(t, track_id)
-        if new_value is None:
-            new_value = tracks._get_new_node_ids(1)[0]
+        existing_node = self._current_track_node(t, track_id)
+        if existing_node is not None and self.new_track_on_copy_checkbox.isChecked():
+            # start a fresh track instead of growing the existing label in this frame
+            self.tracks_viewer.set_new_track_id()
+            track_id = self.tracks_viewer.selected_track
+            existing_node = None
+
+        new_value = (
+            existing_node
+            if existing_node is not None
+            else tracks._get_new_node_ids(1)[0]
+        )
 
         # Nothing to do if every pixel already belongs to the target node: skip the copy
         # so we don't push an empty (un-undoable) action onto the history. Still select
