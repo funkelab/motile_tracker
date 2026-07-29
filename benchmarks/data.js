@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785338821472,
+  "lastUpdate": 1785349224931,
   "repoUrl": "https://github.com/funkelab/motile_tracker",
   "entries": {
     "motile_tracker benchmarks (pytest-benchmark)": [
@@ -1113,6 +1113,135 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.12984051617266024",
             "extra": "mean: 7.2608941519999535 sec\nrounds: 3"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "45037215+TeunHuijben@users.noreply.github.com",
+            "name": "Teun Huijben",
+            "username": "TeunHuijben"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e85a0dd57646074d207b0bc2386b8fabe3e45037",
+          "message": "make table lazy (QTableView) to fix OOM on large datasets (#461)\n\n* make table lazy (QTableView) to fix OOM on large datasets\n\n* remove unused special selection from table view\n\n* Use QStyle selected flag instead of iterating rows\n\n---------\n\nCo-authored-by: AnniekStok <anniek.stokkermans@gmail.com>\nCo-authored-by: Caroline Malin-Mayor <malinmayorc@janelia.hhmi.org>",
+          "timestamp": "2026-07-29T11:11:24-07:00",
+          "tree_id": "414e43ee39c59b52c56887a4fa01a1b25d31a7a7",
+          "url": "https://github.com/funkelab/motile_tracker/commit/e85a0dd57646074d207b0bc2386b8fabe3e45037"
+        },
+        "date": 1785349224556,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/bench_data_model.py::test_extract_sorted_tracks[large]",
+            "value": 2.5281860851209985,
+            "unit": "iter/sec",
+            "range": "stddev: 0.1587341178063402",
+            "extra": "mean: 395.5405046666651 msec\nrounds: 3"
+          },
+          {
+            "name": "tests/benchmarks/bench_ui_actions.py::test_add_tracks[large]",
+            "value": 0.22812761143950305,
+            "unit": "iter/sec",
+            "range": "stddev: 1.4047125924455603",
+            "extra": "mean: 4.383511464000004 sec\nrounds: 3"
+          },
+          {
+            "name": "tests/benchmarks/bench_ui_actions.py::test_click_node_treeview[large]",
+            "value": 3.4037364410131348,
+            "unit": "iter/sec",
+            "range": "stddev: 0.006527046342932577",
+            "extra": "mean: 293.79478033332873 msec\nrounds: 3"
+          },
+          {
+            "name": "tests/benchmarks/bench_ui_actions.py::test_click_node_canvas[large]",
+            "value": 2.3012409168563774,
+            "unit": "iter/sec",
+            "range": "stddev: 0.21092738361786834",
+            "extra": "mean: 434.54815733332924 msec\nrounds: 3"
+          },
+          {
+            "name": "tests/benchmarks/bench_ui_actions.py::test_set_display_mode_lineage[large]",
+            "value": 11.34590267477973,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0009807919799373994",
+            "extra": "mean: 88.13754433332595 msec\nrounds: 3"
+          },
+          {
+            "name": "tests/benchmarks/bench_ui_actions.py::test_tree_flip_axes[large]",
+            "value": 0.5004266696168248,
+            "unit": "iter/sec",
+            "range": "stddev: 0.020748335440350246",
+            "extra": "mean: 1.998294776666673 sec\nrounds: 3"
+          },
+          {
+            "name": "tests/benchmarks/bench_ui_actions.py::test_tree_feature_recolor[large]",
+            "value": 0.43711674540831896,
+            "unit": "iter/sec",
+            "range": "stddev: 0.05108846092548533",
+            "extra": "mean: 2.287718350999986 sec\nrounds: 3"
+          },
+          {
+            "name": "tests/benchmarks/bench_ui_actions.py::test_label_colormap_rebuild[large]",
+            "value": 6.779540961620329,
+            "unit": "iter/sec",
+            "range": "stddev: 0.005401390272355007",
+            "extra": "mean: 147.50261200000145 msec\nrounds: 3"
+          },
+          {
+            "name": "tests/benchmarks/bench_ui_actions.py::test_delete_node[large]",
+            "value": 0.14976131129068063,
+            "unit": "iter/sec",
+            "range": "stddev: 0.2843013636920345",
+            "extra": "mean: 6.677291961333329 sec\nrounds: 3"
+          },
+          {
+            "name": "tests/benchmarks/bench_ui_actions.py::test_delete_nodes_bulk[large]",
+            "value": 0.02090115998588049,
+            "unit": "iter/sec",
+            "range": "stddev: 0",
+            "extra": "mean: 47.84423451499998 sec\nrounds: 1"
+          },
+          {
+            "name": "tests/benchmarks/bench_ui_actions.py::test_undo_bulk_delete[large]",
+            "value": 0.25428495307426235,
+            "unit": "iter/sec",
+            "range": "stddev: 0",
+            "extra": "mean: 3.932596042 sec\nrounds: 1"
+          },
+          {
+            "name": "tests/benchmarks/bench_ui_actions.py::test_delete_edge[large]",
+            "value": 0.2895360752396501,
+            "unit": "iter/sec",
+            "range": "stddev: 0.09669504524185055",
+            "extra": "mean: 3.4538010476666727 sec\nrounds: 3"
+          },
+          {
+            "name": "tests/benchmarks/bench_ui_actions.py::test_create_edge[large]",
+            "value": 0.275779457510947,
+            "unit": "iter/sec",
+            "range": "stddev: 0.36289103084257224",
+            "extra": "mean: 3.626085891333313 sec\nrounds: 3"
+          },
+          {
+            "name": "tests/benchmarks/bench_ui_actions.py::test_undo[large]",
+            "value": 0.2590941719921866,
+            "unit": "iter/sec",
+            "range": "stddev: 0.35278534394873484",
+            "extra": "mean: 3.8596005163333302 sec\nrounds: 3"
+          },
+          {
+            "name": "tests/benchmarks/bench_ui_actions.py::test_redo[large]",
+            "value": 0.1480490101589305,
+            "unit": "iter/sec",
+            "range": "stddev: 0.13230432354701793",
+            "extra": "mean: 6.754519999333335 sec\nrounds: 3"
           }
         ]
       }
