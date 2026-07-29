@@ -388,6 +388,42 @@ def test_get_symbols_returns_correct_symbols(viewer, solution_tracks_2d):
         assert symbol in tracks_viewer.symbolmap.values()
 
 
+def test_selecting_node_does_not_change_same_track_face_color(
+    viewer, solution_tracks_3d_with_division, click_node
+):
+    """Highlighting one node must not alter the face color of another node that
+    shares its track id.
+
+    Regression guard for per-track color-array aliasing in TrackPoints: colors
+    are now produced by a single vectorized colormap.map call, which returns a
+    distinct row per node. Nodes 1 and 2 share track id 1 in this fixture, so
+    they must have equal face colors, and selecting node 1 (which updates
+    border_color/size, never face_color) must leave node 2's face color intact.
+    """
+    tracks_viewer = TracksViewer.get_instance(viewer)
+    tracks_viewer.update_tracks(tracks=solution_tracks_3d_with_division, name="test")
+    points_layer = tracks_viewer.tracking_layers.points_layer
+
+    same_track_a, same_track_b = 1, 2
+    assert tracks_viewer.tracks.get_track_id(
+        same_track_a
+    ) == tracks_viewer.tracks.get_track_id(same_track_b)
+
+    idx_a = points_layer.node_index_dict[same_track_a]
+    idx_b = points_layer.node_index_dict[same_track_b]
+
+    # Same track id -> identical face color
+    assert np.array_equal(
+        points_layer.face_color[idx_a], points_layer.face_color[idx_b]
+    )
+    color_b_before = np.asarray(points_layer.face_color[idx_b]).copy()
+
+    # Highlighting node a must not mutate node b's face color
+    click_node(tracks_viewer, same_track_a)
+    points_layer.update_point_outline("all")
+    assert np.array_equal(points_layer.face_color[idx_b], color_b_before)
+
+
 def test_update_point_outline(viewer, solution_tracks_2d, click_node):
     """Test update_point_outline with different modes and visibility."""
     tracks_viewer = TracksViewer.get_instance(viewer)
