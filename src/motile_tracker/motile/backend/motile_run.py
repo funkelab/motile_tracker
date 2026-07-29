@@ -184,8 +184,8 @@ class MotileRun(SolutionTracks):
     def _save_params(self, run_dir: Path):
         """Save the run parameters in the provided run directory. Currently
         dumps the parameters dict into a json file. Skips writing if there are
-        no params (e.g. tracks imported from CSV/geff that never went through
-        the solver).
+        no params, which only happens for a run loaded from a directory that
+        had no params file (see _load_params).
 
         Args:
             run_dir (Path): A directory in which to save the parameters file.
@@ -199,8 +199,9 @@ class MotileRun(SolutionTracks):
     @staticmethod
     def _load_params(run_dir: Path) -> SolverParams | None:
         """Load parameters from the parameters json file in the provided
-        directory. Returns None if the file is absent — runs imported from
-        CSV/geff are saved without solver params.
+        directory. Returns None if the file is absent, which is the case for
+        v1 run directories and for runs saved by versions that wrapped
+        imported (CSV/geff) tracks in a MotileRun with no solver params.
 
         Args:
             run_dir (Path): The directory in which to find the parameters file.
