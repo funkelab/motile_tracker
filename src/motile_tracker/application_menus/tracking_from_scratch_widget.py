@@ -26,7 +26,6 @@ from qtpy.QtWidgets import (
 )
 from superqt.fonticon import icon as qticon
 
-from motile_tracker.application_menus.editing_selection_menu import NewTrackWidget
 from motile_tracker.data_views.views.layers.track_labels import TrackLabels
 from motile_tracker.data_views.views.layers.track_points import TrackPoints
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
@@ -301,8 +300,6 @@ class TrackingFromScratch(QWidget):
         self.copy_controls_box = QGroupBox("Copy detections into tracks")
         copy_controls_layout = QVBoxLayout(self.copy_controls_box)
         # current track id + "start new track" (same widget as in the Editing menu)
-        self.new_track_widget = NewTrackWidget(self.tracks_viewer)
-        copy_controls_layout.addWidget(self.new_track_widget)
         self.add_label_btn = QPushButton("Copy selected label to track")
         self.add_label_btn.clicked.connect(self._add_selected_label)
         copy_controls_layout.addWidget(self.add_label_btn)
