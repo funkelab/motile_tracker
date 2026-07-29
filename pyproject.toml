@@ -92,6 +92,10 @@ dev = [
 ]
 # For gurobi, install separately: uv pip install "gurobipy>=12,<13"
 
+[tool.uv.sources]
+# This branch tracks the funtracks persistent-graph work, not a released version.
+funtracks = { git = "https://github.com/funkelab/funtracks.git", rev = "50d02f81583abe534c50bff6165c62787086a753" }
+
 [tool.uv]
 # gurobi12 and gurobi13 conflict with each other (mutually exclusive version pins)
 conflicts = [
