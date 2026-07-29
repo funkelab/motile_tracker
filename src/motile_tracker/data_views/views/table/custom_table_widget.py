@@ -443,6 +443,8 @@ class ColoredTableWidget(QWidget):
         self.colormap = self._get_colormap()
 
         self._table_widget.clear()
+        if len(table) == 0:
+            self._table_widget.setRowCount(0)
         try:
             self._table_widget.setRowCount(len(next(iter(table.values()))))
             self._table_widget.setColumnCount(len(table))
