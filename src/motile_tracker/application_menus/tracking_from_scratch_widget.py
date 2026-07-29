@@ -3,6 +3,7 @@ import weakref
 
 import napari
 import numpy as np
+from fonticon_fa6 import FA6S
 from funtracks.data_model import SolutionTracks
 from funtracks.exceptions import InvalidActionError
 from funtracks.user_actions import UserAddNode, UserUpdateSegmentation
@@ -14,14 +15,18 @@ from qtpy.QtCore import Qt
 from qtpy.QtWidgets import (
     QComboBox,
     QGroupBox,
+    QHBoxLayout,
     QLabel,
     QPushButton,
     QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
+from superqt.fonticon import icon as qticon
 
 from motile_tracker.application_menus.editing_selection_menu import NewTrackWidget
+from motile_tracker.data_views.views.layers.track_labels import TrackLabels
+from motile_tracker.data_views.views.layers.track_points import TrackPoints
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 from motile_tracker.data_views.views_coordinator.user_dialogs import (
     confirm_force_operation,
@@ -34,11 +39,18 @@ class LayerDropdown(QComboBox):
 
     layer_changed = Signal(str)
 
-    def __init__(self, viewer: napari.Viewer, layer_types: tuple, allow_none=False):
+    def __init__(
+        self,
+        viewer: napari.Viewer,
+        layer_types: tuple,
+        allow_none=False,
+        exclude_types: tuple = (),
+    ):
         super().__init__()
 
         self.viewer = viewer
         self.layer_types = layer_types
+        self.exclude_types = exclude_types
         self.allow_none = allow_none
         self.selected_layer = None
         self._deleted = False
@@ -78,7 +90,9 @@ class LayerDropdown(QComboBox):
             return
 
         layer = event.value
-        if isinstance(layer, self.layer_types):
+        if isinstance(layer, self.layer_types) and not isinstance(
+            layer, self.exclude_types
+        ):
             cb = self._make_weak_rename_cb()
             layer.events.name.connect(cb)
             self._rename_callbacks[id(layer)] = (weakref.ref(layer), cb)
@@ -111,6 +125,7 @@ class LayerDropdown(QComboBox):
                 selected = self.viewer.layers.selection.active
                 if (
                     isinstance(selected, self.layer_types)
+                    and not isinstance(selected, self.exclude_types)
                     and selected != self.selected_layer
                 ):
                     self.setCurrentText(selected.name)
@@ -132,6 +147,7 @@ class LayerDropdown(QComboBox):
                 layer
                 for layer in self.viewer.layers
                 if isinstance(layer, self.layer_types)
+                and not isinstance(layer, self.exclude_types)
             ]
 
             names = []
@@ -148,6 +164,13 @@ class LayerDropdown(QComboBox):
                 self.setCurrentText(previous)
         except (AttributeError, RuntimeError, TypeError):
             pass
+
+    def set_layer_types(self, layer_types: tuple, exclude_types: tuple = ()) -> None:
+        """Change which layer types are listed (and which to exclude) and refresh."""
+
+        self.layer_types = layer_types
+        self.exclude_types = exclude_types
+        self._update_dropdown()
 
     def _emit_layer_changed(self) -> None:
         """Emit a signal holding the currently selected layer"""
@@ -202,63 +225,68 @@ class TrackingFromScratch(QWidget):
         self.tracks_viewer = TracksViewer.get_instance(viewer)
         self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
 
-        # the detections layer that is currently connected as a copy source, its target
-        # track layer, and the right-click callback attached to the source (so we can
-        # disconnect it later)
+        # the source layer that is currently connected as a copy source, its target
+        # track layer, the right-click callback attached to the source, and the current
+        # tracking mode ("points" or "labels", set by the start buttons)
         self._source_layer = None
         self._target_layer = None
         self._source_callback = None
+        self._mode = None
 
-        exp_manual = QLabel()
-        exp_manual.setWordWrap(True)
-        exp_manual.setTextFormat(Qt.MarkdownText)
-        exp_manual.setText(
-            "**Manual tracking from scratch**\n\n"
-            "*This will create an empty graph, to which you can manually add nodes by "
-            "placing points against the background of a given image layer.*"
+        exp = QLabel()
+        exp.setWordWrap(True)
+        exp.setTextFormat(Qt.MarkdownText)
+        exp.setText(
+            "**Manual tracking**\n\n"
+            "*Create an empty tree with either point or label tracks. Then connect a "
+            "source layer to copy detections from: right-click (or use the button) to "
+            "copy the clicked detection into the tracks with the current tracklet id.*"
         )
 
-        image_box = QGroupBox("Manual tracking from scratch")
-        image_box_layout = QVBoxLayout(image_box)
-
-        image_label = QLabel("Select an Image layer")
-        image_box_layout.addWidget(image_label)
-
-        self.image_layer_dropdown = LayerDropdown(self.viewer, (Image))
-        image_box_layout.addWidget(self.image_layer_dropdown)
-
-        self.start_from_scratch_btn = QPushButton("Start")
-        self.image_layer_dropdown.layer_changed.connect(self._update_buttons)
-        self.start_from_scratch_btn.clicked.connect(self._start_empty_tracks)
-        image_box_layout.addWidget(self.start_from_scratch_btn)
-
-        exp_detection = QLabel()
-        exp_detection.setWordWrap(True)
-        exp_detection.setTextFormat(Qt.MarkdownText)
-        exp_detection.setText(
-            "**Manual tracking from detections**\n\n"
-            "*This creates empty track layers that stay linked to the selected "
-            "detections layer. Right-click a label or point on the source layer to "
-            "copy that detection into the tracks with the current tracklet id. "
-            "Use the 'new track' action to start a new tracklet.*"
+        # --- Box 1: create an empty tree --------------------------------------------
+        create_box = QGroupBox("Create empty tracks")
+        create_layout = QVBoxLayout(create_box)
+        create_layout.addWidget(
+            QLabel("Select an Image or Labels layer (defines the array size)")
         )
+        self.size_layer_dropdown = LayerDropdown(self.viewer, (Image, Labels))
+        self._detach_dropdown_autoselect(self.size_layer_dropdown)
+        self.size_layer_dropdown.layer_changed.connect(self._update_buttons)
+        create_layout.addWidget(self.size_layer_dropdown)
 
-        detections_box = QGroupBox("Manual tracking from detections")
-        detections_box_layout = QVBoxLayout(detections_box)
+        start_row = QHBoxLayout()
+        self.start_points_btn = QPushButton("Tracking with Points")
+        self.start_points_btn.clicked.connect(lambda: self._start_tracking("points"))
+        self.start_labels_btn = QPushButton("Tracking with Labels")
+        self.start_labels_btn.clicked.connect(lambda: self._start_tracking("labels"))
+        start_row.addWidget(self.start_points_btn)
+        start_row.addWidget(self.start_labels_btn)
+        create_layout.addLayout(start_row)
 
-        detections_label = QLabel("Select a Labels or Points layer")
-        detections_box_layout.addWidget(detections_label)
+        # --- Box 2: connect a source layer ------------------------------------------
+        source_box = QGroupBox("Copy from source layer")
+        source_layout = QVBoxLayout(source_box)
+        source_layout.addWidget(QLabel("Select a source layer to copy detections from"))
+        self.source_layer_dropdown = LayerDropdown(
+            self.viewer,
+            (Labels, Points),
+            exclude_types=(TrackLabels, TrackPoints),
+        )
+        self._detach_dropdown_autoselect(self.source_layer_dropdown)
+        self.source_layer_dropdown.layer_changed.connect(
+            self._on_source_dropdown_changed
+        )
+        source_layout.addWidget(self.source_layer_dropdown)
 
-        self.detections_layer_dropdown = LayerDropdown(self.viewer, (Labels, Points))
-        detections_box_layout.addWidget(self.detections_layer_dropdown)
+        self.chain_btn = QPushButton()
+        self.chain_btn.setCheckable(True)
+        self.chain_btn.setEnabled(False)
+        self.chain_btn.toggled.connect(self._on_chain_toggled)
+        self._set_chain_icon(connected=False)
+        source_layout.addWidget(self.chain_btn)
 
-        self.start_from_detections_btn = QPushButton("Start")
-        self.detections_layer_dropdown.layer_changed.connect(self._update_buttons)
-        self.start_from_detections_btn.clicked.connect(self._start_from_detections)
-        detections_box_layout.addWidget(self.start_from_detections_btn)
-
-        # Controls to copy detections into the tracks, only shown while a detections
-        # source is connected and its layer (or its track layer) is the active layer.
+        # Controls to copy detections into the tracks, only shown while a source
+        # is connected and its layer (or its track layer) is the active layer.
         self.copy_controls_box = QGroupBox("Copy detections into tracks")
         copy_controls_layout = QVBoxLayout(self.copy_controls_box)
         # current track id + "start new track" (same widget as in the Editing menu)
@@ -278,51 +306,50 @@ class TrackingFromScratch(QWidget):
         )
 
         layout = QVBoxLayout(self)
-        layout.addWidget(exp_manual)
-        layout.addWidget(image_box)
-        layout.addWidget(exp_detection)
-        layout.addWidget(detections_box)
+        layout.addWidget(exp)
+        layout.addWidget(create_box)
+        layout.addWidget(source_box)
         layout.addWidget(self.copy_controls_box)
         layout.addStretch(0)
 
-    def _update_buttons(self):
-        """Enable/disable buttons according to whether a valid layer is selected"""
+        self._update_buttons()
 
-        self.start_from_scratch_btn.setEnabled(
-            self.image_layer_dropdown.selected_layer is not None
-        )
-        self.start_from_detections_btn.setEnabled(
-            self.detections_layer_dropdown.selected_layer is not None
-        )
+    def _detach_dropdown_autoselect(self, dropdown: LayerDropdown) -> None:
+        """Stop a LayerDropdown from following the active layer, so it only changes when
+        the user explicitly picks a layer from it."""
 
-    def _start_empty_tracks(self):
-        """Create an empty graph to be filled manually by placing points in an initially empty TrackPoints layer"""
+        with contextlib.suppress(TypeError, RuntimeError):
+            dropdown.viewer.layers.selection.events.changed.disconnect(
+                dropdown._on_selection_changed
+            )
 
-        layer = self.image_layer_dropdown.selected_layer
-        graph = create_empty_graphview_graph(
-            node_attributes=["pos"], position_attrs=["pos"], ndim=layer.data.ndim
-        )
-        tracks = SolutionTracks(
-            graph=graph,
-            scale=layer.scale,
-            ndim=layer.ndim,
-            time_attr="t",
-            pos_attr="pos",
-        )
-        self.tracks_viewer.tracks_list.add_tracks(tracks, f"{layer.name}_manual_tracks")
-        self.tracks_viewer.set_new_track_id()
+    def _update_buttons(self, *args) -> None:
+        """Enable the start buttons only when a size layer is selected."""
 
-    def _start_from_detections(self):
-        """Create an empty graph (with empty TrackLabels/TrackPoints layers) that stays
-        linked to the selected detections layer. Detections are copied into the tracks by
-        right-clicking on the source layer (see _copy_detection)."""
+        has_size = self.size_layer_dropdown.selected_layer is not None
+        self.start_points_btn.setEnabled(has_size)
+        self.start_labels_btn.setEnabled(has_size)
 
-        layer = self.detections_layer_dropdown.selected_layer
+    def _start_tracking(self, mode: str) -> None:
+        """Create a new empty tree with empty TrackPoints/TrackGraph layers (and a
+        TrackLabels layer for ``mode == 'labels'``). The array size is taken from the
+        selected Image/Labels layer. Detections are copied in later by connecting a
+        source layer (see the chain button).
 
-        # disconnect any previously connected source layer
+        Args:
+            mode (str): "points" to track with points, "labels" to track with a
+                segmentation.
+        """
+
+        layer = self.size_layer_dropdown.selected_layer
+        if layer is None:
+            return
+
+        # a new tree replaces any previously connected source
+        self._reset_chain()
         self._teardown_source_connection()
 
-        if isinstance(layer, Labels):
+        if mode == "labels":
             # an empty segmentation-backed graph: registering the 'mask' attribute and
             # the segmentation shape makes SolutionTracks expose an (empty) segmentation,
             # so a TrackLabels layer is created and grows as labels are copied in.
@@ -336,7 +363,7 @@ class TrackingFromScratch(QWidget):
             graph = create_empty_graphview_graph(
                 node_attributes=["pos"],
                 position_attrs=["pos"],
-                ndim=layer.data.shape[1],
+                ndim=layer.data.ndim,
             )
 
         tracks = SolutionTracks(
@@ -349,7 +376,77 @@ class TrackingFromScratch(QWidget):
         self.tracks_viewer.tracks_list.add_tracks(tracks, f"{layer.name}_manual_tracks")
         self.tracks_viewer.set_new_track_id()
 
-        self._setup_source_connection(layer)
+        self._mode = mode
+        # only allow source layers of the matching type (excluding the track layers)
+        if mode == "labels":
+            self.source_layer_dropdown.set_layer_types(
+                (Labels,), exclude_types=(TrackLabels,)
+            )
+        else:
+            self.source_layer_dropdown.set_layer_types(
+                (Points,), exclude_types=(TrackPoints,)
+            )
+        self._update_source_controls()
+
+    def _set_chain_icon(self, connected: bool) -> None:
+        """Show a closed chain icon when connected, an open (broken) chain when not."""
+
+        if connected:
+            self.chain_btn.setIcon(qticon(FA6S.link, color="white"))
+            self.chain_btn.setText("Source connected")
+        else:
+            self.chain_btn.setIcon(qticon(FA6S.link_slash, color="white"))
+            self.chain_btn.setText("Connect source")
+
+    def _reset_chain(self) -> None:
+        """Set the chain button back to the disconnected (unchecked) state without
+        triggering a toggle."""
+
+        self.chain_btn.blockSignals(True)
+        self.chain_btn.setChecked(False)
+        self.chain_btn.blockSignals(False)
+        self._set_chain_icon(connected=False)
+
+    def _update_source_controls(self) -> None:
+        """Enable the chain button only when a mode is active and a valid source layer is
+        selected."""
+
+        self.chain_btn.setEnabled(
+            self._mode is not None
+            and self.source_layer_dropdown.selected_layer is not None
+        )
+
+    def _on_source_dropdown_changed(self, name=None) -> None:
+        """React to the user picking a different source layer. If a source is already
+        connected, switch the connection to the newly selected layer."""
+
+        self._update_source_controls()
+        if not self.chain_btn.isChecked():
+            return
+
+        source = self.source_layer_dropdown.selected_layer
+        if source is self._source_layer:
+            return
+        self._teardown_source_connection()
+        if source is not None:
+            self._setup_source_connection(source)
+        else:
+            self._reset_chain()
+
+    def _on_chain_toggled(self, checked: bool) -> None:
+        """Connect (closed chain) or disconnect (open chain) the selected source layer."""
+
+        if checked:
+            source = self.source_layer_dropdown.selected_layer
+            if source is None or self._mode is None:
+                self._reset_chain()
+                return
+            self._teardown_source_connection()
+            self._setup_source_connection(source)
+            self._set_chain_icon(connected=True)
+        else:
+            self._teardown_source_connection()
+            self._set_chain_icon(connected=False)
 
     def _setup_source_connection(self, source_layer: Labels | Points) -> None:
         """Keep the detections layer visible and attach a right-click callback that copies
@@ -573,12 +670,12 @@ class TrackingFromScratch(QWidget):
                 show_info(str(e))
 
     def _get_target_layer(self) -> Labels | Points | None:
-        """Return the track layer that corresponds to the connected source layer: the
-        TrackLabels layer for a Labels source, the TrackPoints layer for a Points source."""
+        """Return the track layer that copies go into, based on the active mode: the
+        TrackLabels layer for 'labels', the TrackPoints layer for 'points'."""
 
-        if isinstance(self._source_layer, Labels):
+        if self._mode == "labels":
             return self.tracks_viewer.tracking_layers.seg_layer
-        if isinstance(self._source_layer, Points):
+        if self._mode == "points":
             return self.tracks_viewer.tracking_layers.points_layer
         return None
 
