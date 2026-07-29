@@ -129,20 +129,22 @@ class NoSelectionHighlightDelegate(QStyledItemDelegate):
     def paint(self, painter, option, index):
         opt = QStyleOptionViewItem(option)
 
-        table = index.model().parent()
-
-        if opt.state & QStyle.State_Selected:
-            opt.state &= ~QStyle.State_Selected
+        # Read the selection state straight off the style option: Qt already
+        # computed it for this cell. Asking the view instead (via
+        # selectedIndexes()) would rebuild the full selection on every single
+        # cell paint, making each repaint O(visible cells x selected cells) --
+        # ~15s for a 25k-row table with everything selected.
+        # With SelectRows behavior every cell of a selected row carries this
+        # flag, so a whole-row border still gets drawn.
+        selected = bool(opt.state & QStyle.State_Selected)
+        opt.state &= ~QStyle.State_Selected
 
         # Paint normally first (preserving the model's Background + Foreground roles)
         super().paint(painter, opt, index)
 
         # Draw a cyan border around the *entire row* if selected
-        if table is not None and index.row() in {
-            i.row() for i in table.selectedIndexes()
-        }:
-            pen = QPen(Qt.cyan, 2)
-            painter.setPen(pen)
+        if selected:
+            painter.setPen(QPen(Qt.cyan, 2))
             painter.drawRect(opt.rect.adjusted(1, 1, -2, -2))
 
 
