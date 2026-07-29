@@ -1,4 +1,5 @@
 import contextlib
+import warnings
 import weakref
 
 import napari
@@ -232,32 +233,34 @@ class TrackingFromScratch(QWidget):
         self._target_layer = None
         self._source_callback = None
         self._mode = None
+        # the tracks object we last derived the mode/source-type from
+        self._synced_tracks = None
 
         exp = QLabel()
         exp.setWordWrap(True)
         exp.setTextFormat(Qt.MarkdownText)
         exp.setText(
             "**Manual tracking**\n\n"
-            "*Create an empty tree with either point or label tracks. Then connect a "
-            "source layer to copy detections from: right-click (or use the button) to "
-            "copy the clicked detection into the tracks with the current tracklet id.*"
+            "*Create an empty tree with either point or label tracks. Optionally, "
+            "connect a source Point or Labels layer to copy detections from: right-click "
+            "(or use the copy button) to copy the clicked detection into the tracks "
+            "with the current tracklet ID. To avoid overwriting existing labels, turn on "
+            "'preserve labels' in the target Segmentation layer.*"
         )
 
         # --- Box 1: create an empty tree --------------------------------------------
         create_box = QGroupBox("Create empty tracks")
         create_layout = QVBoxLayout(create_box)
-        create_layout.addWidget(
-            QLabel("Select an Image or Labels layer (defines the array size)")
-        )
+        create_layout.addWidget(QLabel("Select an Image or Labels layer"))
         self.size_layer_dropdown = LayerDropdown(self.viewer, (Image, Labels))
         self._detach_dropdown_autoselect(self.size_layer_dropdown)
         self.size_layer_dropdown.layer_changed.connect(self._update_buttons)
         create_layout.addWidget(self.size_layer_dropdown)
 
         start_row = QHBoxLayout()
-        self.start_points_btn = QPushButton("Tracking with Points")
+        self.start_points_btn = QPushButton("Track with Points")
         self.start_points_btn.clicked.connect(lambda: self._start_tracking("points"))
-        self.start_labels_btn = QPushButton("Tracking with Labels")
+        self.start_labels_btn = QPushButton("Track with Labels")
         self.start_labels_btn.clicked.connect(lambda: self._start_tracking("labels"))
         start_row.addWidget(self.start_points_btn)
         start_row.addWidget(self.start_labels_btn)
@@ -266,7 +269,9 @@ class TrackingFromScratch(QWidget):
         # --- Box 2: connect a source layer ------------------------------------------
         source_box = QGroupBox("Copy from source layer")
         source_layout = QVBoxLayout(source_box)
-        source_layout.addWidget(QLabel("Select a source layer to copy detections from"))
+        source_layout.addWidget(QLabel("Select a source layer"))
+
+        dropdown_button_layout = QHBoxLayout()
         self.source_layer_dropdown = LayerDropdown(
             self.viewer,
             (Labels, Points),
@@ -276,14 +281,19 @@ class TrackingFromScratch(QWidget):
         self.source_layer_dropdown.layer_changed.connect(
             self._on_source_dropdown_changed
         )
-        source_layout.addWidget(self.source_layer_dropdown)
+        dropdown_button_layout.addWidget(self.source_layer_dropdown)
 
         self.chain_btn = QPushButton()
         self.chain_btn.setCheckable(True)
         self.chain_btn.setEnabled(False)
+        self.chain_btn.setToolTip(
+            "Connect or disconnect a source layer (Labels or Points) to copy detections to the tracking tree."
+        )
         self.chain_btn.toggled.connect(self._on_chain_toggled)
         self._set_chain_icon(connected=False)
-        source_layout.addWidget(self.chain_btn)
+        dropdown_button_layout.addWidget(self.chain_btn)
+
+        source_layout.addLayout(dropdown_button_layout)
 
         # Controls to copy detections into the tracks, only shown while a source
         # is connected and its layer (or its track layer) is the active layer.
@@ -292,10 +302,10 @@ class TrackingFromScratch(QWidget):
         # current track id + "start new track" (same widget as in the Editing menu)
         self.new_track_widget = NewTrackWidget(self.tracks_viewer)
         copy_controls_layout.addWidget(self.new_track_widget)
-        self.add_label_btn = QPushButton("Add selected label to track")
+        self.add_label_btn = QPushButton("Copy selected label to track")
         self.add_label_btn.clicked.connect(self._add_selected_label)
         copy_controls_layout.addWidget(self.add_label_btn)
-        self.switch_layer_btn = QPushButton("Switch source / target layer [\\]")
+        self.switch_layer_btn = QPushButton("Switch source / target layer [ \\ ]")
         self.switch_layer_btn.clicked.connect(self._switch_layer)
         copy_controls_layout.addWidget(self.switch_layer_btn)
         self.copy_controls_box.setVisible(False)
@@ -304,6 +314,8 @@ class TrackingFromScratch(QWidget):
         self.viewer.layers.selection.events.active.connect(
             self._update_copy_controls_visibility
         )
+        # keep the chain button and source-layer type in sync with the current tracks
+        self.tracks_viewer.tracks_updated.connect(self._sync_to_tracks)
 
         layout = QVBoxLayout(self)
         layout.addWidget(exp)
@@ -313,6 +325,7 @@ class TrackingFromScratch(QWidget):
         layout.addStretch(0)
 
         self._update_buttons()
+        self._sync_to_tracks()
 
     def _detach_dropdown_autoselect(self, dropdown: LayerDropdown) -> None:
         """Stop a LayerDropdown from following the active layer, so it only changes when
@@ -373,30 +386,18 @@ class TrackingFromScratch(QWidget):
             time_attr="t",
             pos_attr="pos",
         )
+        # adding the tracks triggers tracks_updated -> _sync_to_tracks, which derives the
+        # mode and the allowed source layer type and enables the chain button.
         self.tracks_viewer.tracks_list.add_tracks(tracks, f"{layer.name}_manual_tracks")
         self.tracks_viewer.set_new_track_id()
-
-        self._mode = mode
-        # only allow source layers of the matching type (excluding the track layers)
-        if mode == "labels":
-            self.source_layer_dropdown.set_layer_types(
-                (Labels,), exclude_types=(TrackLabels,)
-            )
-        else:
-            self.source_layer_dropdown.set_layer_types(
-                (Points,), exclude_types=(TrackPoints,)
-            )
-        self._update_source_controls()
 
     def _set_chain_icon(self, connected: bool) -> None:
         """Show a closed chain icon when connected, an open (broken) chain when not."""
 
         if connected:
             self.chain_btn.setIcon(qticon(FA6S.link, color="white"))
-            self.chain_btn.setText("Source connected")
         else:
             self.chain_btn.setIcon(qticon(FA6S.link_slash, color="white"))
-            self.chain_btn.setText("Connect source")
 
     def _reset_chain(self) -> None:
         """Set the chain button back to the disconnected (unchecked) state without
@@ -408,13 +409,40 @@ class TrackingFromScratch(QWidget):
         self._set_chain_icon(connected=False)
 
     def _update_source_controls(self) -> None:
-        """Enable the chain button only when a mode is active and a valid source layer is
-        selected."""
+        """Enable the chain button whenever there are tracks to copy detections into."""
 
-        self.chain_btn.setEnabled(
-            self._mode is not None
-            and self.source_layer_dropdown.selected_layer is not None
-        )
+        self.chain_btn.setEnabled(self.tracks_viewer.tracks is not None)
+
+    def _sync_to_tracks(self, *args) -> None:
+        """Keep the chain button and the allowed source layer type in sync with the
+        current tracks object. Whenever the tracks object changes (a new tree is created
+        or a different one is selected), derive the mode from it - 'labels' if it has a
+        segmentation, else 'points' - and drop any stale source connection."""
+
+        tracks = self.tracks_viewer.tracks
+        self._update_source_controls()
+
+        if tracks is self._synced_tracks:
+            return
+        self._synced_tracks = tracks
+
+        # a different tracks object: any previously connected source no longer applies
+        self._reset_chain()
+        self._teardown_source_connection()
+
+        if tracks is None:
+            self._mode = None
+            return
+
+        self._mode = "labels" if tracks.segmentation is not None else "points"
+        if self._mode == "labels":
+            self.source_layer_dropdown.set_layer_types(
+                (Labels,), exclude_types=(TrackLabels,)
+            )
+        else:
+            self.source_layer_dropdown.set_layer_types(
+                (Points,), exclude_types=(TrackPoints,)
+            )
 
     def _on_source_dropdown_changed(self, name=None) -> None:
         """React to the user picking a different source layer. If a source is already
@@ -439,6 +467,11 @@ class TrackingFromScratch(QWidget):
         if checked:
             source = self.source_layer_dropdown.selected_layer
             if source is None or self._mode is None:
+                if self._mode is not None:
+                    show_info(
+                        f"Select a {self._mode[:-1].capitalize()} source layer to "
+                        "connect."
+                    )
                 self._reset_chain()
                 return
             self._teardown_source_connection()
@@ -593,8 +626,8 @@ class TrackingFromScratch(QWidget):
             features.position_key: position,
         }
 
+        node_id = tracks._get_new_node_ids(1)[0]
         try:
-            node_id = tracks._get_new_node_ids(1)[0]
             UserAddNode(
                 tracks,
                 node=node_id,
@@ -616,12 +649,27 @@ class TrackingFromScratch(QWidget):
             else:
                 show_info(str(e))
 
+        # make the created node the new selection
+        if tracks.graph.has_node(node_id):
+            self.tracks_viewer.selected_nodes.add(node_id)
+
     def _add_segmentation_node(
         self, t: int, spatial_coords: tuple[np.ndarray, ...]
     ) -> None:
-        """Copy a label into the target segmentation at time ``t``, fully replacing those
-        pixels. The new node takes the current tracklet id; any existing node at those
-        pixels is shrunk, or deleted entirely if all of its pixels were overwritten.
+        """Copy a label into the target segmentation at time ``t`` with the current
+        tracklet id.
+
+        The target value painted with is always the current tracklet id
+        (``tracks_viewer.selected_track``, a new one is created if it is None):
+
+        - If a node of that tracklet already exists in this frame, it grows to include
+          the copied pixels (unless the copied pixels are already fully part of it).
+        - Otherwise a new node with the current tracklet id is created.
+
+        Any node overwritten by the copied pixels is shrunk, or deleted if all of its
+        pixels were overwritten. If the target TrackLabels layer has ``preserve_labels``
+        enabled, pixels belonging to nodes of a *different* tracklet id are protected:
+        only background (0) and same-tracklet pixels can be painted.
 
         Args:
             t (int): The time point of the copied label.
@@ -637,13 +685,41 @@ class TrackingFromScratch(QWidget):
             self.tracks_viewer.set_new_track_id()
         track_id = self.tracks_viewer.selected_track
 
-        t_array = np.full(spatial_coords[0].size, t, dtype=int)
-        pixels = (t_array, *spatial_coords)
-
-        # Read the node ids currently occupying those pixels in the target segmentation,
-        # grouped so UserUpdateSegmentation can shrink/delete the overwritten nodes.
+        # Read the node ids currently occupying those pixels in the target segmentation.
         target_frame = np.asarray(tracks.segmentation[t])
         old_values = target_frame[spatial_coords]
+
+        # preserve_labels: only paint over background or same-tracklet pixels; protect
+        # pixels belonging to nodes of a different tracklet id.
+        target_layer = self._get_target_layer()
+        if target_layer is not None and getattr(target_layer, "preserve_labels", False):
+            allowed = np.ones(old_values.shape, dtype=bool)
+            for old_value in np.unique(old_values):
+                if old_value == 0:
+                    continue
+                if int(tracks.get_track_id(int(old_value))) != track_id:
+                    allowed[old_values == old_value] = False
+            spatial_coords = tuple(coord[allowed] for coord in spatial_coords)
+            old_values = old_values[allowed]
+
+        if spatial_coords[0].size == 0:
+            warnings.warn(
+                "No pixels could be painted, turn off 'preserve labels on the "
+                "TrackLabels layer to allow overwriting of existing labels.",
+                stacklevel=2,
+            )
+            return
+
+        # Target node to paint with: grow the current tracklet's node in this frame if
+        # it exists, otherwise create a new node (still with the current tracklet id).
+        new_value = self._current_track_node(t, track_id)
+        if new_value is None:
+            new_value = tracks._get_new_node_ids(1)[0]
+
+        t_array = np.full(spatial_coords[0].size, t, dtype=int)
+        pixels = (t_array, *spatial_coords)
+        # group the pixels by the node they currently belong to, so
+        # UserUpdateSegmentation can shrink/delete the overwritten nodes.
         updated_pixels = [
             (tuple(dim[old_values == old_value] for dim in pixels), int(old_value))
             for old_value in np.unique(old_values)
@@ -652,7 +728,7 @@ class TrackingFromScratch(QWidget):
         def apply(force: bool) -> None:
             UserUpdateSegmentation(
                 tracks,
-                new_value=tracks._get_new_node_ids(1)[0],
+                new_value=new_value,
                 updated_pixels=updated_pixels,
                 current_track_id=track_id,
                 force=force,
@@ -668,6 +744,20 @@ class TrackingFromScratch(QWidget):
                     apply(True)
             else:
                 show_info(str(e))
+
+        # make the updated/created node the new selection
+        if tracks.graph.has_node(new_value):
+            self.tracks_viewer.selected_nodes.add(new_value)
+
+    def _current_track_node(self, t: int, track_id: int) -> int | None:
+        """Return the node of ``track_id`` present in frame ``t``, or None if there is
+        none."""
+
+        tracks = self.tracks_viewer.tracks
+        for node in tracks.track_id_to_node.get(track_id, []):
+            if tracks.get_time(node) == t:
+                return int(node)
+        return None
 
     def _get_target_layer(self) -> Labels | Points | None:
         """Return the track layer that copies go into, based on the active mode: the
