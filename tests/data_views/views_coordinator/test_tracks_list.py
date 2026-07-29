@@ -175,8 +175,10 @@ class TestTracksListSaveSolutionTracks:
 
         save_path = tmp_path / "my_tracks.geff"
 
-        tracks_list.save_dialog.exec_ = MagicMock(return_value=True)
-        tracks_list.save_dialog.selectedFiles = MagicMock(return_value=[str(save_path)])
+        tracks_list.save_geff_dialog.exec_ = MagicMock(return_value=True)
+        tracks_list.save_geff_dialog.selectedFiles = MagicMock(
+            return_value=[str(save_path)]
+        )
 
         tracks_list.save_tracks(item)
 
@@ -191,8 +193,10 @@ class TestTracksListSaveSolutionTracks:
 
         save_path = tmp_path / "my_tracks.geff"
 
-        tracks_list.save_dialog.exec_ = MagicMock(return_value=True)
-        tracks_list.save_dialog.selectedFiles = MagicMock(return_value=[str(save_path)])
+        tracks_list.save_geff_dialog.exec_ = MagicMock(return_value=True)
+        tracks_list.save_geff_dialog.selectedFiles = MagicMock(
+            return_value=[str(save_path)]
+        )
 
         emitted = []
         tracks_list.tracks_saved.connect(lambda t, p: emitted.append((t, p)))
@@ -214,14 +218,57 @@ class TestTracksListSaveSolutionTracks:
 
         save_path = tmp_path / "my_tracks.geff"
 
-        tracks_list.save_dialog.exec_ = MagicMock(return_value=True)
-        tracks_list.save_dialog.selectedFiles = MagicMock(return_value=[str(save_path)])
+        tracks_list.save_geff_dialog.exec_ = MagicMock(return_value=True)
+        tracks_list.save_geff_dialog.selectedFiles = MagicMock(
+            return_value=[str(save_path)]
+        )
 
         # Save twice — should not raise
         tracks_list.save_tracks(item)
         tracks_list.save_tracks(item)
 
         assert save_path.exists()
+
+    def test_solution_tracks_save_cancelled(
+        self, tracks_list, solution_tracks_2d, tmp_path
+    ):
+        """Cancelling the geff save dialog should write nothing and emit nothing."""
+        tracks_list.add_tracks(solution_tracks_2d, "imported", select=False)
+        item = tracks_list.tracks_list.item(0)
+
+        tracks_list.save_geff_dialog.exec_ = MagicMock(return_value=False)
+
+        emitted = []
+        tracks_list.tracks_saved.connect(lambda t, p: emitted.append((t, p)))
+
+        tracks_list.save_tracks(item)
+
+        assert list(tmp_path.iterdir()) == []
+        assert len(emitted) == 0
+
+    def test_solution_tracks_save_dialog_prefills_name(
+        self, tracks_list, solution_tracks_2d, tmp_path
+    ):
+        """The geff save dialog is pre-filled with a .geff name derived from
+        the tracks name, so the user names a new store rather than picking an
+        existing directory to overwrite.
+        """
+        tracks_list.add_tracks(solution_tracks_2d, "imported", select=False)
+        item = tracks_list.tracks_list.item(0)
+
+        save_path = tmp_path / "imported.geff"
+        tracks_list.save_geff_dialog.exec_ = MagicMock(return_value=True)
+        tracks_list.save_geff_dialog.selectedFiles = MagicMock(
+            return_value=[str(save_path)]
+        )
+        tracks_list.save_geff_dialog.selectFile = MagicMock()
+
+        tracks_list.save_tracks(item)
+
+        tracks_list.save_geff_dialog.selectFile.assert_called_once()
+        assert tracks_list.save_geff_dialog.selectFile.call_args[0][0].endswith(
+            "imported.geff"
+        )
 
 
 # ---------------------------------------------------------------------------

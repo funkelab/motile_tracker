@@ -97,6 +97,16 @@ class TracksList(QGroupBox):
         self.save_dialog.setFileMode(QFileDialog.Directory)
         self.save_dialog.setOption(QFileDialog.ShowDirsOnly, True)
 
+        # Saving plain Tracks/SolutionTracks writes a geff store directly at the
+        # chosen path, so the user must be able to name a new store (or pick an
+        # existing one to replace). AcceptSave also gives us the native
+        # "file exists, replace?" confirmation for free.
+        self.save_geff_dialog = QFileDialog()
+        self.save_geff_dialog.setFileMode(QFileDialog.AnyFile)
+        self.save_geff_dialog.setAcceptMode(QFileDialog.AcceptSave)
+        self.save_geff_dialog.setNameFilter("Geff store (*.geff)")
+        self.save_geff_dialog.setDefaultSuffix("geff")
+
         self.tracks_list = QListWidget()
         self.tracks_list.setSelectionMode(
             QAbstractItemView.SelectionMode.SingleSelection
@@ -192,10 +202,13 @@ class TracksList(QGroupBox):
         """Saves a tracks object from the list. You must pass the list item that
         represents the tracks, not the tracks object itself.
 
-        For MotileRun objects, delegates to MotileRun.save() which creates a
-        timestamped subdirectory and saves solver params alongside the tracks.
-        For plain Tracks/SolutionTracks, saves directly to the chosen path
-        using write_to_geff with overwrite enabled.
+        For MotileRun objects, the user picks a parent directory and
+        MotileRun.save() creates a timestamped subdirectory inside it,
+        storing solver params alongside the tracks.
+
+        For plain Tracks/SolutionTracks, the user names a geff store (or
+        selects an existing one to replace) and write_to_geff writes the
+        store directly at that path.
 
         After saving, emits the tracks_saved signal so that downstream code
         can save additional data into the same directory.
@@ -204,14 +217,21 @@ class TracksList(QGroupBox):
             item (QListWidgetItem): The list item to save. This list item
                 contains the TracksButton that represents a set of tracks.
         """
-        tracks: Tracks = self.tracks_list.itemWidget(item).tracks
-        if self.save_dialog.exec_():
+        widget: TracksButton = self.tracks_list.itemWidget(item)
+        tracks: Tracks = widget.tracks
+        if isinstance(tracks, MotileRun):
+            if not self.save_dialog.exec_():
+                return
             directory = Path(self.save_dialog.selectedFiles()[0])
-            if isinstance(tracks, MotileRun):
-                directory = tracks.save(directory)
-            else:
-                write_to_geff(tracks, directory, overwrite=True)
-            self.tracks_saved.emit(tracks, directory)
+            directory = tracks.save(directory)
+        else:
+            name = widget.name.text()
+            self.save_geff_dialog.selectFile(str(Path.home() / f"{name}.geff"))
+            if not self.save_geff_dialog.exec_():
+                return
+            directory = Path(self.save_geff_dialog.selectedFiles()[0])
+            write_to_geff(tracks, directory, overwrite=True)
+        self.tracks_saved.emit(tracks, directory)
 
     def remove_tracks(self, item: QListWidgetItem):
         """Remove a tracks object from the list. You must pass the list item that
