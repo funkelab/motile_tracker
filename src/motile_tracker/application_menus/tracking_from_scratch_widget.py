@@ -395,9 +395,9 @@ class TrackingFromScratch(QWidget):
         """Show a closed chain icon when connected, an open (broken) chain when not."""
 
         if connected:
-            self.chain_btn.setIcon(qticon(FA6S.link, color="white"))
-        else:
             self.chain_btn.setIcon(qticon(FA6S.link_slash, color="white"))
+        else:
+            self.chain_btn.setIcon(qticon(FA6S.link, color="white"))
 
     def _reset_chain(self) -> None:
         """Set the chain button back to the disconnected (unchecked) state without
@@ -627,31 +627,33 @@ class TrackingFromScratch(QWidget):
         }
 
         node_id = tracks._get_new_node_ids(1)[0]
-        try:
-            UserAddNode(
-                tracks,
-                node=node_id,
-                attributes=attributes,
-                force=self.tracks_viewer.force,
-            )
-        except InvalidActionError as e:
-            if e.forceable:
-                force, always_force = confirm_force_operation(message=str(e))
-                self.tracks_viewer.force = always_force
-                if force:
-                    node_id = tracks._get_new_node_ids(1)[0]
-                    UserAddNode(
-                        tracks,
-                        node=node_id,
-                        attributes=attributes,
-                        force=True,
-                    )
-            else:
-                show_info(str(e))
+        # Suppress view-centering during the add (see _add_segmentation_node).
+        with self.tracks_viewer.center_node.blocked():
+            try:
+                UserAddNode(
+                    tracks,
+                    node=node_id,
+                    attributes=attributes,
+                    force=self.tracks_viewer.force,
+                )
+            except InvalidActionError as e:
+                if e.forceable:
+                    force, always_force = confirm_force_operation(message=str(e))
+                    self.tracks_viewer.force = always_force
+                    if force:
+                        node_id = tracks._get_new_node_ids(1)[0]
+                        UserAddNode(
+                            tracks,
+                            node=node_id,
+                            attributes=attributes,
+                            force=True,
+                        )
+                else:
+                    show_info(str(e))
 
-        # make the created node the new selection
-        if tracks.graph.has_node(node_id):
-            self.tracks_viewer.selected_nodes.add(node_id)
+            # make the created node the new selection
+            if tracks.graph.has_node(node_id):
+                self.tracks_viewer.selected_nodes.add(node_id)
 
     def _add_segmentation_node(
         self, t: int, spatial_coords: tuple[np.ndarray, ...]
@@ -716,6 +718,14 @@ class TrackingFromScratch(QWidget):
         if new_value is None:
             new_value = tracks._get_new_node_ids(1)[0]
 
+        # Nothing to do if every pixel already belongs to the target node: skip the copy
+        # so we don't push an empty (un-undoable) action onto the history. Still select
+        # the clicked node for convenience.
+        if np.all(old_values == new_value):
+            if tracks.graph.has_node(new_value):
+                self._select_node(new_value)
+            return
+
         t_array = np.full(spatial_coords[0].size, t, dtype=int)
         pixels = (t_array, *spatial_coords)
         # group the pixels by the node they currently belong to, so
@@ -734,20 +744,29 @@ class TrackingFromScratch(QWidget):
                 force=force,
             )
 
-        try:
-            apply(self.tracks_viewer.force)
-        except InvalidActionError as e:
-            if e.forceable:
-                force, always_force = confirm_force_operation(message=str(e))
-                self.tracks_viewer.force = always_force
-                if force:
-                    apply(True)
-            else:
-                show_info(str(e))
+        # Suppress view-centering: the action's refresh (and the selection below) would
+        # otherwise re-center the camera on the node, which is jarring during copying.
+        with self.tracks_viewer.center_node.blocked():
+            try:
+                apply(self.tracks_viewer.force)
+            except InvalidActionError as e:
+                if e.forceable:
+                    force, always_force = confirm_force_operation(message=str(e))
+                    self.tracks_viewer.force = always_force
+                    if force:
+                        apply(True)
+                else:
+                    show_info(str(e))
 
-        # make the updated/created node the new selection
-        if tracks.graph.has_node(new_value):
-            self.tracks_viewer.selected_nodes.add(new_value)
+            # make the updated/created node the new selection
+            if tracks.graph.has_node(new_value):
+                self.tracks_viewer.selected_nodes.add(new_value)
+
+    def _select_node(self, node: int) -> None:
+        """Select a node as the current selection without centering the view on it."""
+
+        with self.tracks_viewer.center_node.blocked():
+            self.tracks_viewer.selected_nodes.add(node)
 
     def _current_track_node(self, t: int, track_id: int) -> int | None:
         """Return the node of ``track_id`` present in frame ``t``, or None if there is
