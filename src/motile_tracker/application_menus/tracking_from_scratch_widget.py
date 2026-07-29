@@ -5,7 +5,7 @@ import napari
 import numpy as np
 from funtracks.data_model import SolutionTracks
 from funtracks.exceptions import InvalidActionError
-from funtracks.user_actions import UserAddNode
+from funtracks.user_actions import UserAddNode, UserUpdateSegmentation
 from funtracks.utils.tracksdata_utils import create_empty_graphview_graph
 from napari.layers import Image, Labels, Points
 from napari.utils.notifications import show_info
@@ -201,9 +201,11 @@ class TrackingFromScratch(QWidget):
         self.tracks_viewer = TracksViewer.get_instance(viewer)
         self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
 
-        # the detections layer that is currently connected as a copy source, and the
-        # right-click callback attached to it (so we can disconnect it later)
+        # the detections layer that is currently connected as a copy source, its target
+        # track layer, and the right-click callback attached to the source (so we can
+        # disconnect it later)
         self._source_layer = None
+        self._target_layer = None
         self._source_callback = None
 
         exp_manual = QLabel()
@@ -254,11 +256,29 @@ class TrackingFromScratch(QWidget):
         self.start_from_detections_btn.clicked.connect(self._start_from_detections)
         detections_box_layout.addWidget(self.start_from_detections_btn)
 
+        # Controls to copy detections into the tracks, only shown while a detections
+        # source is connected and its layer (or its track layer) is the active layer.
+        self.copy_controls_box = QGroupBox("Copy detections into tracks")
+        copy_controls_layout = QVBoxLayout(self.copy_controls_box)
+        self.add_label_btn = QPushButton("Add selected label to track")
+        self.add_label_btn.clicked.connect(self._add_selected_label)
+        copy_controls_layout.addWidget(self.add_label_btn)
+        self.switch_layer_btn = QPushButton("Switch source / target layer [\\]")
+        self.switch_layer_btn.clicked.connect(self._switch_layer)
+        copy_controls_layout.addWidget(self.switch_layer_btn)
+        self.copy_controls_box.setVisible(False)
+
+        # show/hide the copy controls depending on the active layer
+        self.viewer.layers.selection.events.active.connect(
+            self._update_copy_controls_visibility
+        )
+
         layout = QVBoxLayout(self)
         layout.addWidget(exp_manual)
         layout.addWidget(image_box)
         layout.addWidget(exp_detection)
         layout.addWidget(detections_box)
+        layout.addWidget(self.copy_controls_box)
         layout.addStretch(0)
 
     def _update_buttons(self):
@@ -332,23 +352,54 @@ class TrackingFromScratch(QWidget):
         the clicked detection into the tracks."""
 
         self._source_layer = source_layer
+        self._target_layer = self._get_target_layer()
         # update_tracks hides all input Labels/Points layers, so re-show the source
         source_layer.visible = True
         if isinstance(source_layer, Labels):
             source_layer.contour = 1
         self._source_callback = self._make_source_callback()
         source_layer.mouse_drag_callbacks.append(self._source_callback)
+        # expose the copy function so orthogonal-view copies of the source layer can
+        # forward their right-clicks to it (see source_layer_hook in ortho_views.py)
+        source_layer._manual_copy_detection = self._copy_detection
+
+        # Bind the '\' key to switch between source and target layer. We bind it on both
+        # layers (rather than the viewer) so it works whenever either is the active layer,
+        # including in the orthogonal views (source_layer_hook binds the ortho copies).
+        for layer in (source_layer, self._target_layer):
+            if layer is not None:
+                layer._manual_switch_layer = self._switch_layer
+                layer.bind_key("\\", self._switch_layer_key, overwrite=True)
+
         # make the source layer active so its click callbacks receive events
         self.viewer.layers.selection.active = source_layer
+        self._update_copy_controls_visibility()
 
     def _teardown_source_connection(self) -> None:
-        """Disconnect the right-click callback from the previously connected source layer."""
+        """Disconnect the right-click callback and shortcuts from the previously connected
+        source and target layers."""
 
-        if self._source_layer is not None and self._source_callback is not None:
-            with contextlib.suppress(ValueError):
-                self._source_layer.mouse_drag_callbacks.remove(self._source_callback)
+        for layer in (self._source_layer, self._target_layer):
+            if layer is None:
+                continue
+            with contextlib.suppress(AttributeError):
+                del layer._manual_switch_layer
+            with contextlib.suppress(Exception):
+                layer.bind_key("\\", None, overwrite=True)
+
+        if self._source_layer is not None:
+            if self._source_callback is not None:
+                with contextlib.suppress(ValueError):
+                    self._source_layer.mouse_drag_callbacks.remove(
+                        self._source_callback
+                    )
+            with contextlib.suppress(AttributeError):
+                del self._source_layer._manual_copy_detection
+
         self._source_layer = None
+        self._target_layer = None
         self._source_callback = None
+        self._update_copy_controls_visibility()
 
     def _make_source_callback(self) -> callable:
         """Create the mouse callback that copies a detection on right-click."""
@@ -372,8 +423,8 @@ class TrackingFromScratch(QWidget):
             self._copy_point(layer, event)
 
     def _copy_label(self, layer: Labels, event) -> None:
-        """Copy the clicked label (in the clicked time point) into the tracks as a
-        segmentation node via an UserAddNode action."""
+        """Copy the clicked label (in the clicked time point) into the target
+        segmentation via an UserUpdateSegmentation action."""
 
         value = layer.get_value(
             event.position,
@@ -392,9 +443,7 @@ class TrackingFromScratch(QWidget):
         if spatial_coords[0].size == 0:
             return
 
-        t_array = np.full(spatial_coords[0].size, t, dtype=int)
-        pixels = (t_array, *spatial_coords)
-        self._add_node(t, pixels=pixels)
+        self._add_segmentation_node(t, spatial_coords)
 
     def _copy_point(self, layer: Points, event) -> None:
         """Copy the clicked point into the tracks as a point node via an UserAddNode
@@ -415,14 +464,9 @@ class TrackingFromScratch(QWidget):
         position = point[1:] * np.asarray(layer.scale[1:])
         self._add_node(t, position=position)
 
-    def _add_node(
-        self,
-        t: int,
-        position: np.ndarray | None = None,
-        pixels: tuple[np.ndarray, ...] | None = None,
-    ) -> None:
-        """Add a node to the tracks with the current tracklet id, from either a position
-        (points) or pixels (segmentation)."""
+    def _add_node(self, t: int, position: np.ndarray) -> None:
+        """Add a point node to the tracks with the current tracklet id, at the given
+        position (used for Points sources)."""
 
         tracks = self.tracks_viewer.tracks
 
@@ -434,9 +478,8 @@ class TrackingFromScratch(QWidget):
         attributes = {
             features.time_key: t,
             features.tracklet_key: track_id,
+            features.position_key: position,
         }
-        if position is not None:
-            attributes[features.position_key] = position
 
         try:
             node_id = tracks._get_new_node_ids(1)[0]
@@ -444,7 +487,6 @@ class TrackingFromScratch(QWidget):
                 tracks,
                 node=node_id,
                 attributes=attributes,
-                pixels=pixels,
                 force=self.tracks_viewer.force,
             )
         except InvalidActionError as e:
@@ -457,8 +499,139 @@ class TrackingFromScratch(QWidget):
                         tracks,
                         node=node_id,
                         attributes=attributes,
-                        pixels=pixels,
                         force=True,
                     )
             else:
                 show_info(str(e))
+
+    def _add_segmentation_node(
+        self, t: int, spatial_coords: tuple[np.ndarray, ...]
+    ) -> None:
+        """Copy a label into the target segmentation at time ``t``, fully replacing those
+        pixels. The new node takes the current tracklet id; any existing node at those
+        pixels is shrunk, or deleted entirely if all of its pixels were overwritten.
+
+        Args:
+            t (int): The time point of the copied label.
+            spatial_coords (tuple[np.ndarray, ...]): The spatial (non-time) coordinates of
+                the label pixels, as returned by ``np.where`` on a single time frame.
+        """
+
+        tracks = self.tracks_viewer.tracks
+        if tracks.segmentation is None:
+            return
+
+        if self.tracks_viewer.selected_track is None:
+            self.tracks_viewer.set_new_track_id()
+        track_id = self.tracks_viewer.selected_track
+
+        t_array = np.full(spatial_coords[0].size, t, dtype=int)
+        pixels = (t_array, *spatial_coords)
+
+        # Read the node ids currently occupying those pixels in the target segmentation,
+        # grouped so UserUpdateSegmentation can shrink/delete the overwritten nodes.
+        target_frame = np.asarray(tracks.segmentation[t])
+        old_values = target_frame[spatial_coords]
+        updated_pixels = [
+            (tuple(dim[old_values == old_value] for dim in pixels), int(old_value))
+            for old_value in np.unique(old_values)
+        ]
+
+        def apply(force: bool) -> None:
+            UserUpdateSegmentation(
+                tracks,
+                new_value=tracks._get_new_node_ids(1)[0],
+                updated_pixels=updated_pixels,
+                current_track_id=track_id,
+                force=force,
+            )
+
+        try:
+            apply(self.tracks_viewer.force)
+        except InvalidActionError as e:
+            if e.forceable:
+                force, always_force = confirm_force_operation(message=str(e))
+                self.tracks_viewer.force = always_force
+                if force:
+                    apply(True)
+            else:
+                show_info(str(e))
+
+    def _get_target_layer(self) -> Labels | Points | None:
+        """Return the track layer that corresponds to the connected source layer: the
+        TrackLabels layer for a Labels source, the TrackPoints layer for a Points source."""
+
+        if isinstance(self._source_layer, Labels):
+            return self.tracks_viewer.tracking_layers.seg_layer
+        if isinstance(self._source_layer, Points):
+            return self.tracks_viewer.tracking_layers.points_layer
+        return None
+
+    def _update_copy_controls_visibility(self, event=None) -> None:
+        """Show the copy controls only while a source layer is connected and either the
+        source or its target track layer is the active layer."""
+
+        if self._source_layer is None:
+            self.copy_controls_box.setVisible(False)
+            return
+
+        active = self.viewer.layers.selection.active
+        on_source = active is self._source_layer
+        self.copy_controls_box.setVisible(
+            on_source or active is self._get_target_layer()
+        )
+        # 'add selected label' only makes sense on the source layer
+        self.add_label_btn.setEnabled(on_source)
+
+    def _switch_layer(self, *args) -> None:
+        """Toggle the active layer between the source detections layer and its target
+        track layer."""
+
+        if self._source_layer is None:
+            return
+
+        target = self._get_target_layer()
+        active = self.viewer.layers.selection.active
+        if active is self._source_layer and target is not None:
+            new_active = target
+        else:
+            new_active = self._source_layer
+        new_active.visible = True
+        self.viewer.layers.selection.active = new_active
+
+    def _switch_layer_key(self, layer=None) -> None:
+        """Keybinding handler ('\\' key) to switch between source and target layer."""
+
+        self._switch_layer()
+
+    def _add_selected_label(self, *args) -> None:
+        """Copy the currently selected label (or selected point) from the source layer into
+        the tracks, at the current time point. Same effect as right-clicking the detection."""
+
+        if self._source_layer is None or self.tracks_viewer.tracks is None:
+            return
+
+        layer = self._source_layer
+        t = int(self.viewer.dims.current_step[0])
+
+        if isinstance(layer, Labels):
+            value = layer.selected_label
+            if not value:
+                show_info("No label selected on the source layer.")
+                return
+            frame = np.asarray(layer.data[t])
+            spatial_coords = np.where(frame == value)
+            if spatial_coords[0].size == 0:
+                show_info(f"Label {value} not found at t={t}.")
+                return
+            self._add_segmentation_node(t, spatial_coords)
+        else:
+            selected = list(layer.selected_data)
+            if not selected:
+                show_info("No point selected on the source layer.")
+                return
+            for idx in selected:
+                point = np.asarray(layer.data[idx])
+                pt_t = int(round(point[0]))
+                position = point[1:] * np.asarray(layer.scale[1:])
+                self._add_node(pt_t, position=position)
