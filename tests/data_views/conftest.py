@@ -1,17 +1,15 @@
+import napari
 import pytest
 
 
-@pytest.fixture
-def viewer(make_napari_viewer):
-    """A napari viewer for data-view tests.
+@pytest.fixture(scope="module")
+def viewer(qapp):
+    """Module-scoped napari viewer shared across all tests in a module.
 
-    A thin alias for napari's ``make_napari_viewer`` factory, for the common case
-    of needing exactly one viewer. Tests that need a second one can request
-    ``make_napari_viewer`` directly.
-
-    Do not construct ``napari.Viewer`` directly in tests: ``make_napari_viewer``
-    gives each test an isolated app-model registry, whereas a bare viewer
-    re-registers plugin actions into the real one and napari >= 0.7 then raises
-    ``ValueError: Command 'motile-tracker.solve' already registered``.
+    Avoids the expensive viewer creation per test. Tests should use the
+    per-file autouse ``clear_viewer_layers`` fixture (defined in each test
+    module) to clean up layers between tests.
     """
-    return make_napari_viewer()
+    v = napari.Viewer(show=False)
+    yield v
+    v.close()
