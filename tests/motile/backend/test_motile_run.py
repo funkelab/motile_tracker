@@ -3,6 +3,34 @@ import numpy as np
 from motile_tracker.motile.backend import MotileRun, SolverParams
 
 
+def test_geff_path_finds_saved_geff(tmp_path, graph_2d):
+    """geff_path resolves the geff store that save() wrote."""
+    run = MotileRun(graph=graph_2d, run_name="test", solver_params=SolverParams())
+    run_dir = run.save(tmp_path)
+
+    geff = MotileRun.geff_path(run_dir)
+    assert geff == run_dir / "tracks.geff"
+    assert geff.exists()
+
+
+def test_geff_path_falls_back_to_tracks_dir(tmp_path):
+    """Intermediate-format runs stored the graph in a 'tracks' zarr."""
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    (run_dir / "tracks").mkdir()
+
+    assert MotileRun.geff_path(run_dir) == run_dir / "tracks"
+
+
+def test_geff_path_none_for_v1_run(tmp_path):
+    """v1 runs stored the graph as graph.json, so there is no geff to report."""
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    (run_dir / "graph.json").write_text("{}")
+
+    assert MotileRun.geff_path(run_dir) is None
+
+
 def test_save_load(tmp_path, graph_2d):
     run_name = "test"
     scale = [1.0, 2.0, 3.0]

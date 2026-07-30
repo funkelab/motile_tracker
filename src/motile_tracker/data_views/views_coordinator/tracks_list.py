@@ -101,12 +101,26 @@ class TracksList(QGroupBox):
     tracks_saved = Signal(object, Path)
     """Emitted after tracks are saved to disk. Arguments: (tracks, path).
     Dependent applications can connect to this signal to save additional
-    data (e.g. solver parameters) alongside the tracks."""
+    data (e.g. solver parameters) alongside the tracks.
+
+    The path is the geff store the tracks were written to. For a MotileRun that
+    is the tracks.geff inside the timestamped run directory, so data saved
+    beside the tracks (e.g. solver params) lives in the parent."""
 
     tracks_loaded = Signal(object, Path)
     """Emitted after tracks are loaded from disk. Arguments: (tracks, path).
     Dependent applications can connect to this signal to load additional
-    data (e.g. solver parameters) from the same location."""
+    data (e.g. solver parameters) from the same location.
+
+    The path is the geff store the tracks were read from, matching what
+    tracks_saved reports for the same tracks. For a MotileRun that is the
+    tracks.geff inside the run directory, so data stored beside the tracks
+    (e.g. solver params) lives in the parent. It is never a container a geff
+    merely happened to be found inside.
+
+    The exception is a CSV import, which reports the .csv file, and a v1 run
+    directory, which has no geff and reports the directory itself. Listeners
+    should tolerate a file as well as a directory."""
 
     def __init__(self):
         super().__init__(title="Results List")
@@ -236,8 +250,10 @@ class TracksList(QGroupBox):
         selects an existing one to replace) and write_to_geff writes the
         store directly at that path.
 
-        After saving, emits the tracks_saved signal so that downstream code
-        can save additional data into the same directory.
+        After saving, emits the tracks_saved signal with the geff store that
+        was written, so that downstream code can save additional data beside
+        it. For a MotileRun that is the tracks.geff inside the run directory,
+        not the run directory itself.
 
         Args:
             item (QListWidgetItem): The list item to save. This list item
@@ -249,15 +265,20 @@ class TracksList(QGroupBox):
             if not self.save_dialog.exec_():
                 return
             directory = Path(self.save_dialog.selectedFiles()[0])
-            directory = tracks.save(directory)
+            run_dir = tracks.save(directory)
+            # Report the geff store, not the run directory that contains it, so
+            # that saving and loading name the same thing. Sibling data (solver
+            # params) lives in its parent. save() always writes a geff, so
+            # geff_path is never None here (only loaded v1 runs lack one).
+            saved_path = MotileRun.geff_path(run_dir)
         else:
             name = widget.name.text()
             self.save_geff_dialog.selectFile(str(Path.home() / f"{name}.geff"))
             if not self.save_geff_dialog.exec_():
                 return
-            directory = Path(self.save_geff_dialog.selectedFiles()[0])
-            write_to_geff(tracks, directory, overwrite=True)
-        self.tracks_saved.emit(tracks, directory)
+            saved_path = Path(self.save_geff_dialog.selectedFiles()[0])
+            write_to_geff(tracks, saved_path, overwrite=True)
+        self.tracks_saved.emit(tracks, saved_path)
 
     def remove_tracks(self, item: QListWidgetItem):
         """Remove a tracks object from the list. You must pass the list item that
@@ -298,9 +319,16 @@ class TracksList(QGroupBox):
             self.tracks_loaded.emit(tracks, source_path)
 
     def _load_from_dialog(
-        self, loader: Callable[[Path], Tracks]
+        self,
+        loader: Callable[[Path], Tracks],
+        geff_path: Callable[[Path], Path | None] | None = None,
     ) -> tuple[Tracks, str, Path] | None:
         """Ask the user for a directory and load tracks from it with `loader`.
+
+        The name shown in the list comes from the directory the user picked. The
+        reported path is the geff store that was actually read, which `geff_path`
+        resolves when the user picks a directory containing one rather than the
+        store itself.
 
         Returns (tracks, name, path), or None if the user cancelled or the
         directory did not contain loadable tracks.
@@ -309,10 +337,12 @@ class TracksList(QGroupBox):
             return None
         directory = Path(self.file_dialog.selectedFiles()[0])
         try:
-            return loader(directory), directory.stem, directory
+            tracks = loader(directory)
         except (ValueError, FileNotFoundError) as e:
             warn(f"Could not load tracks from {directory}: {e}", stacklevel=2)
             return None
+        source = directory if geff_path is None else geff_path(directory)
+        return tracks, directory.stem, source or directory
 
     def load_internal_tracks(self) -> tuple[Tracks, str, Path] | None:
         """Load tracks saved in internal format. The user selects the GEFF
@@ -322,6 +352,6 @@ class TracksList(QGroupBox):
 
     def load_motile_run(self) -> tuple[Tracks, str, Path] | None:
         """Load a MotileRun from disk. The user selects the directory created
-        by MotileRun.save().
+        by MotileRun.save(), and the geff store inside it is reported.
         """
-        return self._load_from_dialog(MotileRun.load)
+        return self._load_from_dialog(MotileRun.load, geff_path=MotileRun.geff_path)

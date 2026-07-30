@@ -463,6 +463,44 @@ def test_geff_import_with_segmentation(
         assert dialog.tracks.graph.nodes[node_id]["area"] > 0
 
 
+def test_geff_import_source_path_is_geff_group_not_container(
+    qtbot, tmp_path, graph_2d, monkeypatch
+):
+    """source_path must name the geff group that was read, not the zarr
+    container it was found inside.
+
+    export_to_geff writes a container with the graph in a nested `tracks.geff`
+    group. Listeners on TracksList.tracks_loaded use this path to find data
+    stored alongside the tracks, so pointing at the container would be
+    ambiguous when it holds more than one group.
+    """
+    monkeypatch.setattr(ImportDialog, "_resize_dialog", lambda self: None)
+
+    tracks = Tracks(graph_2d, ndim=3, time_attr="t", tracklet_attr="track_id")
+    container = tmp_path / "container.zarr"
+    export_to_geff(tracks, container)
+
+    dialog = ImportDialog(import_type="geff")
+    qtbot.addWidget(dialog)
+    dialog.import_widget._load_geff(container)
+    assert dialog.import_widget.root is not None
+
+    seg_combo = dialog.prop_map_widget.mapping_widgets["seg_id"]
+    seg_combo.setCurrentText("None")
+    dialog.prop_map_widget._update_props_left()
+
+    dialog._finish()
+
+    assert dialog.tracks is not None
+    assert dialog.source_path is not None
+    # the geff group lives inside the container, not at its root
+    assert dialog.source_path != container
+    assert container in dialog.source_path.parents
+    assert (dialog.source_path / ".zattrs").exists() or (
+        dialog.source_path / "zarr.json"
+    ).exists()
+
+
 def test_geff_import_without_area_computes_area(
     qtbot, tmp_path, graph_2d_without_segmentation, segmentation_2d, monkeypatch
 ):

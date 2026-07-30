@@ -126,6 +126,24 @@ class MotileRun(SolutionTracks):
         self._save_list(list_to_save=self.gaps, run_dir=run_dir, filename=GAPS_FILENAME)
         return run_dir
 
+    @staticmethod
+    def geff_path(run_dir: Path | str) -> Path | None:
+        """Return the geff store inside a saved run directory.
+
+        Mirrors the layouts that :meth:`load` accepts. Returns None for v1 runs,
+        which stored the graph as graph.json rather than as a geff.
+
+        Args:
+            run_dir (Path | str): A directory created by MotileRun.save.
+        """
+        run_dir = Path(run_dir)
+        tracks_path = run_dir / "tracks.geff"
+        if tracks_path.exists():
+            return tracks_path
+        if (run_dir / "graph.json").exists():
+            return None
+        return run_dir / "tracks"
+
     @classmethod
     def load(cls, run_dir: Path | str, output_required: bool = True):
         """Load a run from disk into memory.

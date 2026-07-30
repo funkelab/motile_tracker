@@ -177,6 +177,30 @@ class TestTracksListSave:
         assert len(emitted) == 1
         assert emitted[0][0] is motile_run
 
+    def test_save_motile_run_emits_geff_path_not_run_dir(
+        self, tracks_list, motile_run, tmp_path
+    ):
+        """tracks_saved must name the geff store, so that it matches what
+        tracks_loaded reports for the same run. The solver params live in the
+        parent directory.
+        """
+        tracks_list.add_tracks(motile_run, "run1", select=False)
+        item = tracks_list.tracks_list.item(0)
+
+        tracks_list.save_dialog.exec_ = MagicMock(return_value=True)
+        tracks_list.save_dialog.selectedFiles = MagicMock(return_value=[str(tmp_path)])
+
+        emitted = []
+        tracks_list.tracks_saved.connect(lambda t, p: emitted.append((t, p)))
+
+        tracks_list.save_tracks(item)
+
+        path = emitted[0][1]
+        assert path.name == "tracks.geff"
+        assert path.exists()
+        # the run directory (with the params json beside the geff) is the parent
+        assert (path.parent / "solver_params.json").exists()
+
     def test_save_does_not_emit_when_dialog_rejected(
         self, tracks_list, motile_run, tmp_path
     ):
@@ -323,7 +347,9 @@ class TestTracksListLoadMotileRun:
 
         assert isinstance(tracks, MotileRun)
         assert name == save_dir.stem
-        assert path == save_dir
+        # the geff store inside the run dir is reported, not the run dir, so
+        # that loading and saving name the same thing
+        assert path == save_dir / "tracks.geff"
 
     def test_load_motile_run_adds_to_list_via_load_tracks(
         self, tracks_list, motile_run, tmp_path
