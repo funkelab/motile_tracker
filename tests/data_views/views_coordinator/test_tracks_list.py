@@ -319,7 +319,22 @@ class TestTracksListLoadMotileRun:
         tracks_list.file_dialog.exec_ = MagicMock(return_value=True)
         tracks_list.file_dialog.selectedFiles = MagicMock(return_value=[str(save_dir)])
 
-        tracks_list.load_motile_run()
+        tracks, name, path = tracks_list.load_motile_run()
+
+        assert isinstance(tracks, MotileRun)
+        assert name == save_dir.stem
+        assert path == save_dir
+
+    def test_load_motile_run_adds_to_list_via_load_tracks(
+        self, tracks_list, motile_run, tmp_path
+    ):
+        save_dir = motile_run.save(tmp_path)
+
+        tracks_list.dropdown_menu.setCurrentText("Motile Run")
+        tracks_list.file_dialog.exec_ = MagicMock(return_value=True)
+        tracks_list.file_dialog.selectedFiles = MagicMock(return_value=[str(save_dir)])
+
+        tracks_list.load_tracks()
 
         assert tracks_list.tracks_list.count() == 1
 
@@ -330,15 +345,14 @@ class TestTracksListLoadMotileRun:
 
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
-            tracks_list.load_motile_run()
+            result = tracks_list.load_motile_run()
 
         assert len(caught) == 1
-        assert tracks_list.tracks_list.count() == 0
+        assert result is None
 
     def test_load_motile_run_dialog_cancelled(self, tracks_list):
         tracks_list.file_dialog.exec_ = MagicMock(return_value=False)
-        tracks_list.load_motile_run()
-        assert tracks_list.tracks_list.count() == 0
+        assert tracks_list.load_motile_run() is None
 
 
 # ---------------------------------------------------------------------------
@@ -353,10 +367,11 @@ class TestTracksListLoadGeff:
         geff_path = tmp_path / "saved_tracks.geff"
         write_to_geff(solution_tracks_2d, geff_path)
 
+        tracks_list.dropdown_menu.setCurrentText("Tracks (geff)")
         tracks_list.file_dialog.exec_ = MagicMock(return_value=True)
         tracks_list.file_dialog.selectedFiles = MagicMock(return_value=[str(geff_path)])
 
-        tracks_list.load_internal_tracks()
+        tracks_list.load_tracks()
 
         assert tracks_list.tracks_list.count() == 1
         item = tracks_list.tracks_list.item(0)
@@ -369,13 +384,14 @@ class TestTracksListLoadGeff:
         geff_path = tmp_path / "saved_tracks.geff"
         write_to_geff(solution_tracks_2d, geff_path)
 
+        tracks_list.dropdown_menu.setCurrentText("Tracks (geff)")
         tracks_list.file_dialog.exec_ = MagicMock(return_value=True)
         tracks_list.file_dialog.selectedFiles = MagicMock(return_value=[str(geff_path)])
 
         emitted = []
         tracks_list.tracks_loaded.connect(lambda t, p: emitted.append((t, p)))
 
-        tracks_list.load_internal_tracks()
+        tracks_list.load_tracks()
 
         assert len(emitted) == 1
         # tracks_loaded hands out the stored object as-is, which is a plain
@@ -390,14 +406,14 @@ class TestTracksListLoadGeff:
 
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
-            tracks_list.load_internal_tracks()
+            result = tracks_list.load_internal_tracks()
 
         assert len(caught) == 1
-        assert tracks_list.tracks_list.count() == 0
+        assert result is None
 
     def test_load_internal_tracks_dialog_cancelled(self, tracks_list):
         tracks_list.file_dialog.exec_ = MagicMock(return_value=False)
-        tracks_list.load_internal_tracks()
+        assert tracks_list.load_internal_tracks() is None
         assert tracks_list.tracks_list.count() == 0
 
 
@@ -409,25 +425,27 @@ class TestTracksListLoadGeff:
 class TestTracksListLoadDispatch:
     def test_load_tracks_dispatches_geff_tracks(self, tracks_list):
         tracks_list.dropdown_menu.setCurrentText("Tracks (geff)")
-        with patch.object(tracks_list, "load_internal_tracks") as mock:
+        with patch.object(
+            tracks_list, "load_internal_tracks", return_value=None
+        ) as mock:
             tracks_list.load_tracks()
             mock.assert_called_once()
 
     def test_load_tracks_dispatches_motile_run(self, tracks_list):
         tracks_list.dropdown_menu.setCurrentText("Motile Run")
-        with patch.object(tracks_list, "load_motile_run") as mock:
+        with patch.object(tracks_list, "load_motile_run", return_value=None) as mock:
             tracks_list.load_tracks()
             mock.assert_called_once()
 
     def test_load_tracks_dispatches_csv(self, tracks_list):
         tracks_list.dropdown_menu.setCurrentText("External tracks from CSV")
-        with patch.object(tracks_list, "_load_tracks") as mock:
+        with patch.object(tracks_list, "_load_tracks", return_value=None) as mock:
             tracks_list.load_tracks()
             mock.assert_called_once_with(import_type="csv")
 
     def test_load_tracks_dispatches_geff(self, tracks_list):
         tracks_list.dropdown_menu.setCurrentText("External tracks from geff")
-        with patch.object(tracks_list, "_load_tracks") as mock:
+        with patch.object(tracks_list, "_load_tracks", return_value=None) as mock:
             tracks_list.load_tracks()
             mock.assert_called_once_with("geff")
 
@@ -445,11 +463,12 @@ class TestTracksListLoadExternal:
         mock_dialog.name = "imported"
         mock_dialog.source_path = tmp_path / "test.csv"
 
+        tracks_list.dropdown_menu.setCurrentText("External tracks from CSV")
         with patch(
             "motile_tracker.data_views.views_coordinator.tracks_list.ImportDialog",
             return_value=mock_dialog,
         ):
-            tracks_list._load_tracks("csv")
+            tracks_list.load_tracks()
 
         assert tracks_list.tracks_list.count() == 1
 
@@ -461,7 +480,7 @@ class TestTracksListLoadExternal:
             "motile_tracker.data_views.views_coordinator.tracks_list.ImportDialog",
             return_value=mock_dialog,
         ):
-            tracks_list._load_tracks("csv")
+            assert tracks_list._load_tracks("csv") is None
 
         assert tracks_list.tracks_list.count() == 0
 
@@ -474,7 +493,7 @@ class TestTracksListLoadExternal:
             "motile_tracker.data_views.views_coordinator.tracks_list.ImportDialog",
             return_value=mock_dialog,
         ):
-            tracks_list._load_tracks("csv")
+            assert tracks_list._load_tracks("csv") is None
 
         assert tracks_list.tracks_list.count() == 0
 

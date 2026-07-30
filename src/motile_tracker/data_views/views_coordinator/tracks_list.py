@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from functools import partial
 from pathlib import Path
 from warnings import warn
@@ -157,15 +158,16 @@ class TracksList(QGroupBox):
         layout.addLayout(load_menu)
         self.setLayout(layout)
 
-    def _load_tracks(self, import_type: str):
+    def _load_tracks(self, import_type: str) -> tuple[Tracks, str, Path | None] | None:
+        """Load externally generated tracks (CSV or geff) via the import dialog.
+
+        Returns (tracks, name, path), where the path may be None because the
+        import dialog does not always know the file the tracks came from.
+        """
         dialog = ImportDialog(import_type)
-        if dialog.exec_() == QDialog.Accepted:
-            tracks = dialog.tracks
-            name = dialog.name
-            if tracks is not None:
-                self.add_tracks(tracks, name, select=True)
-                if dialog.source_path is not None:
-                    self.tracks_loaded.emit(tracks, dialog.source_path)
+        if dialog.exec_() != QDialog.Accepted or dialog.tracks is None:
+            return None
+        return dialog.tracks, dialog.name, dialog.source_path
 
     def _selection_changed(self):
         selected = self.tracks_list.selectedItems()
@@ -269,46 +271,57 @@ class TracksList(QGroupBox):
         self.tracks_list.takeItem(row)
 
     def load_tracks(self):
-        """Call the function to load tracks from disk, depending on the choice
-        in the dropdown menu.
+        """Load tracks from disk, depending on the choice in the dropdown menu.
+
+        Each loader returns the loaded tracks along with the name to display and
+        the path they came from, or None if the user cancelled or the load
+        failed. Adding the tracks to the list and announcing them via
+        tracks_loaded happens here, so every load route behaves the same way.
         """
         selection = self.dropdown_menu.currentText()
         if selection == "Tracks (geff)":
-            self.load_internal_tracks()
+            result = self.load_internal_tracks()
         elif selection == "Motile Run":
-            self.load_motile_run()
+            result = self.load_motile_run()
         elif selection == "External tracks from CSV":
-            self._load_tracks(import_type="csv")
+            result = self._load_tracks(import_type="csv")
         elif selection == "External tracks from geff":
-            self._load_tracks("geff")
+            result = self._load_tracks("geff")
+        else:
+            return
 
-    def load_internal_tracks(self):
+        if result is None:
+            return
+        tracks, name, source_path = result
+        self.add_tracks(tracks, name, select=True)
+        if source_path is not None:
+            self.tracks_loaded.emit(tracks, source_path)
+
+    def _load_from_dialog(
+        self, loader: Callable[[Path], Tracks]
+    ) -> tuple[Tracks, str, Path] | None:
+        """Ask the user for a directory and load tracks from it with `loader`.
+
+        Returns (tracks, name, path), or None if the user cancelled or the
+        directory did not contain loadable tracks.
+        """
+        if not self.file_dialog.exec_():
+            return None
+        directory = Path(self.file_dialog.selectedFiles()[0])
+        try:
+            return loader(directory), directory.stem, directory
+        except (ValueError, FileNotFoundError) as e:
+            warn(f"Could not load tracks from {directory}: {e}", stacklevel=2)
+            return None
+
+    def load_internal_tracks(self) -> tuple[Tracks, str, Path] | None:
         """Load tracks saved in internal format. The user selects the GEFF
         store directly (the path written by :func:`write_to_geff`).
-
-        After loading, emits the tracks_loaded signal so that downstream code
-        can load additional data from the same directory.
         """
-        if self.file_dialog.exec_():
-            directory = Path(self.file_dialog.selectedFiles()[0])
-            name = directory.stem
-            try:
-                tracks = import_from_geff(directory)
-                self.add_tracks(tracks, name, select=True)
-                self.tracks_loaded.emit(tracks, directory)
-            except (ValueError, FileNotFoundError) as e:
-                warn(f"Could not load tracks from {directory}: {e}", stacklevel=2)
+        return self._load_from_dialog(import_from_geff)
 
-    def load_motile_run(self):
+    def load_motile_run(self) -> tuple[Tracks, str, Path] | None:
         """Load a MotileRun from disk. The user selects the directory created
         by MotileRun.save().
         """
-        if self.file_dialog.exec_():
-            directory = Path(self.file_dialog.selectedFiles()[0])
-            name = directory.stem
-            try:
-                tracks = MotileRun.load(directory)
-                self.add_tracks(tracks, name, select=True)
-                self.tracks_loaded.emit(tracks, directory)
-            except (ValueError, FileNotFoundError) as e:
-                warn(f"Could not load tracks from {directory}: {e}", stacklevel=2)
+        return self._load_from_dialog(MotileRun.load)
