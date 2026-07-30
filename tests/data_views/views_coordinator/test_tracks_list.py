@@ -15,6 +15,7 @@ from qtpy.QtWidgets import QDialog
 from motile_tracker.data_views.views_coordinator.tracks_list import (
     TracksButton,
     TracksList,
+    default_save_dir,
 )
 from motile_tracker.motile.backend.motile_run import MotileRun, SolverParams
 
@@ -130,46 +131,129 @@ class TestTracksListAddRemove:
 
 
 # ---------------------------------------------------------------------------
+# TracksList — save path fields
+# ---------------------------------------------------------------------------
+
+
+class TestTracksListSavePathFields:
+    def test_save_dir_defaults_to_appdirs(self, tracks_list):
+        """The save directory starts where the sample data lives, not in the
+        user's home directory."""
+        assert tracks_list.save_dir_line.text() == str(default_save_dir())
+
+    def test_save_name_empty_before_any_selection(self, tracks_list):
+        assert tracks_list.save_name_line.text() == ""
+
+    def test_selecting_tracks_fills_save_name(self, tracks_list, motile_run):
+        """The field holds the bare name; .geff is a fixed label in the UI."""
+        tracks_list.add_tracks(motile_run, "run1", select=True)
+        assert tracks_list.save_name_line.text() == "run1"
+
+    def test_save_name_follows_selection(self, tracks_list, motile_run):
+        tracks_list.add_tracks(motile_run, "run1", select=True)
+        tracks_list.add_tracks(motile_run, "run2", select=True)
+        assert tracks_list.save_name_line.text() == "run2"
+
+    def test_save_name_strips_geff_suffix_from_tracks_name(
+        self, tracks_list, motile_run
+    ):
+        """Tracks loaded from a geff are named after the store, so the suffix
+        must not be doubled up."""
+        tracks_list.add_tracks(motile_run, "loaded.geff", select=True)
+        assert tracks_list.save_name_line.text() == "loaded"
+        assert tracks_list.save_path().name == "loaded.geff"
+
+    def test_user_edit_stops_autofill(self, tracks_list, motile_run):
+        """Once the user types their own name, selecting another row must not
+        overwrite it."""
+        tracks_list.add_tracks(motile_run, "run1", select=True)
+
+        # textEdited only fires on real user input, so simulate it directly
+        tracks_list.save_name_line.setText("my_own_name")
+        tracks_list.save_name_line.textEdited.emit("my_own_name")
+
+        tracks_list.add_tracks(motile_run, "run2", select=True)
+
+        assert tracks_list.save_name_line.text() == "my_own_name"
+
+    def test_save_path_combines_dir_and_name(self, tracks_list, motile_run, tmp_path):
+        tracks_list.add_tracks(motile_run, "run1", select=True)
+        tracks_list.save_dir_line.setText(str(tmp_path))
+
+        assert tracks_list.save_path() == tmp_path / "run1.geff"
+
+    def test_save_path_none_when_name_blank(self, tracks_list, tmp_path):
+        tracks_list.save_dir_line.setText(str(tmp_path))
+        tracks_list.save_name_line.setText("")
+
+        assert tracks_list.save_path() is None
+
+    def test_save_path_none_when_dir_blank(self, tracks_list, motile_run):
+        tracks_list.add_tracks(motile_run, "run1", select=True)
+        tracks_list.save_dir_line.setText("   ")
+
+        assert tracks_list.save_path() is None
+
+    def test_save_path_tolerates_typed_suffix(self, tracks_list, tmp_path):
+        """A user who types the suffix anyway should not get 'x.geff.geff'."""
+        tracks_list.save_dir_line.setText(str(tmp_path))
+        tracks_list.save_name_line.setText("mine.geff")
+
+        assert tracks_list.save_path() == tmp_path / "mine.geff"
+
+    def test_programmatic_fill_does_not_count_as_user_edit(
+        self, tracks_list, motile_run
+    ):
+        """Auto-filling the field must not mark it as user-edited, or the
+        first selection would freeze the name forever."""
+        tracks_list.add_tracks(motile_run, "run1", select=True)
+        assert tracks_list._save_name_edited is False
+
+    def test_browse_sets_save_dir(self, tracks_list, tmp_path, monkeypatch):
+        monkeypatch.setattr(
+            "motile_tracker.data_views.views_coordinator.tracks_list."
+            "QFileDialog.getExistingDirectory",
+            lambda *a, **k: str(tmp_path),
+        )
+        tracks_list._browse_save_dir()
+        assert tracks_list.save_dir_line.text() == str(tmp_path)
+
+    def test_browse_cancelled_leaves_save_dir(self, tracks_list, monkeypatch):
+        before = tracks_list.save_dir_line.text()
+        monkeypatch.setattr(
+            "motile_tracker.data_views.views_coordinator.tracks_list."
+            "QFileDialog.getExistingDirectory",
+            lambda *a, **k: "",
+        )
+        tracks_list._browse_save_dir()
+        assert tracks_list.save_dir_line.text() == before
+
+
+# ---------------------------------------------------------------------------
 # TracksList — save
 # ---------------------------------------------------------------------------
 
 
 class TestTracksListSave:
-    def test_save_motile_run_writes_geff_at_chosen_path(
+    def test_save_motile_run_writes_geff_at_save_path(
         self, tracks_list, motile_run, tmp_path
     ):
-        """MotileRun.save() writes the geff store at exactly the chosen path,
+        """The run is written at exactly the path shown in the save fields,
         with no intervening subdirectory."""
-        tracks_list.add_tracks(motile_run, "run1", select=False)
+        tracks_list.add_tracks(motile_run, "run1", select=True)
+        tracks_list.save_dir_line.setText(str(tmp_path))
         item = tracks_list.tracks_list.item(0)
-
-        save_path = tmp_path / "run1.geff"
-        tracks_list.save_dialog.exec_ = MagicMock(return_value=True)
-        tracks_list.save_dialog.selectedFiles = MagicMock(return_value=[str(save_path)])
 
         tracks_list.save_tracks(item)
 
+        save_path = tmp_path / "run1.geff"
         assert (save_path / "nodes").exists()
         assert list(tmp_path.iterdir()) == [save_path]
 
-    def test_save_tracks_does_nothing_when_dialog_rejected(
-        self, tracks_list, motile_run, tmp_path
-    ):
-        tracks_list.add_tracks(motile_run, "run1", select=False)
-        item = tracks_list.tracks_list.item(0)
-
-        tracks_list.save_dialog.exec_ = MagicMock(return_value=False)
-
-        tracks_list.save_tracks(item)
-
-        assert list(tmp_path.iterdir()) == []
-
     def test_save_emits_tracks_saved_signal(self, tracks_list, motile_run, tmp_path):
-        tracks_list.add_tracks(motile_run, "run1", select=False)
+        tracks_list.add_tracks(motile_run, "run1", select=True)
+        tracks_list.save_dir_line.setText(str(tmp_path))
         item = tracks_list.tracks_list.item(0)
-
-        tracks_list.save_dialog.exec_ = MagicMock(return_value=True)
-        tracks_list.save_dialog.selectedFiles = MagicMock(return_value=[str(tmp_path)])
 
         emitted = []
         tracks_list.tracks_saved.connect(lambda t, p: emitted.append((t, p)))
@@ -178,6 +262,7 @@ class TestTracksListSave:
 
         assert len(emitted) == 1
         assert emitted[0][0] is motile_run
+        assert emitted[0][1] == tmp_path / "run1.geff"
 
     def test_save_motile_run_emits_geff_path_with_params_inside(
         self, tracks_list, motile_run, tmp_path
@@ -185,12 +270,9 @@ class TestTracksListSave:
         """tracks_saved names the geff store, and the solver params live
         inside it rather than beside it.
         """
-        tracks_list.add_tracks(motile_run, "run1", select=False)
+        tracks_list.add_tracks(motile_run, "run1", select=True)
+        tracks_list.save_dir_line.setText(str(tmp_path))
         item = tracks_list.tracks_list.item(0)
-
-        save_path = tmp_path / "run1.geff"
-        tracks_list.save_dialog.exec_ = MagicMock(return_value=True)
-        tracks_list.save_dialog.selectedFiles = MagicMock(return_value=[str(save_path)])
 
         emitted = []
         tracks_list.tracks_saved.connect(lambda t, p: emitted.append((t, p)))
@@ -198,24 +280,41 @@ class TestTracksListSave:
         tracks_list.save_tracks(item)
 
         path = emitted[0][1]
-        assert path == save_path
         assert path.exists()
         assert (path / "solver_params.json").exists()
 
-    def test_save_does_not_emit_when_dialog_rejected(
+    def test_save_does_nothing_without_a_filename(
         self, tracks_list, motile_run, tmp_path
     ):
-        tracks_list.add_tracks(motile_run, "run1", select=False)
+        """With no name there is nowhere to save, so warn rather than raise."""
+        tracks_list.add_tracks(motile_run, "run1", select=True)
+        tracks_list.save_dir_line.setText(str(tmp_path))
+        tracks_list.save_name_line.setText("")
         item = tracks_list.tracks_list.item(0)
-
-        tracks_list.save_dialog.exec_ = MagicMock(return_value=False)
 
         emitted = []
         tracks_list.tracks_saved.connect(lambda t, p: emitted.append((t, p)))
 
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            tracks_list.save_tracks(item)
+
+        assert len(caught) == 1
+        assert list(tmp_path.iterdir()) == []
+        assert len(emitted) == 0
+
+    def test_save_creates_missing_save_directory(
+        self, tracks_list, motile_run, tmp_path
+    ):
+        """The default save directory may not exist yet on a fresh install."""
+        tracks_list.add_tracks(motile_run, "run1", select=True)
+        missing = tmp_path / "does" / "not" / "exist"
+        tracks_list.save_dir_line.setText(str(missing))
+        item = tracks_list.tracks_list.item(0)
+
         tracks_list.save_tracks(item)
 
-        assert len(emitted) == 0
+        assert (missing / "run1.geff").exists()
 
 
 # ---------------------------------------------------------------------------
@@ -227,37 +326,22 @@ class TestTracksListSaveSolutionTracks:
     def test_solution_tracks_saved_directly_to_path(
         self, tracks_list, solution_tracks_2d, tmp_path
     ):
-        """SolutionTracks should be saved directly via write_to_geff,
-        not wrapped in MotileRun. The geff store is written directly at
-        the user-chosen path (no timestamped subdirectory).
-        """
-        tracks_list.add_tracks(solution_tracks_2d, "imported", select=False)
+        """SolutionTracks are written with write_to_geff at the save path,
+        not wrapped in a MotileRun."""
+        tracks_list.add_tracks(solution_tracks_2d, "imported", select=True)
+        tracks_list.save_dir_line.setText(str(tmp_path))
         item = tracks_list.tracks_list.item(0)
-
-        save_path = tmp_path / "my_tracks.geff"
-
-        tracks_list.save_geff_dialog.exec_ = MagicMock(return_value=True)
-        tracks_list.save_geff_dialog.selectedFiles = MagicMock(
-            return_value=[str(save_path)]
-        )
 
         tracks_list.save_tracks(item)
 
-        # write_to_geff writes the geff store directly at the given path
-        assert save_path.exists()
+        assert (tmp_path / "imported.geff").exists()
 
     def test_solution_tracks_save_emits_signal(
         self, tracks_list, solution_tracks_2d, tmp_path
     ):
-        tracks_list.add_tracks(solution_tracks_2d, "imported", select=False)
+        tracks_list.add_tracks(solution_tracks_2d, "imported", select=True)
+        tracks_list.save_dir_line.setText(str(tmp_path))
         item = tracks_list.tracks_list.item(0)
-
-        save_path = tmp_path / "my_tracks.geff"
-
-        tracks_list.save_geff_dialog.exec_ = MagicMock(return_value=True)
-        tracks_list.save_geff_dialog.selectedFiles = MagicMock(
-            return_value=[str(save_path)]
-        )
 
         emitted = []
         tracks_list.tracks_saved.connect(lambda t, p: emitted.append((t, p)))
@@ -266,70 +350,76 @@ class TestTracksListSaveSolutionTracks:
 
         assert len(emitted) == 1
         assert emitted[0][0] is solution_tracks_2d
-        assert emitted[0][1] == save_path
+        assert emitted[0][1] == tmp_path / "imported.geff"
 
-    def test_solution_tracks_save_overwrites(
-        self, tracks_list, solution_tracks_2d, tmp_path
-    ):
-        """Saving the same SolutionTracks twice to the same path should
-        overwrite rather than fail.
-        """
-        tracks_list.add_tracks(solution_tracks_2d, "imported", select=False)
+    def test_save_respects_edited_name(self, tracks_list, solution_tracks_2d, tmp_path):
+        """A name the user typed is where the tracks go."""
+        tracks_list.add_tracks(solution_tracks_2d, "imported", select=True)
+        tracks_list.save_dir_line.setText(str(tmp_path))
+        tracks_list.save_name_line.setText("chosen_by_me")
+        tracks_list.save_name_line.textEdited.emit("chosen_by_me")
         item = tracks_list.tracks_list.item(0)
 
-        save_path = tmp_path / "my_tracks.geff"
+        tracks_list.save_tracks(item)
 
-        tracks_list.save_geff_dialog.exec_ = MagicMock(return_value=True)
-        tracks_list.save_geff_dialog.selectedFiles = MagicMock(
-            return_value=[str(save_path)]
+        assert (tmp_path / "chosen_by_me.geff").exists()
+        assert not (tmp_path / "imported.geff").exists()
+
+
+# ---------------------------------------------------------------------------
+# TracksList — overwrite confirmation
+# ---------------------------------------------------------------------------
+
+
+class TestTracksListOverwrite:
+    """Saving no longer goes through a file dialog, so this confirmation is the
+    only thing guarding an existing store."""
+
+    def _setup(self, tracks_list, tracks, tmp_path):
+        tracks_list.add_tracks(tracks, "imported", select=True)
+        tracks_list.save_dir_line.setText(str(tmp_path))
+        return tracks_list.tracks_list.item(0)
+
+    def test_no_confirmation_when_path_is_free(
+        self, tracks_list, solution_tracks_2d, tmp_path, monkeypatch
+    ):
+        item = self._setup(tracks_list, solution_tracks_2d, tmp_path)
+        asked = []
+        monkeypatch.setattr(
+            tracks_list, "_confirm_overwrite", lambda p: asked.append(p) or True
         )
 
-        # Save twice — should not raise
-        tracks_list.save_tracks(item)
         tracks_list.save_tracks(item)
 
-        assert save_path.exists()
+        assert asked == []
 
-    def test_solution_tracks_save_cancelled(
-        self, tracks_list, solution_tracks_2d, tmp_path
+    def test_overwrite_confirmed_writes(
+        self, tracks_list, solution_tracks_2d, tmp_path, monkeypatch
     ):
-        """Cancelling the geff save dialog should write nothing and emit nothing."""
-        tracks_list.add_tracks(solution_tracks_2d, "imported", select=False)
-        item = tracks_list.tracks_list.item(0)
+        item = self._setup(tracks_list, solution_tracks_2d, tmp_path)
+        monkeypatch.setattr(tracks_list, "_confirm_overwrite", lambda p: True)
 
-        tracks_list.save_geff_dialog.exec_ = MagicMock(return_value=False)
+        tracks_list.save_tracks(item)
+        tracks_list.save_tracks(item)
 
+        assert (tmp_path / "imported.geff").exists()
+
+    def test_overwrite_declined_does_not_write_or_emit(
+        self, tracks_list, solution_tracks_2d, tmp_path, monkeypatch
+    ):
+        item = self._setup(tracks_list, solution_tracks_2d, tmp_path)
+        tracks_list.save_tracks(item)
+
+        monkeypatch.setattr(tracks_list, "_confirm_overwrite", lambda p: False)
         emitted = []
         tracks_list.tracks_saved.connect(lambda t, p: emitted.append((t, p)))
+        marker = tmp_path / "imported.geff" / "untouched.txt"
+        marker.write_text("still here")
 
         tracks_list.save_tracks(item)
 
-        assert list(tmp_path.iterdir()) == []
+        assert marker.read_text() == "still here"
         assert len(emitted) == 0
-
-    def test_solution_tracks_save_dialog_prefills_name(
-        self, tracks_list, solution_tracks_2d, tmp_path
-    ):
-        """The geff save dialog is pre-filled with a .geff name derived from
-        the tracks name, so the user names a new store rather than picking an
-        existing directory to overwrite.
-        """
-        tracks_list.add_tracks(solution_tracks_2d, "imported", select=False)
-        item = tracks_list.tracks_list.item(0)
-
-        save_path = tmp_path / "imported.geff"
-        tracks_list.save_geff_dialog.exec_ = MagicMock(return_value=True)
-        tracks_list.save_geff_dialog.selectedFiles = MagicMock(
-            return_value=[str(save_path)]
-        )
-        tracks_list.save_geff_dialog.selectFile = MagicMock()
-
-        tracks_list.save_tracks(item)
-
-        tracks_list.save_geff_dialog.selectFile.assert_called_once()
-        assert tracks_list.save_geff_dialog.selectFile.call_args[0][0].endswith(
-            "imported.geff"
-        )
 
 
 # ---------------------------------------------------------------------------

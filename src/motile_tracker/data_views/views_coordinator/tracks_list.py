@@ -5,6 +5,7 @@ from functools import partial
 from pathlib import Path
 from warnings import warn
 
+from appdirs import AppDirs
 from fonticon_fa6 import FA6S
 from funtracks.data_model import SolutionTracks, Tracks
 from funtracks.import_export import import_from_geff, write_to_geff
@@ -18,8 +19,10 @@ from qtpy.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QListWidget,
     QListWidgetItem,
+    QMessageBox,
     QPushButton,
     QVBoxLayout,
     QWidget,
@@ -31,6 +34,18 @@ from motile_tracker.import_export.menus.import_dialog import (
     ImportDialog,
 )
 from motile_tracker.motile.backend.motile_run import MotileRun
+
+GEFF_SUFFIX = ".geff"
+
+
+def default_save_dir() -> Path:
+    """Directory the save path starts in.
+
+    The same appdirs location the sample data is downloaded to, so that saved
+    tracks land somewhere the application already owns rather than in the
+    user's home directory.
+    """
+    return Path(AppDirs("motile-tracker").user_data_dir)
 
 
 def _as_solution_tracks(tracks: Tracks) -> SolutionTracks:
@@ -103,9 +118,10 @@ class TracksList(QGroupBox):
     Dependent applications can connect to this signal to save additional
     data (e.g. solver parameters) alongside the tracks.
 
-    The path is the geff store the tracks were written to. For a MotileRun that
-    is the tracks.geff inside the timestamped run directory, so data saved
-    beside the tracks (e.g. solver params) lives in the parent."""
+    The path is the geff store the tracks were written to. A geff is a zarr
+    directory, and writing one only replaces geff-controlled groups, so
+    listeners should write their own data *inside* this path: it survives the
+    tracks being saved again over the same store."""
 
     tracks_loaded = Signal(object, Path)
     """Emitted after tracks are loaded from disk. Arguments: (tracks, path).
@@ -113,13 +129,12 @@ class TracksList(QGroupBox):
     data (e.g. solver parameters) from the same location.
 
     The path is the geff store the tracks were read from, matching what
-    tracks_saved reports for the same tracks. For a MotileRun that is the
-    tracks.geff inside the run directory, so data stored beside the tracks
-    (e.g. solver params) lives in the parent. It is never a container a geff
-    merely happened to be found inside.
+    tracks_saved reports for the same tracks, so data written inside it by a
+    tracks_saved listener is found here. It is never a container a geff merely
+    happened to be found inside.
 
-    The exception is a CSV import, which reports the .csv file, and a v1 run
-    directory, which has no geff and reports the directory itself. Listeners
+    The exceptions are a CSV import, which reports the .csv file, and a v1 motile
+    run directory, which reports the directory holding the networkx graph json. Listeners
     should tolerate a file as well as a directory."""
 
     def __init__(self):
@@ -130,19 +145,32 @@ class TracksList(QGroupBox):
         self.file_dialog.setFileMode(QFileDialog.Directory)
         self.file_dialog.setOption(QFileDialog.ShowDirsOnly, True)
 
-        self.save_dialog = QFileDialog()
-        self.save_dialog.setFileMode(QFileDialog.Directory)
-        self.save_dialog.setOption(QFileDialog.ShowDirsOnly, True)
+        # Where the save button writes to. Auto-filled, but the user can point
+        # it anywhere; edits last for the session. The label and browse button
+        # sit above the directory field so that the path, which is long, gets
+        # the full width of the dock.
+        self._save_name_edited = False
 
-        # Saving plain Tracks/SolutionTracks writes a geff store directly at the
-        # chosen path, so the user must be able to name a new store (or pick an
-        # existing one to replace). AcceptSave also gives us the native
-        # "file exists, replace?" confirmation for free.
-        self.save_geff_dialog = QFileDialog()
-        self.save_geff_dialog.setFileMode(QFileDialog.AnyFile)
-        self.save_geff_dialog.setAcceptMode(QFileDialog.AcceptSave)
-        self.save_geff_dialog.setNameFilter("Geff store (*.geff)")
-        self.save_geff_dialog.setDefaultSuffix("geff")
+        self.save_browse_button = QPushButton("Browse")
+        self.save_browse_button.setAutoDefault(0)
+        self.save_browse_button.clicked.connect(self._browse_save_dir)
+
+        save_dir_header = QHBoxLayout()
+        save_dir_header.addWidget(QLabel("Save directory:"))
+        save_dir_header.addStretch()
+        save_dir_header.addWidget(self.save_browse_button)
+
+        self.save_dir_line = QLineEdit(str(default_save_dir()))
+
+        # The .geff suffix is shown as a fixed label rather than being typed,
+        # so the user cannot omit or misspell it. save_path() adds it back.
+        self.save_name_line = QLineEdit()
+        self.save_name_line.textEdited.connect(self._on_save_name_edited)
+
+        save_name_row = QHBoxLayout()
+        save_name_row.addWidget(QLabel("Save filename:"))
+        save_name_row.addWidget(self.save_name_line)
+        save_name_row.addWidget(QLabel(GEFF_SUFFIX))
 
         self.tracks_list = QListWidget()
         self.tracks_list.setSelectionMode(
@@ -168,6 +196,9 @@ class TracksList(QGroupBox):
         load_menu.addWidget(load_button)
 
         layout = QVBoxLayout()
+        layout.addLayout(save_dir_header)
+        layout.addWidget(self.save_dir_line)
+        layout.addLayout(save_name_row)
         layout.addWidget(self.tracks_list)
         layout.addLayout(load_menu)
         self.setLayout(layout)
@@ -183,13 +214,70 @@ class TracksList(QGroupBox):
             return None
         return dialog.tracks, dialog.name, dialog.source_path
 
+    def _browse_save_dir(self) -> None:
+        """Let the user pick the directory that saved tracks are written to."""
+        directory = QFileDialog.getExistingDirectory(
+            self, "Select save directory", self.save_dir_line.text()
+        )
+        if directory:
+            self.save_dir_line.setText(directory)
+
+    def _confirm_overwrite(self, path: Path) -> bool:
+        """Ask before replacing something already at the save path.
+
+        Saving no longer goes through a file dialog, so this is the only thing
+        standing between a stray click and an overwritten store.
+        """
+        answer = QMessageBox.question(
+            self,
+            "Replace existing tracks?",
+            f"{path} already exists. Replace it?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        return answer == QMessageBox.Yes
+
+    def _on_save_name_edited(self) -> None:
+        """Stop auto-filling the name once the user has typed their own.
+
+        Connected to textEdited rather than textChanged, so that the
+        programmatic setText in _update_save_name does not count as an edit.
+        """
+        self._save_name_edited = True
+
+    def _update_save_name(self, name: str) -> None:
+        """Point the save name at the given tracks, unless the user renamed it.
+
+        Names in the list are not unique, so this only ever changes the name
+        field: the directory stays put, and a collision shows up as a visible
+        name the user can edit rather than silently redirecting the save.
+
+        The name is shown without its .geff suffix, which the UI displays as a
+        fixed label beside the field.
+        """
+        if not self._save_name_edited:
+            self.save_name_line.setText(name.removesuffix(GEFF_SUFFIX))
+
+    def save_path(self) -> Path | None:
+        """The geff store that the save button writes to.
+
+        Combines the save directory with the filename and re-attaches the
+        .geff suffix that the UI shows as a fixed label. Returns None if
+        either field is blank.
+        """
+        directory = self.save_dir_line.text().strip()
+        name = self.save_name_line.text().strip().removesuffix(GEFF_SUFFIX)
+        if not directory or not name:
+            return None
+        return Path(directory) / f"{name}{GEFF_SUFFIX}"
+
     def _selection_changed(self):
         selected = self.tracks_list.selectedItems()
         if selected:
             tracks_button = self.tracks_list.itemWidget(selected[0])
-            self.view_tracks.emit(
-                _as_solution_tracks(tracks_button.tracks), tracks_button.name.text()
-            )
+            name = tracks_button.name.text()
+            self._update_save_name(name)
+            self.view_tracks.emit(_as_solution_tracks(tracks_button.tracks), name)
 
     def add_tracks(self, tracks: Tracks, name: str, select=True):
         """Add tracks to the list and optionally select them. Will make a new
@@ -242,41 +330,34 @@ class TracksList(QGroupBox):
         """Saves a tracks object from the list. You must pass the list item that
         represents the tracks, not the tracks object itself.
 
-        For MotileRun objects, the user picks a parent directory and
-        MotileRun.save() creates a timestamped subdirectory inside it,
-        storing solver params alongside the tracks.
-
-        For plain Tracks/SolutionTracks, the user names a geff store (or
-        selects an existing one to replace) and write_to_geff writes the
-        store directly at that path.
+        Writes a geff store at the path shown in the save fields above the
+        list, confirming first if something is already there. A MotileRun
+        additionally stores its solver params inside that store.
 
         After saving, emits the tracks_saved signal with the geff store that
-        was written, so that downstream code can save additional data beside
-        it. For a MotileRun that is the tracks.geff inside the run directory,
-        not the run directory itself.
+        was written, so that downstream code can save additional data inside
+        it.
 
         Args:
             item (QListWidgetItem): The list item to save. This list item
                 contains the TracksButton that represents a set of tracks.
         """
+        saved_path = self.save_path()
+        if saved_path is None:
+            warn(
+                "Cannot save without both a save directory and a filename.",
+                stacklevel=2,
+            )
+            return
+        if saved_path.exists() and not self._confirm_overwrite(saved_path):
+            return
+
         widget: TracksButton = self.tracks_list.itemWidget(item)
         tracks: Tracks = widget.tracks
+        saved_path.parent.mkdir(parents=True, exist_ok=True)
         if isinstance(tracks, MotileRun):
-            if not self.save_dialog.exec_():
-                return
-            directory = Path(self.save_dialog.selectedFiles()[0])
-            run_dir = tracks.save(directory)
-            # Report the geff store, not the run directory that contains it, so
-            # that saving and loading name the same thing. Sibling data (solver
-            # params) lives in its parent. save() always writes a geff, so
-            # geff_path is never None here (only loaded v1 runs lack one).
-            saved_path = MotileRun.geff_path(run_dir)
+            tracks.save(saved_path)
         else:
-            name = widget.name.text()
-            self.save_geff_dialog.selectFile(str(Path.home() / f"{name}.geff"))
-            if not self.save_geff_dialog.exec_():
-                return
-            saved_path = Path(self.save_geff_dialog.selectedFiles()[0])
             write_to_geff(tracks, saved_path, overwrite=True)
         self.tracks_saved.emit(tracks, saved_path)
 
