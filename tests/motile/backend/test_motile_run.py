@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 
 from motile_tracker.motile.backend import MotileRun, SolverParams
@@ -29,6 +31,29 @@ def test_save_writes_params_inside_the_geff(tmp_path, graph_2d):
     assert (run_dir / "solver_params.json").exists()
     assert (run_dir / "attrs.json").exists()
     assert (run_dir / "nodes").exists()
+
+
+def test_resave_is_quiet(tmp_path, graph_2d):
+    """Overwriting a run must not warn about its own files.
+
+    The run keeps solver params, attrs, gaps and input points inside the geff
+    store. Zarr walks the directory while the geff is being replaced and warns
+    once per file it does not recognise, which is expected and not actionable.
+    """
+    run = MotileRun(graph=graph_2d, run_name="test", solver_params=SolverParams())
+    path = tmp_path / "my_run.geff"
+    run.save(path)
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        run.save(path)
+
+    unrecognized = [
+        w for w in caught if "not recognized as a component" in str(w.message)
+    ]
+    non_geff = [w for w in caught if "non-geff members" in str(w.message)]
+    assert unrecognized == []
+    assert non_geff == []
 
 
 def test_resave_preserves_params(tmp_path, graph_2d):

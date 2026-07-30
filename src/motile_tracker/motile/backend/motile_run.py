@@ -8,7 +8,9 @@ from typing import TYPE_CHECKING
 import numpy as np
 import tracksdata as td
 from funtracks.data_model import SolutionTracks
-from funtracks.import_export import import_from_geff, load_v1_tracks, write_to_geff
+from funtracks.import_export import import_from_geff, load_v1_tracks
+
+from motile_tracker.import_export.geff_io import write_geff_over
 
 from .solver_params import SolverParams
 
@@ -154,7 +156,7 @@ class MotileRun(SolutionTracks):
         """
         run_dir = Path(path)
         run_dir.mkdir(parents=True, exist_ok=True)
-        write_to_geff(self, run_dir, overwrite=True)
+        write_geff_over(self, run_dir)
         self._save_params(run_dir)
         self._save_attrs(run_dir)
         if self.input_points is not None:

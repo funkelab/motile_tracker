@@ -8,7 +8,7 @@ from warnings import warn
 from appdirs import AppDirs
 from fonticon_fa6 import FA6S
 from funtracks.data_model import SolutionTracks, Tracks
-from funtracks.import_export import import_from_geff, write_to_geff
+from funtracks.import_export import import_from_geff
 from napari._qt.qt_resources import QColoredSVGIcon
 from qtpy.QtCore import Signal
 from qtpy.QtWidgets import (
@@ -29,6 +29,7 @@ from qtpy.QtWidgets import (
 )
 from superqt.fonticon import icon as qticon
 
+from motile_tracker.import_export.geff_io import write_geff_over
 from motile_tracker.import_export.menus.export_dialog import ExportDialog
 from motile_tracker.import_export.menus.import_dialog import (
     ImportDialog,
@@ -358,7 +359,7 @@ class TracksList(QGroupBox):
         if isinstance(tracks, MotileRun):
             tracks.save(saved_path)
         else:
-            write_to_geff(tracks, saved_path, overwrite=True)
+            write_geff_over(tracks, saved_path)
         self.tracks_saved.emit(tracks, saved_path)
 
     def remove_tracks(self, item: QListWidgetItem):
