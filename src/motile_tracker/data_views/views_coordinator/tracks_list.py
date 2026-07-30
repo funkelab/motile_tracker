@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 from functools import partial
 from pathlib import Path
 from warnings import warn
 
 from fonticon_fa6 import FA6S
-from funtracks.data_model import Tracks
+from funtracks.data_model import SolutionTracks, Tracks
 from funtracks.import_export import import_from_geff, write_to_geff
 from napari._qt.qt_resources import QColoredSVGIcon
 from qtpy.QtCore import Signal
@@ -28,6 +30,26 @@ from motile_tracker.import_export.menus.import_dialog import (
     ImportDialog,
 )
 from motile_tracker.motile.backend.motile_run import MotileRun
+
+
+def _as_solution_tracks(tracks: Tracks) -> SolutionTracks:
+    """Return a SolutionTracks view of the given tracks.
+
+    The list stores plain Tracks, but the views and actions downstream of
+    view_tracks still require track IDs, so they are handed a SolutionTracks.
+    Objects that are already SolutionTracks (including MotileRun) are passed
+    through unchanged, so a solved run keeps its solver params and identity.
+
+    Defers to the (deprecated) SolutionTracks.from_tracks rather than
+    reconstructing here, so that scale, ndim, features and segmentation are
+    carried over in one place instead of being re-derived.
+
+    TODO: remove once motile_tracker operates on Tracks directly and consumers
+    call tracks.graph_solution themselves.
+    """
+    if isinstance(tracks, SolutionTracks):
+        return tracks
+    return SolutionTracks.from_tracks(tracks)
 
 
 class TracksButton(QWidget):
@@ -149,7 +171,9 @@ class TracksList(QGroupBox):
         selected = self.tracks_list.selectedItems()
         if selected:
             tracks_button = self.tracks_list.itemWidget(selected[0])
-            self.view_tracks.emit(tracks_button.tracks, tracks_button.name.text())
+            self.view_tracks.emit(
+                _as_solution_tracks(tracks_button.tracks), tracks_button.name.text()
+            )
 
     def add_tracks(self, tracks: Tracks, name: str, select=True):
         """Add tracks to the list and optionally select them. Will make a new

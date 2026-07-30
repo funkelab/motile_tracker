@@ -8,7 +8,7 @@ import warnings
 from unittest.mock import MagicMock, patch
 
 import pytest
-from funtracks.data_model import SolutionTracks
+from funtracks.data_model import SolutionTracks, Tracks
 from funtracks.import_export import write_to_geff
 from qtpy.QtWidgets import QDialog
 
@@ -91,6 +91,42 @@ class TestTracksListAddRemove:
         widget = tracks_list.tracks_list.itemWidget(item)
         assert isinstance(widget.tracks, SolutionTracks)
         assert not isinstance(widget.tracks, MotileRun)
+
+    def test_view_tracks_emits_solution_tracks_for_plain_tracks(
+        self, tracks_list, graph_2d
+    ):
+        """The list stores plain Tracks, but view_tracks must emit a
+        SolutionTracks because the views and actions still need track IDs.
+        """
+        plain_tracks = Tracks(graph_2d, ndim=3, time_attr="t")
+
+        emitted = []
+        tracks_list.view_tracks.connect(lambda t, n: emitted.append((t, n)))
+        tracks_list.add_tracks(plain_tracks, "plain", select=True)
+
+        # stored as-is, not converted on the way in
+        item = tracks_list.tracks_list.item(0)
+        assert tracks_list.tracks_list.itemWidget(item).tracks is plain_tracks
+
+        assert len(emitted) == 1
+        converted = emitted[0][0]
+        assert isinstance(converted, SolutionTracks)
+        # the conversion must carry over the attributes the views rely on
+        # rather than re-deriving them
+        assert converted.scale == plain_tracks.scale
+        assert converted.ndim == plain_tracks.ndim
+        assert (converted.segmentation is None) == (plain_tracks.segmentation is None)
+
+    def test_view_tracks_passes_through_motile_run(self, tracks_list, motile_run):
+        """A MotileRun is already a SolutionTracks, so it must be emitted
+        unchanged rather than rebuilt (which would drop its solver params).
+        """
+        emitted = []
+        tracks_list.view_tracks.connect(lambda t, n: emitted.append((t, n)))
+        tracks_list.add_tracks(motile_run, "run1", select=True)
+
+        assert len(emitted) == 1
+        assert emitted[0][0] is motile_run
 
 
 # ---------------------------------------------------------------------------
@@ -342,7 +378,9 @@ class TestTracksListLoadGeff:
         tracks_list.load_internal_tracks()
 
         assert len(emitted) == 1
-        assert isinstance(emitted[0][0], SolutionTracks)
+        # tracks_loaded hands out the stored object as-is, which is a plain
+        # Tracks. Only view_tracks converts to SolutionTracks.
+        assert isinstance(emitted[0][0], Tracks)
         assert emitted[0][1] == geff_path
 
     def test_load_internal_tracks_bad_path_warns(self, tracks_list, tmp_path):
