@@ -103,6 +103,37 @@ class MotileRun(SolutionTracks):
             ) from e
         return time, run_name
 
+    @classmethod
+    def _resolve_name_and_time(
+        cls, run_dir: Path, attrs: dict | None
+    ) -> tuple[datetime | None, str]:
+        """Determine the run name and run time for a run being loaded.
+
+        Runs used to be saved in a directory named by _make_id, so the name and
+        time could be recovered by unpacking the directory name. Newer runs
+        store both in the attrs file instead, which lets them be saved to a
+        directory the user named. Falls back through both, and finally to the
+        directory name with no time, so that a run directory is loadable
+        however it was named. A None time is replaced with the current time by
+        __init__, so the run still displays.
+
+        Args:
+            run_dir (Path): The directory the run is being loaded from.
+            attrs (dict | None): The loaded attrs, or None if there is no
+                attrs file.
+
+        Returns:
+            tuple[datetime | None, str]: The run time and run name.
+        """
+        if attrs is not None and attrs.get("run_name") is not None:
+            stamp = attrs.get("time")
+            time = datetime.fromisoformat(stamp) if stamp is not None else None
+            return time, attrs["run_name"]
+        try:
+            return cls._unpack_id(run_dir.stem)
+        except ValueError:
+            return None, run_dir.stem
+
     def save(self, base_path: str | Path, save_segmentation: bool = False) -> Path:
         """Save the run in the provided directory. Creates a subdirectory from
         the timestamp and run name and stores one file for each element of the
@@ -161,10 +192,10 @@ class MotileRun(SolutionTracks):
         """
         if isinstance(run_dir, str):
             run_dir = Path(run_dir)
-        time, run_name = cls._unpack_id(run_dir.stem)
         params = cls._load_params(run_dir)
         input_points = cls._load_array(run_dir, IN_POINTS_FILENAME, required=False)
         attrs = cls._load_attrs(run_dir)
+        time, run_name = cls._resolve_name_and_time(run_dir, attrs)
         # Support old v1 ("graph.json" at run dir level), intermediate ("tracks" zarr),
         # and new ("tracks.geff") save formats
         tracks_path = run_dir / "tracks.geff"
@@ -278,7 +309,15 @@ class MotileRun(SolutionTracks):
             return None
 
     def _save_attrs(self, directory: Path):
-        """Save the time_attr, pos_attr, scale, and segmentation_shape in a json file.
+        """Save the run name, run time, time_attr, pos_attr, scale, and
+        segmentation_shape in a json file.
+
+        The run name and time are stored here rather than being recoverable
+        from the directory name alone (see _make_id), so that a run can be
+        saved to a directory the user named.
+
+        Note that "time" is when the run was solved, while "time_attr" is the
+        name of the graph's time column.
 
         Args:
             directory (Path):  The directory in which to save the attributes
@@ -294,6 +333,8 @@ class MotileRun(SolutionTracks):
             "segmentation_shape": list(seg_shape) if seg_shape is not None else None,
             "scale": scale,
             "time_attr": self.features.time_key,
+            "run_name": self.run_name,
+            "time": self.time.isoformat(),
         }
         with open(out_path, "w") as f:
             json.dump(attrs_dict, f)

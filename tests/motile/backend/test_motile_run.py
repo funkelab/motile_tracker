@@ -31,6 +31,45 @@ def test_geff_path_none_for_v1_run(tmp_path):
     assert MotileRun.geff_path(run_dir) is None
 
 
+def test_load_run_dir_renamed_to_non_timestamp(tmp_path, graph_2d):
+    """A run directory the user renamed must still load.
+
+    The name and time come from the attrs file, so they survive a rename that
+    _unpack_id could not parse.
+    """
+    run = MotileRun(graph=graph_2d, run_name="my_run", solver_params=SolverParams())
+    run_dir = run.save(tmp_path)
+    renamed = run_dir.rename(tmp_path / "not_a_timestamp")
+
+    loaded = MotileRun.load(renamed)
+
+    assert loaded.run_name == "my_run"
+    assert loaded.time == run.time
+
+
+def test_load_falls_back_to_unpack_id_without_attrs(tmp_path, graph_2d):
+    """Runs saved before the name/time were written to attrs still load by
+    unpacking the timestamped directory name."""
+    run = MotileRun(graph=graph_2d, run_name="test", solver_params=SolverParams())
+    run_dir = run.save(tmp_path)
+    (run_dir / "attrs.json").unlink()
+
+    loaded = MotileRun.load(run_dir)
+
+    assert loaded.run_name == "test"
+    # the directory-name timestamp only has second granularity
+    assert loaded.time == run.time.replace(microsecond=0)
+
+
+def test_resolve_name_and_time_falls_back_to_dir_stem(tmp_path):
+    """With neither attrs nor a parseable directory name, the directory name
+    is used and the time is left for __init__ to fill in."""
+    time, name = MotileRun._resolve_name_and_time(tmp_path / "some_run", None)
+
+    assert name == "some_run"
+    assert time is None
+
+
 def test_save_load(tmp_path, graph_2d):
     run_name = "test"
     scale = [1.0, 2.0, 3.0]
@@ -48,7 +87,9 @@ def test_save_load(tmp_path, graph_2d):
     }
     assert run.run_name == newrun.run_name
     assert np.array_equal(np.asarray(run.segmentation), np.asarray(newrun.segmentation))
-    assert run.time.replace(microsecond=0) == newrun.time
+    # the time now round-trips exactly: it comes from the attrs file rather
+    # than from the second-granularity timestamp in the directory name
+    assert run.time == newrun.time
     assert run.gaps == newrun.gaps
     assert run.scale == newrun.scale
     assert run.solver_params == newrun.solver_params
