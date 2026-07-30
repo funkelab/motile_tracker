@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import tracksdata as td
 from funtracks.data_model import SolutionTracks
-from funtracks.import_export import export_to_geff, import_from_geff, load_v1_tracks
+from funtracks.import_export import import_from_geff, load_v1_tracks, write_to_geff
 
 from .solver_params import SolverParams
 
@@ -134,22 +134,27 @@ class MotileRun(SolutionTracks):
         except ValueError:
             return None, run_dir.stem
 
-    def save(self, base_path: str | Path, save_segmentation: bool = False) -> Path:
-        """Save the run in the provided directory. Creates a subdirectory from
-        the timestamp and run name and stores one file for each element of the
-        run in that subdirectory.
+    def save(self, path: str | Path, save_segmentation: bool = False) -> Path:
+        """Save the run as a geff store at the provided path.
+
+        The geff store is written at exactly `path` — no subdirectory is
+        created — and the rest of the run (solver params, attrs, input points,
+        gaps) is stored inside that store alongside the graph. A geff is a zarr
+        directory, and writing a geff only replaces geff-controlled groups, so
+        these files survive re-saving over the same store.
 
         Args:
-            base_path (str | Path): The directory to save the run in.
+            path (str | Path): The geff store to save the run to. Created if
+                it does not exist, and replaced if it does.
+            save_segmentation (bool): Ignored. Kept for backwards
+                compatibility; the segmentation is never written here.
 
         Returns:
-            (Path): The Path that the run was saved in. The last part of the
-            path is the directory that was created to store the run.
+            (Path): The Path that the run was saved to.
         """
-        base_path = Path(base_path)
-        run_dir = base_path / self._make_id()
-        Path.mkdir(run_dir)
-        export_to_geff(self, run_dir, save_segmentation=save_segmentation)
+        run_dir = Path(path)
+        run_dir.mkdir(parents=True, exist_ok=True)
+        write_to_geff(self, run_dir, overwrite=True)
         self._save_params(run_dir)
         self._save_attrs(run_dir)
         if self.input_points is not None:
@@ -159,21 +164,39 @@ class MotileRun(SolutionTracks):
 
     @staticmethod
     def geff_path(run_dir: Path | str) -> Path | None:
-        """Return the geff store inside a saved run directory.
+        """Return the geff store holding a saved run's graph.
 
-        Mirrors the layouts that :meth:`load` accepts. Returns None for v1 runs,
-        which stored the graph as graph.json rather than as a geff.
+        Mirrors the layouts that :meth:`load` accepts. Runs saved by the
+        current version are themselves the geff store. Returns None for v1
+        runs, which stored the graph as graph.json rather than as a geff.
 
         Args:
             run_dir (Path | str): A directory created by MotileRun.save.
         """
         run_dir = Path(run_dir)
+        if MotileRun._is_geff(run_dir):
+            return run_dir
         tracks_path = run_dir / "tracks.geff"
         if tracks_path.exists():
             return tracks_path
         if (run_dir / "graph.json").exists():
             return None
         return run_dir / "tracks"
+
+    @staticmethod
+    def _is_geff(directory: Path) -> bool:
+        """Whether the given directory is itself a geff store.
+
+        A geff keeps its graph in `nodes`/`edges` groups at the top level, so
+        their presence distinguishes a run saved as a geff from an older run
+        directory that merely contains one.
+
+        Note that geff's own `check_for_geff` cannot be used here: it reports
+        whether a geff exists at or under a store, and so returns True for an
+        old run directory containing tracks.geff, for a v1 run directory, and
+        even for an empty one. Telling those apart is exactly what load() needs.
+        """
+        return (directory / "nodes").exists() and (directory / "edges").exists()
 
     @classmethod
     def load(cls, run_dir: Path | str, output_required: bool = True):
@@ -196,10 +219,13 @@ class MotileRun(SolutionTracks):
         input_points = cls._load_array(run_dir, IN_POINTS_FILENAME, required=False)
         attrs = cls._load_attrs(run_dir)
         time, run_name = cls._resolve_name_and_time(run_dir, attrs)
-        # Support old v1 ("graph.json" at run dir level), intermediate ("tracks" zarr),
-        # and new ("tracks.geff") save formats
+        # Support the current format (the run dir is itself the geff store) as
+        # well as old v1 ("graph.json" at run dir level), intermediate
+        # ("tracks" zarr), and ("tracks.geff") save formats
         tracks_path = run_dir / "tracks.geff"
-        if tracks_path.exists():
+        if cls._is_geff(run_dir):
+            tracks = import_from_geff(run_dir)
+        elif tracks_path.exists():
             tracks = import_from_geff(tracks_path)
         elif (run_dir / "graph.json").exists():
             tracks = load_v1_tracks(run_dir, solution=True)

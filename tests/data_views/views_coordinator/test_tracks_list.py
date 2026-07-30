@@ -135,20 +135,22 @@ class TestTracksListAddRemove:
 
 
 class TestTracksListSave:
-    def test_save_motile_run_creates_subdirectory(
+    def test_save_motile_run_writes_geff_at_chosen_path(
         self, tracks_list, motile_run, tmp_path
     ):
-        """MotileRun.save() creates a timestamped subdirectory."""
+        """MotileRun.save() writes the geff store at exactly the chosen path,
+        with no intervening subdirectory."""
         tracks_list.add_tracks(motile_run, "run1", select=False)
         item = tracks_list.tracks_list.item(0)
 
+        save_path = tmp_path / "run1.geff"
         tracks_list.save_dialog.exec_ = MagicMock(return_value=True)
-        tracks_list.save_dialog.selectedFiles = MagicMock(return_value=[str(tmp_path)])
+        tracks_list.save_dialog.selectedFiles = MagicMock(return_value=[str(save_path)])
 
         tracks_list.save_tracks(item)
 
-        saved_dirs = [p for p in tmp_path.iterdir() if p.is_dir()]
-        assert len(saved_dirs) == 1
+        assert (save_path / "nodes").exists()
+        assert list(tmp_path.iterdir()) == [save_path]
 
     def test_save_tracks_does_nothing_when_dialog_rejected(
         self, tracks_list, motile_run, tmp_path
@@ -177,18 +179,18 @@ class TestTracksListSave:
         assert len(emitted) == 1
         assert emitted[0][0] is motile_run
 
-    def test_save_motile_run_emits_geff_path_not_run_dir(
+    def test_save_motile_run_emits_geff_path_with_params_inside(
         self, tracks_list, motile_run, tmp_path
     ):
-        """tracks_saved must name the geff store, so that it matches what
-        tracks_loaded reports for the same run. The solver params live in the
-        parent directory.
+        """tracks_saved names the geff store, and the solver params live
+        inside it rather than beside it.
         """
         tracks_list.add_tracks(motile_run, "run1", select=False)
         item = tracks_list.tracks_list.item(0)
 
+        save_path = tmp_path / "run1.geff"
         tracks_list.save_dialog.exec_ = MagicMock(return_value=True)
-        tracks_list.save_dialog.selectedFiles = MagicMock(return_value=[str(tmp_path)])
+        tracks_list.save_dialog.selectedFiles = MagicMock(return_value=[str(save_path)])
 
         emitted = []
         tracks_list.tracks_saved.connect(lambda t, p: emitted.append((t, p)))
@@ -196,10 +198,9 @@ class TestTracksListSave:
         tracks_list.save_tracks(item)
 
         path = emitted[0][1]
-        assert path.name == "tracks.geff"
+        assert path == save_path
         assert path.exists()
-        # the run directory (with the params json beside the geff) is the parent
-        assert (path.parent / "solver_params.json").exists()
+        assert (path / "solver_params.json").exists()
 
     def test_save_does_not_emit_when_dialog_rejected(
         self, tracks_list, motile_run, tmp_path
@@ -338,7 +339,7 @@ class TestTracksListSaveSolutionTracks:
 
 class TestTracksListLoadMotileRun:
     def test_load_motile_run_success(self, tracks_list, motile_run, tmp_path):
-        save_dir = motile_run.save(tmp_path)
+        save_dir = motile_run.save(tmp_path / "run1.geff")
 
         tracks_list.file_dialog.exec_ = MagicMock(return_value=True)
         tracks_list.file_dialog.selectedFiles = MagicMock(return_value=[str(save_dir)])
@@ -347,9 +348,9 @@ class TestTracksListLoadMotileRun:
 
         assert isinstance(tracks, MotileRun)
         assert name == save_dir.stem
-        # the geff store inside the run dir is reported, not the run dir, so
-        # that loading and saving name the same thing
-        assert path == save_dir / "tracks.geff"
+        # the run dir is itself the geff store, so loading and saving name the
+        # same thing
+        assert path == save_dir
 
     def test_load_motile_run_adds_to_list_via_load_tracks(
         self, tracks_list, motile_run, tmp_path

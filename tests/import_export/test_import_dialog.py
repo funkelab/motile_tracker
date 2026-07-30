@@ -883,9 +883,10 @@ def test_motile_run_save_load(tmp_path, graph_2d):
         ndim=3,
         time_attr="t",
     )
-    run_dir = run.save(tmp_path)
+    run_dir = run.save(tmp_path / "test_run.geff")
 
-    assert (run_dir / "tracks.geff").exists()
+    # the run dir is itself the geff store, with the run's own files inside it
+    assert (run_dir / "nodes").exists()
     assert (run_dir / "solver_params.json").exists()
     assert (run_dir / "attrs.json").exists()
 
@@ -905,10 +906,15 @@ def test_motile_run_load_backward_compat(tmp_path, graph_2d):
         ndim=3,
         time_attr="t",
     )
-    run_dir = run.save(tmp_path)
+    saved = run.save(tmp_path / "old_run.geff")
 
-    # Simulate old save format: rename tracks.geff → tracks
-    (run_dir / "tracks.geff").rename(run_dir / "tracks")
+    # Simulate the old save format: the graph in a 'tracks' subdirectory of a
+    # run directory, rather than the run directory being the geff store itself
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    saved.rename(run_dir / "tracks")
+    for name in ("solver_params.json", "attrs.json"):
+        (run_dir / "tracks" / name).rename(run_dir / name)
     assert not (run_dir / "tracks.geff").exists()
 
     loaded = MotileRun.load(run_dir)

@@ -4,13 +4,43 @@ from motile_tracker.motile.backend import MotileRun, SolverParams
 
 
 def test_geff_path_finds_saved_geff(tmp_path, graph_2d):
-    """geff_path resolves the geff store that save() wrote."""
+    """A run saved by the current version is itself the geff store."""
     run = MotileRun(graph=graph_2d, run_name="test", solver_params=SolverParams())
-    run_dir = run.save(tmp_path)
+    run_dir = run.save(tmp_path / "my_run.geff")
 
     geff = MotileRun.geff_path(run_dir)
-    assert geff == run_dir / "tracks.geff"
+    assert geff == run_dir
     assert geff.exists()
+
+
+def test_geff_path_finds_nested_tracks_geff(tmp_path):
+    """Runs saved by the previous version nested the graph in tracks.geff."""
+    run_dir = tmp_path / "run"
+    (run_dir / "tracks.geff").mkdir(parents=True)
+
+    assert MotileRun.geff_path(run_dir) == run_dir / "tracks.geff"
+
+
+def test_save_writes_params_inside_the_geff(tmp_path, graph_2d):
+    """Solver params live inside the store, not beside it."""
+    run = MotileRun(graph=graph_2d, run_name="test", solver_params=SolverParams())
+    run_dir = run.save(tmp_path / "my_run.geff")
+
+    assert (run_dir / "solver_params.json").exists()
+    assert (run_dir / "attrs.json").exists()
+    assert (run_dir / "nodes").exists()
+
+
+def test_resave_preserves_params(tmp_path, graph_2d):
+    """Writing a geff only replaces geff-controlled groups, so the run's own
+    files survive being saved over."""
+    run = MotileRun(graph=graph_2d, run_name="test", solver_params=SolverParams())
+    path = tmp_path / "my_run.geff"
+    run.save(path)
+    run.save(path)
+
+    assert (path / "solver_params.json").exists()
+    assert MotileRun.load(path).solver_params == run.solver_params
 
 
 def test_geff_path_falls_back_to_tracks_dir(tmp_path):
@@ -38,7 +68,7 @@ def test_load_run_dir_renamed_to_non_timestamp(tmp_path, graph_2d):
     _unpack_id could not parse.
     """
     run = MotileRun(graph=graph_2d, run_name="my_run", solver_params=SolverParams())
-    run_dir = run.save(tmp_path)
+    run_dir = run.save(tmp_path / "my_run.geff")
     renamed = run_dir.rename(tmp_path / "not_a_timestamp")
 
     loaded = MotileRun.load(renamed)
@@ -51,7 +81,8 @@ def test_load_falls_back_to_unpack_id_without_attrs(tmp_path, graph_2d):
     """Runs saved before the name/time were written to attrs still load by
     unpacking the timestamped directory name."""
     run = MotileRun(graph=graph_2d, run_name="test", solver_params=SolverParams())
-    run_dir = run.save(tmp_path)
+    # reproduce the old layout: a directory named by _make_id
+    run_dir = run.save(tmp_path / run._make_id())
     (run_dir / "attrs.json").unlink()
 
     loaded = MotileRun.load(run_dir)
@@ -79,7 +110,7 @@ def test_save_load(tmp_path, graph_2d):
         solver_params=SolverParams(),
         scale=scale,
     )
-    path = run.save(tmp_path)
+    path = run.save(tmp_path / "test.geff")
     newrun = MotileRun.load(path)
     assert set(run.graph.node_ids()) == set(newrun.graph.node_ids())
     assert {tuple(e) for e in run.graph.edge_list()} == {
