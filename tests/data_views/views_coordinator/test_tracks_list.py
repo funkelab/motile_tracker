@@ -99,7 +99,9 @@ class TestTracksListAddRemove:
         """The list stores plain Tracks, but view_tracks must emit a
         SolutionTracks because the views and actions still need track IDs.
         """
-        plain_tracks = Tracks(graph_2d, ndim=3, time_attr="t")
+        # the fixture graph stores track ids in "track_id", so that has to be
+        # declared: tracklet_attr is how a caller names an existing column
+        plain_tracks = Tracks(graph_2d, ndim=3, time_attr="t", tracklet_attr="track_id")
 
         emitted = []
         tracks_list.view_tracks.connect(lambda t, n: emitted.append((t, n)))
@@ -117,6 +119,32 @@ class TestTracksListAddRemove:
         assert converted.scale == plain_tracks.scale
         assert converted.ndim == plain_tracks.ndim
         assert (converted.segmentation is None) == (plain_tracks.segmentation is None)
+        # the point of converting: the views need track ids to actually be on
+        # the graph, not merely named by the FeatureDict
+        assert converted.features.tracklet_key in converted.graph.node_attr_keys()
+        assert converted.features.lineage_key in converted.graph.node_attr_keys()
+
+    def test_view_tracks_computes_missing_track_ids(self, tracks_list, graph_2d):
+        """Tracks with no track id column at all must come out of the
+        conversion with one computed, not merely declared.
+
+        Tracks imported from a geff that never had track ids land here. On
+        funtracks < 2.1, passing a FeatureDict to Tracks.__init__ activates the
+        declared features without computing the missing ones, so the conversion
+        has to enable them itself. From 2.1 the constructor already computes
+        them, so this only checks that the outcome is the same either way.
+        """
+        graph_2d.remove_node_attr_key("track_id")
+        graph_2d.remove_node_attr_key("lineage_id")
+        plain_tracks = Tracks(graph_2d, ndim=3, time_attr="t")
+
+        emitted = []
+        tracks_list.view_tracks.connect(lambda t, n: emitted.append((t, n)))
+        tracks_list.add_tracks(plain_tracks, "plain", select=True)
+
+        converted = emitted[0][0]
+        assert converted.features.tracklet_key in converted.graph.node_attr_keys()
+        assert converted.features.lineage_key in converted.graph.node_attr_keys()
 
     def test_view_tracks_passes_through_motile_run(self, tracks_list, motile_run):
         """A MotileRun is already a SolutionTracks, so it must be emitted

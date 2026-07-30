@@ -57,16 +57,37 @@ def _as_solution_tracks(tracks: Tracks) -> SolutionTracks:
     Objects that are already SolutionTracks (including MotileRun) are passed
     through unchanged, so a solved run keeps its solver params and identity.
 
-    Defers to the (deprecated) SolutionTracks.from_tracks rather than
-    reconstructing here, so that scale, ndim, features and segmentation are
-    carried over in one place instead of being re-derived.
+    Constructs directly rather than using SolutionTracks.from_tracks, which in
+    funtracks 2.0.x reads features.tracklet_key off the graph before building
+    anything. tracklet_key only declares which attribute *would* hold the
+    tracklet id; whether it exists is a separate question (whether that key is
+    in the FeatureDict). Tracks whose tracklet column was never created
+    therefore raise KeyError there.
 
     TODO: remove once motile_tracker operates on Tracks directly and consumers
     call tracks.graph_solution themselves.
     """
     if isinstance(tracks, SolutionTracks):
         return tracks
-    return SolutionTracks.from_tracks(tracks)
+    solution_tracks = SolutionTracks(
+        tracks.graph,
+        scale=tracks.scale,
+        ndim=tracks.ndim,
+        features=tracks.features,
+        _segmentation=tracks.segmentation,
+    )
+    # Only needed on funtracks < 2.1, where passing a FeatureDict makes
+    # __init__ activate the declared features without computing the missing
+    # ones. From 2.1 every Tracks already has track ids, so this finds nothing.
+    features = solution_tracks.features
+    missing = [
+        key
+        for key in (features.tracklet_key, features.lineage_key)
+        if key is not None and key not in solution_tracks.graph.node_attr_keys()
+    ]
+    if missing:
+        solution_tracks.enable_features(missing)
+    return solution_tracks
 
 
 class TracksButton(QWidget):
