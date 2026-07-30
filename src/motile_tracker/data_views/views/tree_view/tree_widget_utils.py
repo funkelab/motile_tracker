@@ -149,6 +149,14 @@ def extract_sorted_tracks(
         node_to_track_id,
     )
 
+    # Map every track id to its color in one vectorized colormap.map call, then
+    # look up per tracklet. colormap.map has a large fixed per-call overhead, so
+    # a single array call is far faster than calling it once per tracklet.
+    unique_track_ids = list(set(node_to_track_id.values()))
+    tid_to_color = dict(
+        zip(unique_track_ids, colormap.map(np.asarray(unique_track_ids)), strict=True)
+    )
+
     for node_set in tracklets:
         # Sort nodes in each tracklet by time using the precomputed dict
         sorted_nodes = sorted(node_set, key=lambda node: node_to_time[node])
@@ -156,7 +164,7 @@ def extract_sorted_tracks(
         # track_id and color are the same for all nodes in a node_set
         parent_track_id = None
         track_id = node_to_track_id[sorted_nodes[0]]
-        color = np.concatenate((colormap.map(track_id)[:3] * 255, [255]))
+        color = np.concatenate((tid_to_color[track_id][:3] * 255, [255]))
 
         for node in sorted_nodes:
             if node in parent_nodes:
