@@ -1,4 +1,5 @@
 import numpy as np
+from napari.components import ViewerModel
 from napari.layers import Points
 
 from motile_tracker.data_views.views.layers.out_of_slice_points import ZOnlyPoints
@@ -20,9 +21,31 @@ def get_visible_indices(layer):
     return sorted(set(idx))
 
 
-def test_zonly_vs_normal_points(make_napari_viewer):
+def add_points(viewer, data):
+    """Add a ZOnlyPoints and a plain Points layer for the same data.
 
-    viewer = make_napari_viewer()
+    Returns the (zonly, normal) pair, both with out of slice display on.
+    """
+    zonly = ZOnlyPoints(data, size=20)
+    normal = Points(data, size=20)
+
+    viewer.add_layer(zonly)
+    viewer.add_layer(normal)
+
+    zonly.out_of_slice_display = True
+    normal.out_of_slice_display = True
+
+    return zonly, normal
+
+
+# Uses ViewerModel rather than napari's ``make_napari_viewer`` fixture: these
+# tests only need viewer dims and layer slicing, no Qt window, and
+# ``make_napari_viewer`` cannot be mixed with the module scoped ``viewer``
+# fixture in tests/data_views/conftest.py (see the note there).
+
+
+def test_zonly_vs_normal_points():
+    viewer = ViewerModel()
     viewer.add_labels(np.zeros((20, 20, 20, 20), dtype=np.uint8))  # to set viewer dims
 
     data = np.array(
@@ -32,14 +55,7 @@ def test_zonly_vs_normal_points(make_napari_viewer):
         ]
     )
 
-    zonly = ZOnlyPoints(data, size=20)
-    normal = Points(data, size=20)
-
-    viewer.add_layer(zonly)
-    viewer.add_layer(normal)
-
-    zonly.out_of_slice_display = True
-    normal.out_of_slice_display = True
+    zonly, normal = add_points(viewer, data)
 
     viewer.dims.current_step = (1, 5, 20, 20)
 
@@ -52,7 +68,9 @@ def test_zonly_vs_normal_points(make_napari_viewer):
     assert set(n_idx) == {0, 1}
     assert z_idx == [0]
 
-    # Also check for 5 dims
+
+def test_zonly_vs_normal_points_5d():
+    viewer = ViewerModel()
     viewer.add_labels(
         np.zeros((20, 20, 20, 20, 20), dtype=np.uint8)
     )  # to set viewer dims
@@ -65,14 +83,7 @@ def test_zonly_vs_normal_points(make_napari_viewer):
         ]
     )
 
-    zonly = ZOnlyPoints(data, size=20)
-    normal = Points(data, size=20)
-
-    viewer.add_layer(zonly)
-    viewer.add_layer(normal)
-
-    zonly.out_of_slice_display = True
-    normal.out_of_slice_display = True
+    zonly, normal = add_points(viewer, data)
 
     viewer.dims.current_step = (1, 1, 5, 20, 20)
 
