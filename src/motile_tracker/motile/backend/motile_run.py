@@ -155,7 +155,6 @@ class MotileRun(SolutionTracks):
             (Path): The Path that the run was saved to.
         """
         run_dir = Path(path)
-        run_dir.mkdir(parents=True, exist_ok=True)
         write_geff_over(self, run_dir)
         self._save_params(run_dir)
         self._save_attrs(run_dir)
