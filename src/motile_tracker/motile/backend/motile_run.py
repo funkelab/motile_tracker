@@ -10,7 +10,7 @@ import tracksdata as td
 from funtracks.data_model import SolutionTracks
 from funtracks.import_export import import_from_geff, load_v1_tracks
 
-from motile_tracker.import_export.geff_io import write_geff_over
+from motile_tracker.import_export.geff_io import is_geff, write_geff_over
 
 from .solver_params import SolverParams
 
@@ -188,16 +188,10 @@ class MotileRun(SolutionTracks):
     def _is_geff(directory: Path) -> bool:
         """Whether the given directory is itself a geff store.
 
-        A geff keeps its graph in `nodes`/`edges` groups at the top level, so
-        their presence distinguishes a run saved as a geff from an older run
-        directory that merely contains one.
-
-        Note that geff's own `check_for_geff` cannot be used here: it reports
-        whether a geff exists at or under a store, and so returns True for an
-        old run directory containing tracks.geff, for a v1 run directory, and
-        even for an empty one. Telling those apart is exactly what load() needs.
+        Distinguishes a run saved as a geff from an older run directory that
+        merely contains one, which is exactly what load() needs.
         """
-        return (directory / "nodes").exists() and (directory / "edges").exists()
+        return is_geff(directory)
 
     @classmethod
     def load(cls, run_dir: Path | str, output_required: bool = True):
