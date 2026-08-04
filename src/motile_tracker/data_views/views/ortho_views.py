@@ -55,7 +55,12 @@ def copy_layer(layer: Layer, name: str = ""):
         res_layer = ZOnlyPoints(
             data=layer.data,
             name=layer.name,
+            size=layer.size,  # these are not synced, so copy these properties here to set
+            shown=layer.shown,  # the initial size and shown properties correctly.
         )
+        # points added in an orthogonal view are created at current_size, which is not
+        # synced either, so start it at the size the tracks are drawn with
+        res_layer.current_size = layer.default_size
     else:
         res_layer = Layer.create(*layer.as_layer_data_tuple())
 
