@@ -141,9 +141,16 @@ def point_data_hook(
     # size on the TrackPoints layer.
     def sync_shown_points(orig_layer: TrackPoints, copied_layer: ZOnlyPoints) -> None:
         """Sync the visible points between original TrackPoints layer and Points layers
-        in ViewerModel instances (this is not a synced property)"""
+        in ViewerModel instances (this is not a synced property).
 
-        with copied_layer.events.blocker_all():
+        Both setters re-slice the copied layer on their own, so their refreshes are
+        blocked and a single one is done afterwards instead.
+        """
+
+        if len(copied_layer.data) != len(orig_layer.data):
+            return  # data update still on its way; it syncs these as well
+
+        with copied_layer.events.blocker_all(), copied_layer._block_refresh():
             copied_layer.size = orig_layer.size
             copied_layer.shown = orig_layer.shown
 

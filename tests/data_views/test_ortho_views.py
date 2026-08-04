@@ -1,3 +1,6 @@
+import collections
+import math
+
 import numpy as np
 import pytest
 from napari.layers import Labels, Points
@@ -192,6 +195,59 @@ def test_colormap_shared_with_ortho_views(
     viewer.dims.ndisplay = 2
     tracks_viewer.selected_nodes.add(nodes[0], False)
     check_shared("back in 2D")
+
+    m.cleanup()
+
+
+def test_point_outline_updates_ortho_views_once(
+    viewer, qtbot, solution_tracks_3d_with_division
+):
+    """Updating the point outline must emit a single border color event.
+
+    The orthogonal views re-slice their copy of the points layer whenever the border
+    color changes (napari's size setter is silent, which is why the views listen to the
+    border color), so emitting the same state twice doubles that work per view.
+    """
+
+    m = initialize_ortho_views(viewer)
+    tracks_viewer = TracksViewer.get_instance(viewer)
+    tracks_viewer.update_tracks(tracks=solution_tracks_3d_with_division, name="test")
+    m.show()
+    qtbot.waitUntil(lambda: m.is_shown(), timeout=1000)
+
+    points_layer = tracks_viewer.tracking_layers.points_layer
+    copies = [
+        widget.vm_container.viewer_model.layers[points_layer.name]
+        for widget in (m.right_widget, m.bottom_widget)
+    ]
+
+    emitted = collections.Counter()
+    points_layer.events.border_color.connect(
+        lambda event: emitted.update(["border_color"])
+    )
+
+    node = tracks_viewer.tracks.graph.node_ids()[1]
+    tracks_viewer.selected_nodes.add(node, False)
+    assert emitted["border_color"] == 1, emitted
+
+    # the selected point is highlighted and enlarged, and the copies follow
+    index = points_layer.node_index_dict[node]
+    assert np.allclose(points_layer.border_color[index], (0, 1, 1, 1))
+    assert points_layer.size[index] == math.ceil(1.3 * points_layer.default_size)
+    for copied_layer in copies:
+        assert np.array_equal(copied_layer.size, points_layer.size)
+        assert np.array_equal(copied_layer.shown, points_layer.shown)
+
+    # hiding all but one node must reach the copies as well
+    points_layer.update_point_outline([int(node)])
+    assert points_layer.shown.sum() == 1
+    for copied_layer in copies:
+        assert np.array_equal(copied_layer.shown, points_layer.shown)
+
+    points_layer.update_point_outline("all")
+    assert points_layer.shown.all()
+    for copied_layer in copies:
+        assert np.array_equal(copied_layer.shown, points_layer.shown)
 
     m.cleanup()
 
