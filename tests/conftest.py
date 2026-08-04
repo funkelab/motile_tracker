@@ -317,6 +317,14 @@ def solution_tracks_2d_without_segmentation(
 
 
 @pytest.fixture
+def solution_tracks_3d_without_segmentation(
+    graph_3d_without_segmentation,
+) -> SolutionTracks:
+    """Return a SolutionTracks object wrapping graph_3d_without_segmentation."""
+    return SolutionTracks(graph=graph_3d_without_segmentation, ndim=4, time_attr="t")
+
+
+@pytest.fixture
 def segmentation_2d(graph_2d):
     return np.asarray(Tracks(graph_2d, ndim=3, time_attr="t").segmentation)
 
