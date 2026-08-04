@@ -104,3 +104,49 @@ def test_ortho_views(viewer, qtbot, solution_tracks_3d_with_division):
     )
 
     m.cleanup()
+
+
+def n_slots(signal):
+    """Number of callbacks on a napari EventEmitter or a psygnal SignalInstance."""
+
+    callbacks = getattr(signal, "callbacks", None)
+    return len(callbacks) if callbacks is not None else len(signal)
+
+
+def test_hook_connections_released_on_hide(
+    viewer, qtbot, solution_tracks_3d_with_division
+):
+    """The hooks connect to the *original* layers but close over the copied layers, so
+    hiding the orthogonal views has to disconnect them again.
+
+    If they survive, every hide/show cycle adds another handler that rebuilds the
+    colormap of / re-slices a copied layer nobody sees anymore, which makes every
+    selection and every paint permanently slower.
+    """
+
+    m = initialize_ortho_views(viewer)
+    tracks_viewer = TracksViewer.get_instance(viewer)
+    tracks_viewer.update_tracks(tracks=solution_tracks_3d_with_division, name="test")
+
+    seg_layer = tracks_viewer.tracking_layers.seg_layer
+    points_layer = tracks_viewer.tracking_layers.points_layer
+
+    def hook_slot_counts():
+        return (
+            n_slots(seg_layer.events.colormap),  # colormap_hook
+            n_slots(points_layer.events.border_color),  # point_data_hook
+            n_slots(points_layer.data_updated),  # point_data_hook
+            n_slots(seg_layer.events.paint),  # paint_event_hook + container
+        )
+
+    baseline = hook_slot_counts()
+
+    for _ in range(3):
+        m.show()
+        qtbot.waitUntil(lambda: m.is_shown(), timeout=1000)
+        assert hook_slot_counts() > baseline  # connected while shown
+
+        m.hide()
+        assert hook_slot_counts() == baseline  # and released again
+
+    m.cleanup()

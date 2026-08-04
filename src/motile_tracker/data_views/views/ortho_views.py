@@ -1,4 +1,6 @@
 import inspect
+from collections.abc import Callable
+from typing import Any
 
 import napari_orthogonal_views.ortho_view_widget as ov_widget
 from napari import Viewer
@@ -117,7 +119,9 @@ sync_filters = {
 # Define special functions to allow specific behavior on special layer types (TrackLabels,
 # and TrackPoints)
 #
-def point_data_hook(orig_layer: TrackPoints, copied_layer: ZOnlyPoints) -> None:
+def point_data_hook(
+    orig_layer: TrackPoints, copied_layer: ZOnlyPoints
+) -> list[tuple[Any, Callable]]:
     """Hook to connect to sync points data and visualization between original and copied
     Points layers.
 
@@ -125,6 +129,10 @@ def point_data_hook(orig_layer: TrackPoints, copied_layer: ZOnlyPoints) -> None:
         orig_layer (TrackPoints): TracksLabels layer from which the copied layer is
             derived.
         copied_layer (ZOnlyPoints): ZOnlyPoints equivalent of the TracksPoints layer.
+
+    Returns:
+        list[tuple[Any, Callable]]: the (signal, handler) pairs connected here, so the
+            orthoviews can disconnect them again when the layer or the views go away.
     """
 
     # Sync the shown points and their size, as it is not synced by default. We bind to the
@@ -144,6 +152,7 @@ def point_data_hook(orig_layer: TrackPoints, copied_layer: ZOnlyPoints) -> None:
         return sync_shown_points(orig_layer, copied_layer)
 
     orig_layer.events.border_color.connect(shown_points_wrapper)
+    connections = [(orig_layer.events.border_color, shown_points_wrapper)]
 
     # Receive data updates from the original layer
     def receive_data(orig_layer: TrackPoints, copied_layer: ZOnlyPoints) -> None:
@@ -157,6 +166,7 @@ def point_data_hook(orig_layer: TrackPoints, copied_layer: ZOnlyPoints) -> None:
         return receive_data(orig_layer, copied_layer)
 
     orig_layer.data_updated.connect(receive_data_wrapper)
+    connections.append((orig_layer.data_updated, receive_data_wrapper))
 
     # Sync the event that is emitted when a point is moved or deleted. We need to capture
     # it on the original layer to process it there, and potentially undo it if it was an
@@ -187,9 +197,14 @@ def point_data_hook(orig_layer: TrackPoints, copied_layer: ZOnlyPoints) -> None:
 
     copied_layer._sync_data_wrapper = sync_data_wrapper
     copied_layer.events.data.connect(sync_data_wrapper)
+    connections.append((copied_layer.events.data, sync_data_wrapper))
+
+    return connections
 
 
-def paint_event_hook(orig_layer: TrackLabels, copied_layer: Labels) -> None:
+def paint_event_hook(
+    orig_layer: TrackLabels, copied_layer: Labels
+) -> list[tuple[Any, Callable]]:
     """Hook to connect to paint events and process them on the original TracksLabels
     layer.
 
@@ -199,6 +214,9 @@ def paint_event_hook(orig_layer: TrackLabels, copied_layer: Labels) -> None:
         copied_layer (Labels): Labels equivalent of the TracksLabels layer. Instead of
             processing paint actions on this copy, we want to send them to the original
             layer and process them there.
+
+    Returns:
+        list[tuple[Any, Callable]]: the (signal, handler) pairs connected here.
     """
 
     def sync_paint(orig_layer: TrackLabels, copied_layer: Labels, event: Event):
@@ -218,8 +236,12 @@ def paint_event_hook(orig_layer: TrackLabels, copied_layer: Labels) -> None:
 
     copied_layer.events.paint.connect(paint_wrapper)
 
+    return [(copied_layer.events.paint, paint_wrapper)]
 
-def colormap_hook(orig_layer: TrackLabels, copied_layer: Labels) -> None:
+
+def colormap_hook(
+    orig_layer: TrackLabels, copied_layer: Labels
+) -> list[tuple[Any, Callable]]:
     """Hook to sync colormap changes from the original TrackLabels layer to the copied
     layers. We need a hook for the special case in which one of the views is showing a 3D
     rendering in combination with partially filled contour labels. Since contours are not
@@ -229,6 +251,11 @@ def colormap_hook(orig_layer: TrackLabels, copied_layer: Labels) -> None:
         orig_layer (TrackLabels): TracksLabels layer from which the copied layer is
             derived.
         copied_layer (ContourLabels): ContourLabels equivalent of the TracksLabels layer.
+
+    Returns:
+        list[tuple[Any, Callable]]: the (signal, handler) pairs connected here. This one
+            matters most: the handler rebuilds the colormap of the copied layer, so if it
+            outlives the copy it keeps doing that work for a layer nobody sees.
     """
 
     def sync_colormap(orig_layer: TrackLabels, copied_layer: Labels, event: Event):
@@ -254,6 +281,8 @@ def colormap_hook(orig_layer: TrackLabels, copied_layer: Labels) -> None:
 
     orig_layer.events.colormap.connect(update_colormap_wrapper)
 
+    return [(orig_layer.events.colormap, update_colormap_wrapper)]
+
 
 def track_layers_hook(
     orig_layer: TrackLabels | TrackPoints, copied_layer: Labels | ZOnlyPoints
@@ -267,6 +296,9 @@ def track_layers_hook(
             which the copied layer is derived.
         copied_layer (Labels | ZOnlyPoints): Labels or ZOnlyPoints equivalent of the TracksLabels
             or TrackPoints layer.
+
+    Nothing is returned because everything connected here lives on the copied layer,
+    which is discarded together with the orthogonal view.
     """
 
     # define the click behavior the layer should respond to
