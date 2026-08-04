@@ -309,8 +309,8 @@ class TrackingFromScratch(QWidget):
 
         # Controls to copy detections into the tracks, only shown while a source
         # is connected and its layer (or its track layer) is the active layer.
-        self.copy_controls_box = QGroupBox("Copy detections into tracks")
-        copy_controls_layout = QVBoxLayout(self.copy_controls_box)
+        self.copy_controls = QWidget()
+        copy_controls_layout = QVBoxLayout(self.copy_controls)
         # current track id + "start new track" (same widget as in the Editing menu)
         self.add_label_btn = QPushButton("Copy selected label to track")
         self.add_label_btn.clicked.connect(self._add_selected_label)
@@ -318,7 +318,7 @@ class TrackingFromScratch(QWidget):
         # When checked, copying a label onto a frame that already contains a node of the
         # current tracklet starts a new track instead of growing the existing label.
         self.new_track_on_copy_checkbox = QCheckBox(
-            "Copy as new track (don't grow existing tracklet)"
+            "Copy as new track\n(don't grow existing tracklet)"
         )
         self.new_track_on_copy_checkbox.setToolTip(
             "When checked, copying a label to a frame that already has an object with the "
@@ -329,7 +329,8 @@ class TrackingFromScratch(QWidget):
         self.switch_layer_btn = QPushButton("Switch source / target layer [ \\ ]")
         self.switch_layer_btn.clicked.connect(self._switch_layer)
         copy_controls_layout.addWidget(self.switch_layer_btn)
-        self.copy_controls_box.setVisible(False)
+        self.copy_controls.setVisible(False)
+        source_layout.addWidget(self.copy_controls)
 
         # show/hide the copy controls depending on the active layer
         self.viewer.layers.selection.events.active.connect(
@@ -342,7 +343,6 @@ class TrackingFromScratch(QWidget):
         layout.addWidget(exp)
         layout.addWidget(create_box)
         layout.addWidget(source_box)
-        layout.addWidget(self.copy_controls_box)
         layout.addStretch(0)
 
         self._update_buttons()
@@ -824,14 +824,12 @@ class TrackingFromScratch(QWidget):
         source or its target track layer is the active layer."""
 
         if self._source_layer is None:
-            self.copy_controls_box.setVisible(False)
+            self.copy_controls.setVisible(False)
             return
 
         active = self.viewer.layers.selection.active
         on_source = active is self._source_layer
-        self.copy_controls_box.setVisible(
-            on_source or active is self._get_target_layer()
-        )
+        self.copy_controls.setVisible(on_source or active is self._get_target_layer())
         # 'add selected label' only makes sense on the source layer
         self.add_label_btn.setEnabled(on_source)
 
