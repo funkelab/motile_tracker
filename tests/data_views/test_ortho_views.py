@@ -3,7 +3,10 @@ import pytest
 from napari.layers import Labels, Points
 from napari_orthogonal_views.ortho_view_widget import OrthoViewWidget
 
-from motile_tracker.data_views.views.layers.track_labels import TrackLabels
+from motile_tracker.data_views.views.layers.track_labels import (
+    TrackLabels,
+    new_label,
+)
 from motile_tracker.data_views.views.layers.track_points import TrackPoints
 from motile_tracker.data_views.views.ortho_views import (
     initialize_ortho_views,
@@ -111,6 +114,86 @@ def n_slots(signal):
 
     callbacks = getattr(signal, "callbacks", None)
     return len(callbacks) if callbacks is not None else len(signal)
+
+
+def assert_same_colors(copied_layer, orig_layer, tag):
+    """Assert that both layers show every label in exactly the same color."""
+
+    copied_colors = copied_layer.colormap.color_dict
+    orig_colors = orig_layer.colormap.color_dict
+    assert copied_colors.keys() == orig_colors.keys(), f"{tag}: different labels"
+    for label, color in orig_colors.items():
+        assert np.allclose(copied_colors[label], color), f"{tag}: label {label} differs"
+
+
+def test_colormap_shared_with_ortho_views(
+    viewer, qtbot, solution_tracks_3d_with_division
+):
+    """The copied layers show the same colors as the original, and share its colormap.
+
+    Building a DirectLabelColormap validates every color again, which is expensive for
+    a large graph and happened per view on every colormap event. The copies only need a
+    colormap of their own when their background opacity differs from the original's,
+    which is the 3D + contours case.
+    """
+
+    m = initialize_ortho_views(viewer)
+    tracks_viewer = TracksViewer.get_instance(viewer)
+    tracks_viewer.update_tracks(tracks=solution_tracks_3d_with_division, name="test")
+    m.show()
+    qtbot.waitUntil(lambda: m.is_shown(), timeout=1000)
+
+    seg_layer = tracks_viewer.tracking_layers.seg_layer
+    copies = [
+        widget.vm_container.viewer_model.layers[seg_layer.name]
+        for widget in (m.right_widget, m.bottom_widget)
+    ]
+    nodes = tracks_viewer.tracks.graph.node_ids()
+
+    def check_shared(tag):
+        for copied_layer in copies:
+            assert_same_colors(copied_layer, seg_layer, tag)
+            assert copied_layer.colormap is seg_layer.colormap, f"{tag}: not shared"
+
+    check_shared("initial")
+
+    tracks_viewer.selected_nodes.add(nodes[0], False)
+    check_shared("after node selection")
+
+    tracks_viewer.set_display_mode("lineage")
+    check_shared("after switching to lineage mode")
+
+    seg_layer.contour = 1
+    check_shared("after enabling contours")
+
+    new_label(seg_layer)  # adds a label, so a new entry in the color dict
+    check_shared("after a new label")
+
+    # Rendering the main viewer in 3D with contours on is the one case where the copies
+    # need their own colormap: contours are not rendered in 3D, so the original hides its
+    # background labels while the (2D) copies must keep showing them.
+    viewer.dims.ndisplay = 3
+    tracks_viewer.selected_nodes.add(nodes[1], False)
+    background_label = next(
+        label for label in seg_layer.background if label not in (None, 0)
+    )
+    for copied_layer in copies:
+        assert copied_layer.colormap is not seg_layer.colormap
+        assert seg_layer.colormap.color_dict[background_label][3] == 0
+        assert (
+            copied_layer.colormap.color_dict[background_label][3]
+            == seg_layer.background_opacity
+        )
+        # the colors themselves must still match
+        for label, color in seg_layer.colormap.color_dict.items():
+            assert np.allclose(copied_layer.colormap.color_dict[label][:3], color[:3])
+
+    # and back to sharing once the main viewer is 2D again
+    viewer.dims.ndisplay = 2
+    tracks_viewer.selected_nodes.add(nodes[0], False)
+    check_shared("back in 2D")
+
+    m.cleanup()
 
 
 def test_hook_connections_released_on_hide(

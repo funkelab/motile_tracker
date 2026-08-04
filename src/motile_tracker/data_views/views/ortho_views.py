@@ -3,6 +3,7 @@ from collections.abc import Callable
 from typing import Any
 
 import napari_orthogonal_views.ortho_view_widget as ov_widget
+import numpy as np
 from napari import Viewer
 from napari.layers import Labels, Layer, Points, Shapes
 from napari.utils.colormaps import DirectLabelColormap
@@ -239,6 +240,62 @@ def paint_event_hook(
     return [(copied_layer.events.paint, paint_wrapper)]
 
 
+def needs_own_colormap(orig_layer: TrackLabels, copied_layer: Labels) -> bool:
+    """Check whether the copied layer needs a colormap separate from the original's.
+
+    It only does when the two disagree about the background opacity, which happens when
+    contours are on and exactly one of the two views renders in 3D: contours are not
+    rendered in 3D, so there the labels are shown filled and the background is hidden
+    instead (see colormap_hook). In every other case the colors are identical and the
+    colormap object can simply be shared.
+
+    Args:
+        orig_layer (TrackLabels): TrackLabels layer from which the copy is derived.
+        copied_layer (ContourLabels): ContourLabels equivalent of the TrackLabels layer.
+
+    Returns:
+        bool: True if the copied layer needs a color dict of its own.
+    """
+
+    if orig_layer.contour == 0:
+        return False
+    return (orig_layer._slice.slice_input.ndisplay == 3) != (
+        copied_layer._slice.slice_input.ndisplay == 3
+    )
+
+
+def make_own_colormap(orig_layer: TrackLabels, copied_layer: Labels) -> None:
+    """Give the copied layer a color dict of its own, holding the original's colors.
+
+    The colors are copied into the existing dict when the copy already has one for the
+    same labels, because building a new DirectLabelColormap validates every color again.
+    A new one is only constructed when the labels changed, or when the copy is still
+    sharing the original's colormap (see colormap_hook).
+
+    Args:
+        orig_layer (TrackLabels): TrackLabels layer from which the copy is derived.
+        copied_layer (ContourLabels): ContourLabels equivalent of the TrackLabels layer.
+    """
+
+    source_colors = orig_layer.colormap.color_dict
+    target_colors = copied_layer.colormap.color_dict
+
+    if (
+        copied_layer.colormap is orig_layer.colormap
+        or target_colors.keys() != source_colors.keys()
+    ):
+        copied_layer.colormap = DirectLabelColormap(
+            color_dict={
+                label: np.array(color, copy=True)
+                for label, color in source_colors.items()
+            }
+        )
+        return
+
+    for label, color in source_colors.items():
+        target_colors[label][:] = color
+
+
 def colormap_hook(
     orig_layer: TrackLabels, copied_layer: Labels
 ) -> list[tuple[Any, Callable]]:
@@ -246,6 +303,11 @@ def colormap_hook(
     layers. We need a hook for the special case in which one of the views is showing a 3D
     rendering in combination with partially filled contour labels. Since contours are not
     rendered in 3D, we want to display the non-filled labels with full opacity instead.
+
+    That special case is the only one in which the copy needs a colormap of its own; the
+    rest of the time both views show identical colors and share a single colormap object,
+    which keeps this hook off the critical path of every selection and every paint (see
+    needs_own_colormap and make_own_colormap).
 
     Args:
         orig_layer (TrackLabels): TracksLabels layer from which the copied layer is
@@ -263,10 +325,21 @@ def colormap_hook(
         ContourLabels instance. Check the slice ndisplay and contour settings to adjust
         background opacity accordingly."""
 
-        copied_layer.colormap = DirectLabelColormap(
-            color_dict=orig_layer.colormap.color_dict
-        )
-        if copied_layer._slice.slice_input.ndisplay == 3 and orig_layer.contour > 0:
+        if not needs_own_colormap(orig_layer, copied_layer):
+            # Both views want exactly the same colors, so let them share the very same
+            # colormap object instead of giving the copy one of its own: constructing a
+            # DirectLabelColormap re-validates every color (~0.2s for a 37k label graph,
+            # per view, on every colormap event). Opacity changes the original makes in
+            # place are then visible here immediately, and only the texture is rebuilt.
+            if copied_layer.colormap is orig_layer.colormap:
+                copied_layer.refresh_colormap()
+            else:
+                copied_layer.colormap = orig_layer.colormap
+            return
+
+        # The copy needs its own color dict, because its background opacity differs.
+        make_own_colormap(orig_layer, copied_layer)
+        if copied_layer._slice.slice_input.ndisplay == 3:
             copied_layer.set_opacity(orig_layer.background, 0)
         else:
             copied_layer.set_opacity(
