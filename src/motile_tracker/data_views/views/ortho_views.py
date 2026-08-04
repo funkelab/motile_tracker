@@ -97,6 +97,7 @@ sync_filters = {
             "data",
             "size",
             "current_size",
+            "properties",  # we sync features but no need to sync properties as well
         },  # we will sync data separately on TrackPoints as we
         # need finer control
         "reverse_exclude": set(get_property_names_from_class(Points))
