@@ -31,7 +31,9 @@ classifiers = [
 
 dependencies =[
     "napari>=0.6.2,<0.8.0",
-    "funtracks>=2,<3",
+    # 2.0.4 fixes the in-place Mask.__isub__ misuse on erase, which corrupts the
+    # GraphArrayView cache with tracksdata >=0.1.0rc7 (funtracks#264)
+    "funtracks>=2.0.4,<3",
     "appdirs>=1,<2",
     "numpy>=2,<3",
     "magicgui>=0.10.1",
@@ -99,6 +101,13 @@ conflicts = [
         {extra = "gurobi12"},
         {extra = "gurobi13"},
     ],
+]
+# TEMPORARY: the geff mask dtype helpers used by the geff import dialog
+# (convert_geff_prop_dtype / geff_prop_dtype, royerlab/tracksdata#319) are only on
+# tracksdata main. funtracks pins tracksdata exactly, so override it to test against
+# the real code. Remove once a tracksdata release includes them.
+override-dependencies = [
+    "tracksdata[spatial] @ git+https://github.com/royerlab/tracksdata@80d94cc7da0ce063d2fa2a3b18271606294cbb27",
 ]
 
 [tool.pytest.ini_options]
