@@ -152,7 +152,7 @@ def test_delete_node(benchmark, build_app, fresh_tracks):
     def setup():
         _, tv, _ = build_app(fresh_tracks)
         tv.selected_nodes.reset()
-        tv.selected_nodes.add(pick_nodes(fresh_tracks)["del_node"], False)
+        tv.selected_nodes.add(pick_nodes(tv.tracks)["del_node"], False)
         return (tv,), {}
 
     benchmark.pedantic(
@@ -170,7 +170,7 @@ def test_delete_nodes_bulk(benchmark, build_app, fresh_tracks):
 
     def setup():
         _, tv, _ = build_app(fresh_tracks)
-        nodes = tracklet_nodes(fresh_tracks, pick_nodes(fresh_tracks)["del_node"])
+        nodes = tracklet_nodes(tv.tracks, pick_nodes(tv.tracks)["del_node"])
         tv.selected_nodes.reset()
         tv.selected_nodes.add_list(nodes)
         return (tv,), {}
@@ -185,7 +185,7 @@ def test_undo_bulk_delete(benchmark, build_app, fresh_tracks):
 
     def setup():
         _, tv, _ = build_app(fresh_tracks)
-        nodes = tracklet_nodes(fresh_tracks, pick_nodes(fresh_tracks)["del_node"])
+        nodes = tracklet_nodes(tv.tracks, pick_nodes(tv.tracks)["del_node"])
         tv.selected_nodes.reset()
         tv.selected_nodes.add_list(nodes)
         tv.delete_node()
@@ -199,7 +199,7 @@ def test_undo_bulk_delete(benchmark, build_app, fresh_tracks):
 def test_delete_edge(benchmark, build_app, fresh_tracks):
     def setup():
         _, tv, _ = build_app(fresh_tracks)
-        u, v = pick_nodes(fresh_tracks)["del_edge"]
+        u, v = pick_nodes(tv.tracks)["del_edge"]
         tv.selected_nodes.reset()
         tv.selected_nodes.add(u, False)
         tv.selected_nodes.add(v, True)
@@ -215,7 +215,7 @@ def test_create_edge(benchmark, build_app, fresh_tracks):
 
     def setup():
         _, tv, _ = build_app(fresh_tracks)
-        u, v = pick_nodes(fresh_tracks)["del_edge"]
+        u, v = pick_nodes(tv.tracks)["del_edge"]
         # Break the edge first so re-adding it is a valid action.
         tv.selected_nodes.reset()
         tv.selected_nodes.add(u, False)
@@ -235,7 +235,7 @@ def test_undo(benchmark, build_app, fresh_tracks):
     def setup():
         _, tv, _ = build_app(fresh_tracks)
         tv.selected_nodes.reset()
-        tv.selected_nodes.add(pick_nodes(fresh_tracks)["del_node"], False)
+        tv.selected_nodes.add(pick_nodes(tv.tracks)["del_node"], False)
         tv.delete_node()
         return (tv,), {}
 
@@ -246,7 +246,7 @@ def test_redo(benchmark, build_app, fresh_tracks):
     def setup():
         _, tv, _ = build_app(fresh_tracks)
         tv.selected_nodes.reset()
-        tv.selected_nodes.add(pick_nodes(fresh_tracks)["del_node"], False)
+        tv.selected_nodes.add(pick_nodes(tv.tracks)["del_node"], False)
         tv.delete_node()
         tv.undo()
         return (tv,), {}
