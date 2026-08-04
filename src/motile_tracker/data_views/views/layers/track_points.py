@@ -72,7 +72,7 @@ class TrackPoints(ZOnlyPoints):
             points = np.empty((0, self.tracks_viewer.tracks.ndim))
 
         track_ids = self.tracks_viewer.tracks.get_track_ids(self.nodes)
-        colors = [self.tracks_viewer.colormap.map(track_id) for track_id in track_ids]
+        colors = self._map_track_colors(track_ids)
         symbols = self.get_symbols(
             self.tracks_viewer.tracks, self.tracks_viewer.symbolmap
         )
@@ -193,9 +193,7 @@ class TrackPoints(ZOnlyPoints):
         self.symbol = self.get_symbols(
             self.tracks_viewer.tracks, self.tracks_viewer.symbolmap
         )
-        self.face_color = [
-            self.tracks_viewer.colormap.map(track_id) for track_id in track_ids
-        ]
+        self.face_color = self._map_track_colors(track_ids)
         self.properties = {"node_id": self.nodes, "track_id": track_ids}
         self.size = self.default_size
         self.border_color = [1, 1, 1, 1]
@@ -305,6 +303,22 @@ class TrackPoints(ZOnlyPoints):
             for point in selected_points:
                 node_id = self.nodes[point]
                 self.tracks_viewer.selected_nodes.add(node_id, True)
+
+    def _map_track_colors(self, track_ids: list[int]) -> np.ndarray:
+        """Map track ids to an (N, 4) array of face colors in a single colormap call.
+
+        colormap.map has a large fixed per-call overhead (cache lookup, dtype, reshape),
+        so mapping the whole array at once is ~290x faster than calling it per node (or
+        even once per unique track id): for ~37k nodes / 142 unique ids, ~1ms vs ~300ms.
+
+        With no nodes (an empty tracks graph, e.g. when tracking from scratch) a single
+        white color is returned instead of a (0, 4) array: napari's ColorManager treats
+        the color argument as *the* current color when the layer holds no data, and
+        feeding it an empty array raises in `transform_color`.
+        """
+        if len(track_ids) == 0:
+            return np.ones((1, 4))
+        return self.tracks_viewer.colormap.map(np.asarray(track_ids))
 
     def get_symbols(self, tracks: Tracks, symbolmap: dict[NodeType, str]) -> list[str]:
         statemap = {

@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import napari
+import numpy as np
 from funtracks.data_model import Tracks
 from funtracks.import_export import export_to_csv, export_to_geff
 from qtpy.QtWidgets import (
@@ -171,7 +172,10 @@ class ExportDialog:
 
             nodes = tracks.graph.node_ids()
             track_ids = tracks.get_track_ids(nodes)
-            colors = [colormap.map(tid) for tid in track_ids]
+            # Single vectorized colormap.map call (per-call overhead makes
+            # per-node mapping O(nodes) slow); these colors are export-only and
+            # not mutated in place, so no per-node copy is needed.
+            colors = colormap.map(np.asarray(track_ids)) if len(track_ids) > 0 else []
             color_dict = {
                 **dict(zip(nodes, colors, strict=True)),
                 None: [0, 0, 0, 0],
