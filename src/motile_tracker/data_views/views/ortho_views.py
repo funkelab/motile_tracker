@@ -2,17 +2,18 @@ import inspect
 from collections.abc import Callable
 from typing import Any
 
-import napari_orthogonal_views.ortho_view_widget as ov_widget
 import numpy as np
 from napari import Viewer
 from napari.layers import Labels, Layer, Points, Shapes
 from napari.utils.colormaps import DirectLabelColormap
 from napari.utils.events import Event
 from napari.utils.notifications import show_info
+from napari_orthogonal_views.layer_sync_hooks import sync_labels_paint
 from napari_orthogonal_views.ortho_view_manager import (  # noqa
     OrthoViewManager,
     _get_manager,
 )
+from napari_orthogonal_views.ortho_view_widget import ViewerModelContainer
 
 from motile_tracker.data_views.keybindings_config import KEYMAP, bind_keymap
 from motile_tracker.data_views.views.layers.click_utils import (
@@ -27,7 +28,8 @@ from motile_tracker.data_views.views.layers.track_labels import TrackLabels
 from motile_tracker.data_views.views.layers.track_points import TrackPoints
 
 
-# redefinition of copy_layer function
+# How the tracking layers are copied into the orthogonal views. Installed with
+# OrthoViewManager.set_copy_layer.
 def copy_layer(layer: Layer, name: str = ""):
     if isinstance(
         layer, TrackGraph
@@ -67,9 +69,6 @@ def copy_layer(layer: Layer, name: str = ""):
     res_layer.metadata["viewer_name"] = name
     return res_layer
 
-
-ov_widget.copy_layer = copy_layer  # replace the copy layer with the customized version
-# defined here
 
 # Define custom sync_filters. By default, all properties are synced forwards and backwards
 # between the original layer and its derived copy. However, for Tracks Layers we need
@@ -124,15 +123,22 @@ sync_filters = {
 
 
 # Define special functions to allow specific behavior on special layer types (TrackLabels,
-# and TrackPoints)
+# and TrackPoints). They follow the hook contract of napari-orthogonal-views: called once
+# per layer per orthogonal view as hook(container, orig_layer, copied_layer), returning
+# whatever has to be undone when the layer or the views go away. None of these need the
+# container, because they hand the work to the original layer rather than syncing it
+# themselves, so they take it as `_container`.
 #
 def point_data_hook(
-    orig_layer: TrackPoints, copied_layer: ZOnlyPoints
+    _container: ViewerModelContainer,
+    orig_layer: TrackPoints,
+    copied_layer: ZOnlyPoints,
 ) -> list[tuple[Any, Callable]]:
     """Hook to connect to sync points data and visualization between original and copied
     Points layers.
 
     Args:
+        _container (ViewerModelContainer): owner of the copied layer; unused here.
         orig_layer (TrackPoints): TracksLabels layer from which the copied layer is
             derived.
         copied_layer (ZOnlyPoints): ZOnlyPoints equivalent of the TracksPoints layer.
@@ -217,12 +223,15 @@ def point_data_hook(
 
 
 def paint_event_hook(
-    orig_layer: TrackLabels, copied_layer: Labels
+    _container: ViewerModelContainer,
+    orig_layer: TrackLabels,
+    copied_layer: Labels,
 ) -> list[tuple[Any, Callable]]:
     """Hook to connect to paint events and process them on the original TracksLabels
     layer.
 
     Args:
+        _container (ViewerModelContainer): owner of the copied layer; unused here.
         orig_layer (TrackLabels): TracksLabels layer from which the copied layer is
             derived.
         copied_layer (Labels): Labels equivalent of the TracksLabels layer. Instead of
@@ -310,7 +319,9 @@ def make_own_colormap(orig_layer: TrackLabels, copied_layer: Labels) -> None:
 
 
 def colormap_hook(
-    orig_layer: TrackLabels, copied_layer: Labels
+    _container: ViewerModelContainer,
+    orig_layer: TrackLabels,
+    copied_layer: Labels,
 ) -> list[tuple[Any, Callable]]:
     """Hook to sync colormap changes from the original TrackLabels layer to the copied
     layers. We need a hook for the special case in which one of the views is showing a 3D
@@ -370,14 +381,42 @@ def colormap_hook(
     return [(orig_layer.events.colormap, update_colormap_wrapper)]
 
 
+def labels_paint_hook(
+    container: ViewerModelContainer,
+    orig_layer: Labels,
+    copied_layer: Labels,
+) -> list[tuple[Any, Callable]] | None:
+    """Replacement for the built-in paint syncing, for TrackLabels layers only. This is to
+    ensure that normal Labels layers keep the default behavior, but TrackLabels layers
+    skip this because they are handled via our custom paint_event_hook.
+
+    Args:
+        container (ViewerModelContainer): owner of the copied layer.
+        orig_layer (Labels): the layer on the main viewer.
+        copied_layer (Labels): its counterpart in the orthogonal view.
+
+    Returns:
+        list[tuple[Any, Callable]] | None: connections made for a non-TrackLabels layer,
+            or None for a TrackLabels layer, where motile syncs the paint itself.
+    """
+
+    if isinstance(orig_layer, TrackLabels):
+        return None
+
+    return sync_labels_paint(container, orig_layer, copied_layer)
+
+
 def track_layers_hook(
-    orig_layer: TrackLabels | TrackPoints, copied_layer: Labels | ZOnlyPoints
+    _container: ViewerModelContainer,
+    orig_layer: TrackLabels | TrackPoints,
+    copied_layer: Labels | ZOnlyPoints,
 ) -> None:
     """Hook to capture click events on TrackLabels and TrackPoints derived Labels and
     ZOnlyPoints layers, and forward them to their original layer. Also, register key binds
     for view mode, undo & redo to copied layer, that call functions on the original layer.
 
     Args:
+        _container (ViewerModelContainer): owner of the copied layer; unused here.
         orig_layer (TrackLabels | TrackPoints): TracksLabels or TrackPoints layer from
             which the copied layer is derived.
         copied_layer (Labels | ZOnlyPoints): Labels or ZOnlyPoints equivalent of the TracksLabels
@@ -423,10 +462,28 @@ def initialize_ortho_views(viewer: Viewer) -> OrthoViewManager:
     """
 
     orth_view_manager = _get_manager(viewer)
-    orth_view_manager.register_layer_hook((TrackLabels, TrackPoints), track_layers_hook)
-    orth_view_manager.register_layer_hook((TrackLabels), paint_event_hook)
-    orth_view_manager.register_layer_hook((TrackPoints), point_data_hook)
-    orth_view_manager.register_layer_hook((TrackLabels), colormap_hook)
+
+    # how the tracking layers are shown in the orthogonal views
+    orth_view_manager.set_copy_layer(copy_layer)
+
+    # what they have to do beyond the generic property syncing
+    orth_view_manager.register_layer_hook(
+        (TrackLabels, TrackPoints), track_layers_hook, name="TrackLayer_clicks_and_keys"
+    )
+    orth_view_manager.register_layer_hook(
+        TrackLabels, paint_event_hook, name="TrackLabels_paint"
+    )
+    orth_view_manager.register_layer_hook(
+        TrackPoints, point_data_hook, name="TrackPoints_point_data"
+    )
+    orth_view_manager.register_layer_hook(
+        TrackLabels, colormap_hook, name="TrackLabels_colormap"
+    )
+
+    # Narrow the built-in paint syncing to normal Labels layers (so that TrackLabels do
+    # not run this on top of their own paint_event_hook)
+    orth_view_manager.set_layer_hook("labels_paint", labels_paint_hook)
+
     orth_view_manager.set_sync_filters(sync_filters)
     orth_view_manager.activate_checkboxes = True
 
