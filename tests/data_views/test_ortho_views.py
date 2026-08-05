@@ -1,9 +1,15 @@
+import collections
+import math
+
 import numpy as np
 import pytest
 from napari.layers import Labels, Points
 from napari_orthogonal_views.ortho_view_widget import OrthoViewWidget
 
-from motile_tracker.data_views.views.layers.track_labels import TrackLabels
+from motile_tracker.data_views.views.layers.track_labels import (
+    TrackLabels,
+    new_label,
+)
 from motile_tracker.data_views.views.layers.track_points import TrackPoints
 from motile_tracker.data_views.views.ortho_views import (
     initialize_ortho_views,
@@ -102,5 +108,184 @@ def test_ortho_views(viewer, qtbot, solution_tracks_3d_with_division):
         == m.right_widget.vm_container.viewer_model.layers[-1].selected_label
         == m.bottom_widget.vm_container.viewer_model.layers[-1].selected_label
     )
+
+    m.cleanup()
+
+
+def n_slots(signal):
+    """Number of callbacks on a napari EventEmitter or a psygnal SignalInstance."""
+
+    callbacks = getattr(signal, "callbacks", None)
+    return len(callbacks) if callbacks is not None else len(signal)
+
+
+def assert_same_colors(copied_layer, orig_layer, tag):
+    """Assert that both layers show every label in exactly the same color."""
+
+    copied_colors = copied_layer.colormap.color_dict
+    orig_colors = orig_layer.colormap.color_dict
+    assert copied_colors.keys() == orig_colors.keys(), f"{tag}: different labels"
+    for label, color in orig_colors.items():
+        assert np.allclose(copied_colors[label], color), f"{tag}: label {label} differs"
+
+
+def test_colormap_shared_with_ortho_views(
+    viewer, qtbot, solution_tracks_3d_with_division
+):
+    """The copied layers show the same colors as the original, and share its colormap.
+
+    Building a DirectLabelColormap validates every color again, which is expensive for
+    a large graph and happened per view on every colormap event. The copies only need a
+    colormap of their own when their background opacity differs from the original's,
+    which is the 3D + contours case.
+    """
+
+    m = initialize_ortho_views(viewer)
+    tracks_viewer = TracksViewer.get_instance(viewer)
+    tracks_viewer.update_tracks(tracks=solution_tracks_3d_with_division, name="test")
+    m.show()
+    qtbot.waitUntil(lambda: m.is_shown(), timeout=1000)
+
+    seg_layer = tracks_viewer.tracking_layers.seg_layer
+    copies = [
+        widget.vm_container.viewer_model.layers[seg_layer.name]
+        for widget in (m.right_widget, m.bottom_widget)
+    ]
+    nodes = tracks_viewer.tracks.graph.node_ids()
+
+    def check_shared(tag):
+        for copied_layer in copies:
+            assert_same_colors(copied_layer, seg_layer, tag)
+            assert copied_layer.colormap is seg_layer.colormap, f"{tag}: not shared"
+
+    check_shared("initial")
+
+    tracks_viewer.selected_nodes.add(nodes[0], False)
+    check_shared("after node selection")
+
+    tracks_viewer.set_display_mode("lineage")
+    check_shared("after switching to lineage mode")
+
+    seg_layer.contour = 1
+    check_shared("after enabling contours")
+
+    new_label(seg_layer)  # adds a label, so a new entry in the color dict
+    check_shared("after a new label")
+
+    # Rendering the main viewer in 3D with contours on is the one case where the copies
+    # need their own colormap: contours are not rendered in 3D, so the original hides its
+    # background labels while the (2D) copies must keep showing them.
+    viewer.dims.ndisplay = 3
+    tracks_viewer.selected_nodes.add(nodes[1], False)
+    background_label = next(
+        label for label in seg_layer.background if label not in (None, 0)
+    )
+    for copied_layer in copies:
+        assert copied_layer.colormap is not seg_layer.colormap
+        assert seg_layer.colormap.color_dict[background_label][3] == 0
+        assert (
+            copied_layer.colormap.color_dict[background_label][3]
+            == seg_layer.background_opacity
+        )
+        # the colors themselves must still match
+        for label, color in seg_layer.colormap.color_dict.items():
+            assert np.allclose(copied_layer.colormap.color_dict[label][:3], color[:3])
+
+    # and back to sharing once the main viewer is 2D again
+    viewer.dims.ndisplay = 2
+    tracks_viewer.selected_nodes.add(nodes[0], False)
+    check_shared("back in 2D")
+
+    m.cleanup()
+
+
+def test_point_outline_updates_ortho_views_once(
+    viewer, qtbot, solution_tracks_3d_with_division
+):
+    """Updating the point outline must emit a single border color event.
+
+    The orthogonal views re-slice their copy of the points layer whenever the border
+    color changes (napari's size setter is silent, which is why the views listen to the
+    border color), so emitting the same state twice doubles that work per view.
+    """
+
+    m = initialize_ortho_views(viewer)
+    tracks_viewer = TracksViewer.get_instance(viewer)
+    tracks_viewer.update_tracks(tracks=solution_tracks_3d_with_division, name="test")
+    m.show()
+    qtbot.waitUntil(lambda: m.is_shown(), timeout=1000)
+
+    points_layer = tracks_viewer.tracking_layers.points_layer
+    copies = [
+        widget.vm_container.viewer_model.layers[points_layer.name]
+        for widget in (m.right_widget, m.bottom_widget)
+    ]
+
+    emitted = collections.Counter()
+    points_layer.events.border_color.connect(
+        lambda event: emitted.update(["border_color"])
+    )
+
+    node = tracks_viewer.tracks.graph.node_ids()[1]
+    tracks_viewer.selected_nodes.add(node, False)
+    assert emitted["border_color"] == 1, emitted
+
+    # the selected point is highlighted and enlarged, and the copies follow
+    index = points_layer.node_index_dict[node]
+    assert np.allclose(points_layer.border_color[index], (0, 1, 1, 1))
+    assert points_layer.size[index] == math.ceil(1.3 * points_layer.default_size)
+    for copied_layer in copies:
+        assert np.array_equal(copied_layer.size, points_layer.size)
+        assert np.array_equal(copied_layer.shown, points_layer.shown)
+
+    # hiding all but one node must reach the copies as well
+    points_layer.update_point_outline([int(node)])
+    assert points_layer.shown.sum() == 1
+    for copied_layer in copies:
+        assert np.array_equal(copied_layer.shown, points_layer.shown)
+
+    points_layer.update_point_outline("all")
+    assert points_layer.shown.all()
+    for copied_layer in copies:
+        assert np.array_equal(copied_layer.shown, points_layer.shown)
+
+    m.cleanup()
+
+
+def test_hook_connections_released_on_hide(
+    viewer, qtbot, solution_tracks_3d_with_division
+):
+    """The hooks connect to the *original* layers but close over the copied layers, so
+    hiding the orthogonal views has to disconnect them again.
+
+    If they survive, every hide/show cycle adds another handler that rebuilds the
+    colormap of / re-slices a copied layer nobody sees anymore, which makes every
+    selection and every paint permanently slower.
+    """
+
+    m = initialize_ortho_views(viewer)
+    tracks_viewer = TracksViewer.get_instance(viewer)
+    tracks_viewer.update_tracks(tracks=solution_tracks_3d_with_division, name="test")
+
+    seg_layer = tracks_viewer.tracking_layers.seg_layer
+    points_layer = tracks_viewer.tracking_layers.points_layer
+
+    def hook_slot_counts():
+        return (
+            n_slots(seg_layer.events.colormap),  # colormap_hook
+            n_slots(points_layer.events.border_color),  # point_data_hook
+            n_slots(points_layer.data_updated),  # point_data_hook
+            n_slots(seg_layer.events.paint),  # paint_event_hook + container
+        )
+
+    baseline = hook_slot_counts()
+
+    for _ in range(3):
+        m.show()
+        qtbot.waitUntil(lambda: m.is_shown(), timeout=1000)
+        assert hook_slot_counts() > baseline  # connected while shown
+
+        m.hide()
+        assert hook_slot_counts() == baseline  # and released again
 
     m.cleanup()
