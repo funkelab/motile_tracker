@@ -34,10 +34,8 @@ def test_get_base_type():
     assert result is float
 
 
-def test_editable_param(make_napari_viewer):
+def test_editable_param(qapp):
     """Test EditableParam widget for required parameters."""
-    make_napari_viewer()  # Create Qt context
-
     # Test 1: EditableParam creates all UI elements correctly
     solver_params = SolverParams()
     param = EditableParam("max_edge_distance", solver_params)
@@ -73,10 +71,8 @@ def test_editable_param(make_napari_viewer):
     assert param5.param_value.value() == 5
 
 
-def test_optional_editable_param(make_napari_viewer, qtbot):
+def test_optional_editable_param(qapp, qtbot):
     """Test OptionalEditableParam widget for optional parameters."""
-    make_napari_viewer()  # Create Qt context
-
     # Test 1: OptionalEditableParam creates checkbox label
     solver_params = SolverParams()
     param = OptionalEditableParam("window_size", solver_params)
@@ -127,10 +123,8 @@ def test_optional_editable_param(make_napari_viewer, qtbot):
         param8.toggle_visible(False)
 
 
-def test_solver_params_editor_initialization(make_napari_viewer):
+def test_solver_params_editor_initialization(qapp):
     """Test SolverParamsEditor initialization."""
-    make_napari_viewer()  # Create Qt context
-
     # Test 1: SolverParamsEditor creates all UI elements
     editor = SolverParamsEditor()
     assert isinstance(editor.solver_params, SolverParams)
@@ -156,10 +150,8 @@ def test_solver_params_editor_initialization(make_napari_viewer):
     assert "single_window_start" in editor.param_categories["chunking"]
 
 
-def test_chunking_constraints(make_napari_viewer):
+def test_chunking_constraints(qapp):
     """Test chunking parameter validation constraints."""
-    make_napari_viewer()  # Create Qt context
-
     # Test 1: window_size has minimum value of 2
     editor = SolverParamsEditor()
     assert editor.window_size_row.param_value.minimum() == 2
@@ -219,10 +211,8 @@ def test_chunking_constraints(make_napari_viewer):
     assert not editor3.overlap_size_row.param_label.isChecked()
 
 
-def test_set_max_frames(make_napari_viewer):
+def test_set_max_frames(qapp):
     """Test set_max_frames method."""
-    make_napari_viewer()  # Create Qt context
-
     # Test 1: set_max_frames sets correct maximum for single_window_start
     editor = SolverParamsEditor()
     editor.set_max_frames(100)
@@ -241,10 +231,8 @@ def test_set_max_frames(make_napari_viewer):
     assert editor2.single_window_start_row.param_value.maximum() == 0
 
 
-def test_param_signals(make_napari_viewer):
+def test_param_signals(qapp):
     """Test signal emissions and connections."""
-    make_napari_viewer()  # Create Qt context
-
     # Test 1: new_params signal updates all parameter widgets
     editor = SolverParamsEditor()
     new_params = SolverParams(max_edge_distance=100.0, max_children=3, window_size=50)

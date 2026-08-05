@@ -1,14 +1,14 @@
 import sys
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 
 @pytest.mark.parametrize("mode", ["all", "tracking", "editing"])
-def test_main_entrypoint(make_napari_viewer, qtbot, mode):
+def test_main_entrypoint(mode):
     """CLI entrypoint passes correct mode to StartupWidget."""
 
-    viewer = make_napari_viewer()
+    viewer = MagicMock(name="viewer")
 
     with (
         patch("motile_tracker.__main__.napari.Viewer", return_value=viewer),
@@ -25,7 +25,7 @@ def test_main_entrypoint(make_napari_viewer, qtbot, mode):
     args, kwargs = mock_widget.call_args
 
     # First positional arg should be viewer
-    assert args[0] == viewer
+    assert args[0] is viewer
 
     # mode should match CLI flag
     assert kwargs["mode"] == mode
