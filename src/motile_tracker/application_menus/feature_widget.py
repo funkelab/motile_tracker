@@ -28,6 +28,7 @@ class FeatureWidget(QWidget):
         self.tracks_viewer = TracksViewer.get_instance(viewer)
         self.tracks_viewer.tracks_updated.connect(self._update_checkboxes)
         self._checkboxes: dict[str, QCheckBox] = {}
+        self._toggling = False  # guard against rebuilding while handling a toggle
 
         self.label = QLabel()
         self.label.setWordWrap(True)
@@ -46,6 +47,10 @@ class FeatureWidget(QWidget):
 
     def _update_checkboxes(self):
         """Update the list of available checkboxes."""
+
+        if self._toggling:
+            # no need to rebuild, the checkbox states are already correct
+            return
 
         self._clear_layout()
         self._checkboxes.clear()
@@ -115,4 +120,9 @@ class FeatureWidget(QWidget):
         else:
             tracks.disable_features([feature_key])
 
-        self.tracks_viewer.update_track_df(initialization=False, refresh_view=False)
+        self._toggling = True
+        try:
+            self.tracks_viewer.update_track_df(initialization=False, refresh_view=False)
+            self.tracks_viewer.tracks_updated.emit(False)
+        finally:
+            self._toggling = False
