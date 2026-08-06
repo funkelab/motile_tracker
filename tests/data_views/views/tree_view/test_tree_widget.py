@@ -4,6 +4,7 @@ Tests cover TreePlot data display, node selection, keyboard shortcuts,
 mode switching, and integration with TracksViewer.
 """
 
+import gc
 import sys
 from unittest.mock import MagicMock, patch
 
@@ -428,3 +429,60 @@ def test_update_track_data_with_none_tracks(viewer):
 
     assert tree_widget.tracks_viewer.track_df.empty
     assert tree_widget.graph is None
+
+
+def _render_canvas_of(tree_widget):
+    """The QRenderWidget that rendercanvas registers for this tree view."""
+    figure_canvas = tree_widget.tree_widget._figure.canvas
+    return getattr(figure_canvas, "_subwidget", figure_canvas)
+
+
+def test_cleanup_releases_canvas(viewer, solution_tracks_2d):
+    """cleanup() closes the wgpu canvas and releases the graphics it was drawing."""
+    tracks_viewer = TracksViewer.get_instance(viewer)
+    tracks_viewer.update_tracks(tracks=solution_tracks_2d, name="test")
+
+    tree_widget = TreeWidget(viewer)
+    canvas = _render_canvas_of(tree_widget)
+    assert not canvas.get_closed()
+    assert tree_widget.tree_widget._scatter is not None
+
+    tree_widget.cleanup()
+
+    assert tree_widget.tree_widget._closed
+    assert canvas.get_closed()
+    assert tree_widget.tree_widget._scatter is None  # GPU buffers released
+
+    tree_widget.cleanup()  # idempotent
+    # a closed tree view ignores further updates instead of touching a dead canvas
+    tree_widget.tree_widget.update(
+        tracks_viewer.track_df, "vertical", "tree", None, [], reset_view=True
+    )
+    tree_widget.tree_widget.set_selection([], "tree")
+    tree_widget.tree_widget.center_on_node(1)
+
+
+def test_deleted_tree_widget_leaves_no_dangling_canvas(viewer):
+    """A destroyed tree view must not leave a canvas behind in rendercanvas.
+
+    rendercanvas only drops a canvas from its registry when that canvas reports itself
+    closed, and the nested QRenderWidget never receives a Qt close event. Its Python
+    wrapper then outlives the deleted C++ widget, and rendercanvas' loop trips over it
+    at application exit with "wrapped C/C++ object of type QRenderWidget has been
+    deleted".
+    """
+    from rendercanvas.qt import loop
+
+    tree_widget = TreeWidget(viewer)
+    canvas = _render_canvas_of(tree_widget)
+    assert canvas in canvas._rc_canvas_group._canvases
+
+    del tree_widget
+    gc.collect()
+
+    assert canvas.get_closed()
+    # this is what the loop does on QApplication.aboutToQuit
+    remaining = loop.get_canvases(close_closed=True)
+    assert canvas not in remaining
+    for remaining_canvas in remaining:
+        getattr(remaining_canvas, "_rc_closed_by_loop", False)

@@ -1,6 +1,7 @@
 # do not put the from __future__ import annotations as it breaks the injection
 
 import contextlib
+import weakref
 from typing import Any
 
 import fastplotlib as fpl
@@ -59,6 +60,13 @@ _AXIS_LINE = _DOCK_WORLD * 0.88
 _AXIS_EDGE = _DOCK_WORLD * 0.10
 
 
+def _flag_canvas_closed(canvas_ref: weakref.ref) -> None:
+    """Mark a rendercanvas canvas as closed once its C++ widget is gone."""
+    canvas = canvas_ref()
+    if canvas is not None:
+        canvas._is_closed = True
+
+
 class TreePlot(QWidget):
     """fastplotlib (pygfx/wgpu) canvas for the lineage tree.
 
@@ -78,6 +86,7 @@ class TreePlot(QWidget):
         super().__init__()
         self.setFocusPolicy(Qt.StrongFocus)
 
+        self._closed = False  # set by close_figure(); the canvas is gone after that
         self.view_direction = "vertical"
         self.plot_type = "tree"
         self.feature = None
@@ -157,6 +166,11 @@ class TreePlot(QWidget):
         # keep the canvas tall enough that the subplot viewport height never goes
         # negative during dock layout (avoids wgpu "Viewport size < zero" draw errors)
         canvas_widget.setMinimumHeight(120)
+        # last-resort unregistration for every teardown path we don't see coming
+        # (see _flag_canvas_closed); close_figure() is the orderly route.
+        render_widget = getattr(canvas_widget, "_subwidget", canvas_widget)
+        render_widget_ref = weakref.ref(render_widget)
+        render_widget.destroyed.connect(lambda: _flag_canvas_closed(render_widget_ref))
 
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
@@ -168,15 +182,13 @@ class TreePlot(QWidget):
         self._subplot.add_animations(self._update_rulers)
 
         # canvas mouse handling: right-click reset + shift-drag box-select
-        self._figure.renderer.add_event_handler(
-            self._on_canvas_pointer_down, "pointer_down"
+        self._pointer_handlers = (
+            (self._on_canvas_pointer_down, "pointer_down"),
+            (self._on_canvas_pointer_move, "pointer_move"),
+            (self._on_canvas_pointer_up, "pointer_up"),
         )
-        self._figure.renderer.add_event_handler(
-            self._on_canvas_pointer_move, "pointer_move"
-        )
-        self._figure.renderer.add_event_handler(
-            self._on_canvas_pointer_up, "pointer_up"
-        )
+        for handler, event_type in self._pointer_handlers:
+            self._figure.renderer.add_event_handler(handler, event_type)
 
     # ------------------------------------------------------------------ #
     # pan/zoom + X/Y axis lock
@@ -196,6 +208,42 @@ class TreePlot(QWidget):
                 ctrl.add_camera(cam, include_state={"y", "height"})
 
     # ------------------------------------------------------------------ #
+    # teardown
+    # ------------------------------------------------------------------ #
+    def close_figure(self) -> None:
+        """Close the fastplotlib figure while its Qt widgets are still alive. Closing
+        the figure ourselves, before the widgets are deleted, unregisters the canvas and
+        releases the wgpu/pygfx resources, so it does not crash with "wrapped C/C++
+        object of type QRenderWidget has been deleted".
+        """
+        if self._closed:
+            return
+        self._closed = True
+        with contextlib.suppress(Exception):
+            self._subplot.remove_animation(self._update_rulers)
+        for handler, event_type in self._pointer_handlers:
+            with contextlib.suppress(Exception):
+                self._figure.renderer.remove_event_handler(handler, event_type)
+        with contextlib.suppress(Exception):
+            self._subplot.clear()
+        self._scatter = None
+        self._edges = None
+        self._rubber = None
+        self._edge_colors = None
+        self._positions = np.empty((0, 3), dtype=np.float32)
+        self._base_colors = np.empty((0, 4), dtype=np.float32)
+        self._base_sizes = np.empty(0, dtype=np.float32)
+        self._node_ids = np.empty(0, dtype=np.int64)
+        self._id_to_row = {}
+        self._selected_rows = []
+        with contextlib.suppress(Exception):
+            self._figure.close()
+
+    def closeEvent(self, event) -> None:  # noqa: N802 (Qt-style name)
+        self.close_figure()
+        super().closeEvent(event)
+
+    # ------------------------------------------------------------------ #
     # public API expected by TreeWidget
     # ------------------------------------------------------------------ #
     def update(
@@ -208,6 +256,8 @@ class TreePlot(QWidget):
         reset_view: bool | None = False,
         allow_flip: bool | None = True,
     ) -> None:
+        if self._closed:
+            return
         if plot_type == "feature" and (feature is None or feature == ""):
             plot_type = "tree"
         self.view_direction = view_direction
@@ -506,7 +556,7 @@ class TreePlot(QWidget):
     # selection (surgical: only touch changed rows)
     # ------------------------------------------------------------------ #
     def set_selection(self, selected_nodes: list[Any], plot_type: str) -> None:
-        if self._scatter is None:
+        if self._scatter is None or self._closed:
             return
         # Selection = a cyan outline + a size bump; the fill keeps its track color so
         # you can still tell which track a selected node belongs to (like the old tree).
@@ -693,6 +743,8 @@ class TreePlot(QWidget):
     # centering
     # ------------------------------------------------------------------ #
     def center_on_node(self, node_id: int) -> None:
+        if self._closed:
+            return
         row = self._id_to_row.get(int(node_id))
         if row is None:
             return

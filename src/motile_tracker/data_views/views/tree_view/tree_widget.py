@@ -1,9 +1,11 @@
 # do not put the from __future__ import annotations as it breaks the injection
 
+import contextlib
+
 import napari
 import numpy as np
 import pandas as pd
-from qtpy.QtCore import Qt
+from qtpy.QtCore import QEvent, QObject, Qt
 from qtpy.QtGui import QKeyEvent
 from qtpy.QtWidgets import (
     QHBoxLayout,
@@ -124,7 +126,29 @@ class TreeWidget(QWidget):
         tree_widget.setLayout(layout)
 
         self.setLayout(layout)
+
+        # Install eventfilter to watch for the deferred delete event, and call cleanup()
+        # to close the fastplotlib canvas before the Qt widgets are destroyed.
+        qt_main_window = getattr(viewer.window, "_qt_window", None)
+        if qt_main_window is not None:
+            qt_main_window.installEventFilter(self)
+
         self._update_track_data(reset_view=True)
+
+    def cleanup(self) -> None:
+        """Close the wgpu canvas while its Qt widgets are still alive. Idempotent."""
+        self.tree_widget.close_figure()
+
+    def eventFilter(self, obj: QObject, event: QEvent) -> bool:
+        """Trigger clean up when napari's main window is being destroyed"""
+        if event.type() == QEvent.Type.DeferredDelete:
+            with contextlib.suppress(AttributeError, RuntimeError):
+                self.cleanup()
+        return super().eventFilter(obj, event)
+
+    def closeEvent(self, event) -> None:  # noqa: N802 (Qt-style name)
+        self.cleanup()
+        super().closeEvent(event)
 
     def keyPressEvent(self, event: QKeyEvent) -> None:
         """Handle key press events.
