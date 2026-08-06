@@ -1,10 +1,12 @@
 """Tests for MenuManager: initialization, tab management, and widget visibility."""
 
+import gc
+import weakref
 from unittest.mock import MagicMock
 
 from qtpy.QtWidgets import QDockWidget, QScrollArea, QTabBar, QWidget
 
-from motile_tracker.application_menus.main_app import StartupWidget
+from motile_tracker.application_menus.main_app import MENU_WIDGETS, StartupWidget
 from motile_tracker.application_menus.menu_manager import MenuManager
 
 
@@ -146,3 +148,95 @@ def test_foreground_tabs_and_tabbar_fallback(make_napari_viewer):
     for tb in tabbars:
         tb.setStyleSheet.assert_called()
         tb.setElideMode.assert_called()
+
+
+class CleanupWidget(QWidget):
+    """DummyWidget that records that MenuManager gave it a chance to clean up."""
+
+    def __init__(self, viewer):
+        super().__init__()
+        self.cleaned = 0
+
+    def cleanup(self):
+        self.cleaned += 1
+
+
+def test_dock_close_destroys_widget(make_napari_viewer, qtbot):
+    """The 'x' on a tab must destroy the widget, not just orphan it.
+
+    napari's remove_dock_widget deletes the QDockWidget but only detaches the widget
+    it contained (setParent(None)), so without MenuManager destroying it the widget
+    lives on and keeps reacting to TracksViewer signals.
+    """
+    viewer = make_napari_viewer()
+    manager = MenuManager(viewer)
+
+    menu = {"TestWidget": {"widget": CleanupWidget, "location": "right"}}
+    manager.initialize_menu(menu)
+    wrapper = manager.menu_widgets["TestWidget"]
+    widget = wrapper.widget()
+    widget_ref = weakref.ref(widget)
+
+    dock = viewer.window._wrapped_dock_widgets["TestWidget"]
+    dock.destroyOnClose()  # what the tab's close button calls
+    qtbot.wait(10)
+
+    assert widget.cleaned == 1
+    assert "TestWidget" not in manager.menu_widgets
+    assert "TestWidget" not in manager.initialized_menu_widgets
+    assert "TestWidget" not in manager.visible_menus
+
+    del wrapper, widget
+    gc.collect()
+    assert widget_ref() is None  # really gone, not just undocked
+
+
+def test_closing_the_viewer_does_not_raise(make_napari_viewer, qtbot):
+    """Docks destroyed with their window must not trip the destroyed handler.
+
+    Their children are gone by then, so there is nothing left to clean up - it just
+    has to stay quiet, since an exception raised from a Qt signal aborts the process.
+    """
+    viewer = make_napari_viewer()
+    manager = MenuManager(viewer)
+    manager.initialize_menu(
+        {
+            "WidgetA": {"widget": CleanupWidget, "location": "right"},
+            "WidgetB": {"widget": CleanupWidget, "location": "right"},
+        }
+    )
+
+    viewer.close()
+    qtbot.wait(10)
+
+
+def test_real_menu_widgets_stop_following_tracks_viewer(make_napari_viewer, qtbot):
+    """Destroying the docks unhooks the tree and table from the TracksViewer."""
+    viewer = make_napari_viewer()
+    manager = MenuManager(viewer)
+    manager.initialize_menu(
+        {
+            "Lineage View": MENU_WIDGETS["Lineage View"],
+            "Table": MENU_WIDGETS["Table"],
+        }
+    )
+
+    tree_widget = manager.menu_widgets["Lineage View"].widget()
+    tracks_viewer = tree_widget.tracks_viewer
+    assert tracks_viewer.tree_widget_present
+    assert tracks_viewer.table_widget_present
+    connected = len(tracks_viewer.tracks_updated)
+
+    for name in ("Lineage View", "Table"):
+        viewer.window._wrapped_dock_widgets[name].destroyOnClose()
+    qtbot.wait(10)
+
+    assert not tracks_viewer.tree_widget_present
+    assert not tracks_viewer.table_widget_present
+    assert len(tracks_viewer.tracks_updated) == connected - 2
+    tracks_viewer.tracks_updated.emit(True)  # must not reach the destroyed widgets
+
+    # re-opening gives fresh, working widgets
+    manager.initialize_menu({"Lineage View": MENU_WIDGETS["Lineage View"]})
+    assert manager.menu_widgets["Lineage View"].widget() is not tree_widget
+    assert tracks_viewer.tree_widget_present
