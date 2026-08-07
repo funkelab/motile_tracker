@@ -1,7 +1,5 @@
 """Tests for MenuManager: initialization, tab management, and widget visibility."""
 
-import gc
-import weakref
 from unittest.mock import MagicMock
 
 from qtpy.QtWidgets import QDockWidget, QScrollArea, QTabBar, QWidget
@@ -153,12 +151,17 @@ def test_foreground_tabs_and_tabbar_fallback(make_napari_viewer):
 class CleanupWidget(QWidget):
     """DummyWidget that records that MenuManager gave it a chance to clean up."""
 
+    count = 0
+    cleaned_up: list[str] = []  # names of the widgets whose cleanup() ran
+
     def __init__(self, viewer):
         super().__init__()
-        self.cleaned = 0
+        CleanupWidget.count += 1
+        self.name = f"widget-{CleanupWidget.count}"
 
     def cleanup(self):
-        self.cleaned += 1
+        # kept on the class: the widget itself is deleted right after this
+        CleanupWidget.cleaned_up.append(self.name)
 
 
 def test_dock_close_destroys_widget(make_napari_viewer, qtbot):
@@ -170,25 +173,24 @@ def test_dock_close_destroys_widget(make_napari_viewer, qtbot):
     """
     viewer = make_napari_viewer()
     manager = MenuManager(viewer)
+    CleanupWidget.cleaned_up.clear()
 
     menu = {"TestWidget": {"widget": CleanupWidget, "location": "right"}}
     manager.initialize_menu(menu)
-    wrapper = manager.menu_widgets["TestWidget"]
-    widget = wrapper.widget()
-    widget_ref = weakref.ref(widget)
+    widget = manager.menu_widgets["TestWidget"].widget()
+    name = widget.name
 
     dock = viewer.window._wrapped_dock_widgets["TestWidget"]
-    dock.destroyOnClose()  # what the tab's close button calls
-    qtbot.wait(10)
+    # `destroyed` is emitted once the widget is really gone, which takes a couple of
+    # deferred deletions: waiting for the signal instead of a fixed delay keeps this
+    # independent of how promptly a platform gets round to them.
+    with qtbot.waitSignal(widget.destroyed, timeout=5000):
+        dock.destroyOnClose()  # what the tab's close button calls
 
-    assert widget.cleaned == 1
+    assert CleanupWidget.cleaned_up == [name]
     assert "TestWidget" not in manager.menu_widgets
     assert "TestWidget" not in manager.initialized_menu_widgets
     assert "TestWidget" not in manager.visible_menus
-
-    del wrapper, widget
-    gc.collect()
-    assert widget_ref() is None  # really gone, not just undocked
 
 
 def test_closing_the_viewer_does_not_raise(make_napari_viewer, qtbot):
@@ -205,9 +207,14 @@ def test_closing_the_viewer_does_not_raise(make_napari_viewer, qtbot):
             "WidgetB": {"widget": CleanupWidget, "location": "right"},
         }
     )
+    docks_destroyed = []
+    for name in ("WidgetA", "WidgetB"):
+        viewer.window._wrapped_dock_widgets[name].destroyed.connect(
+            lambda *_: docks_destroyed.append(1)
+        )
 
     viewer.close()
-    qtbot.wait(10)
+    qtbot.waitUntil(lambda: len(docks_destroyed) == 2, timeout=5000)
 
 
 def test_real_menu_widgets_stop_following_tracks_viewer(make_napari_viewer, qtbot):
@@ -222,14 +229,15 @@ def test_real_menu_widgets_stop_following_tracks_viewer(make_napari_viewer, qtbo
     )
 
     tree_widget = manager.menu_widgets["Lineage View"].widget()
+    table_widget = manager.menu_widgets["Table"].widget()
     tracks_viewer = tree_widget.tracks_viewer
     assert tracks_viewer.tree_widget_present
     assert tracks_viewer.table_widget_present
     connected = len(tracks_viewer.tracks_updated)
 
-    for name in ("Lineage View", "Table"):
-        viewer.window._wrapped_dock_widgets[name].destroyOnClose()
-    qtbot.wait(10)
+    for name, widget in (("Lineage View", tree_widget), ("Table", table_widget)):
+        with qtbot.waitSignal(widget.destroyed, timeout=5000):
+            viewer.window._wrapped_dock_widgets[name].destroyOnClose()
 
     assert not tracks_viewer.tree_widget_present
     assert not tracks_viewer.table_widget_present
