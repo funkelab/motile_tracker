@@ -24,6 +24,20 @@ from motile_tracker.motile.backend.motile_run import MotileRun
 from motile_tracker.motile.backend.solver_params import SolverParams
 
 
+def _remove_geff_shape(root):
+    """Remove the shape from a geff store's extra.tracksdata metadata (in place).
+
+    Simulates a GEFF with mask/bbox but no shape (e.g. from an external tool).
+    """
+    geff_meta = dict(root.attrs["geff"])
+    extra = dict(geff_meta.get("extra", {}))
+    tracksdata = dict(extra.get("tracksdata", {}))
+    tracksdata.pop("shape", None)
+    extra["tracksdata"] = tracksdata
+    geff_meta["extra"] = extra
+    root.attrs["geff"] = geff_meta
+
+
 @pytest.fixture(autouse=True)
 def mock_qmessagebox(monkeypatch):
     """Mock QMessageBox to prevent blocking popups in all tests.
@@ -630,11 +644,11 @@ def test_geff_import_without_axes_metadata(
 
 
 def test_geff_import_embedded_segmentation(qtbot, tmp_path, graph_2d, monkeypatch):
-    """Test that embedded segmentation (mask/bbox + segmentation_shape) is reconstructed.
+    """Test that embedded segmentation (mask/bbox + shape) is reconstructed.
 
     Regression test for the bug where mask/bbox were not included in the name_map
     passed to import_from_geff, causing tracks.segmentation to be None even though
-    the GEFF contained embedded mask data and a segmentation_shape zarr attribute.
+    the GEFF contained embedded mask data and a recorded shape.
     """
     monkeypatch.setattr(ImportDialog, "_resize_dialog", lambda self: None)
 
@@ -647,7 +661,7 @@ def test_geff_import_embedded_segmentation(qtbot, tmp_path, graph_2d, monkeypatc
 
     root = _zarr.open_group(geff_path / "tracks.geff", mode="r")
     assert geff_has_embedded_segmentation(root), (
-        "Precondition: geff should have mask/bbox and segmentation_shape"
+        "Precondition: geff should have mask/bbox and shape"
     )
 
     dialog = ImportDialog(import_type="geff")
@@ -690,7 +704,7 @@ def test_geff_import_embedded_segmentation(qtbot, tmp_path, graph_2d, monkeypatc
 
 def test_geff_import_old_geff_warning(qtbot, tmp_path, graph_2d, monkeypatch):
     """Test that the old GEFF warning is shown when mask/bbox is present but
-    segmentation_shape is missing (simulating a GEFF exported by an older funtracks).
+    the shape is missing (simulating a GEFF from an external tool).
     """
     monkeypatch.setattr(ImportDialog, "_resize_dialog", lambda self: None)
 
@@ -698,9 +712,9 @@ def test_geff_import_old_geff_warning(qtbot, tmp_path, graph_2d, monkeypatch):
     geff_path = tmp_path / "old_geff.zarr"
     export_to_geff(tracks, geff_path, save_segmentation=False)
 
-    # Remove segmentation_shape to simulate old funtracks export
+    # Remove the shape to simulate a GEFF without shape metadata
     root = zarr.open_group(geff_path / "tracks.geff", mode="r+")
-    del root.attrs["segmentation_shape"]
+    _remove_geff_shape(root)
 
     dialog = ImportDialog(import_type="geff")
     qtbot.addWidget(dialog)
@@ -708,7 +722,7 @@ def test_geff_import_old_geff_warning(qtbot, tmp_path, graph_2d, monkeypatch):
 
     assert dialog.import_widget.root is not None
 
-    # Old GEFF warning should be shown (mask/bbox present, no segmentation_shape)
+    # Old GEFF warning should be shown (mask/bbox present, no shape)
     assert not dialog.segmentation_widget._old_geff_warning_label.isHidden()
     assert dialog.segmentation_widget._embedded_info_label.isHidden()
     assert not dialog.segmentation_widget.none_radio.isHidden()
@@ -742,7 +756,6 @@ def test_geff_import_with_related_data(qtbot, tmp_path, graph_2d, monkeypatch):
     import shutil
 
     root = zarr.open_group(geff_path / "tracks.geff", mode="r+")
-    del root.attrs["segmentation_shape"]
 
     geff_meta = dict(root.attrs["geff"])
     node_props_meta = dict(geff_meta["node_props_metadata"])
@@ -751,6 +764,7 @@ def test_geff_import_with_related_data(qtbot, tmp_path, graph_2d, monkeypatch):
     geff_meta["node_props_metadata"] = node_props_meta
     extra = dict(geff_meta.get("extra", {}))
     extra.pop("funtracks", None)
+    extra.pop("tracksdata", None)  # drop the recorded shape
     geff_meta["extra"] = extra
     root.attrs["geff"] = geff_meta
 
@@ -797,8 +811,11 @@ def test_geff_import_with_related_data(qtbot, tmp_path, graph_2d, monkeypatch):
 def test_geff_import_no_mask_with_segmentation_shape(
     qtbot, tmp_path, graph_2d_without_segmentation, monkeypatch
 ):
-    """Test that injecting segmentation_shape without mask/bbox shows the normal
-    flow (no warning, no embedded info) and produces no segmentation on import.
+    """Test that injecting a shape without mask/bbox shows the normal flow
+    (no warning, no embedded info) and produces no segmentation on import.
+
+    Uses the legacy top-level ``segmentation_shape`` zarr attribute, which also
+    exercises the legacy shape-detection fallback.
     """
     monkeypatch.setattr(ImportDialog, "_resize_dialog", lambda self: None)
 
@@ -806,10 +823,8 @@ def test_geff_import_no_mask_with_segmentation_shape(
     geff_path = tmp_path / "no_mask_with_shape.zarr"
     export_to_geff(tracks, geff_path, save_segmentation=False)
 
-    # Manually inject segmentation_shape even though no mask/bbox exist
+    # Manually inject a (legacy) shape attr even though no mask/bbox exist
     root = zarr.open_group(geff_path / "tracks.geff", mode="r+")
-    attrs = dict(root.attrs)
-    attrs["segmentation_shape"] = [5, 100, 100]
     root.attrs["segmentation_shape"] = [5, 100, 100]
 
     dialog = ImportDialog(import_type="geff")

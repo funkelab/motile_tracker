@@ -178,7 +178,7 @@ class StandardFieldMapWidget(QWidget):
         self.metadata = dict(root.attrs.get("geff", {}))
 
         # Exclude mask/bbox from optional features when they are embedded segmentation
-        # attributes that will be imported automatically (segmentation_shape present).
+        # attributes that will be imported automatically (shape metadata present).
         if geff_has_embedded_segmentation(root):
             self.node_attrs = [a for a in self.node_attrs if a not in ("mask", "bbox")]
 

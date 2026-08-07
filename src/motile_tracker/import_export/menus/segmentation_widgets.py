@@ -274,17 +274,33 @@ def _geff_has_mask_props(root: zarr.Group) -> bool:
         return False
 
 
+def _geff_has_shape(root: zarr.Group) -> bool:
+    """Return True if the geff store records the segmentation shape.
+
+    The shape is stored inside the geff metadata at extra.tracksdata.shape
+    (the convention shared with tracksdata). Older funtracks GEFFs stored it as a
+    top-level 'segmentation_shape' zarr attribute, which is still recognised.
+    """
+    attrs = dict(root.attrs)
+    new_shape = (
+        attrs.get("geff", {}).get("extra", {}).get("tracksdata", {}).get("shape")
+    )
+    legacy_shape = attrs.get("segmentation_shape")
+    return new_shape is not None or legacy_shape is not None
+
+
 def geff_has_embedded_segmentation(root: zarr.Group) -> bool:
     """Return True if the geff group has embedded segmentation that can be reconstructed.
 
     Requires both:
     - 'mask' and 'bbox' node prop arrays in the zarr store
-    - 'segmentation_shape' in zarr attrs (written by funtracks export_to_geff)
+    - the segmentation shape recorded in the geff metadata (extra.tracksdata.shape)
+      or the legacy top-level 'segmentation_shape' zarr attribute
 
     When both conditions are met, funtracks will reconstruct the segmentation
     automatically as a GraphArrayView — no external segmentation file is needed.
     """
-    return _geff_has_mask_props(root) and "segmentation_shape" in dict(root.attrs)
+    return _geff_has_mask_props(root) and _geff_has_shape(root)
 
 
 class GeffSegmentationWidget(QWidget):
@@ -338,10 +354,10 @@ class GeffSegmentationWidget(QWidget):
         self._embedded_info_label.setFont(font)
         self._embedded_info_label.setVisible(False)
 
-        # Warning label shown when masks/bboxes are present but segmentation_shape is
-        # missing (GEFF exported by an older version of funtracks)
+        # Warning label shown when masks/bboxes are present but the shape metadata
+        # is missing (GEFF exported by an older version of funtracks or external tool)
         self._old_geff_warning_label = QLabel(
-            "⚠ This GEFF contains mask/bbox data but no segmentation_shape. "
+            "⚠ This GEFF contains mask/bbox data but no shape metadata. "
             "The segmentation cannot be reconstructed automatically. "
             "Re-export with an updated version of funtracks, or provide an "
             "external segmentation file below."
@@ -394,7 +410,7 @@ class GeffSegmentationWidget(QWidget):
                 self._old_geff_warning_label.setVisible(False)
                 self.none_radio.setChecked(True)
             elif _geff_has_mask_props(self.root):
-                # Old GEFF: masks present but segmentation_shape missing.
+                # Old GEFF: masks present but shape metadata missing.
                 # Show a warning and the normal options so the user can provide
                 # an external segmentation or skip it.
                 self.none_radio.setVisible(True)
