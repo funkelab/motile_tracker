@@ -179,9 +179,22 @@ class ContourLabels(napari.layers.Labels):
                 color[3] = value
 
     def refresh_colormap(self):
-        """Refresh the label colormap by setting its dictionary"""
+        """Refresh the label colormap after in-place opacity/color changes.
 
-        self.colormap = DirectLabelColormap(color_dict=self.colormap.color_dict)
+        `set_opacity` mutates the colormap's `color_dict` alphas in place. Rather
+        than constructing a new DirectLabelColormap (which re-validates every color
+        via `transform_color` - ~0.2s for a 37k-label graph), clear the colormap's
+        cached value->color mapping and re-assign the same object so napari rebuilds
+        only the GPU texture (~0.08s).
+
+        Setting colormap also emits `selected_label`, which triggers
+        `_ensure_valid_label` and would rebuild the colormap a second time; that
+        validation is only needed when the painting label changes, not on a
+        highlight/opacity refresh, so block it here.
+        """
+        self.colormap._clear_cache()
+        with self.events.selected_label.blocker():
+            self.colormap = self.colormap
 
     def data_setitem(self, indices, value, refresh=True):
         """Override to handle read-only data (e.g. GraphArrayView).
