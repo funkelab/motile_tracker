@@ -294,45 +294,6 @@ def track_layers_hook(
         copied_layer.bind_key("m")(orig_layer.assign_new_label)
 
 
-def source_layer_hook(
-    orig_layer: Labels | Points, copied_layer: Labels | Points
-) -> None:
-    """Hook to forward right-clicks on an orthogonal-view copy of a manual-tracking
-    source (detections) layer to the main-view copy logic, so copying a detection works
-    identically from the ortho views.
-
-    The forwarding is only active while a layer is connected for manual tracking: the
-    TrackingFromScratch widget stores a ``_manual_copy_detection`` callback on the source
-    layer and a ``_manual_switch_layer`` callback on both the source and target layers
-    while its mode is running, and removes them afterwards. Both are looked up dynamically,
-    so this hook is a no-op for all other Labels / Points layers (and their copies).
-
-    Args:
-        orig_layer (Labels | Points): the original detections/track layer in the main
-            viewer.
-        copied_layer (Labels | Points): the ortho-view copy of that layer.
-    """
-
-    def click(layer: Labels | Points, event: Event):
-        copy_detection = getattr(orig_layer, "_manual_copy_detection", None)
-        if (
-            copy_detection is not None
-            and event.type == "mouse_press"
-            and event.button == 2
-        ):
-            copy_detection(layer, event)
-
-    copied_layer.mouse_drag_callbacks.append(click)
-
-    # forward the '\' key (switch source/target layer) from the ortho-view copy
-    def switch_layer(layer: Labels | Points):
-        switch = getattr(orig_layer, "_manual_switch_layer", None)
-        if switch is not None:
-            switch()
-
-    copied_layer.bind_key("\\", switch_layer, overwrite=True)
-
-
 def initialize_ortho_views(viewer: Viewer) -> OrthoViewManager:
     """Initialize orthoviews on the current napari Viewer and register hooks and filters.
 
@@ -345,7 +306,6 @@ def initialize_ortho_views(viewer: Viewer) -> OrthoViewManager:
 
     orth_view_manager = _get_manager(viewer)
     orth_view_manager.register_layer_hook((TrackLabels, TrackPoints), track_layers_hook)
-    orth_view_manager.register_layer_hook((Labels, Points), source_layer_hook)
     orth_view_manager.register_layer_hook((TrackLabels), paint_event_hook)
     orth_view_manager.register_layer_hook((TrackPoints), point_data_hook)
     orth_view_manager.register_layer_hook((TrackLabels), colormap_hook)

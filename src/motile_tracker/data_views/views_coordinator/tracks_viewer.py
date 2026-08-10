@@ -142,11 +142,9 @@ class TracksViewer:
     def set_keybinds(self):
         bind_keymap(self.viewer, KEYMAP, self)
 
-    def request_new_track(self, event=None) -> None:
+    def request_new_track(self) -> None:
         """Request a new track id (with new segmentation label if a seg layer is present)"""
 
-        if self.tracks is None:
-            return
         if self.tracking_layers.seg_layer is not None:
             new_label(self.tracking_layers.seg_layer)
         else:
