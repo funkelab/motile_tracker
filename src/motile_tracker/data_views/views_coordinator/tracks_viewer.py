@@ -500,12 +500,15 @@ class TracksViewer:
     def undo(self, event=None):
         if self.tracks is None:
             return
-        self.tracks.undo()
+        # prevent jumping to the selected node, so that the view stays stable.
+        with self.center_node.blocked():
+            self.tracks.undo()
 
     def redo(self, event=None):
         if self.tracks is None:
             return
-        self.tracks.redo()
+        with self.center_node.blocked():
+            self.tracks.redo()
 
     def hide_panels(self, event=None):
         """Show/hide menu and tree view panels without destroying"""
