@@ -101,6 +101,12 @@ conflicts = [
     ],
 ]
 
+[tool.uv.sources]
+# TEMPORARY: pin funtracks to the commit from PR #272, which fixes background
+# coloring when the loaded geff has node ids starting at 0. Remove this source
+# once funtracks PR #272 is merged and released.
+funtracks = { git = "https://github.com/funkelab/funtracks.git", rev = "5be6bfb2c5361a4bab6b5065c55b9ed3dbf11eb4" }
+
 [tool.pytest.ini_options]
 # Benchmarks are slow and run in a dedicated CI job; exclude them from the normal
 # test suite (`just test` / `pytest .`). Run with `pytest tests/benchmarks -o addopts=`.
