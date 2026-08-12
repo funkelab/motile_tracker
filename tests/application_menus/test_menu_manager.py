@@ -8,119 +8,91 @@ from motile_tracker.application_menus.main_app import StartupWidget
 from motile_tracker.application_menus.menu_manager import MenuManager
 
 
-def test_initialize_menu_adds_widget(make_napari_viewer):
+class DummyWidget(QWidget):
+    def __init__(self, viewer):
+        super().__init__()
+
+
+def test_basic_menu_operations(make_napari_viewer):
+    """Test initialize_menu, find_dock_widget, toggle, and tabbar location."""
     viewer = make_napari_viewer()
     manager = MenuManager(viewer)
 
-    class DummyWidget(QWidget):
-        def __init__(self, viewer):
-            super().__init__()
-
     menu = {"TestWidget": {"widget": DummyWidget, "location": "right"}}
     manager.initialize_menu(menu)
+
+    # initialize_menu adds widget wrapped in QScrollArea
     assert "TestWidget" in viewer.window.dock_widgets
-    # Should wrap in QScrollArea
     assert isinstance(viewer.window.dock_widgets["TestWidget"], QScrollArea)
 
-
-def test_find_dock_widget_by_name(make_napari_viewer):
-    viewer = make_napari_viewer()
-    manager = MenuManager(viewer)
-
-    class DummyWidget(QWidget):
-        def __init__(self, viewer):
-            super().__init__()
-
-    menu = {"TestWidget": {"widget": DummyWidget, "location": "right"}}
-    manager.initialize_menu(menu)
+    # _find_dock_widget_by_name finds the widget
     found = manager._find_dock_widget_by_name("TestWidget")
     assert found is not None
 
-
-def test_toggle_menu_panel_visibility(make_napari_viewer):
-    viewer = make_napari_viewer()
-    manager = MenuManager(viewer)
-
-    class DummyWidget(QWidget):
-        def __init__(self, viewer):
-            super().__init__()
-
-    menu = {"TestWidget": {"widget": DummyWidget, "location": "right"}}
-    manager.initialize_menu(menu)
-    # Should not raise
+    # toggle_menu_panel_visibility doesn't raise
     manager.toggle_menu_panel_visibility()
     manager.toggle_menu_panel_visibility()
 
-
-def test_set_tabbar_location_and_foreground_tabs(make_napari_viewer):
-    viewer = make_napari_viewer()
-    manager = MenuManager(viewer)
-    # Should not raise
+    # set_tabbar_location and set_foreground_tabs don't raise
     manager.set_tabbar_location("North")
     manager.set_foreground_tabs(["TestWidget"])
 
 
-def test_initialize_menu_recreates_missing_widget(make_napari_viewer):
-    """If a widget exists but is hidden, it should be reused and shown."""
+def test_recreate_hidden_widget_and_hide_restore_cycle(make_napari_viewer):
+    """Test widget reuse when hidden and full hide/restore cycle."""
     viewer = make_napari_viewer()
     manager = MenuManager(viewer)
 
-    class DummyWidget(QWidget):
-        def __init__(self, viewer):
-            super().__init__()
-
-    # create real widget via system
     menu = {"TestWidget": {"widget": DummyWidget, "location": "right"}}
     manager.initialize_menu(menu)
 
-    # get dock widget
     dock = manager._find_dock_widget_by_name("TestWidget")
     assert dock is not None
 
-    # simulate hidden state
+    # Simulate hidden state for recreate path
     dock.isVisible = MagicMock(return_value=False)
-
     fake_parent = MagicMock()
     dock.parent = MagicMock(return_value=fake_parent)
 
-    # re-run initialization (triggers reuse path)
     manager.initialize_menu(menu)
-
     assert "TestWidget" in manager.visible_menus
     fake_parent.show.assert_called_once()
 
+    # Now test full hide/restore cycle with a fresh widget
+    menu2 = {"A": {"widget": DummyWidget, "location": "right"}}
+    manager.initialize_menu(menu2)
+    dock2 = manager._find_dock_widget_by_name("A")
+    dock2.isVisible = MagicMock(return_value=True)
+    parent2 = MagicMock()
+    dock2.parent = MagicMock(return_value=parent2)
 
-def test_find_dock_widget_runtime_error_fallback(make_napari_viewer):
-    """Ensure RuntimeError during isVisible causes fallback search to continue safely."""
+    manager.toggle_menu_panel_visibility()
+    parent2.close.assert_called_once()
+    assert manager.hidden is True
+
+    manager.toggle_menu_panel_visibility()
+    parent2.show.assert_called_once()
+    assert manager.hidden is False
+
+
+def test_error_fallback_and_visible_tabs(make_napari_viewer):
+    """Test RuntimeError fallback and _get_visible_tabs filtering."""
     viewer = make_napari_viewer()
     manager = MenuManager(viewer)
 
+    # RuntimeError during isVisible causes safe fallback
     bad_widget = MagicMock()
     bad_widget.isVisible.side_effect = RuntimeError("deleted")
-
     viewer.window.__dict__["dock_widgets"] = {"BrokenWidget": bad_widget}
-
     result = manager._find_dock_widget_by_name("BrokenWidget")
     assert result is None
 
-
-def test_get_visible_tabs(make_napari_viewer):
-    """Visible tabs should only include initialized + visible widgets."""
-    viewer = make_napari_viewer()
-    manager = MenuManager(viewer)
-
-    class DummyWidget(QWidget):
-        def __init__(self, viewer):
-            super().__init__()
-
-    # Create one visible widget
+    # Restore dock_widgets for visible tabs test
     menu = {"Visible": {"widget": DummyWidget, "location": "right"}}
     manager.initialize_menu(menu)
-
     dock = manager._find_dock_widget_by_name("Visible")
     dock.isVisible = MagicMock(return_value=True)
 
-    # Add fake initialized-but-not-visible widget
     manager.initialized_menu_widgets.add("Hidden")
 
     def fake_find(name):
@@ -135,40 +107,8 @@ def test_get_visible_tabs(make_napari_viewer):
     assert "Hidden" not in visible
 
 
-def test_toggle_menu_hide_and_restore(make_napari_viewer):
-    """Test full hide → restore cycle for menu visibility."""
-    viewer = make_napari_viewer()
-    manager = MenuManager(viewer)
-
-    class DummyWidget(QWidget):
-        def __init__(self, viewer):
-            super().__init__()
-
-    menu = {"A": {"widget": DummyWidget, "location": "right"}}
-    manager.initialize_menu(menu)
-
-    dock = manager._find_dock_widget_by_name("A")
-
-    # Make isVisible controllable
-    dock.isVisible = MagicMock(return_value=True)
-
-    parent = MagicMock()
-    dock.parent = MagicMock(return_value=parent)
-
-    # --- hide ---
-    manager.toggle_menu_panel_visibility()
-    parent.close.assert_called_once()
-
-    assert manager.hidden is True
-
-    # --- restore ---
-    manager.toggle_menu_panel_visibility()
-    parent.show.assert_called_once()
-
-    assert manager.hidden is False
-
-
-def test_set_foreground_tabs_raises_correct_widget(make_napari_viewer):
+def test_foreground_tabs_and_tabbar_fallback(make_napari_viewer):
+    """Test set_foreground_tabs raises correct widget and tabbar fallback."""
     viewer = make_napari_viewer()
     manager = MenuManager(viewer)
 
@@ -176,15 +116,12 @@ def test_set_foreground_tabs_raises_correct_widget(make_napari_viewer):
 
     qt_window = viewer.window._qt_window
     dock_widgets = qt_window.findChildren(QDockWidget)
-
     assert len(dock_widgets) > 0
 
-    # Pick one real widget to test
+    # set_foreground_tabs raises the correct widget
     target = dock_widgets[3]
     target_title = target.windowTitle()
-
     target.raise_ = MagicMock()
-
     manager.set_foreground_tabs([target_title])
 
     for dw in dock_widgets:
@@ -193,16 +130,8 @@ def test_set_foreground_tabs_raises_correct_widget(make_napari_viewer):
         else:
             assert not getattr(dw.raise_, "called", False)
 
-
-def test_set_tabbar_location_default_fallback(make_napari_viewer):
-    """Invalid location should fall back to North safely using real Qt objects."""
-    viewer = make_napari_viewer()
-    manager = MenuManager(viewer)
-
-    qt_window = viewer.window._qt_window
-
+    # Invalid tabbar location falls back safely
     tabbars = qt_window.findChildren(QTabBar)
-
     if not tabbars:
         tabbar = QTabBar()
         tabbar.setParent(qt_window)
