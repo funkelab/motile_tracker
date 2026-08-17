@@ -10,32 +10,42 @@ from motile_tracker.motile.backend import MotileRun, SolverParams
 from motile_tracker.motile.menus.motile_widget import MotileWidget
 
 
-def test_motile_widget_initialization(make_napari_viewer):
-    """Test MotileWidget initialization and signal connections."""
+def test_initialization_and_title(make_napari_viewer):
+    """Test MotileWidget initialization, signals, and title widget."""
+    from qtpy.QtWidgets import QLabel
+
     viewer = make_napari_viewer()
     widget = MotileWidget(viewer)
 
-    # Test 1: Verify all components created
+    # Verify all components created
     assert widget.viewer is viewer
     assert widget.edit_run_widget is not None
     assert widget.view_run_widget is not None
     assert not widget.view_run_widget.isVisible()
 
-    # Test 2: Verify signal connections exist
+    # Verify signal connections exist
     assert hasattr(widget, "solver_update")
     assert hasattr(widget, "new_run")
     assert hasattr(widget.edit_run_widget, "start_run")
     assert hasattr(widget.view_run_widget, "edit_run")
 
+    # Title widget
+    title = widget._title_widget()
+    assert isinstance(title, QLabel)
+    assert len(title.text()) > 0
+    assert "motile" in title.text().lower()
+    assert title.openExternalLinks()
+    assert title.wordWrap()
 
-def test_view_run(make_napari_viewer, solution_tracks_2d, qtbot):
-    """Test view_run method with different track types."""
+
+def test_view_and_edit_run(make_napari_viewer, solution_tracks_2d, qtbot):
+    """Test view_run and edit_run widget visibility toggling."""
     viewer = make_napari_viewer()
     widget = MotileWidget(viewer)
     qtbot.addWidget(widget)
     widget.show()
 
-    # Test 1: MotileRun shows viewer and hides editor
+    # view_run with MotileRun shows viewer and hides editor
     run = MotileRun(
         graph=create_empty_graphview_graph(),
         run_name="test_run",
@@ -46,35 +56,27 @@ def test_view_run(make_napari_viewer, solution_tracks_2d, qtbot):
     assert widget.view_run_widget.isVisible()
     assert not widget.edit_run_widget.isVisible()
 
-    # Test 2: SolutionTracks (non-MotileRun) hides viewer
+    # view_run with SolutionTracks (non-MotileRun) hides viewer
     widget.view_run(solution_tracks_2d)
     assert not widget.view_run_widget.isVisible()
 
-
-def test_edit_run(make_napari_viewer, qtbot):
-    """Test edit_run method."""
-    viewer = make_napari_viewer()
-    widget = MotileWidget(viewer)
-    qtbot.addWidget(widget)
-    widget.show()
-
-    # Test 1: edit_run with None shows editor and hides viewer
+    # edit_run with None shows editor and hides viewer
     widget.view_run_widget.show()
     widget.edit_run(None)
     assert widget.edit_run_widget.isVisible()
     assert not widget.view_run_widget.isVisible()
 
-    # Test 2: edit_run with run loads parameters into editor
+    # edit_run with run loads parameters into editor
     custom_params = SolverParams(max_edge_distance=999.0)
-    run = MotileRun(
+    run2 = MotileRun(
         graph=create_empty_graphview_graph(),
         run_name="test_run",
         solver_params=custom_params,
         ndim=3,
     )
     with patch.object(widget.edit_run_widget, "new_run") as mock_new_run:
-        widget.edit_run(run)
-        mock_new_run.assert_called_once_with(run)
+        widget.edit_run(run2)
+        mock_new_run.assert_called_once_with(run2)
     assert widget.edit_run_widget.isVisible()
 
 
@@ -94,12 +96,12 @@ def test_generate_tracks(make_napari_viewer):
         mock_worker = MagicMock()
         mock_solve.return_value = mock_worker
 
-        # Test 1: Sets status to initializing and starts worker
+        # Sets status to initializing and starts worker
         widget._generate_tracks(run)
         assert run.status == "initializing"
         mock_worker.start.assert_called_once()
 
-    # Test 2: Calls view_run
+    # Calls view_run
     with (
         patch.object(widget, "solve_with_motile") as mock_solve,
         patch.object(widget, "view_run") as mock_view_run,
@@ -116,7 +118,7 @@ def test_solve_with_motile(make_napari_viewer, segmentation_2d):
     widget = MotileWidget(viewer)
     worker_fn = widget.solve_with_motile.__wrapped__
 
-    # Test 1: Returns a run where all nodes have track_id assigned
+    # Returns a run where all nodes have track_id assigned
     run = MotileRun(
         graph=create_empty_graphview_graph(),
         run_name="test_run",
@@ -129,12 +131,12 @@ def test_solve_with_motile(make_napari_viewer, segmentation_2d):
     for node in result.graph.node_ids():
         assert result.get_track_id(node) is not None
 
-    # Test 1b: Area feature is enabled and computed for all nodes
+    # Area feature is enabled and computed for all nodes
     assert "area" in result.features
     for node in result.graph.node_ids():
         assert result.graph.nodes[node]["area"] > 0
 
-    # Test 2: Raises ValueError without input data
+    # Raises ValueError without input data
     run2 = MotileRun(
         graph=create_empty_graphview_graph(),
         input_segmentation=None,
@@ -146,7 +148,7 @@ def test_solve_with_motile(make_napari_viewer, segmentation_2d):
     with pytest.raises(ValueError, match="Must have one of input segmentation"):
         worker_fn(widget, run2)
 
-    # Test 3: Uses points when provided
+    # Uses points when provided
     points_data = np.array([[0, 10, 20], [1, 30, 40]])
     run3 = MotileRun(
         graph=create_empty_graphview_graph(),
@@ -170,7 +172,7 @@ def test_solve_with_motile(make_napari_viewer, segmentation_2d):
         assert np.array_equal(mock_build.call_args[0][0], points_data)
         mock_solve.assert_called_once()
 
-    # Test 4: Shows warning for empty result
+    # Shows warning for empty result
     run4 = MotileRun(
         graph=create_empty_graphview_graph(),
         input_segmentation=segmentation_2d,
@@ -191,7 +193,7 @@ def test_solve_with_motile(make_napari_viewer, segmentation_2d):
         mock_warning.assert_called_once()
         assert "No tracks found" in mock_warning.call_args[0][0]
 
-    # Test 5: Relabel segmentation when there are duplicate labels
+    # Relabel segmentation when there are duplicate labels
     segmentation_2d[1][10:10, 10:10] = 1  # duplicate value
 
     run5 = MotileRun(
@@ -238,8 +240,8 @@ def test_solve_with_motile(make_napari_viewer, segmentation_2d):
         assert mock_solve.call_args[0][1] is relabeled
 
 
-def test_on_solver_event(make_napari_viewer, qtbot):
-    """Test _on_solver_event method."""
+def test_solver_events_and_completion(make_napari_viewer, qtbot):
+    """Test _on_solver_event and _on_solve_complete methods."""
     viewer = make_napari_viewer()
     widget = MotileWidget(viewer)
 
@@ -251,75 +253,41 @@ def test_on_solver_event(make_napari_viewer, qtbot):
     )
     widget.view_run_widget.run = run
 
-    # Test 1: PRESOLVE event sets status
+    # PRESOLVE event sets status
     event_data = {"event_type": "PRESOLVE"}
     widget._on_solver_event(run, event_data)
     assert run.status == "presolving"
     assert run.gaps == []
 
-    # Test 2: MIPSOL event sets status and gap
+    # MIPSOL event sets status and gap
     event_data = {"event_type": "MIPSOL", "gap": 0.5}
     widget._on_solver_event(run, event_data)
     assert run.status == "solving"
     assert len(run.gaps) == 1
     assert run.gaps[0] == 0.5
 
-    # Test 3: Appends multiple gaps
+    # Appends multiple gaps
     event_data2 = {"event_type": "MIPSOL", "gap": 0.3}
     widget._on_solver_event(run, event_data2)
     assert len(run.gaps) == 2
     assert run.gaps[0] == 0.5
     assert run.gaps[1] == 0.3
 
-    # Test 4: Emits solver_update signal
+    # Emits solver_update signal
     event_data = {"event_type": "MIPSOL", "gap": 0.1}
     with qtbot.waitSignal(widget.solver_update, timeout=1000):
         widget._on_solver_event(run, event_data)
 
-
-def test_on_solve_complete(make_napari_viewer, qtbot):
-    """Test _on_solve_complete method."""
-    viewer = make_napari_viewer()
-    widget = MotileWidget(viewer)
-
-    run = MotileRun(
-        graph=create_empty_graphview_graph(),
-        run_name="test_run",
-        solver_params=SolverParams(),
-        ndim=3,
-    )
-    widget.view_run_widget.run = run
-
-    # Test 1: Sets status to done
+    # _on_solve_complete sets status to done
     widget._on_solve_complete(run)
     assert run.status == "done"
 
-    # Test 2: Emits solver_update signal
+    # Emits solver_update signal
     with qtbot.waitSignal(widget.solver_update, timeout=1000):
         widget._on_solve_complete(run)
 
-    # Test 3: Emits new_run signal with correct args
+    # Emits new_run signal with correct args
     with qtbot.waitSignal(widget.new_run, timeout=1000) as blocker:
         widget._on_solve_complete(run)
     assert blocker.args[0] is run
     assert blocker.args[1] == "test_run"
-
-
-def test_title_widget(make_napari_viewer):
-    """Test _title_widget method."""
-    from qtpy.QtWidgets import QLabel
-
-    viewer = make_napari_viewer()
-    widget = MotileWidget(viewer)
-    title = widget._title_widget()
-
-    # Test 1: Creates QLabel with rich text
-    assert isinstance(title, QLabel)
-    assert len(title.text()) > 0
-    assert "motile" in title.text().lower()
-
-    # Test 2: Enables external links
-    assert title.openExternalLinks()
-
-    # Test 3: Enables word wrap
-    assert title.wordWrap()
