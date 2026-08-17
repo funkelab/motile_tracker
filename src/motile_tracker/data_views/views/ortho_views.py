@@ -284,7 +284,7 @@ def make_own_colormap(orig_layer: TrackLabels, copied_layer: Labels) -> None:
     The colors are copied into the existing dict when the copy already has one for the
     same labels, because building a new DirectLabelColormap validates every color again.
     A new one is only constructed when the labels changed, or when the copy is still
-    sharing the original's colormap (see colormap_hook).
+    sharing the original's colormap.
 
     Args:
         orig_layer (TrackLabels): TrackLabels layer from which the copy is derived.
@@ -320,9 +320,7 @@ def colormap_hook(
     rendered in 3D, we want to display the non-filled labels with full opacity instead.
 
     That special case is the only one in which the copy needs a colormap of its own; the
-    rest of the time both views show identical colors and share a single colormap object,
-    which keeps this hook off the critical path of every selection and every paint (see
-    needs_own_colormap and make_own_colormap).
+    rest of the time both views show identical colors and share a single colormap object.
 
     Args:
         orig_layer (TrackLabels): TracksLabels layer from which the copied layer is
@@ -330,9 +328,8 @@ def colormap_hook(
         copied_layer (ContourLabels): ContourLabels equivalent of the TracksLabels layer.
 
     Returns:
-        list[tuple[Any, Callable]]: the (signal, handler) pairs connected here. This one
-            matters most: the handler rebuilds the colormap of the copied layer, so if it
-            outlives the copy it keeps doing that work for a layer nobody sees.
+        list[tuple[Any, Callable]]: the (signal, handler) pairs connected here, so they
+        can be cleaned up when the layer or the views go away.
     """
 
     def sync_colormap(orig_layer: TrackLabels, copied_layer: Labels, event: Event):
@@ -341,11 +338,10 @@ def colormap_hook(
         background opacity accordingly."""
 
         if not needs_own_colormap(orig_layer, copied_layer):
-            # Both views want exactly the same colors, so let them share the very same
-            # colormap object instead of giving the copy one of its own: constructing a
-            # DirectLabelColormap re-validates every color (~0.2s for a 37k label graph,
-            # per view, on every colormap event). Opacity changes the original makes in
-            # place are then visible here immediately, and only the texture is rebuilt.
+            # Both views want exactly the same colors, so they can share the same
+            # colormap object instead of giving the copy one of its own. Opacity changes
+            # the original makes in place are visible here immediately, and only the
+            # texture is rebuilt.
             if copied_layer.colormap is orig_layer.colormap:
                 copied_layer.refresh_colormap()
             else:
@@ -386,7 +382,7 @@ def labels_paint_hook(
 
     Returns:
         list[tuple[Any, Callable]] | None: connections made for a non-TrackLabels layer,
-            or None for a TrackLabels layer, where motile syncs the paint itself.
+            or None for a TrackLabels layer (handled separately).
     """
 
     if isinstance(orig_layer, TrackLabels):
