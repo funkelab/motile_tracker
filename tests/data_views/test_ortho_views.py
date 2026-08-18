@@ -289,3 +289,54 @@ def test_hook_connections_released_on_hide(
         assert hook_slot_counts() == baseline  # and released again
 
     m.cleanup()
+
+
+def test_point_size_stable_when_editing_in_ortho_views(
+    viewer, qtbot, solution_tracks_3d_without_segmentation, monkeypatch
+):
+    """Adding or selecting points in an orthogonal view must not change the point size.
+
+    Selected points are drawn 30% larger, and napari copies the size of a selected point
+    into current_size, which TrackPoints reads as a size slider change. Every add or
+    selection made in an orthogonal view therefore used to grow the points by another
+    30% (5 -> 7 -> 10 -> 13 -> ...).
+    """
+
+    monkeypatch.setattr(
+        "motile_tracker.data_views.views.layers.track_points.confirm_force_operation",
+        lambda message: (True, False),
+    )
+
+    m = initialize_ortho_views(viewer)
+    tracks_viewer = TracksViewer.get_instance(viewer)
+    tracks_viewer.update_tracks(
+        tracks=solution_tracks_3d_without_segmentation, name="test"
+    )
+    m.show()
+    qtbot.waitUntil(lambda: m.is_shown(), timeout=1000)
+
+    points_layer = tracks_viewer.tracking_layers.points_layer
+    right = m.right_widget.vm_container.viewer_model.layers[points_layer.name]
+    bottom = m.bottom_widget.vm_container.viewer_model.layers[points_layer.name]
+    default_size = points_layer.default_size
+
+    # adding points in an orthogonal view
+    for i in range(4):
+        right.add(np.array([0, 20, 55 + i, 65 + i], dtype=float))
+        assert points_layer.default_size == default_size
+
+    # selecting points, in an orthogonal view and in the main viewer
+    for index in range(3):
+        bottom.selected_data = {index}
+    assert points_layer.default_size == default_size
+    for node in tracks_viewer.tracks.graph.node_ids()[:3]:
+        tracks_viewer.selected_nodes.add(node, False)
+    assert points_layer.default_size == default_size
+
+    # a real size change still works, and reaches the orthogonal views
+    points_layer.current_size = default_size + 3
+    assert points_layer.default_size == default_size + 3
+    for copied_layer in (right, bottom):
+        assert np.array_equal(copied_layer.size, points_layer.size)
+
+    m.cleanup()
