@@ -110,6 +110,11 @@ The tracking results can also be visualized as a lineage tree.
 You can open the lineage tree widget via ``Plugins`` > ``Motile Tracker`` > ``Widget - Lineage View``.
 For more details, go to the :doc:`Tree View <tree_view>` documentation.
 
+Displaying feature measurements
+*******************************
+If you are tracking with a segmentation layer, you can select size and shape features to measure in the ``Features`` widget.
+Once selected, the measurements for these features will appear in the ``Lineage View`` (select ``Plot`` > ``Feature`` to display them), and in the ``Table`` widget.
+
 .. _save-load-vs-import-export:
 
 Saving and loading vs. importing and exporting
