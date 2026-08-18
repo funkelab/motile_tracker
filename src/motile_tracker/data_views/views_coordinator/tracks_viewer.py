@@ -63,6 +63,12 @@ class TracksViewer:
         ):
             if viewer is None:
                 raise ValueError("Make a viewer first please!")
+            # The outgoing instance is about to become unreachable, but psygnal
+            # connections keep it subscribed to its tracks object. Unsubscribe it,
+            # or a tracks object shown in successive viewers ends up notifying
+            # every TracksViewer ever built (see _disconnect_tracks).
+            if hasattr(cls, "_instance"):
+                cls._instance._disconnect_tracks()
             cls._instance = TracksViewer(viewer)
         return cls._instance
 
@@ -77,6 +83,7 @@ class TracksViewer:
         self.table_widget_present = False
 
         def _clear_if_current():
+            self._disconnect_tracks()
             if hasattr(TracksViewer, "_instance") and TracksViewer._instance is self:
                 del TracksViewer._instance
 
@@ -250,6 +257,20 @@ class TracksViewer:
         # know about their selection ('all' vs 'lineage'), but TracksViewer does)
         self.update_selection(update_counts=True)
 
+    def _disconnect_tracks(self) -> None:
+        """Stop listening to the currently displayed tracks object.
+
+        The connections below live on the Tracks object, not on this TracksViewer,
+        so they outlive both the viewer and the singleton reference unless they are
+        explicitly removed. Because one Tracks object can be handed to more than one
+        viewer over a session, leaving them in place means an edit notifies every
+        TracksViewer that ever displayed those tracks.
+        """
+        tracks = getattr(self, "tracks", None)
+        if tracks is not None:
+            tracks.refresh.disconnect(self._refresh)
+            tracks.action_applied.disconnect(self._on_action_applied)
+
     def update_tracks(self, tracks: SolutionTracks, name: str) -> None:
         """Stop viewing a previous set of tracks and replace it with a new one.
         Will create new segmentation and tracks layers and add them to the viewer.
@@ -260,9 +281,7 @@ class TracksViewer:
         """
         self.selected_nodes.reset()
 
-        if self.tracks is not None:
-            self.tracks.refresh.disconnect(self._refresh)
-            self.tracks.action_applied.disconnect(self._on_action_applied)
+        self._disconnect_tracks()
 
         self.tracks = tracks
         self.selected_nodes.deleted_items.clear()  # Reset deleted nodes when switching tracks

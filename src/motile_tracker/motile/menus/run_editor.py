@@ -231,8 +231,9 @@ class RunEditor(QGroupBox):
 
     def new_run(self, run: MotileRun) -> None:
         """Configure the run editor to copy the name and params of the given
-        run. Imported runs (CSV/geff) have no solver_params — leave the
-        editor at its current values rather than emitting None.
+        run. A run loaded from a directory with no params file has no
+        solver_params — leave the editor at its current values rather than
+        emitting None.
         """
         self.run_name.setText(run.run_name)
         if run.solver_params is not None:
