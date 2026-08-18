@@ -1,11 +1,14 @@
+import contextlib
+
 import napari
 import numpy as np
 import pandas as pd
-from matplotlib.colors import to_rgba
 from napari.utils import DirectLabelColormap
 from qtpy.QtCore import (
+    QAbstractTableModel,
     QItemSelection,
     QItemSelectionModel,
+    QModelIndex,
     Qt,
     QTimer,
 )
@@ -16,8 +19,7 @@ from qtpy.QtWidgets import (
     QStyle,
     QStyledItemDelegate,
     QStyleOptionViewItem,
-    QTableWidget,
-    QTableWidgetItem,
+    QTableView,
     QVBoxLayout,
     QWidget,
 )
@@ -32,6 +34,96 @@ from motile_tracker.data_views.views.tree_view.tree_widget_utils import (
 from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
 
+class TrackTableModel(QAbstractTableModel):
+    """Lazy table model backing the tracks table.
+
+    Holds the data as columns of numpy arrays (one row per node) and serves
+    values/colors on demand, so the view only ever realizes the handful of rows
+    currently visible. This keeps memory and populate-time O(visible rows)
+    regardless of the total node count (a ``QTableWidget`` would instead create
+    one ``QTableWidgetItem`` per cell, which blows up memory and freezes the UI
+    for large datasets).
+    """
+
+    def __init__(self, parent=None, decimals: int = 3):
+        super().__init__(parent)
+        self._table: dict[str, np.ndarray] = {}
+        self._columns: list[str] = []
+        self._nrows = 0
+        self._decimals = decimals
+        self._bg: list[QColor] = []
+        self._fg: list[QColor] = []
+
+    def set_table(self, table: dict[str, np.ndarray], colormap) -> None:
+        """Replace the table contents and precompute per-row colors."""
+        self.beginResetModel()
+        self._table = table
+        self._columns = list(table.keys())
+        self._nrows = len(next(iter(table.values()))) if table else 0
+
+        # Precompute one background/foreground color per row (O(rows), cheap;
+        # no per-cell widget objects are created).
+        self._bg = []
+        self._fg = []
+        ids = table.get("ID")
+        if ids is not None and len(ids) > 0 and colormap is not None:
+            # Single vectorized colormap.map call over all row labels: colormap.map
+            # has a large fixed per-call overhead, so mapping row-by-row is O(rows)
+            # slow. Map once, then build the per-row QColors.
+            mapped = colormap.map(np.asarray(ids))
+            for rgba in mapped:
+                if rgba[3] == 0:
+                    rgba = [0, 0, 0, 0]
+                r, g, b = int(rgba[0] * 255), int(rgba[1] * 255), int(rgba[2] * 255)
+                self._bg.append(QColor(r, g, b))
+                luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
+                self._fg.append(
+                    QColor(0, 0, 0) if luminance > 140 else QColor(255, 255, 255)
+                )
+        self.endResetModel()
+
+    def rowCount(self, parent=None) -> int:
+        if parent is not None and parent.isValid():
+            return 0  # flat table: child rows don't exist
+        return self._nrows
+
+    def columnCount(self, parent=None) -> int:
+        if parent is not None and parent.isValid():
+            return 0
+        return len(self._columns)
+
+    def headerData(self, section, orientation, role=Qt.DisplayRole):
+        if role == Qt.DisplayRole and orientation == Qt.Horizontal:
+            return self._columns[section]
+        return None
+
+    def _format(self, value) -> str:
+        try:
+            number = float(value)
+        except (ValueError, TypeError):
+            return str(value)
+        if float(number).is_integer():
+            return str(int(number))
+        return f"{number:.{self._decimals}f}"
+
+    def data(self, index: QModelIndex, role=Qt.DisplayRole):
+        if not index.isValid():
+            return None
+        row, col = index.row(), index.column()
+        if role == Qt.DisplayRole:
+            return self._format(self._table[self._columns[col]][row])
+        if role == Qt.BackgroundRole:
+            return self._bg[row] if row < len(self._bg) else None
+        if role == Qt.ForegroundRole:
+            return self._fg[row] if row < len(self._fg) else None
+        return None
+
+    def flags(self, index):
+        if not index.isValid():
+            return Qt.NoItemFlags
+        return Qt.ItemIsSelectable | Qt.ItemIsEnabled
+
+
 class NoSelectionHighlightDelegate(QStyledItemDelegate):
     """Prevents Qt from painting the default selection background,
     preserving each row's custom background color, and draws a cyan border instead."""
@@ -39,38 +131,26 @@ class NoSelectionHighlightDelegate(QStyledItemDelegate):
     def paint(self, painter, option, index):
         opt = QStyleOptionViewItem(option)
 
-        table = index.model().parent()
+        # Read the selection state straight off the style option: Qt already
+        # computed it for this cell. Asking the view instead (via
+        # selectedIndexes()) would rebuild the full selection on every single
+        # cell paint, making each repaint O(visible cells x selected cells) --
+        # ~15s for a 25k-row table with everything selected.
+        # With SelectRows behavior every cell of a selected row carries this
+        # flag, so a whole-row border still gets drawn.
+        selected = bool(opt.state & QStyle.State_Selected)
+        opt.state &= ~QStyle.State_Selected
 
-        if opt.state & QStyle.State_Selected:
-            opt.state &= ~QStyle.State_Selected
-
-        # Paint normally first (preserving your setBackground + setForeground)
+        # Paint normally first (preserving the model's Background + Foreground roles)
         super().paint(painter, opt, index)
 
         # Draw a cyan border around the *entire row* if selected
-        if index.row() in {i.row() for i in table.selectedIndexes()}:
-            pen = QPen(Qt.cyan, 2)
-            painter.setPen(pen)
+        if selected:
+            painter.setPen(QPen(Qt.cyan, 2))
             painter.drawRect(opt.rect.adjusted(1, 1, -2, -2))
 
 
-class FloatDelegate(QStyledItemDelegate):
-    def __init__(self, decimals, parent=None):
-        super().__init__(parent)
-        self.nDecimals = decimals
-
-    def displayText(self, value, locale):
-        try:
-            number = float(value)
-        except (ValueError, TypeError):
-            return str(value)
-
-        if number.is_integer():
-            return str(int(number))
-        return f"{number:.{self.nDecimals}f}"
-
-
-class CustomTableWidget(QTableWidget):
+class CustomTableWidget(QTableView):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.verticalHeader().setSectionsClickable(False)
@@ -156,7 +236,7 @@ class CustomTableWidget(QTableWidget):
 
         selection = QItemSelection(
             self.model().index(top, 0),
-            self.model().index(bottom, self.columnCount() - 1),
+            self.model().index(bottom, self.model().columnCount() - 1),
         )
 
         modifiers = event.modifiers()
@@ -209,17 +289,28 @@ class ColoredTableWidget(QWidget):
         )  # make sure tracks_viewer initializes/updates the track df
         self.tracks_viewer.table_widget_present = True
         self.tracks_viewer.tracks_updated.connect(self.update_data)
-        self._table_widget = CustomTableWidget()
-        self.special_selection = []
 
-        self.update_data()
+        self._table = {}
+        self._id_to_row: dict[int, int] = {}
         self.ascending = False  # for choosing whether to sort ascending or descending
         self._syncing = False
+
+        self._table_widget = CustomTableWidget()
+        self._model = TrackTableModel(self._table_widget)
+        self._table_widget.setModel(self._model)
+
+        # Custom delegate: preserve per-row background color and draw the cyan
+        # selection border (set once; the model handles formatting/colors).
+        self._table_widget.setItemDelegate(
+            NoSelectionHighlightDelegate(self._table_widget)
+        )
+
+        self.update_data()
 
         # Connect to single click in the header to sort the table.
         self._table_widget.horizontalHeader().sectionClicked.connect(self._sort_table)
 
-        # Instruction label to explain left and right mouse click.
+        # Instruction label to explain mouse and keyboard functions.
         label = QLabel(
             "Use left mouse click to select and center a label. Use Ctrl/CMD to center a node, Shift to append to selection. Use mouse drag to select a range."
         )
@@ -236,7 +327,7 @@ class ColoredTableWidget(QWidget):
 
         # Selection behavior
         self._table_widget.setStyleSheet("""
-            QTableWidget::item:selected {
+            QTableView::item:selected {
                 border: 2px solid cyan;
             }
         """)
@@ -263,12 +354,26 @@ class ColoredTableWidget(QWidget):
         self._table_widget.setSelectionMode(QAbstractItemView.MultiSelection)
         self._table_widget.setSelectionBehavior(QAbstractItemView.SelectRows)
 
-        delegate = NoSelectionHighlightDelegate(self._table_widget)
-        self._table_widget.setItemDelegate(delegate)
-
-        self._table_widget.itemSelectionChanged.connect(self._on_selection_changed)
+        self._table_widget.selectionModel().selectionChanged.connect(
+            self._on_selection_changed
+        )
         self.tracks_viewer.node_selection_updated.connect(self._update_selected)
         self.tracks_viewer.center_node.connect(self.scroll_to_node)
+
+    def cleanup(self) -> None:
+        """Stop following the TracksViewer.
+
+        Called by MenuManager when the dock is destroyed, so we can stop listening to
+        TracksViewer update signals to rebuild the table.
+        """
+        self.tracks_viewer.table_widget_present = False
+        for signal, slot in (
+            (self.tracks_viewer.tracks_updated, self.update_data),
+            (self.tracks_viewer.node_selection_updated, self._update_selected),
+            (self.tracks_viewer.center_node, self.scroll_to_node),
+        ):
+            with contextlib.suppress(ValueError, KeyError, RuntimeError):
+                signal.disconnect(slot)
 
     def update_data(self, **kwargs) -> None:
         """Update the displayed data based on the tracks_df on TracksViewer"""
@@ -324,7 +429,7 @@ class ColoredTableWidget(QWidget):
             QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows,
         )
 
-    def _on_selection_changed(self) -> None:
+    def _on_selection_changed(self, *args) -> None:
         """Update the node selection list on TracksViewer based on the rows selected in
         the table.
         """
@@ -409,8 +514,14 @@ class ColoredTableWidget(QWidget):
         Returns: row index or None
         """
 
-        n_rows = self._table_widget.rowCount()
+        # Fast path: lookup by node id (the only condition used in practice).
+        if set(conditions) == {"ID"} and conditions["ID"] is not None:
+            try:
+                return self._id_to_row.get(int(conditions["ID"]))
+            except (ValueError, TypeError):
+                return None
 
+        n_rows = len(self._table.get("ID", []))
         for row in range(n_rows):
             # Only check conditions that are not None
             if all(
@@ -425,7 +536,7 @@ class ColoredTableWidget(QWidget):
     def set_data(
         self, df: pd.DataFrame, columns_to_display: list[str] | None = None
     ) -> None:
-        """Set the content of the table from a dictionary
+        """Set the content of the table from a dataframe.
 
         Args:
             df (pd.DataFrame): dataframe holding the tree widget data, one row per node.
@@ -442,23 +553,14 @@ class ColoredTableWidget(QWidget):
         self._table = table
         self.colormap = self._get_colormap()
 
-        self._table_widget.clear()
-        try:
-            self._table_widget.setRowCount(len(next(iter(table.values()))))
-            self._table_widget.setColumnCount(len(table))
-        except StopIteration:
-            pass
+        # Fast id -> row lookup for selection syncing / scrolling.
+        if "ID" in table:
+            self._id_to_row = {int(v): i for i, v in enumerate(table["ID"])}
+        else:
+            self._id_to_row = {}
 
-        for i, column in enumerate(table):
-            self._table_widget.setHorizontalHeaderItem(i, QTableWidgetItem(column))
-            for j, value in enumerate(table.get(column)):
-                item = QTableWidgetItem(str(value))
-                item.setFlags(item.flags() & ~Qt.ItemIsEditable)
-                self._table_widget.setItem(j, i, item)
-
-        self._table_widget.setItemDelegate(FloatDelegate(3, self._table_widget))
-
-        self._set_label_colors_to_rows()
+        # Hand the data to the lazy model (no per-cell widgets are created).
+        self._model.set_table(table, self.colormap)
 
     def _get_colormap(self) -> DirectLabelColormap:
         """Get a DirectLabelColormap that maps node ids to their track ids, and then
@@ -471,7 +573,14 @@ class ColoredTableWidget(QWidget):
         if tracks is not None:
             nodes = tracks.graph.node_ids()
             track_ids = tracks.get_track_ids(nodes)
-            colors = [self.tracks_viewer.colormap.map(tid) for tid in track_ids]
+            # Single vectorized colormap.map call: ~290x faster than per-node
+            # calls because colormap.map has a large fixed per-call overhead.
+            # Copy per node (distinct rows) so each color is an independent array.
+            if len(track_ids) > 0:
+                mapped = self.tracks_viewer.colormap.map(np.asarray(track_ids))
+                colors = [color.copy() for color in mapped]
+            else:
+                colors = []
         else:
             nodes = []
             colors = []
@@ -483,65 +592,27 @@ class ColoredTableWidget(QWidget):
             }
         )
 
-    def _set_label_colors_to_rows(self) -> None:
-        """Apply the colors of the napari label image to the table, and set the text color
-        depending on luminance (black text on light backgrounds, white text on dark
-        backgrounds).
-        """
-
-        for i in range(self._table_widget.rowCount()):
-            label = self._table["ID"][i]
-            label_color = to_rgba(self.colormap.map(label))
-
-            if label_color[3] == 0:
-                label_color = [0, 0, 0, 0]
-
-            r, g, b = (
-                int(label_color[0] * 255),
-                int(label_color[1] * 255),
-                int(label_color[2] * 255),
-            )
-
-            qcolor = QColor(r, g, b)
-
-            luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
-            text_color = QColor(0, 0, 0) if luminance > 140 else QColor(255, 255, 255)
-
-            for j in range(self._table_widget.columnCount()):
-                item = self._table_widget.item(i, j)
-                item.setBackground(qcolor)
-                item.setForeground(text_color)
-
     def _update_label_colormap(self) -> None:
         """
         Highlight the labels of selected rows. Assumes the layer already has a
         DirectLabelColormap.
         """
 
-        # in case of right-click on the table, we should only show the selected label(s)
-        if len(self.special_selection) != 0:
-            for _, color in self.colormap.color_dict.items():
-                color[-1] = 0
-            for key in self.special_selection:
-                if key in self.colormap.color_dict:
-                    self.colormap.color_dict[key][-1] = 1
-
         # find selected rows, and set highlight matching labels
-        else:
-            selected_rows = sorted(
-                {index.row() for index in self._table_widget.selectedIndexes()}
-            )
-            if not selected_rows:
-                self._reset_layer_colormap()
-                return
+        selected_rows = sorted(
+            {index.row() for index in self._table_widget.selectedIndexes()}
+        )
+        if not selected_rows:
+            self._reset_layer_colormap()
+            return
 
-            selected_labels = [self._table["ID"][row] for row in selected_rows]
-            for key, color in self.colormap.color_dict.items():
-                if key is not None and key != 0:
-                    color[-1] = 0.6
-            for key in selected_labels:
-                if key in self.colormap.color_dict:
-                    self.colormap.color_dict[key][-1] = 1
+        selected_labels = [self._table["ID"][row] for row in selected_rows]
+        for key, color in self.colormap.color_dict.items():
+            if key is not None and key != 0:
+                color[-1] = 0.6
+        for key in selected_labels:
+            if key in self.colormap.color_dict:
+                self.colormap.color_dict[key][-1] = 1
 
     def _sort_table(self, column_index: int) -> None:
         """Sorts the table in ascending or descending order
@@ -557,4 +628,3 @@ class ColoredTableWidget(QWidget):
         self.ascending = not self.ascending
 
         self.set_data(df)
-        self._set_label_colors_to_rows()

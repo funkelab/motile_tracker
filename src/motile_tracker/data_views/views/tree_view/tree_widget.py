@@ -136,7 +136,21 @@ class TreeWidget(QWidget):
         self._update_track_data(reset_view=True)
 
     def cleanup(self) -> None:
-        """Close the wgpu canvas while its Qt widgets are still alive. Idempotent."""
+        """Tear down the tree view: stop reacting to TracksViewer signals, then close
+        the wgpu canvas while its Qt widgets are still alive. Idempotent.
+
+        Called by MenuManager when the widget is destroyed, and by the event hooks
+        below when napari's main window goes away. Disconnecting comes first, so that
+        nothing tries to redraw a figure that is already closed.
+        """
+        self.tracks_viewer.tree_widget_present = False
+        for signal, slot in (
+            (self.tracks_viewer.node_selection_updated, self._update_selected),
+            (self.tracks_viewer.tracks_updated, self._update_track_data),
+            (self.tracks_viewer.center_node, self.tree_widget.center_on_node),
+        ):
+            with contextlib.suppress(ValueError, KeyError, RuntimeError):
+                signal.disconnect(slot)
         self.tree_widget.close_figure()
 
     def eventFilter(self, obj: QObject, event: QEvent) -> bool:

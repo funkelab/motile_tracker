@@ -50,6 +50,7 @@ class ImportDialog(QDialog):
         self.seg = None
         self.df = None
         self.incl_z = False
+        self.source_path: Path | None = None
         self.setWindowTitle(f"Import external tracks from {import_type.upper()}")
         self.name = f"Tracks from {import_type.upper()}"
 
@@ -379,6 +380,11 @@ class ImportDialog(QDialog):
                 except Exception as e:  # noqa: BLE001
                     QMessageBox.critical(self, "Error", f"Failed to load tracks: {e}")
                     return
+                # Report the geff group we actually read, not the container it
+                # was found in: a listener uses this path to find data saved
+                # alongside the tracks, and the container may hold several
+                # groups.
+                self.source_path = geff_dir
                 self.accept()
         else:
             if self.df is not None:
@@ -407,4 +413,6 @@ class ImportDialog(QDialog):
                 except Exception as e:  # noqa: BLE001
                     QMessageBox.critical(self, "Error", f"Failed to load tracks: {e}")
                     return
+                csv_text = self.import_widget.csv_path_line.text().strip()
+                self.source_path = Path(csv_text) if csv_text else None
                 self.accept()

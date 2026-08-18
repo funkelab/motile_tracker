@@ -51,8 +51,8 @@ def test_table_population(colored_table_widget):
 
     table = widget._table_widget
 
-    assert table.rowCount() > 0
-    assert table.columnCount() >= 1
+    assert table.model().rowCount() > 0
+    assert table.model().columnCount() >= 1
 
 
 def test_table_selection_updates_tracksviewer(colored_table_widget, qtbot):
@@ -116,7 +116,7 @@ def test_center_from_tracksviewer_scrolls_table(colored_table_widget, qtbot):
     # Force small viewport so only 2 rows fit
     row_height = 30
     table.setFixedHeight(row_height * 2)
-    for i in range(table.rowCount()):
+    for i in range(table.model().rowCount()):
         table.setRowHeight(i, row_height)
 
     widget.show()

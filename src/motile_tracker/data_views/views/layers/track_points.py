@@ -12,6 +12,7 @@ from funtracks.user_actions import UserAddNode, UserDeleteNodes, UserUpdateNodes
 from napari.layers.points._points_mouse_bindings import select
 from napari.utils.notifications import show_info
 from psygnal import Signal
+from psygnal.containers import Selection
 
 from motile_tracker.data_views.keybindings_config import (
     KEYMAP,
@@ -69,7 +70,7 @@ class TrackPoints(ZOnlyPoints):
         points = self.tracks_viewer.tracks.get_positions(self.nodes, incl_time=True)
 
         track_ids = self.tracks_viewer.tracks.get_track_ids(self.nodes)
-        colors = [self.tracks_viewer.colormap.map(track_id) for track_id in track_ids]
+        colors = self._map_track_colors(track_ids)
         symbols = self.get_symbols(
             self.tracks_viewer.tracks, self.tracks_viewer.symbolmap
         )
@@ -126,6 +127,21 @@ class TrackPoints(ZOnlyPoints):
 
         with self.events.current_size.blocker():
             super().add(coords)
+
+    @property
+    def selected_data(self) -> Selection[int]:
+        """Set of currently selected point indices."""
+
+        return napari.layers.Points.selected_data.fget(self)
+
+    @selected_data.setter
+    def selected_data(self, selected_data) -> None:
+        """Block the current_size event while changing the selection, so that the point
+        size will not accumulate size increases when selecting points.
+        """
+
+        with self.events.current_size.blocker():
+            napari.layers.Points.selected_data.fset(self, selected_data)
 
     def process_click(
         self,
@@ -190,9 +206,7 @@ class TrackPoints(ZOnlyPoints):
         self.symbol = self.get_symbols(
             self.tracks_viewer.tracks, self.tracks_viewer.symbolmap
         )
-        self.face_color = [
-            self.tracks_viewer.colormap.map(track_id) for track_id in track_ids
-        ]
+        self.face_color = self._map_track_colors(track_ids)
         self.properties = {"node_id": self.nodes, "track_id": track_ids}
         self.size = self.default_size
         self.border_color = [1, 1, 1, 1]
@@ -302,6 +316,17 @@ class TrackPoints(ZOnlyPoints):
             for point in selected_points:
                 node_id = self.nodes[point]
                 self.tracks_viewer.selected_nodes.add(node_id, True)
+
+    def _map_track_colors(self, track_ids: list[int]) -> np.ndarray:
+        """Map track ids to an (N, 4) array of face colors in a single colormap call.
+
+        colormap.map has a large fixed per-call overhead (cache lookup, dtype, reshape),
+        so mapping the whole array at once is ~290x faster than calling it per node (or
+        even once per unique track id): for ~37k nodes / 142 unique ids, ~1ms vs ~300ms.
+        """
+        if len(track_ids) == 0:
+            return np.empty((0, 4))
+        return self.tracks_viewer.colormap.map(np.asarray(track_ids))
 
     def get_symbols(self, tracks: Tracks, symbolmap: dict[NodeType, str]) -> list[str]:
         statemap = {
