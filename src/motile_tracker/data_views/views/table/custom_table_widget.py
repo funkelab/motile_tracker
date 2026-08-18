@@ -1,3 +1,5 @@
+import contextlib
+
 import napari
 import numpy as np
 import pandas as pd
@@ -357,6 +359,21 @@ class ColoredTableWidget(QWidget):
         )
         self.tracks_viewer.node_selection_updated.connect(self._update_selected)
         self.tracks_viewer.center_node.connect(self.scroll_to_node)
+
+    def cleanup(self) -> None:
+        """Stop following the TracksViewer.
+
+        Called by MenuManager when the dock is destroyed, so we can stop listening to
+        TracksViewer update signals to rebuild the table.
+        """
+        self.tracks_viewer.table_widget_present = False
+        for signal, slot in (
+            (self.tracks_viewer.tracks_updated, self.update_data),
+            (self.tracks_viewer.node_selection_updated, self._update_selected),
+            (self.tracks_viewer.center_node, self.scroll_to_node),
+        ):
+            with contextlib.suppress(ValueError, KeyError, RuntimeError):
+                signal.disconnect(slot)
 
     def update_data(self, **kwargs) -> None:
         """Update the displayed data based on the tracks_df on TracksViewer"""

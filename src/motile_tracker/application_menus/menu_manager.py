@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 from typing import Any
 
 import napari
@@ -27,6 +28,8 @@ class MenuManager:
         )  # names of widgets ever initialized
         self.visible_menus: set[str] = set()  # names of widgets currently visible
         self.active_tabs: list[str] = []  # names of foreground tabs
+        # name -> the scroll wrapper we docked, so we can destroy it again
+        self.menu_widgets: dict[str, QScrollArea] = {}
 
     def initialize_menu(self, menu: dict[str, dict[str, Any]]) -> None:
         """Initialize the menu by creating and adding the specified widgets, with robust
@@ -53,11 +56,17 @@ class MenuManager:
                 location = config["location"]
                 widget = widget_cls(self.viewer)
                 scroll_wrapper = self._create_scroll_wrapper(widget)
-                self.viewer.window.add_dock_widget(
+                dock_widget = self.viewer.window.add_dock_widget(
                     scroll_wrapper, area=location, name=name, tabify=True
                 )
                 self.initialized_menu_widgets.add(name)
                 self.visible_menus.add(name)
+                self.menu_widgets[name] = scroll_wrapper
+                # Clicking the 'x' on a tab makes napari drop the QDockWidget but only
+                # *detach* our widget, so connect it to properly destroy it ourselves
+                dock_widget.destroyed.connect(
+                    lambda *_, menu_name=name: self._on_dock_destroyed(menu_name)
+                )
 
         for tb in self.viewer.window._qt_window.findChildren(QTabBar):
             tb.setUsesScrollButtons(True)
@@ -67,6 +76,39 @@ class MenuManager:
                     min-width: 50px;
                 }
             """)
+
+    def destroy_menu_widget(self, name: str) -> None:
+        """Destroy a menu widget and everything it holds on to.
+
+        Clicking the 'x' on a tab calls napari's ``remove_dock_widget``, which deletes
+        the QDockWidget but leaves the widget behind as a parentless orphan: it stays
+        alive for as long as anything still references it and keeps reacting to
+        TracksViewer signals (rebuilding the tree, re-filling the table) with nothing to
+        show it in. By giving the widget a `cleanup` method, we can properly disconnect
+        from these signals and remove it.
+        """
+        scroll_wrapper = self.menu_widgets.pop(name, None)
+        self.initialized_menu_widgets.discard(name)
+        self.visible_menus.discard(name)
+        if name in self.active_tabs:
+            self.active_tabs.remove(name)
+        if scroll_wrapper is None:
+            return
+
+        try:
+            widget = scroll_wrapper.widget()
+        except RuntimeError:
+            return  # already deleted along with its parent
+        cleanup = getattr(widget, "cleanup", None)  # check if widget has cleanup method
+        if callable(cleanup):
+            cleanup()
+        scroll_wrapper.setParent(None)
+        scroll_wrapper.deleteLater()
+
+    def _on_dock_destroyed(self, name: str) -> None:
+        """Call the menu widget's cleanup method when its dock is destroyed"""
+        with contextlib.suppress(RuntimeError):
+            self.destroy_menu_widget(name)
 
     def _find_dock_widget_by_name(self, name: str) -> QScrollArea | None:
         """Find a widget in the dock dock by name, or return None if not found or
