@@ -417,6 +417,59 @@ class TestSingletonLifecycle:
             TracksViewer._instance = tv1
 
 
+class TestTracksSignalCleanup:
+    """Tests that a superseded TracksViewer unsubscribes from its tracks object."""
+
+    def test_superseded_instance_disconnects_from_tracks(
+        self, viewer, solution_tracks_2d, qapp
+    ):
+        """Showing one tracks object in successive viewers must not stack up
+        listeners on that object's refresh signal.
+
+        Regression: get_instance() replaced _instance without telling the outgoing
+        TracksViewer to disconnect, and update_tracks only ever disconnects the
+        instance's *own* previous tracks (None for a fresh instance). So every new
+        viewer added another _refresh listener to the same Tracks object, and each
+        subsequent edit refreshed every viewer ever built - editing cost grew
+        linearly with the number of viewers (~2x in a 3-round benchmark).
+        """
+        tv1 = TracksViewer.get_instance(viewer)
+        tv1.update_tracks(tracks=solution_tracks_2d, name="test")
+        assert len(solution_tracks_2d.refresh) == 1
+
+        v2 = napari.Viewer(show=False)
+        try:
+            tv2 = TracksViewer.get_instance(v2)
+            tv2.update_tracks(tracks=solution_tracks_2d, name="test")
+
+            assert len(solution_tracks_2d.refresh) == 1, (
+                "the superseded TracksViewer is still connected to "
+                "tracks.refresh; listeners accumulate per viewer"
+            )
+            assert len(solution_tracks_2d.action_applied) == 1, (
+                "the superseded TracksViewer is still connected to "
+                "tracks.action_applied"
+            )
+        finally:
+            v2.close()
+            qapp.processEvents()
+            TracksViewer._instance = tv1
+
+    def test_disconnects_when_viewer_window_destroyed(self, solution_tracks_2d, qapp):
+        """Closing a viewer must unsubscribe its TracksViewer from the tracks."""
+        v = napari.Viewer(show=False)
+        tv = TracksViewer.get_instance(v)
+        tv.update_tracks(tracks=solution_tracks_2d, name="test")
+        assert len(solution_tracks_2d.refresh) == 1
+
+        v.close()
+        qapp.processEvents()
+
+        assert len(solution_tracks_2d.refresh) == 0, (
+            "tracks.refresh still holds a listener from the closed viewer"
+        )
+
+
 class TestUndoRedo:
     """Tests for undo/redo functionality."""
 

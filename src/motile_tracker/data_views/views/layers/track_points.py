@@ -12,6 +12,7 @@ from funtracks.user_actions import UserAddNode, UserDeleteNodes, UserUpdateNodes
 from napari.layers.points._points_mouse_bindings import select
 from napari.utils.notifications import show_info
 from psygnal import Signal
+from psygnal.containers import Selection
 
 from motile_tracker.data_views.keybindings_config import (
     KEYMAP,
@@ -132,6 +133,21 @@ class TrackPoints(ZOnlyPoints):
 
         with self.events.current_size.blocker():
             super().add(coords)
+
+    @property
+    def selected_data(self) -> Selection[int]:
+        """Set of currently selected point indices."""
+
+        return napari.layers.Points.selected_data.fget(self)
+
+    @selected_data.setter
+    def selected_data(self, selected_data) -> None:
+        """Block the current_size event while changing the selection, so that the point
+        size will not accumulate size increases when selecting points.
+        """
+
+        with self.events.current_size.blocker():
+            napari.layers.Points.selected_data.fset(self, selected_data)
 
     def process_click(
         self,
