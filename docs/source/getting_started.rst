@@ -111,6 +111,11 @@ The tracking results can also be visualized as a lineage tree.
 You can open the lineage tree widget via ``Plugins`` > ``Motile Tracker`` > ``Widget - Lineage View``.
 For more details, go to the :doc:`Tree View <tree_view>` documentation.
 
+Displaying feature measurements
+*******************************
+If you are tracking with a segmentation layer, you can select size and shape features to measure in the ``Features`` widget.
+Once selected, the measurements for these features will appear in the ``Lineage View`` (select ``Plot`` > ``Feature`` to display them), and in the ``Table`` widget.
+
 .. _Issue #48: https://github.com/funkelab/motile_tracker/issues/48
 .. _Cell Tracking Challenge: https://celltrackingchallenge.net/
 .. _Fabrèges et al (2024): https://www.science.org/doi/10.1126/science.adh1145
