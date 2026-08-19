@@ -1,5 +1,6 @@
 # do not put the from __future__ import annotations as it breaks the injection
 
+import contextlib
 from typing import Any
 
 import napari
@@ -562,6 +563,19 @@ class TreeWidget(QWidget):
 
         self.setLayout(layout)
         self._update_track_data(reset_view=True)
+
+    def cleanup(self) -> None:
+        """Called by MenuManager to disconnect from the TracksViewer signals to stop
+        updating the tree.
+        """
+        self.tracks_viewer.tree_widget_present = False
+        for signal, slot in (
+            (self.tracks_viewer.node_selection_updated, self._update_selected),
+            (self.tracks_viewer.tracks_updated, self._update_track_data),
+            (self.tracks_viewer.center_node, self.tree_widget.center_on_node),
+        ):
+            with contextlib.suppress(ValueError, KeyError, RuntimeError):
+                signal.disconnect(slot)
 
     def keyPressEvent(self, event: QKeyEvent) -> None:
         """Handle key press events.

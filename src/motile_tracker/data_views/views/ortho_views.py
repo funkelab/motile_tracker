@@ -104,7 +104,11 @@ sync_filters = {
         },  # we will sync data separately on TrackPoints as we
         # need finer control
         "reverse_exclude": set(get_property_names_from_class(Points))
-        - {"mode", "size", "current_size", "visible"},
+        - {
+            "mode",
+            "visible",
+        },  # Block 'size' and 'current_size' syncing of the enlarged size of a selected
+        # point to the original layer
     },
     TrackLabels: {
         "forward_exclude": {"colormap"},
