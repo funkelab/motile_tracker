@@ -250,13 +250,14 @@ class TrackPoints(ZOnlyPoints):
                 new_point = event.value[-1]
                 attributes = self._create_node_attrs(new_point)
                 try:
-                    new_node_id = self.tracks_viewer.tracks._get_new_node_ids(1)[0]
-                    UserAddNode(
-                        self.tracks_viewer.tracks,
-                        node=new_node_id,
-                        attributes=attributes,
-                        force=self.tracks_viewer.force,
-                    )
+                    with self.tracks_viewer.center_node.blocked():
+                        new_node_id = self.tracks_viewer.tracks._get_new_node_ids(1)[0]
+                        UserAddNode(
+                            self.tracks_viewer.tracks,
+                            node=new_node_id,
+                            attributes=attributes,
+                            force=self.tracks_viewer.force,
+                        )
 
                 except InvalidActionError as e:
                     if e.forceable:
