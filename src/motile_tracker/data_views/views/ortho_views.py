@@ -280,7 +280,9 @@ def track_layers_hook(
         side_button = detect_side_button(event)
         if side_button is not None:
             orig_layer.process_click(event, side_button=side_button)
-        elif layer.mode == "pan_zoom":
+        # only the left button selects: the right button is used to copy a detection
+        # from a connected source layer
+        elif layer.mode == "pan_zoom" and event.button == 1:
             was_click = yield from detect_click(event)
             if was_click:
                 value = get_click_value(layer, event)
@@ -298,6 +300,36 @@ def track_layers_hook(
         copied_layer.bind_key("m")(orig_layer.assign_new_label)
 
 
+def copy_detection_hook(
+    orig_layer: TrackLabels | TrackPoints, copied_layer: Labels | ZOnlyPoints
+) -> None:
+    """Hook to forward right-clicks on an orthogonal-view copy of a track layer to the
+    main-view copy logic, so copying a detection from a connected source layer works
+    identically from the ortho views.
+
+    The forwarding is only active while a source layer is connected: the
+    CopyFromSourceWidget stores a ``_manual_copy_detection`` callback on the target track
+    layer while connected and removes it afterwards. It is looked up dynamically, so this
+    hook is a no-op for track layers without a connected source (and their copies).
+
+    Args:
+        orig_layer (TrackLabels | TrackPoints): the original track layer in the main
+            viewer.
+        copied_layer (Labels | ZOnlyPoints): the ortho-view copy of that layer.
+    """
+
+    def click(layer: Labels | ZOnlyPoints, event: Event):
+        copy_detection = getattr(orig_layer, "_manual_copy_detection", None)
+        if (
+            copy_detection is not None
+            and event.type == "mouse_press"
+            and event.button == 2
+        ):
+            copy_detection(event)
+
+    copied_layer.mouse_drag_callbacks.append(click)
+
+
 def initialize_ortho_views(viewer: Viewer) -> OrthoViewManager:
     """Initialize orthoviews on the current napari Viewer and register hooks and filters.
 
@@ -310,6 +342,9 @@ def initialize_ortho_views(viewer: Viewer) -> OrthoViewManager:
 
     orth_view_manager = _get_manager(viewer)
     orth_view_manager.register_layer_hook((TrackLabels, TrackPoints), track_layers_hook)
+    orth_view_manager.register_layer_hook(
+        (TrackLabels, TrackPoints), copy_detection_hook
+    )
     orth_view_manager.register_layer_hook((TrackLabels), paint_event_hook)
     orth_view_manager.register_layer_hook((TrackPoints), point_data_hook)
     orth_view_manager.register_layer_hook((TrackLabels), colormap_hook)
