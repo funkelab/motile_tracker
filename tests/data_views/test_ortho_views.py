@@ -3,9 +3,10 @@ import math
 
 import numpy as np
 import pytest
-from napari.layers import Labels, Points
 from napari_orthogonal_views.ortho_view_widget import OrthoViewWidget
 
+from motile_tracker.data_views.views.layers.contour_labels import ContourLabels
+from motile_tracker.data_views.views.layers.out_of_slice_points import ZOnlyPoints
 from motile_tracker.data_views.views.layers.track_labels import (
     TrackLabels,
     new_label,
@@ -50,10 +51,14 @@ def test_ortho_views(viewer, qtbot, solution_tracks_3d_with_division):
     m.show()
     qtbot.waitUntil(lambda: m.is_shown(), timeout=1000)
     assert isinstance(m.right_widget, OrthoViewWidget)
-    assert isinstance(m.right_widget.vm_container.viewer_model.layers[-1], Labels)
-    assert isinstance(m.bottom_widget.vm_container.viewer_model.layers[-1], Labels)
-    assert isinstance(m.right_widget.vm_container.viewer_model.layers[-2], Points)
-    assert isinstance(m.bottom_widget.vm_container.viewer_model.layers[-2], Points)
+    assert isinstance(
+        m.right_widget.vm_container.viewer_model.layers[-1], ContourLabels
+    )
+    assert isinstance(
+        m.bottom_widget.vm_container.viewer_model.layers[-1], ContourLabels
+    )
+    assert isinstance(m.right_widget.vm_container.viewer_model.layers[-2], ZOnlyPoints)
+    assert isinstance(m.bottom_widget.vm_container.viewer_model.layers[-2], ZOnlyPoints)
     assert (
         m.right_widget.vm_container.viewer_model.layers[-1].contour
         == viewer.layers[-1].contour
