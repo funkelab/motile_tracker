@@ -54,7 +54,31 @@ class LayerDropdown(QComboBox):
             )
 
         self.currentTextChanged.connect(self._emit_layer_changed)
+
+        # layers that are already present must be watched for renames too
+        for layer in self.viewer.layers:
+            self._watch_name(layer)
+
         self._update_dropdown()
+
+    def _watch_name(self, layer) -> bool:
+        """Start tracking name changes of this layer, if it is one we list.
+
+        Returns:
+            True if the layer is listed (and is now watched), False otherwise.
+        """
+
+        if not isinstance(layer, self.layer_types) or isinstance(
+            layer, self.exclude_types
+        ):
+            return False
+
+        if id(layer) not in self._rename_callbacks:  # never connect twice
+            cb = self._make_weak_rename_cb()
+            layer.events.name.connect(cb)
+            self._rename_callbacks[id(layer)] = (weakref.ref(layer), cb)
+
+        return True
 
     def _make_weak_rename_cb(self):
         """Create a weak callback to track name updates but do not let the layer keep the
@@ -77,13 +101,7 @@ class LayerDropdown(QComboBox):
         if self._deleted:
             return
 
-        layer = event.value
-        if isinstance(layer, self.layer_types) and not isinstance(
-            layer, self.exclude_types
-        ):
-            cb = self._make_weak_rename_cb()
-            layer.events.name.connect(cb)
-            self._rename_callbacks[id(layer)] = (weakref.ref(layer), cb)
+        if self._watch_name(event.value):
             self._update_dropdown()
 
     def _on_removed(self, event) -> None:
@@ -170,6 +188,11 @@ class LayerDropdown(QComboBox):
 
         self.layer_types = layer_types
         self.exclude_types = exclude_types
+
+        # layers that were not listed before may be listed now
+        for layer in self.viewer.layers:
+            self._watch_name(layer)
+
         self._update_dropdown()
 
     def _emit_layer_changed(self) -> None:
