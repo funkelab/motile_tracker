@@ -36,6 +36,10 @@ def _remove_geff_shape(root):
     extra["tracksdata"] = tracksdata
     geff_meta["extra"] = extra
     root.attrs["geff"] = geff_meta
+    # funtracks also writes a legacy top-level "segmentation_shape" attr; drop it
+    # too so the store truly has no shape metadata.
+    if "segmentation_shape" in root.attrs:
+        del root.attrs["segmentation_shape"]
 
 
 @pytest.fixture(autouse=True)
