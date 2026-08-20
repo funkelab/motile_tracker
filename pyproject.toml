@@ -31,7 +31,7 @@ classifiers = [
 
 dependencies =[
     "napari>=0.6.2,<0.8.0",
-    "funtracks>=2.0.4,<3",
+    "funtracks>=2.1.0-a3,<3",
     "appdirs>=1,<2",
     "numpy>=2,<3",
     "magicgui>=0.10.1",
@@ -100,11 +100,6 @@ conflicts = [
         {extra = "gurobi13"},
     ],
 ]
-
-# TEMPORARY: pin funtracks to the segmentation-shape PR commit until it is merged
-# and released. Revert to the PyPI version (drop this source) once released.
-[tool.uv.sources]
-funtracks = { git = "https://github.com/funkelab/funtracks.git", rev = "ec1d3257e24f7411804d50e8c5e7981d4b92cad1" }
 
 [tool.pytest.ini_options]
 # Benchmarks are slow and run in a dedicated CI job; exclude them from the normal
