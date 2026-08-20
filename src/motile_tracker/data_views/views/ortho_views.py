@@ -1,6 +1,5 @@
 import inspect
 
-import napari_orthogonal_views.ortho_view_widget as ov_widget
 from napari import Viewer
 from napari.layers import Labels, Layer, Points, Shapes
 from napari.utils.colormaps import DirectLabelColormap
@@ -59,9 +58,6 @@ def copy_layer(layer: Layer, name: str = ""):
     res_layer.metadata["viewer_name"] = name
     return res_layer
 
-
-ov_widget.copy_layer = copy_layer  # replace the copy layer with the customized version
-# defined here
 
 # Define custom sync_filters. By default, all properties are synced forwards and backwards
 # between the original layer and its derived copy. However, for Tracks Layers we need
@@ -309,6 +305,7 @@ def initialize_ortho_views(viewer: Viewer) -> OrthoViewManager:
     """
 
     orth_view_manager = _get_manager(viewer)
+    orth_view_manager.set_copy_layer(copy_layer)
     orth_view_manager.register_layer_hook((TrackLabels, TrackPoints), track_layers_hook)
     orth_view_manager.register_layer_hook((TrackLabels), paint_event_hook)
     orth_view_manager.register_layer_hook((TrackPoints), point_data_hook)
