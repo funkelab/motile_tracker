@@ -55,8 +55,9 @@ class RunViewer(QGroupBox):
         run_name_view = f"{run.run_name} ({run_time})"
         self.setTitle("Run Viewer: " + run_name_view)
         self.solver_event_update()
-        # Imported runs (CSV/geff) have no solver_params — hide the params
-        # display rather than emit None into widgets that can't render it.
+        # A run loaded from a directory with no params file has no
+        # solver_params — hide the params display rather than emit None into
+        # widgets that can't render it.
         if run.solver_params is None:
             self.params_widget.hide()
         else:

@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import numpy as np
 from funtracks.import_export import import_from_geff, tracks_from_df
 from funtracks.import_export.magic_imread import magic_imread
 from geff_spec.utils import axes_from_lists
@@ -50,6 +51,7 @@ class ImportDialog(QDialog):
         self.seg = None
         self.df = None
         self.incl_z = False
+        self.source_path: Path | None = None
         self.setWindowTitle(f"Import external tracks from {import_type.upper()}")
         self.name = f"Tracks from {import_type.upper()}"
 
@@ -329,6 +331,62 @@ class ImportDialog(QDialog):
             recompute = "area" not in self.tracks.graph.node_attr_keys()
             self.tracks.enable_features(["area"], recompute=recompute)
 
+    def _maybe_convert_legacy_masks(self, geff_dir: Path) -> bool:
+        """Offer to convert masks stored in an older, memory-heavy dtype.
+
+        Geff files written by older versions of tracksdata store segmentation
+        masks as integers (e.g. ``uint64``) rather than ``bool``, using ~8x more
+        memory when read, which can run out of memory on large datasets. If such
+        masks are detected, warn the user and offer a lossless, in-place
+        conversion of the mask buffer (the rest of the geff is untouched).
+
+        Returns:
+            bool: True to continue the import, False if the user cancelled or the
+            conversion failed.
+        """
+        # TODO: the geff dtype helpers are only on tracksdata main
+        # (royerlab/tracksdata#319). Once released, add a tracksdata floor to
+        # pyproject.toml and import these at module level.
+        try:
+            from tracksdata.constants import DEFAULT_ATTR_KEYS
+            from tracksdata.io import convert_geff_prop_dtype, geff_prop_dtype
+        except ImportError:
+            return True  # older tracksdata without the utility; import as before
+
+        mask_key = DEFAULT_ATTR_KEYS.MASK
+        try:
+            dtype = geff_prop_dtype(geff_dir, mask_key)
+        except Exception:  # noqa: BLE001
+            return True  # detection failed; don't block the import
+
+        if dtype is None or dtype == np.bool_:
+            return True
+
+        answer = QMessageBox.question(
+            self,
+            "Old mask format detected",
+            f"This geff stores segmentation masks as '{dtype}', an older format that "
+            "uses about 8x more memory when loaded.\n\n"
+            "Convert them to boolean now? The conversion is lossless, but it edits "
+            f"{geff_dir.name} in place.",
+            QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
+            QMessageBox.Yes,
+        )
+        if answer == QMessageBox.Cancel:
+            return False
+        if answer == QMessageBox.No:
+            return True  # load as-is
+
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        try:
+            convert_geff_prop_dtype(geff_dir, mask_key, np.bool_)
+        except Exception as e:  # noqa: BLE001
+            QMessageBox.critical(self, "Error", f"Failed to convert masks: {e}")
+            return False
+        finally:
+            QApplication.restoreOverrideCursor()
+        return True
+
     def _finish(self) -> None:
         """Tries to read the csv/geff file and optional segmentation image and apply the
         attribute to column mapping to construct a Tracks object"""
@@ -338,6 +396,9 @@ class ImportDialog(QDialog):
                 store_path = self.import_widget.store_path
                 group_path = Path(self.import_widget.root.path)  # e.g. 'tracks'
                 geff_dir = store_path / group_path
+
+                if not self._maybe_convert_legacy_masks(geff_dir):
+                    return
 
                 self.name = self.import_widget.dir_name
                 scale = self.scale_widget.get_scale() if self.seg else None
@@ -379,6 +440,11 @@ class ImportDialog(QDialog):
                 except Exception as e:  # noqa: BLE001
                     QMessageBox.critical(self, "Error", f"Failed to load tracks: {e}")
                     return
+                # Report the geff group we actually read, not the container it
+                # was found in: a listener uses this path to find data saved
+                # alongside the tracks, and the container may hold several
+                # groups.
+                self.source_path = geff_dir
                 self.accept()
         else:
             if self.df is not None:
@@ -407,4 +473,6 @@ class ImportDialog(QDialog):
                 except Exception as e:  # noqa: BLE001
                     QMessageBox.critical(self, "Error", f"Failed to load tracks: {e}")
                     return
+                csv_text = self.import_widget.csv_path_line.text().strip()
+                self.source_path = Path(csv_text) if csv_text else None
                 self.accept()

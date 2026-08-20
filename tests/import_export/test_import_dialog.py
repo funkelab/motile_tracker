@@ -463,6 +463,44 @@ def test_geff_import_with_segmentation(
         assert dialog.tracks.graph.nodes[node_id]["area"] > 0
 
 
+def test_geff_import_source_path_is_geff_group_not_container(
+    qtbot, tmp_path, graph_2d, monkeypatch
+):
+    """source_path must name the geff group that was read, not the zarr
+    container it was found inside.
+
+    export_to_geff writes a container with the graph in a nested `tracks.geff`
+    group. Listeners on TracksList.tracks_loaded use this path to find data
+    stored alongside the tracks, so pointing at the container would be
+    ambiguous when it holds more than one group.
+    """
+    monkeypatch.setattr(ImportDialog, "_resize_dialog", lambda self: None)
+
+    tracks = Tracks(graph_2d, ndim=3, time_attr="t", tracklet_attr="track_id")
+    container = tmp_path / "container.zarr"
+    export_to_geff(tracks, container)
+
+    dialog = ImportDialog(import_type="geff")
+    qtbot.addWidget(dialog)
+    dialog.import_widget._load_geff(container)
+    assert dialog.import_widget.root is not None
+
+    seg_combo = dialog.prop_map_widget.mapping_widgets["seg_id"]
+    seg_combo.setCurrentText("None")
+    dialog.prop_map_widget._update_props_left()
+
+    dialog._finish()
+
+    assert dialog.tracks is not None
+    assert dialog.source_path is not None
+    # the geff group lives inside the container, not at its root
+    assert dialog.source_path != container
+    assert container in dialog.source_path.parents
+    assert (dialog.source_path / ".zattrs").exists() or (
+        dialog.source_path / "zarr.json"
+    ).exists()
+
+
 def test_geff_import_without_area_computes_area(
     qtbot, tmp_path, graph_2d_without_segmentation, segmentation_2d, monkeypatch
 ):
@@ -845,9 +883,10 @@ def test_motile_run_save_load(tmp_path, graph_2d):
         ndim=3,
         time_attr="t",
     )
-    run_dir = run.save(tmp_path)
+    run_dir = run.save(tmp_path / "test_run.geff")
 
-    assert (run_dir / "tracks.geff").exists()
+    # the run dir is itself the geff store, with the run's own files inside it
+    assert (run_dir / "nodes").exists()
     assert (run_dir / "solver_params.json").exists()
     assert (run_dir / "attrs.json").exists()
 
@@ -867,13 +906,165 @@ def test_motile_run_load_backward_compat(tmp_path, graph_2d):
         ndim=3,
         time_attr="t",
     )
-    run_dir = run.save(tmp_path)
+    saved = run.save(tmp_path / "old_run.geff")
 
-    # Simulate old save format: rename tracks.geff → tracks
-    (run_dir / "tracks.geff").rename(run_dir / "tracks")
+    # Simulate the old save format: the graph in a 'tracks' subdirectory of a
+    # run directory, rather than the run directory being the geff store itself
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    saved.rename(run_dir / "tracks")
+    for name in ("solver_params.json", "attrs.json"):
+        (run_dir / "tracks" / name).rename(run_dir / name)
     assert not (run_dir / "tracks.geff").exists()
 
     loaded = MotileRun.load(run_dir)
     assert loaded.run_name == "old_run"
     assert loaded.graph.num_nodes() == graph_2d.num_nodes()
     assert loaded.graph.num_edges() == graph_2d.num_edges()
+
+
+# --- legacy (non-bool) mask conversion -------------------------------------
+
+
+def _write_geff(tracks: Tracks, path: Path) -> Path:
+    """Export tracks to a geff and return the inner geff group directory."""
+    export_to_geff(tracks, path)
+    return path / "tracks.geff"
+
+
+@pytest.fixture
+def legacy_mask_geff(tmp_path, graph_2d) -> Path:
+    """A geff whose masks are stored as uint64, as older tracksdata wrote them."""
+    from tracksdata.io import convert_geff_prop_dtype, geff_prop_dtype
+
+    tracks = Tracks(graph_2d, ndim=3, time_attr="t", tracklet_attr="track_id")
+    geff_dir = _write_geff(tracks, tmp_path / "legacy.zarr")
+    convert_geff_prop_dtype(geff_dir, "mask", np.uint64)
+    assert geff_prop_dtype(geff_dir, "mask") == np.dtype(np.uint64)
+    return geff_dir
+
+
+def _mask_dtype(geff_dir: Path) -> np.dtype:
+    from tracksdata.io import geff_prop_dtype
+
+    return geff_prop_dtype(geff_dir, "mask")
+
+
+def test_legacy_masks_converted_in_place_on_yes(
+    qtbot, legacy_mask_geff, mock_qmessagebox
+):
+    """Answering Yes rewrites the mask buffer to bool in place, without a copy."""
+    dialog = ImportDialog(import_type="geff")
+    qtbot.addWidget(dialog)
+    mock_qmessagebox.question.return_value = mock_qmessagebox.Yes
+
+    assert dialog._maybe_convert_legacy_masks(legacy_mask_geff) is True
+
+    assert _mask_dtype(legacy_mask_geff) == np.dtype(bool)
+    # No duplicate geff written next to the original
+    siblings = [p.name for p in legacy_mask_geff.parent.glob("*.geff")]
+    assert siblings == [legacy_mask_geff.name]
+
+
+@pytest.mark.parametrize("answer_attr, expected", [("No", True), ("Cancel", False)])
+def test_legacy_masks_not_converted_on_no_or_cancel(
+    qtbot, legacy_mask_geff, mock_qmessagebox, answer_attr, expected
+):
+    """No imports the file as-is; Cancel aborts the import. Neither converts."""
+    dialog = ImportDialog(import_type="geff")
+    qtbot.addWidget(dialog)
+    mock_qmessagebox.question.return_value = getattr(mock_qmessagebox, answer_attr)
+
+    assert dialog._maybe_convert_legacy_masks(legacy_mask_geff) is expected
+    assert _mask_dtype(legacy_mask_geff) == np.dtype(np.uint64)
+
+
+def test_bool_masks_are_not_offered_for_conversion(
+    qtbot, tmp_path, graph_2d, mock_qmessagebox
+):
+    """Masks already written as bool need no dialog and no conversion."""
+    tracks = Tracks(graph_2d, ndim=3, time_attr="t", tracklet_attr="track_id")
+    geff_dir = _write_geff(tracks, tmp_path / "current.zarr")
+    assert _mask_dtype(geff_dir) == np.dtype(bool)
+
+    dialog = ImportDialog(import_type="geff")
+    qtbot.addWidget(dialog)
+
+    assert dialog._maybe_convert_legacy_masks(geff_dir) is True
+    mock_qmessagebox.question.assert_not_called()
+
+
+def test_missing_mask_prop_is_not_offered_for_conversion(
+    qtbot, tmp_path, graph_2d_without_segmentation, mock_qmessagebox
+):
+    """A geff without a mask prop (points-only tracks) is imported unchanged."""
+    tracks = Tracks(
+        graph_2d_without_segmentation, ndim=3, time_attr="t", tracklet_attr="track_id"
+    )
+    geff_dir = _write_geff(tracks, tmp_path / "points_only.zarr")
+    assert _mask_dtype(geff_dir) is None
+
+    dialog = ImportDialog(import_type="geff")
+    qtbot.addWidget(dialog)
+
+    assert dialog._maybe_convert_legacy_masks(geff_dir) is True
+    mock_qmessagebox.question.assert_not_called()
+
+
+def test_failed_conversion_aborts_import(
+    qtbot, legacy_mask_geff, monkeypatch, mock_qmessagebox
+):
+    """A conversion error (e.g. a read-only store) is reported and aborts the import."""
+    import tracksdata.io
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("zarr store is read-only")
+
+    monkeypatch.setattr(tracksdata.io, "convert_geff_prop_dtype", boom)
+    mock_qmessagebox.critical.side_effect = None  # allow the error dialog
+    mock_qmessagebox.question.return_value = mock_qmessagebox.Yes
+
+    dialog = ImportDialog(import_type="geff")
+    qtbot.addWidget(dialog)
+
+    assert dialog._maybe_convert_legacy_masks(legacy_mask_geff) is False
+    assert mock_qmessagebox.critical.called
+    assert _mask_dtype(legacy_mask_geff) == np.dtype(np.uint64)
+
+
+def test_missing_tracksdata_helpers_do_not_block_import(
+    qtbot, legacy_mask_geff, monkeypatch, mock_qmessagebox
+):
+    """Against a tracksdata without the helpers, the import proceeds untouched.
+
+    Released tracksdata does not yet have them, so the dialog imports them
+    defensively; this covers that fallback.
+    """
+    import tracksdata.io
+
+    monkeypatch.delattr(tracksdata.io, "geff_prop_dtype", raising=False)
+    monkeypatch.delattr(tracksdata.io, "convert_geff_prop_dtype", raising=False)
+
+    dialog = ImportDialog(import_type="geff")
+    qtbot.addWidget(dialog)
+
+    assert dialog._maybe_convert_legacy_masks(legacy_mask_geff) is True
+    mock_qmessagebox.question.assert_not_called()
+
+
+def test_legacy_mask_geff_imports_after_conversion(
+    qtbot, legacy_mask_geff, monkeypatch, mock_qmessagebox
+):
+    """Full import path: a uint64-mask geff converts and still loads its segmentation."""
+    monkeypatch.setattr(ImportDialog, "_resize_dialog", lambda self: None)
+
+    dialog = ImportDialog(import_type="geff")
+    qtbot.addWidget(dialog)
+    dialog.import_widget._load_geff(legacy_mask_geff.parent)
+    mock_qmessagebox.question.return_value = mock_qmessagebox.Yes
+
+    dialog._finish()
+
+    assert _mask_dtype(legacy_mask_geff) == np.dtype(bool)
+    assert dialog.tracks is not None
+    assert dialog.tracks.segmentation is not None
