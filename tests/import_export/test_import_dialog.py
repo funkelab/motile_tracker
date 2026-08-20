@@ -14,12 +14,13 @@ import pytest
 import tifffile
 import zarr
 from funtracks.data_model import Tracks
-from funtracks.import_export import export_to_csv, export_to_geff
+from funtracks.import_export import (
+    export_to_csv,
+    export_to_geff,
+    has_embedded_segmentation,
+)
 
 from motile_tracker.import_export.menus.import_dialog import ImportDialog
-from motile_tracker.import_export.menus.segmentation_widgets import (
-    geff_has_embedded_segmentation,
-)
 from motile_tracker.motile.backend.motile_run import MotileRun
 from motile_tracker.motile.backend.solver_params import SolverParams
 
@@ -702,7 +703,7 @@ def test_geff_import_embedded_segmentation(qtbot, tmp_path, graph_2d, monkeypatc
     import zarr as _zarr
 
     root = _zarr.open_group(geff_path / "tracks.geff", mode="r")
-    assert geff_has_embedded_segmentation(root), (
+    assert has_embedded_segmentation(root.store_path), (
         "Precondition: geff should have mask/bbox and shape"
     )
 

@@ -3,6 +3,7 @@ from pathlib import Path
 
 import numpy as np
 import zarr
+from funtracks.import_export import has_embedded_segmentation
 from funtracks.import_export.magic_imread import magic_imread
 from funtracks.utils import get_store_path
 from psygnal import Signal
@@ -274,35 +275,6 @@ def _geff_has_mask_props(root: zarr.Group) -> bool:
         return False
 
 
-def _geff_has_shape(root: zarr.Group) -> bool:
-    """Return True if the geff store records the segmentation shape.
-
-    The shape is stored inside the geff metadata at extra.tracksdata.shape
-    (the convention shared with tracksdata). Older funtracks GEFFs stored it as a
-    top-level 'segmentation_shape' zarr attribute, which is still recognised.
-    """
-    attrs = dict(root.attrs)
-    new_shape = (
-        attrs.get("geff", {}).get("extra", {}).get("tracksdata", {}).get("shape")
-    )
-    legacy_shape = attrs.get("segmentation_shape")
-    return new_shape is not None or legacy_shape is not None
-
-
-def geff_has_embedded_segmentation(root: zarr.Group) -> bool:
-    """Return True if the geff group has embedded segmentation that can be reconstructed.
-
-    Requires both:
-    - 'mask' and 'bbox' node prop arrays in the zarr store
-    - the segmentation shape recorded in the geff metadata (extra.tracksdata.shape)
-      or the legacy top-level 'segmentation_shape' zarr attribute
-
-    When both conditions are met, funtracks will reconstruct the segmentation
-    automatically as a GraphArrayView — no external segmentation file is needed.
-    """
-    return _geff_has_mask_props(root) and _geff_has_shape(root)
-
-
 class GeffSegmentationWidget(QWidget):
     """QWidget to select segmentation data when importing from geff."""
 
@@ -399,7 +371,8 @@ class GeffSegmentationWidget(QWidget):
         clear_layout(self.related_objects_layout)
         self.related_object_radio_buttons = {}
         if self.root is not None:
-            if geff_has_embedded_segmentation(self.root):
+            has_embedded_seg = has_embedded_segmentation(self.root.store_path)
+            if has_embedded_seg:
                 # Embedded segmentation: hide radio options, show info label.
                 # segmentation_path=None will be passed to import_from_geff and
                 # funtracks will reconstruct the segmentation as a GraphArrayView.
@@ -423,7 +396,7 @@ class GeffSegmentationWidget(QWidget):
                 self._embedded_info_label.setVisible(False)
                 self._old_geff_warning_label.setVisible(False)
 
-            if not geff_has_embedded_segmentation(self.root):
+            if not has_embedded_seg:
                 metadata = dict(self.root.attrs)
                 related_objects = metadata.get("geff", {}).get("related_objects", None)
                 if related_objects:

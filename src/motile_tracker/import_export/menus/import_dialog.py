@@ -1,7 +1,11 @@
 from pathlib import Path
 
 import numpy as np
-from funtracks.import_export import import_from_geff, tracks_from_df
+from funtracks.import_export import (
+    has_embedded_segmentation,
+    import_from_geff,
+    tracks_from_df,
+)
 from funtracks.import_export.magic_imread import magic_imread
 from geff_spec.utils import axes_from_lists
 from qtpy.QtCore import Qt
@@ -31,7 +35,6 @@ from motile_tracker.import_export.menus.scale_widget import ScaleWidget
 from motile_tracker.import_export.menus.segmentation_widgets import (
     CSVSegmentationWidget,
     GeffSegmentationWidget,
-    geff_has_embedded_segmentation,
 )
 
 
@@ -153,7 +156,7 @@ class ImportDialog(QDialog):
                     self.seg,
                     self.incl_z,
                     seg_for_features=self.seg
-                    or geff_has_embedded_segmentation(self.import_widget.root),
+                    or has_embedded_segmentation(self.import_widget.root.store_path),
                 )
 
             else:
@@ -413,8 +416,8 @@ class ImportDialog(QDialog):
                 # external segmentation file is provided, ensure those attributes are
                 # loaded so funtracks can reconstruct the segmentation as a
                 # GraphArrayView.
-                if segmentation_path is None and geff_has_embedded_segmentation(
-                    self.import_widget.root
+                if segmentation_path is None and has_embedded_segmentation(
+                    self.import_widget.root.store_path
                 ):
                     name_map.setdefault("mask", "mask")
                     name_map.setdefault("bbox", "bbox")
