@@ -5,7 +5,6 @@ import numpy as np
 import zarr
 from funtracks.import_export import has_embedded_segmentation
 from funtracks.import_export.magic_imread import magic_imread
-from funtracks.utils import get_store_path
 from psygnal import Signal
 from qtpy.QtWidgets import (
     QButtonGroup,
@@ -25,6 +24,7 @@ from qtpy.QtWidgets import (
 
 from motile_tracker.import_export.menus.geff_import_utils import (
     clear_layout,
+    geff_group_path,
 )
 
 
@@ -371,7 +371,7 @@ class GeffSegmentationWidget(QWidget):
         clear_layout(self.related_objects_layout)
         self.related_object_radio_buttons = {}
         if self.root is not None:
-            has_embedded_seg = has_embedded_segmentation(self.root.store_path)
+            has_embedded_seg = has_embedded_segmentation(geff_group_path(self.root))
             if has_embedded_seg:
                 # Embedded segmentation: hide radio options, show info label.
                 # segmentation_path=None will be passed to import_from_geff and
@@ -436,10 +436,7 @@ class GeffSegmentationWidget(QWidget):
 
         for path, radio in self.related_object_radio_buttons.items():
             if radio.isChecked():
-                store_path = get_store_path(self.root.store)  # e.g. /.../geff.zarr
-                group_path = Path(self.root.path)  # e.g. 'tracks'
-                full_group_path = store_path / group_path  # /.../geff.zarr/tracks
-                seg_path = (full_group_path / path).resolve()
+                seg_path = (geff_group_path(self.root) / path).resolve()
                 return seg_path
         if self.external_segmentation_radio.isChecked():
             return self.segmentation_widget.get_segmentation_path()

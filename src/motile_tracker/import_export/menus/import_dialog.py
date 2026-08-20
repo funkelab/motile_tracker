@@ -27,6 +27,7 @@ from motile_tracker.import_export.menus.csv_dimension_widget import (
 from motile_tracker.import_export.menus.csv_import_widget import (
     ImportCSVWidget,
 )
+from motile_tracker.import_export.menus.geff_import_utils import geff_group_path
 from motile_tracker.import_export.menus.geff_import_widget import (
     ImportGeffWidget,
 )
@@ -156,7 +157,9 @@ class ImportDialog(QDialog):
                     self.seg,
                     self.incl_z,
                     seg_for_features=self.seg
-                    or has_embedded_segmentation(self.import_widget.root.store_path),
+                    or has_embedded_segmentation(
+                        geff_group_path(self.import_widget.root)
+                    ),
                 )
 
             else:
@@ -416,9 +419,7 @@ class ImportDialog(QDialog):
                 # external segmentation file is provided, ensure those attributes are
                 # loaded so funtracks can reconstruct the segmentation as a
                 # GraphArrayView.
-                if segmentation_path is None and has_embedded_segmentation(
-                    self.import_widget.root.store_path
-                ):
+                if segmentation_path is None and has_embedded_segmentation(geff_dir):
                     name_map.setdefault("mask", "mask")
                     name_map.setdefault("bbox", "bbox")
 

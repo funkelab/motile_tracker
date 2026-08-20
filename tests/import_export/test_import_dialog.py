@@ -700,10 +700,7 @@ def test_geff_import_embedded_segmentation(qtbot, tmp_path, graph_2d, monkeypatc
     export_to_geff(tracks, geff_path, save_segmentation=False)
 
     # Verify that the geff has embedded segmentation (precondition)
-    import zarr as _zarr
-
-    root = _zarr.open_group(geff_path / "tracks.geff", mode="r")
-    assert has_embedded_segmentation(root.store_path), (
+    assert has_embedded_segmentation(geff_path / "tracks.geff"), (
         "Precondition: geff should have mask/bbox and shape"
     )
 

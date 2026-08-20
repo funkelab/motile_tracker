@@ -25,6 +25,7 @@ from qtpy.QtWidgets import (
 
 from motile_tracker.import_export.menus.geff_import_utils import (
     clear_layout,
+    geff_group_path,
 )
 
 
@@ -177,7 +178,7 @@ class StandardFieldMapWidget(QWidget):
 
         # Exclude mask/bbox from optional features when they are embedded segmentation
         # attributes that will be imported automatically (shape metadata present).
-        if has_embedded_segmentation(root.store_path):
+        if has_embedded_segmentation(geff_group_path(root)):
             self.node_attrs = [a for a in self.node_attrs if a not in ("mask", "bbox")]
 
         # Retrieve attribute types from the zarr group
