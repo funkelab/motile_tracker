@@ -30,6 +30,9 @@ contributions:
     - id: motile-tracker.visualization
       python_name: motile_tracker.application_menus.main_app:Visualization_LauncherWidget
       title: "Open Visualization menu"
+    - id: motile-tracker.features
+      python_name: motile_tracker.application_menus.main_app:Feature_LauncherWidget
+      title: "Open Feature menu"
     - id: motile-tracker.groups
       python_name: motile_tracker.application_menus.main_app:Groups_LauncherWidget
       title: "Open Groups menu"
@@ -68,6 +71,8 @@ contributions:
       display_name: Widget - Editing & Selection
     - command: motile-tracker.visualization
       display_name: Widget - Visualization
+    - command: motile-tracker.features
+      display_name: Widget - Features
     - command: motile-tracker.groups
       display_name: Widget - Groups
     - command: motile-tracker.table

@@ -61,4 +61,4 @@ def test_tracking_and_editing_group_widgets(qtbot, make_napari_viewer):
     assert isinstance(tracking, StartupWidget)
     assert isinstance(editing, StartupWidget)
     # Should initialize subset of widgets
-    assert len(viewer.window.dock_widgets) == 6
+    assert len(viewer.window.dock_widgets) == 7
