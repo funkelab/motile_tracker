@@ -477,6 +477,44 @@ def test_geff_import_with_segmentation(
         assert dialog.tracks.graph.nodes[node_id]["area"] > 0
 
 
+def test_geff_import_source_path_is_geff_group_not_container(
+    qtbot, tmp_path, graph_2d, monkeypatch
+):
+    """source_path must name the geff group that was read, not the zarr
+    container it was found inside.
+
+    export_to_geff writes a container with the graph in a nested `tracks.geff`
+    group. Listeners on TracksList.tracks_loaded use this path to find data
+    stored alongside the tracks, so pointing at the container would be
+    ambiguous when it holds more than one group.
+    """
+    monkeypatch.setattr(ImportDialog, "_resize_dialog", lambda self: None)
+
+    tracks = Tracks(graph_2d, ndim=3, time_attr="t", tracklet_attr="track_id")
+    container = tmp_path / "container.zarr"
+    export_to_geff(tracks, container)
+
+    dialog = ImportDialog(import_type="geff")
+    qtbot.addWidget(dialog)
+    dialog.import_widget._load_geff(container)
+    assert dialog.import_widget.root is not None
+
+    seg_combo = dialog.prop_map_widget.mapping_widgets["seg_id"]
+    seg_combo.setCurrentText("None")
+    dialog.prop_map_widget._update_props_left()
+
+    dialog._finish()
+
+    assert dialog.tracks is not None
+    assert dialog.source_path is not None
+    # the geff group lives inside the container, not at its root
+    assert dialog.source_path != container
+    assert container in dialog.source_path.parents
+    assert (dialog.source_path / ".zattrs").exists() or (
+        dialog.source_path / "zarr.json"
+    ).exists()
+
+
 def test_geff_import_without_area_computes_area(
     qtbot, tmp_path, graph_2d_without_segmentation, segmentation_2d, monkeypatch
 ):
@@ -860,9 +898,10 @@ def test_motile_run_save_load(tmp_path, graph_2d):
         ndim=3,
         time_attr="t",
     )
-    run_dir = run.save(tmp_path)
+    run_dir = run.save(tmp_path / "test_run.geff")
 
-    assert (run_dir / "tracks.geff").exists()
+    # the run dir is itself the geff store, with the run's own files inside it
+    assert (run_dir / "nodes").exists()
     assert (run_dir / "solver_params.json").exists()
     assert (run_dir / "attrs.json").exists()
 
@@ -882,10 +921,15 @@ def test_motile_run_load_backward_compat(tmp_path, graph_2d):
         ndim=3,
         time_attr="t",
     )
-    run_dir = run.save(tmp_path)
+    saved = run.save(tmp_path / "old_run.geff")
 
-    # Simulate old save format: rename tracks.geff → tracks
-    (run_dir / "tracks.geff").rename(run_dir / "tracks")
+    # Simulate the old save format: the graph in a 'tracks' subdirectory of a
+    # run directory, rather than the run directory being the geff store itself
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    saved.rename(run_dir / "tracks")
+    for name in ("solver_params.json", "attrs.json"):
+        (run_dir / "tracks" / name).rename(run_dir / name)
     assert not (run_dir / "tracks.geff").exists()
 
     loaded = MotileRun.load(run_dir)
