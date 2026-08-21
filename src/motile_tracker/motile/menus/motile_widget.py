@@ -162,11 +162,10 @@ class MotileWidget(QWidget):
                     graph=run.graph, shape=seg_shape, attr_key="node_id", offset=0
                 )
 
-        if run.segmentation is not None and "area" not in run.features:
-            # Area is a default regionprops feature, so a Tracks built with a
-            # segmentation already has it. This covers the case where the
-            # segmentation only became available after construction.
-            run.enable_features(["area"])
+        if run.segmentation is not None:
+            # recompute=False: area values are already on the graph nodes
+            # because compute_graph_from_seg computes area during node extraction.
+            run.enable_features(["area"], recompute=False)
 
         if run.graph.num_nodes() == 0:
             show_warning(
