@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import napari
+import numpy as np
 from funtracks.data_model import Tracks
 from napari.experimental import link_layers, unlink_layers
 
@@ -117,12 +118,26 @@ class TracksLayerGroup:
 
     def _refresh(self) -> None:
         """Refresh the tracking layers with new tracks info"""
+        self._sync_scale()
         if self.tracks_layer is not None:
             self.tracks_layer._refresh()
         if self.seg_layer is not None:
             self.seg_layer._refresh()
         if self.points_layer is not None:
             self.points_layer._refresh()
+
+    def _sync_scale(self) -> None:
+        """Sync the layer scales in case tracks.scale was updated."""
+
+        if self.tracks is None or self.tracks.scale is None:
+            return
+
+        scale = np.asarray(self.tracks.scale, dtype=float)
+        for layer in (self.tracks_layer, self.points_layer, self.seg_layer):
+            if layer is None:
+                continue
+            if not np.array_equal(np.asarray(layer.scale, dtype=float), scale):
+                layer.scale = scale
 
     def update_visible(self, visible_nodes: list[int] | str):
         if self.seg_layer is not None:
