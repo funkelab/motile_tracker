@@ -369,23 +369,30 @@ class TrackPoints(ZOnlyPoints):
             self.shown[:] = False
             self.shown[indices] = True
 
-        # set border color for selected item
-        self.border_color = [1, 1, 1, 1]
-        self.size = self.default_size
+        n_points = len(self.data)
+        if n_points == 0:
+            # nothing to style, and napari warns when assigning empty color arrays
+            self.refresh()
+            return
+
+        # Set border color and size for the selected items. Both are built up first and
+        # then assigned once, because every assignment emits an event that the orthogonal
+        # views (if present) answer by re-slicing their copy of this layer.
+        border_colors = np.tile([1.0, 1.0, 1.0, 1.0], (n_points, 1))
+        sizes = np.full(n_points, self.default_size)
+        selected_size = math.ceil(self.default_size + 0.3 * self.default_size)
         for node in self.tracks_viewer.selected_nodes:
             index = self.node_index_dict.get(node, None)
             if index is not None:
-                self.border_color[index] = (
+                border_colors[index] = (
                     0,
                     1,
                     1,
                     1,
                 )
-                self.size[index] = math.ceil(
-                    self.default_size + 0.3 * self.default_size
-                )
+                sizes[index] = selected_size
 
-        # emit the event to trigger update in orthogonal views
-        self.border_color = self.border_color
-        self.size = self.size
+        # size first: the orthogonal views read it when the border color event arrives
+        self.size = sizes
+        self.border_color = border_colors
         self.refresh()
