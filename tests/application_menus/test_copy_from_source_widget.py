@@ -555,3 +555,27 @@ def test_replace_is_undone_in_one_step(overlapping_source):
     widget.tracks_viewer.redo()
     assert tuple(viewer.dims.current_step) == step_before
     assert not tracks.graph.has_node(1)
+def test_copy_from_a_lazily_loaded_source(dask_source, monkeypatch):
+    """A dask-backed source hands out unevaluated scalars; the copy has to materialise
+    them, or the pixel lookup stays lazy and comes back with arrays of unknown length."""
+
+    _viewer, widget, _source = dask_source
+    monkeypatch.setattr(
+        "motile_tracker.application_menus.copy_from_source_widget.confirm_extend_segmentation",
+        lambda current, new: True,
+    )
+
+    widget.source_layer_dropdown.setCurrentText("src")
+    widget.chain_btn.setChecked(True)
+
+    tracks = widget.tracks_viewer.tracks
+    n_nodes = tracks.graph_solution.num_nodes()
+    target = widget._get_target_layer()
+    # t=7 is outside the original segmentation, so this also covers the extended region
+    widget._target_callback(target, _RightClickEvent(position=(7, 51.5, 11.5)))
+
+    assert tracks.graph_solution.num_nodes() == n_nodes + 1
+    frame = np.asarray(tracks.segmentation[7])
+    # the copied label covers exactly the 4x4 block the source holds at t=7
+    assert frame[50:54, 10:14].all()
+    assert frame.sum() == frame[50:54, 10:14].sum()

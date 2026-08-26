@@ -352,7 +352,10 @@ class CopyFromSourceWidget(QWidget):
         if np.any(coords < 0) or np.any(coords >= shape):
             return
 
-        value = layer.data[tuple(coords)]
+        # materialise the clicked value: a lazily loaded (dask/zarr) source returns an
+        # unevaluated scalar here, and comparing the frame against that makes the whole
+        # comparison lazy, so np.where comes back with arrays of unknown length
+        value = int(np.asarray(layer.data[tuple(coords)]))
         # ignore clicks on the background
         if not value:
             return
