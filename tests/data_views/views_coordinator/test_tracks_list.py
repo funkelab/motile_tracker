@@ -798,6 +798,19 @@ class TestTracksListOnDiskNote:
         assert tracks_list.on_disk_label.isVisibleTo(tracks_list)
         assert str(tracks_db) in tracks_list.on_disk_label.text()
 
+    def test_hidden_when_the_last_database_row_is_removed(self, tracks_list, tracks_db):
+        """Removing the row clears the selection, and the note must go with it.
+
+        Left up, it would keep claiming edits are being written to a database
+        that is no longer open anywhere.
+        """
+        tracks_list.add_tracks(tracks_from_sql(tracks_db), "on disk")
+        assert tracks_list.on_disk_label.isVisibleTo(tracks_list)
+
+        tracks_list.remove_tracks(tracks_list.tracks_list.item(0))
+
+        assert not tracks_list.on_disk_label.isVisibleTo(tracks_list)
+
     def test_hidden_again_when_an_in_memory_row_is_selected(
         self, tracks_list, tracks_db, solution_tracks_2d
     ):

@@ -17,6 +17,7 @@ from qtpy.QtWidgets import (
 
 from motile_tracker.import_export.sql_io import (
     SQL_SUFFIX,
+    is_same_database,
     is_sql_backed,
     rebind_tracks_to_graph,
     sql_database_path,
@@ -167,8 +168,10 @@ class ExportTypeDialog(QDialog):
     def rebind(self) -> bool:
         """Whether to switch the session over to the database being written.
 
-        The checkbox asks the opposite question - whether to stay in memory - so
-        that leaving it alone exports without changing anything.
+        The checkbox asks the opposite question - whether to stay put - so that
+        the default always leaves the user working in a database: in-memory
+        tracks move to the new one (unticked), tracks already in a database stay
+        in the one they are in (ticked).
         """
         return not self.keep_in_memory_checkbox.isChecked()
 
@@ -358,7 +361,7 @@ class ExportDialog:
             return False
 
         file_path = Path(file_dialog.selectedFiles()[0])
-        if file_path == sql_database_path(tracks):
+        if is_same_database(file_path, tracks):
             QMessageBox.warning(
                 parent,
                 "Export Error",
@@ -368,9 +371,7 @@ class ExportDialog:
             return False
 
         try:
-            if file_path.exists():
-                file_path.unlink()
-            graph = write_tracks_to_sql(tracks, file_path)
+            graph = write_tracks_to_sql(tracks, file_path, overwrite=True)
         except (OSError, ValueError) as e:
             QMessageBox.warning(parent, "Export Error", str(e))
             return False

@@ -4,14 +4,18 @@ No Qt here: sql_io deliberately holds no widgets, so the format itself can be
 tested without a running application.
 """
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 import tracksdata as td
 from funtracks.data_model import Tracks
 from funtracks.user_actions import UserDeleteNodes
 
+from motile_tracker.import_export import sql_io
 from motile_tracker.import_export.sql_io import (
     META_KEY,
+    is_same_database,
     is_sql_backed,
     rebind_tracks_to_graph,
     sql_database_path,
@@ -185,6 +189,83 @@ class TestForeignDatabase:
             3.0,
             3.0,
         ]
+
+
+class TestOverwrite:
+    """Replacing a database must never destroy the old one on failure."""
+
+    def test_overwrite_replaces_contents(self, tracks_2d, graph_3d, tmp_path):
+        path = tmp_path / "tracks.db"
+        write_tracks_to_sql(Tracks(graph_3d, ndim=4, time_attr="t"), path)
+
+        write_tracks_to_sql(tracks_2d, path, overwrite=True)
+
+        assert tracks_from_sql(path).ndim == 3
+
+    def test_returned_graph_is_open_at_the_real_path(self, tracks_2d, tmp_path):
+        """Overwriting stages a temp file; the caller must get the final one.
+
+        Rebinding hands this graph to Tracks, so if it were still bound to the
+        staging path every later edit would be written to the wrong file.
+        """
+        path = tmp_path / "tracks.db"
+        write_tracks_to_sql(tracks_2d, path)
+
+        graph = write_tracks_to_sql(tracks_2d, path, overwrite=True)
+
+        assert Path(graph._url.database) == path
+        assert not list(tmp_path.glob(".*.exporting"))
+
+    def test_failed_overwrite_leaves_the_original(
+        self, tracks_2d, tmp_path, monkeypatch
+    ):
+        """A write that blows up must not take the existing database with it."""
+        path = tmp_path / "tracks.db"
+        write_tracks_to_sql(tracks_2d, path)
+        before = path.read_bytes()
+
+        monkeypatch.setattr(
+            sql_io,
+            "_write_new_database",
+            lambda *a, **k: (_ for _ in ()).throw(ValueError("boom")),
+        )
+        with pytest.raises(ValueError, match="boom"):
+            write_tracks_to_sql(tracks_2d, path, overwrite=True)
+
+        assert path.read_bytes() == before
+        assert not list(tmp_path.glob(".*.exporting"))
+
+
+class TestSameDatabase:
+    """The guard standing between an export and the user's only copy."""
+
+    @pytest.fixture
+    def opened(self, tracks_2d, tmp_path):
+        write_tracks_to_sql(tracks_2d, tmp_path / "tracks.db")
+        return tracks_from_sql(tmp_path / "tracks.db")
+
+    def test_exact_path(self, opened, tmp_path):
+        assert is_same_database(tmp_path / "tracks.db", opened)
+
+    def test_different_file(self, opened, tmp_path):
+        assert not is_same_database(tmp_path / "other.db", opened)
+
+    def test_in_memory_tracks_are_never_the_same(self, tracks_2d, tmp_path):
+        assert not is_same_database(tmp_path / "tracks.db", tracks_2d)
+
+    def test_symlinked_parent(self, opened, tmp_path):
+        """Plain Path equality misses this; on macOS /tmp is a link already."""
+        link = tmp_path / "link"
+        link.symlink_to(tmp_path, target_is_directory=True)
+
+        assert is_same_database(link / "tracks.db", opened)
+
+    def test_nonexistent_path_through_a_symlinked_parent(self, opened, tmp_path):
+        """samefile cannot help when the destination does not exist yet."""
+        link = tmp_path / "link"
+        link.symlink_to(tmp_path, target_is_directory=True)
+
+        assert not is_same_database(link / "missing.db", opened)
 
 
 class TestWriteGuards:

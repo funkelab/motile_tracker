@@ -22,6 +22,7 @@ running application.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -65,7 +66,35 @@ def sql_database_path(tracks: Tracks) -> Path | None:
     return Path(database) if database else None
 
 
-def write_tracks_to_sql(tracks: Tracks, path: Path) -> td.graph.SQLGraph:
+def is_same_database(path: Path, tracks: Tracks) -> bool:
+    """Whether `path` names the database the given tracks already live in.
+
+    Exporting a database over itself would clear the way before reading it, so
+    this has to catch the same file spelled differently: a symlinked parent
+    (on macOS /tmp is a link to /private/tmp) or, on a case-insensitive
+    filesystem, different capitalisation. ``samefile`` compares the underlying
+    file and is the reliable test when both paths exist; resolving covers the
+    case where the destination does not exist yet.
+
+    Args:
+        path (Path): The proposed destination.
+        tracks (Tracks): The tracks being exported.
+    """
+    current = sql_database_path(tracks)
+    if current is None:
+        return False
+    try:
+        return os.path.samefile(path, current)
+    except OSError:
+        # One of them does not exist, so they cannot be the same file - but
+        # resolve anyway, since a not-yet-created path can still spell an
+        # existing one via a symlinked parent.
+        return Path(path).resolve() == Path(current).resolve()
+
+
+def write_tracks_to_sql(
+    tracks: Tracks, path: Path, overwrite: bool = False
+) -> td.graph.SQLGraph:
     """Write tracks to a SQLite database at the given path.
 
     Writes ``graph_full``, not ``graph_solution``, so soft-deleted candidates
@@ -73,31 +102,60 @@ def write_tracks_to_sql(tracks: Tracks, path: Path) -> td.graph.SQLGraph:
     already drops candidates and marks everything ``solution=True`` again; the
     database format should not repeat that.
 
-    The destination must not already hold data. tracksdata copies a SQLite
-    source to a SQLite destination with ``ATTACH DATABASE``, never materialising
-    the graph, but only when the destination file is absent or empty and
-    ``overwrite`` is not set. Asking the caller to clear the path first (having
-    confirmed with the user) keeps that fast path available for tracks that are
-    themselves already SQL-backed.
+    tracksdata copies a SQLite source to a SQLite destination with
+    ``ATTACH DATABASE``, never materialising the graph, but only when the
+    destination is absent or empty. So replacing an existing database means
+    clearing the way first, and doing that in place would destroy the old file
+    before knowing the new one can be written. Instead the graph is written to a
+    temporary file beside the destination and moved over it once complete: a
+    failed export leaves whatever was there untouched.
 
     Args:
         tracks (Tracks): The tracks to write.
         path (Path): The database file to create.
+        overwrite (bool): Whether to replace a database already at `path`.
 
     Returns:
-        td.graph.SQLGraph: The graph that was written, open and ready to be
-            handed to :func:`rebind_tracks_to_graph`.
+        td.graph.SQLGraph: The graph that was written, open at `path` and ready
+            to be handed to :func:`rebind_tracks_to_graph`.
 
     Raises:
-        FileExistsError: If something is already at `path`.
+        FileExistsError: If something is already at `path` and `overwrite` is
+            False.
     """
     path = Path(path)
-    if path.exists() and path.stat().st_size > 0:
+    occupied = path.exists() and path.stat().st_size > 0
+    if occupied and not overwrite:
         raise FileExistsError(
             f"{path} already exists. Remove it before writing a database there."
         )
 
     path.parent.mkdir(parents=True, exist_ok=True)
+
+    if not occupied:
+        path.unlink(missing_ok=True)  # an empty file still blocks ATTACH
+        return _write_new_database(tracks, path)
+
+    # Write beside the destination, on the same filesystem so the move is
+    # atomic, and only then replace. Nothing touches `path` until the new
+    # database is complete on disk.
+    staged = path.with_name(f".{path.name}.exporting")
+    staged.unlink(missing_ok=True)
+    try:
+        graph = _write_new_database(tracks, staged)
+        # Drop the connection before moving: the reopened graph below must be
+        # the one the caller edits through, not one still bound to `staged`.
+        graph._engine.dispose()
+        os.replace(staged, path)
+    except BaseException:
+        staged.unlink(missing_ok=True)
+        raise
+
+    return td.graph.SQLGraph(drivername=DRIVERNAME, database=str(path))
+
+
+def _write_new_database(tracks: Tracks, path: Path) -> td.graph.SQLGraph:
+    """Copy the full graph into a database at a path known to be free."""
     graph = td.graph.SQLGraph.from_other(
         tracks.graph_full,
         drivername=DRIVERNAME,

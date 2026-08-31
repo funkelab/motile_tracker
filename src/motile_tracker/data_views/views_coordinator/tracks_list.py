@@ -311,14 +311,19 @@ class TracksList(QGroupBox):
 
     def _selection_changed(self):
         selected = self.tracks_list.selectedItems()
+        # Updated even with nothing selected: removing the last database-backed
+        # row would otherwise leave the note up, still claiming edits are being
+        # written to a database that is no longer open.
+        self._update_on_disk_label(
+            self.tracks_list.itemWidget(selected[0]).tracks if selected else None
+        )
         if selected:
             tracks_button = self.tracks_list.itemWidget(selected[0])
             name = tracks_button.name.text()
             self._update_save_name(name)
-            self._update_on_disk_label(tracks_button.tracks)
             self.view_tracks.emit(_as_solution_tracks(tracks_button.tracks), name)
 
-    def _update_on_disk_label(self, tracks: Tracks) -> None:
+    def _update_on_disk_label(self, tracks: Tracks | None) -> None:
         """Say so when the selected tracks are already stored in a database.
 
         Saving still writes a geff for every backend, so without this the save
@@ -326,9 +331,14 @@ class TracksList(QGroupBox):
         which for a database-backed session is not true.
 
         Args:
-            tracks (Tracks): The tracks now selected.
+            tracks (Tracks | None): The tracks now selected, or None if the
+                selection was cleared.
         """
-        database = sql_database_path(tracks) if is_sql_backed(tracks) else None
+        database = (
+            sql_database_path(tracks)
+            if tracks is not None and is_sql_backed(tracks)
+            else None
+        )
         if database is None:
             self.on_disk_label.setVisible(False)
             return
