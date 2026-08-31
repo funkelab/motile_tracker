@@ -67,6 +67,32 @@ def labels_app(make_napari_viewer, solution_tracks_2d):
     return viewer, widget, source
 
 
+def _multichannel_source_labels(shape=(5, 100, 100)) -> np.ndarray:
+    """Two alternative segmentations of the same objects, stacked on a channel axis.
+
+    Channel 0 holds a small 4x4 mask per frame, channel 1 a bigger 8x8 one covering
+    it, so which channel a copy came from can be told from the copied pixel count.
+    """
+
+    data = np.zeros((2, *shape), dtype=np.uint16)
+    for t in range(shape[0]):
+        data[0, t, 50:54, 10:14] = t + 1
+        data[1, t, 50:58, 10:18] = t + 1
+    return data
+
+
+@pytest.fixture
+def multichannel_labels_app(make_napari_viewer, solution_tracks_2d):
+    """A viewer with tracks and a Labels source carrying an extra channel axis."""
+
+    viewer = make_napari_viewer()
+    tracks_viewer = TracksViewer.get_instance(viewer)
+    tracks_viewer.update_tracks(tracks=solution_tracks_2d, name="test")
+    source = viewer.add_labels(_multichannel_source_labels(), name="src")
+    widget = CopyFromSourceWidget(viewer)
+    return viewer, widget, source
+
+
 @pytest.fixture
 def points_app(make_napari_viewer, solution_tracks_2d_without_segmentation):
     """A viewer with points-only tracks, a Points source layer and the widget."""
@@ -555,6 +581,8 @@ def test_replace_is_undone_in_one_step(overlapping_source):
     widget.tracks_viewer.redo()
     assert tuple(viewer.dims.current_step) == step_before
     assert not tracks.graph.has_node(1)
+
+
 def test_copy_from_a_lazily_loaded_source(dask_source, monkeypatch):
     """A dask-backed source hands out unevaluated scalars; the copy has to materialise
     them, or the pixel lookup stays lazy and comes back with arrays of unknown length."""
@@ -579,3 +607,121 @@ def test_copy_from_a_lazily_loaded_source(dask_source, monkeypatch):
     # the copied label covers exactly the 4x4 block the source holds at t=7
     assert frame[50:54, 10:14].all()
     assert frame.sum() == frame[50:54, 10:14].sum()
+
+
+def _copied_node(widget, t):
+    """The node of the current tracklet in frame `t`, and its pixel count."""
+
+    tracks = widget.tracks_viewer.tracks
+    track_id = widget.tracks_viewer.selected_track
+    node = next(
+        node
+        for node in tracks.graph.node_ids()
+        if int(tracks.get_track_id(node)) == track_id and tracks.get_time(node) == t
+    )
+    n_pixels = int(np.count_nonzero(np.asarray(tracks.segmentation[t]) == node))
+    return node, n_pixels
+
+
+class TestMultiChannelSource:
+    """A source layer can hold several alternative segmentations of the same objects on
+    extra leading axes; the sliders pick which one a copy reads from."""
+
+    def test_connects_and_reports_the_extra_axis(self, multichannel_labels_app):
+        _viewer, widget, source = multichannel_labels_app
+        widget.source_layer_dropdown.setCurrentText("src")
+        widget.chain_btn.setChecked(True)
+
+        assert widget._source_layer is source
+        assert widget._leading_axes(source) == 1
+        assert widget.channel_hint.isVisibleTo(widget.copy_controls_box)
+
+        widget.chain_btn.setChecked(False)
+        assert not widget.channel_hint.isVisibleTo(widget.copy_controls_box)
+
+    def test_single_channel_source_reports_no_extra_axis(self, labels_app):
+        _viewer, widget, source = labels_app
+        widget.source_layer_dropdown.setCurrentText("src")
+        widget.chain_btn.setChecked(True)
+
+        assert widget._leading_axes(source) == 0
+        assert not widget.channel_hint.isVisibleTo(widget.copy_controls_box)
+
+    @pytest.mark.parametrize(("channel", "n_pixels"), [(0, 16), (1, 64)])
+    def test_right_click_copies_the_selected_channel(
+        self, multichannel_labels_app, channel, n_pixels
+    ):
+        """The channel in the click position - which napari fills from the slider -
+        decides which of the two mask options is copied."""
+
+        _viewer, widget, _source = multichannel_labels_app
+        widget.source_layer_dropdown.setCurrentText("src")
+        widget.chain_btn.setChecked(True)
+
+        tracks = widget.tracks_viewer.tracks
+        n_nodes = tracks.graph.num_nodes()
+
+        target = widget._get_target_layer()
+        # a point inside the label in both channels, at t=3
+        event = _RightClickEvent(position=(channel, 3, 51.5, 11.5))
+        widget._target_callback(target, event)
+
+        assert tracks.graph.num_nodes() == n_nodes + 1
+        node, copied_pixels = _copied_node(widget, t=3)
+        assert tracks.get_time(node) == 3
+        assert copied_pixels == n_pixels
+
+    def test_click_outside_the_smaller_channel_is_ignored(
+        self, multichannel_labels_app
+    ):
+        """A position that only holds a label in channel 1 copies nothing on channel 0."""
+
+        _viewer, widget, _source = multichannel_labels_app
+        widget.source_layer_dropdown.setCurrentText("src")
+        widget.chain_btn.setChecked(True)
+
+        tracks = widget.tracks_viewer.tracks
+        n_nodes = tracks.graph.num_nodes()
+
+        target = widget._get_target_layer()
+        # (56, 16) is inside the 8x8 mask of channel 1, but background in channel 0
+        widget._target_callback(target, _RightClickEvent(position=(0, 3, 56.5, 16.5)))
+        assert tracks.graph.num_nodes() == n_nodes
+
+        widget._target_callback(target, _RightClickEvent(position=(1, 3, 56.5, 16.5)))
+        assert tracks.graph.num_nodes() == n_nodes + 1
+
+    def test_segmentation_is_not_grown_for_the_channel_axis(
+        self, multichannel_labels_app
+    ):
+        """Only the trailing dims of a source have to fit inside the segmentation, so a
+        matching multi-channel source does not trigger the grow dialog."""
+
+        _viewer, widget, _source = multichannel_labels_app
+        tracks = widget.tracks_viewer.tracks
+        shape_before = tuple(tracks.segmentation.shape)
+
+        widget.source_layer_dropdown.setCurrentText("src")
+        widget.chain_btn.setChecked(True)
+
+        assert widget._source_layer is not None  # connected without asking
+        assert tuple(tracks.segmentation.shape) == shape_before
+
+    def test_clicked_track_label_ignores_the_channel_axis(
+        self, multichannel_labels_app
+    ):
+        """The clicked node is read from the target layer, which has no channel axis:
+        napari lines the click position up on the trailing dimensions."""
+
+        _viewer, widget, _source = multichannel_labels_app
+        widget.source_layer_dropdown.setCurrentText("src")
+        widget.chain_btn.setChecked(True)
+
+        # node 1 of the graph_2d fixture sits at (50, 50) in t=0
+        for channel in (0, 1):
+            event = _RightClickEvent(position=(channel, 0, 50, 50))
+            assert widget._clicked_track_label(event) == 1
+
+        # a spot the tracks do not occupy reads as background
+        event = _RightClickEvent(position=(0, 0, 51.5, 11.5))
+        assert widget._clicked_track_label(event) == 0

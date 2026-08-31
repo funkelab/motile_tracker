@@ -430,7 +430,7 @@ class TrackLabels(ContourLabels):
 
         update_colormap = False
         if self.tracks_viewer.tracks is not None:
-            current_timepoint = self.viewer.dims.current_step[0]
+            current_timepoint = self.viewer.dims.current_step[-self.ndim]
             # if a node with the given label is already in the graph
             if self.tracks_viewer.tracks.graph.has_node(self.selected_label):
                 # Update the track id

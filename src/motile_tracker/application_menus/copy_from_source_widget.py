@@ -160,6 +160,14 @@ class CopyFromSourceWidget(QWidget):
         )
         copy_controls_layout.addWidget(self.new_track_on_copy_checkbox)
 
+        # Shown while the connected source carries extra axes in front of the ones the
+        # tracks use, holding alternative segmentations of the same objects.
+        self.channel_hint = QLabel()
+        self.channel_hint.setWordWrap(True)
+        self.channel_hint.setStyleSheet("font-style: italic;")
+        self.channel_hint.setVisible(False)
+        copy_controls_layout.addWidget(self.channel_hint)
+
         # schematic of copy action
         self.illustration = ScaledSvgWidget(COPY_ILLUSTRATION)
         copy_controls_layout.addWidget(self.illustration)
@@ -340,10 +348,28 @@ class CopyFromSourceWidget(QWidget):
         else:
             self._copy_point(self._source_layer, event)
 
+    def _leading_axes(self, layer: Labels | Points) -> int:
+        """Return how many leading axes the source layer has that the tracks do not.
+
+        A source layer may hold several 'channels': alternative segmentations of the
+        same objects, stacked on extra axes in front of the ones the tracks use. Napari
+        aligns layers on their trailing dimensions, so those axes come first in the
+        viewer, and their sliders pick which of the alternatives a copy reads from.
+        """
+
+        tracks = self.tracks_viewer.tracks
+        if tracks is None or layer is None:
+            return 0
+        return max(layer.ndim - tracks.ndim, 0)
+
     def _copy_label(self, layer: Labels, event) -> None:
         """Copy the label under the cursor (in the clicked time point) into the target
         segmentation via an UserUpdateSegmentation action.The label is read from the
         source data at the clicked coordinates.
+
+        If the source carries extra leading axes, the click reads from the one the
+        sliders are on, so which segmentation option gets copied follows the channel
+        the user has selected.
         """
 
         coords = np.round(layer.world_to_data(event.position)).astype(int)
@@ -360,8 +386,12 @@ class CopyFromSourceWidget(QWidget):
         if not value:
             return
 
-        t = int(coords[0])
-        frame = np.asarray(layer.data[t])
+        lead = self._leading_axes(layer)
+        channel = tuple(int(coord) for coord in coords[:lead])
+        t = int(coords[lead])
+        # index the selected channel and time point, so the copied pixels come from the
+        # segmentation option the user is looking at
+        frame = np.asarray(layer.data[(*channel, t)])
         spatial_coords = np.where(frame == value)
         if spatial_coords[0].size == 0:
             return
@@ -398,11 +428,18 @@ class CopyFromSourceWidget(QWidget):
             return
 
         coords = np.asarray(layer.world_to_data(event.position))
-        in_frame = np.round(data[:, 0]).astype(int) == int(round(coords[0]))
+        # extra leading axes select between alternatives, see _leading_axes: only the
+        # points of the axes the sliders are on are candidates
+        lead = self._leading_axes(layer)
+        in_frame = np.round(data[:, lead]).astype(int) == int(round(coords[lead]))
+        for axis in range(lead):
+            in_frame &= np.round(data[:, axis]).astype(int) == int(round(coords[axis]))
         if not in_frame.any():
             return
 
-        distances = np.linalg.norm(data[in_frame, 1:] - coords[1:], axis=1)
+        distances = np.linalg.norm(
+            data[in_frame, lead + 1 :] - coords[lead + 1 :], axis=1
+        )
         closest = int(np.argmin(distances))
         sizes = np.broadcast_to(
             np.atleast_1d(np.asarray(layer.size, dtype=float)), (len(data),)
@@ -412,9 +449,9 @@ class CopyFromSourceWidget(QWidget):
             return
 
         point = data[np.flatnonzero(in_frame)[closest]]
-        t = int(round(point[0]))
+        t = int(round(point[lead]))
         # tracks store positions in world coordinates (see nodes_from_points_list)
-        position = point[1:] * np.asarray(layer.scale[1:])
+        position = point[lead + 1 :] * np.asarray(layer.scale[lead + 1 :])
         self._add_node(t, position=position)
 
     def _add_node(self, t: int, position: np.ndarray) -> None:
@@ -760,6 +797,18 @@ class CopyFromSourceWidget(QWidget):
         return None
 
     def _update_copy_controls_visibility(self, event=None) -> None:
-        """Show the copy controls while a source layer is connected."""
+        """Show the copy controls while a source layer is connected, and tell the user
+        about the extra axes of a multi-channel source."""
 
         self.copy_controls_box.setVisible(self._source_layer is not None)
+
+        lead = self._leading_axes(self._source_layer)
+        if lead:
+            labels = list(self.viewer.dims.axis_labels)[:lead]
+            named = ", ".join(f"'{label}'" for label in labels)
+            self.channel_hint.setText(
+                f"This source has {lead} extra axis/axes ({named}) in front of the ones "
+                "the tracks use. Move the corresponding slider(s) to choose which "
+                "segmentation option a right-click copies."
+            )
+        self.channel_hint.setVisible(bool(lead))
