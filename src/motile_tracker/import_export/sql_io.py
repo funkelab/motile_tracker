@@ -145,13 +145,41 @@ def write_tracks_to_sql(
         graph = _write_new_database(tracks, staged)
         # Drop the connection before moving: the reopened graph below must be
         # the one the caller edits through, not one still bound to `staged`.
-        graph._engine.dispose()
-        os.replace(staged, path)
+        close_database(graph)
+        try:
+            os.replace(staged, path)
+        except OSError as err:
+            # Windows refuses to rename over a file that anything still holds
+            # open, where POSIX would replace it and leave the other reader on
+            # a deleted inode. Neither outcome is wanted, so report the cause
+            # rather than the errno.
+            raise OSError(
+                f"Could not replace {path}: something still has it open. "
+                f"Another set of tracks in this session may be stored there, "
+                f"in which case export to a different file instead."
+            ) from err
     except BaseException:
         staged.unlink(missing_ok=True)
         raise
 
     return td.graph.SQLGraph(drivername=DRIVERNAME, database=str(path))
+
+
+def close_database(graph_or_tracks: td.graph.BaseGraph | Tracks) -> None:
+    """Release a database's connections.
+
+    SQLAlchemy engines are not closed when the object goes out of scope, and
+    while an engine is alive Windows will not let the file be renamed over or
+    deleted. Anything that stops using a database should say so.
+
+    No-op for an in-memory graph, so callers need not check first.
+
+    Args:
+        graph_or_tracks: A tracksdata graph, or tracks holding one.
+    """
+    graph = getattr(graph_or_tracks, "graph_full", graph_or_tracks)
+    if isinstance(graph, td.graph.SQLGraph):
+        graph._engine.dispose()
 
 
 def _write_new_database(tracks: Tracks, path: Path) -> td.graph.SQLGraph:

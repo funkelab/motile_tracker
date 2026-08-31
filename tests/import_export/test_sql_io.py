@@ -15,6 +15,7 @@ from funtracks.user_actions import UserDeleteNodes
 from motile_tracker.import_export import sql_io
 from motile_tracker.import_export.sql_io import (
     META_KEY,
+    close_database,
     is_same_database,
     is_sql_backed,
     rebind_tracks_to_graph,
@@ -196,7 +197,11 @@ class TestOverwrite:
 
     def test_overwrite_replaces_contents(self, tracks_2d, graph_3d, tmp_path):
         path = tmp_path / "tracks.db"
-        write_tracks_to_sql(Tracks(graph_3d, ndim=4, time_attr="t"), path)
+        # Released because Windows will not rename over an open file, which is
+        # exactly the precondition the export path relies on.
+        close_database(
+            write_tracks_to_sql(Tracks(graph_3d, ndim=4, time_attr="t"), path)
+        )
 
         write_tracks_to_sql(tracks_2d, path, overwrite=True)
 
@@ -209,11 +214,35 @@ class TestOverwrite:
         staging path every later edit would be written to the wrong file.
         """
         path = tmp_path / "tracks.db"
-        write_tracks_to_sql(tracks_2d, path)
+        close_database(write_tracks_to_sql(tracks_2d, path))
 
         graph = write_tracks_to_sql(tracks_2d, path, overwrite=True)
 
         assert Path(graph._url.database) == path
+        assert not list(tmp_path.glob(".*.exporting"))
+
+    def test_overwriting_an_open_database_is_refused_clearly(
+        self, tracks_2d, tmp_path, monkeypatch
+    ):
+        """Replacing a database something else still holds open must not happen.
+
+        Windows raises WinError 5 here; POSIX would silently replace the file
+        and leave the other reader writing to a deleted inode. Both are reported
+        as the same explicit refusal, so the message does not depend on the
+        platform the user happens to be on.
+        """
+        path = tmp_path / "tracks.db"
+        write_tracks_to_sql(tracks_2d, path)  # deliberately left open
+        before = path.read_bytes()
+
+        def deny(*args, **kwargs):
+            raise PermissionError("[WinError 5] Access is denied")
+
+        monkeypatch.setattr(sql_io.os, "replace", deny)
+        with pytest.raises(OSError, match="still has it open"):
+            write_tracks_to_sql(tracks_2d, path, overwrite=True)
+
+        assert path.read_bytes() == before
         assert not list(tmp_path.glob(".*.exporting"))
 
     def test_failed_overwrite_leaves_the_original(
