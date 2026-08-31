@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1787255187677,
+  "lastUpdate": 1788219237840,
   "repoUrl": "https://github.com/funkelab/motile_tracker",
   "entries": {
     "motile_tracker benchmarks (pytest-benchmark)": [
@@ -2790,6 +2790,135 @@ window.BENCHMARK_DATA = {
             "unit": "iter/sec",
             "range": "stddev: 0.4090633164131715",
             "extra": "mean: 3.2236577250000287 sec\nrounds: 3"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "66853113+pre-commit-ci[bot]@users.noreply.github.com",
+            "name": "pre-commit-ci[bot]",
+            "username": "pre-commit-ci[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1e1a8adca6ce92d9bb1adacba702c57117e761ac",
+          "message": "[pre-commit.ci] pre-commit autoupdate (#484)\n\nupdates:\n- [github.com/astral-sh/ruff-pre-commit: v0.16.3 → v0.16.5](https://github.com/astral-sh/ruff-pre-commit/compare/v0.16.3...v0.16.5)\n\nCo-authored-by: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.github.com>",
+          "timestamp": "2026-08-31T16:27:29-07:00",
+          "tree_id": "17ab1f24cdaa3c90b09df47c899796b3f427f1e5",
+          "url": "https://github.com/funkelab/motile_tracker/commit/1e1a8adca6ce92d9bb1adacba702c57117e761ac"
+        },
+        "date": 1788219236781,
+        "tool": "pytest",
+        "benches": [
+          {
+            "name": "tests/benchmarks/bench_data_model.py::test_extract_sorted_tracks[large]",
+            "value": 3.348025731332105,
+            "unit": "iter/sec",
+            "range": "stddev: 0.019722754115149774",
+            "extra": "mean: 298.6834870000005 msec\nrounds: 3"
+          },
+          {
+            "name": "tests/benchmarks/bench_ui_actions.py::test_add_tracks[large]",
+            "value": 0.2329871320404721,
+            "unit": "iter/sec",
+            "range": "stddev: 1.579594278996316",
+            "extra": "mean: 4.292082533666668 sec\nrounds: 3"
+          },
+          {
+            "name": "tests/benchmarks/bench_ui_actions.py::test_click_node_treeview[large]",
+            "value": 3.3815602323458283,
+            "unit": "iter/sec",
+            "range": "stddev: 0.007313295602040829",
+            "extra": "mean: 295.72148099999634 msec\nrounds: 3"
+          },
+          {
+            "name": "tests/benchmarks/bench_ui_actions.py::test_click_node_canvas[large]",
+            "value": 3.2586853109580196,
+            "unit": "iter/sec",
+            "range": "stddev: 0.019100378020748952",
+            "extra": "mean: 306.8722213333359 msec\nrounds: 3"
+          },
+          {
+            "name": "tests/benchmarks/bench_ui_actions.py::test_set_display_mode_lineage[large]",
+            "value": 11.524483890874327,
+            "unit": "iter/sec",
+            "range": "stddev: 0.0027118388838811933",
+            "extra": "mean: 86.77178166666977 msec\nrounds: 3"
+          },
+          {
+            "name": "tests/benchmarks/bench_ui_actions.py::test_tree_flip_axes[large]",
+            "value": 0.5638719180681434,
+            "unit": "iter/sec",
+            "range": "stddev: 0.19193041310881603",
+            "extra": "mean: 1.7734523886666598 sec\nrounds: 3"
+          },
+          {
+            "name": "tests/benchmarks/bench_ui_actions.py::test_tree_feature_recolor[large]",
+            "value": 0.4552629707157641,
+            "unit": "iter/sec",
+            "range": "stddev: 0.16295330591088122",
+            "extra": "mean: 2.1965326949999926 sec\nrounds: 3"
+          },
+          {
+            "name": "tests/benchmarks/bench_ui_actions.py::test_label_colormap_rebuild[large]",
+            "value": 7.525771005644298,
+            "unit": "iter/sec",
+            "range": "stddev: 0.007729237265860993",
+            "extra": "mean: 132.87675099999774 msec\nrounds: 3"
+          },
+          {
+            "name": "tests/benchmarks/bench_ui_actions.py::test_delete_node[large]",
+            "value": 0.2947435253123149,
+            "unit": "iter/sec",
+            "range": "stddev: 0.057573132671891056",
+            "extra": "mean: 3.3927802110000016 sec\nrounds: 3"
+          },
+          {
+            "name": "tests/benchmarks/bench_ui_actions.py::test_delete_nodes_bulk[large]",
+            "value": 0.24957598724405014,
+            "unit": "iter/sec",
+            "range": "stddev: 0",
+            "extra": "mean: 4.006795730000022 sec\nrounds: 1"
+          },
+          {
+            "name": "tests/benchmarks/bench_ui_actions.py::test_undo_bulk_delete[large]",
+            "value": 0.30523208533592194,
+            "unit": "iter/sec",
+            "range": "stddev: 0",
+            "extra": "mean: 3.2761955510000007 sec\nrounds: 1"
+          },
+          {
+            "name": "tests/benchmarks/bench_ui_actions.py::test_delete_edge[large]",
+            "value": 0.29900372318240026,
+            "unit": "iter/sec",
+            "range": "stddev: 0.3430312813607488",
+            "extra": "mean: 3.3444399600000074 sec\nrounds: 3"
+          },
+          {
+            "name": "tests/benchmarks/bench_ui_actions.py::test_create_edge[large]",
+            "value": 0.30350353773319383,
+            "unit": "iter/sec",
+            "range": "stddev: 0.42386639648231833",
+            "extra": "mean: 3.2948545096666635 sec\nrounds: 3"
+          },
+          {
+            "name": "tests/benchmarks/bench_ui_actions.py::test_undo[large]",
+            "value": 0.3060600123623026,
+            "unit": "iter/sec",
+            "range": "stddev: 0.4485135635460096",
+            "extra": "mean: 3.267333070666666 sec\nrounds: 3"
+          },
+          {
+            "name": "tests/benchmarks/bench_ui_actions.py::test_redo[large]",
+            "value": 0.32422882649154655,
+            "unit": "iter/sec",
+            "range": "stddev: 0.4722432081509063",
+            "extra": "mean: 3.084241493333328 sec\nrounds: 3"
           }
         ]
       }
