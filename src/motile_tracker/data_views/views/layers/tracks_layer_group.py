@@ -152,8 +152,9 @@ class TracksLayerGroup:
             )
 
             # Set dims.point directly with world coordinates - napari will
-            # automatically convert to the correct step indices
-            self.viewer.dims.point = location
+            # automatically convert to the correct step indices.
+            with self.tracks_viewer.block_reference_shift():
+                self.viewer.dims.point = location
 
             # check whether the new coordinates are inside or outside the field of view,
             # then adjust the camera if needed

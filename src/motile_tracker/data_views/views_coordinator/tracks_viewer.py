@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 from typing import Optional
 
 import napari
+import numpy as np
 import pandas as pd
 from funtracks.actions import AddNode, BasicAction, DeleteNode
 from funtracks.data_model import SolutionTracks
@@ -52,6 +54,7 @@ class TracksViewer:
 
     tracks_updated = Signal(Optional[bool])  # noqa: UP007 UP045
     update_track_id = Signal()
+    reference_track_updated = Signal()
     mode_updated = Signal()
     center_node = Signal(int)  # emitted when any component wants to center on a node
     node_selection_updated = Signal(bool)
@@ -117,11 +120,19 @@ class TracksViewer:
         self.track_id_color = [0, 0, 0, 0]
         self.force = False
 
+        # Reference track: when set, stepping through time with the napari slider
+        # shifts the view along with this track
+        self.reference_track: int | None = None
+        self.reference_track_color = [0, 0, 0, 0]
+        self._reference_shift_blocked = False
+        self._last_dims_state: tuple[float, tuple[int, ...]] | None = None
+
         self.collection_widget = None
 
         self.set_keybinds()
 
         self.viewer.dims.events.ndisplay.connect(self.update_selection)
+        self.viewer.dims.events.point.connect(self._on_dims_point_changed)
 
     def get_collection_widget(self) -> CollectionWidget:
         """Return a reference to the groups widget"""
@@ -174,6 +185,100 @@ class TracksViewer:
         self.track_id_color = (
             [0, 0, 0, 0] if track_id is None else self.colormap.map(track_id)
         )
+
+    def set_reference_track(self, track_id: int | None) -> None:
+        """Set (or clear, when track_id is None) the track that the view follows when
+        stepping through time with the napari slider. Also updates the color used to
+        mark the reference track in the UI."""
+
+        if track_id is not None and (
+            self.tracks is None or track_id not in self.tracks.track_id_to_node
+        ):
+            track_id = None
+
+        self.reference_track = track_id
+        self.reference_track_color = (
+            [0, 0, 0, 0] if track_id is None else self.colormap.map(track_id)
+        )
+        self.reference_track_updated.emit()
+
+    @contextmanager
+    def block_reference_shift(self):
+        """Set a mark to block the reference shift when the viewer dims changes because of
+        any other dims changing events that do not originate from the user moving the
+         viewer slider."""
+
+        previous = self._reference_shift_blocked
+        self._reference_shift_blocked = True
+        try:
+            yield
+        finally:
+            self._reference_shift_blocked = previous
+
+    def _dims_state(self) -> tuple[float, tuple[int, ...]]:
+        """The time point of the viewer plus the slider positions of the other
+        dimensions."""
+
+        dims = self.viewer.dims
+        return (dims.point[0], tuple(dims.current_step[1:]))
+
+    def _on_dims_point_changed(self, event=None) -> None:
+        """Shift the view along with the reference track when the user steps to another
+        time point with the napari slider. Skip if the dims change was triggered by
+        something else.
+        """
+
+        state = self._dims_state()
+        previous = self._last_dims_state
+        self._last_dims_state = state
+
+        if self._reference_shift_blocked or self.reference_track is None:
+            return
+        if previous is None or self.viewer.dims.ndim < 2:
+            return
+
+        previous_time, previous_sliders = previous
+        new_time, new_sliders = state
+        if previous_sliders != new_sliders or previous_time == new_time:
+            return
+
+        self._shift_view_along_reference(
+            int(round(previous_time)), int(round(new_time))
+        )
+
+    def _shift_view_along_reference(self, previous_time: int, new_time: int) -> None:
+        """Move the viewer along by the displacement of the reference track between the
+        two time points.
+
+        Every spatial dimension of dims.point is shifted, the displayed ones included so
+        that the ortho views can also follow.
+
+        Does nothing if the reference track has no node at one of the two time points.
+        """
+
+        nodes = self.tracks.get_track_nodes_at_times(
+            self.reference_track, (previous_time, new_time)
+        )
+        if previous_time not in nodes or new_time not in nodes:
+            return
+
+        start = np.asarray(self.tracks.get_position(nodes[previous_time]), dtype=float)
+        end = np.asarray(self.tracks.get_position(nodes[new_time]), dtype=float)
+
+        shift = end - start
+        dims = self.viewer.dims
+        if len(shift) != dims.ndim - 1:
+            return
+
+        point = list(dims.point)
+        for axis, offset in enumerate(shift, start=1):
+            point[axis] += offset
+        if tuple(point) == tuple(dims.point):
+            return
+
+        with self.block_reference_shift():
+            dims.point = point
+        self._last_dims_state = self._dims_state()
 
     def update_track_df(
         self, initialization: bool | None = False, refresh_view: bool | None = False
@@ -242,6 +347,10 @@ class TracksViewer:
 
         self.update_track_df(initialization=False, refresh_view=refresh_view)
 
+        # the reference track may have been edited or removed; revalidate and rebuild
+        # its cached positions
+        self.set_reference_track(self.reference_track)
+
         self.tracks_updated.emit(refresh_view)
 
         # if a new node was added, we would like to select this one now (call this after
@@ -277,6 +386,7 @@ class TracksViewer:
             name (str): The name of the tracks to display in the layer names
         """
         self.selected_nodes.reset()
+        self.set_reference_track(None)
 
         self._disconnect_tracks()
 
