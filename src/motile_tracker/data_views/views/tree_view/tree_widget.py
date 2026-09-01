@@ -67,6 +67,16 @@ class TreeWidget(QWidget):
         self.tree_widget.jump_to_node.connect(self.tracks_viewer.center_on_node)
         self.tree_widget.nodes_selected.connect(self.selected_nodes.add_list)
         self.tracks_viewer.center_node.connect(self.tree_widget.center_on_node)
+        # track-id axis: follow the Visualization tab, and adopt whatever it is set to
+        # now (the tab may well have been used before this tree view was opened)
+        self.tracks_viewer.show_track_ids_updated.connect(
+            self.tree_widget.set_show_track_ids
+        )
+        self.tree_widget.set_show_track_ids(self.tracks_viewer.show_track_ids)
+        self.tracks_viewer.show_hover_info_updated.connect(
+            self.tree_widget.set_show_hover_info
+        )
+        self.tree_widget.set_show_hover_info(self.tracks_viewer.show_hover_info)
 
         # Add radiobuttons for switching between different display modes
         self.mode_widget = TreeViewModeWidget()
@@ -148,6 +158,14 @@ class TreeWidget(QWidget):
             (self.tracks_viewer.node_selection_updated, self._update_selected),
             (self.tracks_viewer.tracks_updated, self._update_track_data),
             (self.tracks_viewer.center_node, self.tree_widget.center_on_node),
+            (
+                self.tracks_viewer.show_track_ids_updated,
+                self.tree_widget.set_show_track_ids,
+            ),
+            (
+                self.tracks_viewer.show_hover_info_updated,
+                self.tree_widget.set_show_hover_info,
+            ),
         ):
             with contextlib.suppress(ValueError, KeyError, RuntimeError):
                 signal.disconnect(slot)

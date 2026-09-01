@@ -10,8 +10,9 @@ import pandas as pd
 import pygfx as gfx
 from psygnal import Signal
 from pygfx.utils.enums import MarkerInt
-from qtpy.QtCore import Qt
-from qtpy.QtWidgets import QVBoxLayout, QWidget
+from qtpy.QtCore import QPoint, Qt
+from qtpy.QtGui import QCursor
+from qtpy.QtWidgets import QToolTip, QVBoxLayout, QWidget
 
 _SELECT_COLOR = np.array(
     [0.0, 1.0, 1.0, 1.0], dtype=np.float32
@@ -25,14 +26,37 @@ _SELECT_EDGE_WIDTH = (
 _BASE_SIZE = 10.0  # bigger than the old 10 so nodes are easier to click and glyphs read
 _SELECT_BUMP = 6.0  # size increase for a selected node (scaled along with the markers)
 _SELECT_BUMP_MIN = 2.0  # ...but at least this, so a small node still reads as selected
-# Markers are drawn in screen pixels, so zooming out packs the lanes closer together
-# without shrinking the dots, until parallel lineages merge into one blob. In tree mode
-# the lanes sit on integer x_axis_pos, so scale the markers with the on-screen width of
-# one lane: a dot spans _MARKER_FILL of it, clamped to [_MIN_SIZE, _BASE_SIZE]. Feature
-# mode keeps the fixed size — its axis is continuous, so there is no lane width to use.
+# Markers are drawn in screen pixels, so a fixed size looks wrong at both ends of the
+# zoom range: zoomed out, the lanes pack closer until parallel lineages merge into one
+# blob; zoomed in, a handful of nodes float in a mostly empty canvas. In tree mode both
+# grids are one unit apart (integer x_axis_pos, integer t), so scale the markers with
+# whichever of the two is tighter on screen: a glyph spans _MARKER_FILL of that gap,
+# clamped to [_MIN_SIZE, _MAX_SIZE]. Feature mode keeps a fixed size — its value axis is
+# continuous, so it has no grid to measure.
 _MIN_SIZE = 3.0  # never shrink past this: nodes must stay visible and clickable
-_MARKER_FILL = 0.9  # dot diameter as a fraction of the lane width (<1 leaves a gap)
+_MAX_SIZE = 68.0  # ...and never grow past this, however far you zoom in
+_MARKER_FILL = 0.9  # glyph diameter as a fraction of the grid spacing (<1 leaves a gap)
 _SIZE_SCALE_EPS = 0.02  # skip <2% changes so a slow zoom won't re-upload sizes a frame
+# Once a node is drawn big enough to hold text, write its node_id inside it. Only the
+# nodes currently on screen get a label, and only while there are few enough of them
+# that building the text blocks stays cheap.
+_NODE_LABEL_MIN_SIZE = 20.0  # node diameter (px) from which the id fits inside
+_NODE_LABEL_MAX = 400  # give up past this many on-screen nodes
+_NODE_LABEL_COLOR = (0.0, 0.0, 0.0, 1.0)  # black on the track-coloured fill
+# The font has to fit the *longest* id on screen inside a circle, so it is capped two
+# ways: by the dot's height, and by its width once the digits are counted (a five-digit
+# id in a dot sized for two would spill its first and last digit outside the circle).
+_NODE_LABEL_FONT_FRACTION = 0.5  # of the dot diameter, for a short label
+_NODE_LABEL_DIGIT_WIDTH = 0.62  # digit advance as a fraction of the font size
+# Track ids along the lane axis (optional, toggled from the Visualization tab). They
+# live in the same dock as the perpendicular ruler, which they replace when shown.
+_DOCK_TRACK_ID_PX = 22.0  # dock margin needed for one row of track-id labels
+_TRACK_LABEL_MIN_PX = 30.0  # min spacing between labels; lanes in between are skipped
+_TRACK_LABEL_MAX = 200  # hard cap on label count, whatever the spacing works out to
+# Qt drops a tooltip a little below-right of the position it is given, which leaves it
+# floating away from the node. Pull it back up so it sits right next to the cursor,
+# still clear of the pointer itself.
+_TOOLTIP_OFFSET = QPoint(10, -22)
 # triangle (split) and cross (end) glyphs have less visual weight than a filled circle
 # at the same bounding-box size, so enlarge them to match and stay clickable/legible.
 _SYMBOL_SIZE_FACTOR = {"t1": 1.9, "x": 1.4}
@@ -112,6 +136,14 @@ class TreePlot(QWidget):
         )
         self._selected_rows: list[int] = []
         self._size_scale = 1.0  # zoom-dependent multiplier on _base_sizes
+        # per-row lookups for the hover tooltip, filled in _rebuild
+        self._row_track_ids = np.empty(0, dtype=np.int64)
+        self._row_lineage_ids = None  # None when the df has no parent_track_id column
+        self._row_times = np.empty(0, dtype=np.float32)
+        # lane (x_axis_pos) -> track id, for the optional track-id axis
+        self._lane_track_ids: dict[int, int] = {}
+        self.show_track_ids = False  # toggled from the Visualization tab
+        self.show_hover_info = True  # ...as is the hover tooltip
 
         # shift-drag rectangle (box-select) state
         self._drag_start: tuple[float, float] | None = None
@@ -163,6 +195,22 @@ class TreePlot(QWidget):
             anchor="middle-center",
             material=gfx.TextMaterial(color=_AXIS_COLOR),
         )
+        # track ids along the lane axis: one MultiText re-used across frames, living in
+        # whichever dock currently holds that axis (see _configure_docks)
+        self._track_labels = gfx.MultiText(
+            font_size=11,
+            screen_space=True,
+            anchor="middle-center",
+            material=gfx.TextMaterial(color=_AXIS_COLOR),
+        )
+        # node ids drawn inside the markers once they are big enough (main scene)
+        self._node_labels = gfx.MultiText(
+            font_size=10,
+            screen_space=True,
+            anchor="middle-center",
+            material=gfx.TextMaterial(color=_NODE_LABEL_COLOR),
+        )
+        self._node_labels.visible = False
         self._configure_docks()
 
         canvas_widget = self._figure.show()
@@ -189,7 +237,11 @@ class TreePlot(QWidget):
 
         # keep the rulers pinned to the viewport edges every frame (they follow the
         # camera as the user pans/zooms), and rescale the markers with the zoom level
-        self._animations = (self._update_rulers, self._update_marker_scale)
+        self._animations = (
+            self._update_rulers,
+            self._update_marker_scale,
+            self._update_node_labels,
+        )
         self._subplot.add_animations(*self._animations)
 
         # canvas mouse handling: right-click reset + shift-drag box-select
@@ -248,6 +300,9 @@ class TreePlot(QWidget):
         self._node_ids = np.empty(0, dtype=np.int64)
         self._id_to_row = {}
         self._selected_rows = []
+        self._lane_track_ids = {}
+        self._row_lineage_ids = None
+        QToolTip.hideText()
         with contextlib.suppress(Exception):
             self._figure.close()
 
@@ -315,26 +370,53 @@ class TreePlot(QWidget):
         always shown (the perpendicular axis shows tick marks even in tree mode; its
         number labels are toggled per-mode in ``_update_rulers``). Time axis: left
         dock (vertical) / bottom dock (horizontal); feature axis: the other dock."""
-        for obj in (self._ruler_time, self._ruler_feature, self._time_label):
+        for obj in (
+            self._ruler_time,
+            self._ruler_feature,
+            self._time_label,
+            self._track_labels,
+        ):
             if obj.parent is not None:
                 obj.parent.remove(obj)
 
-        # the perpendicular (feature) axis is minimal in tree mode -> a thin margin
-        minimal = _DOCK_MINIMAL_PX
+        # the perpendicular axis in tree mode is either a thin strip of tick marks or,
+        # with the track-id axis switched on, a row of track ids that replaces them
+        minimal = _DOCK_TRACK_ID_PX if self._track_id_axis_shown() else _DOCK_MINIMAL_PX
         if self.view_direction == "vertical":
             self._dock_left.scene.add(self._ruler_time, self._time_label)
-            self._dock_bottom.scene.add(self._ruler_feature)
+            self._dock_bottom.scene.add(self._ruler_feature, self._track_labels)
             self._dock_left.size = _DOCK_LEFT_PX
             self._dock_bottom.size = (
                 _DOCK_BOTTOM_PX if self.plot_type == "feature" else minimal
             )
         else:  # horizontal: time along the bottom
             self._dock_bottom.scene.add(self._ruler_time, self._time_label)
-            self._dock_left.scene.add(self._ruler_feature)
+            self._dock_left.scene.add(self._ruler_feature, self._track_labels)
             self._dock_bottom.size = _DOCK_BOTTOM_PX
             self._dock_left.size = (
                 _DOCK_LEFT_PX if self.plot_type == "feature" else minimal
             )
+
+    def _track_id_axis_shown(self) -> bool:
+        """The track-id axis is a tree-mode thing: a feature plot's perpendicular axis
+        is the feature value, which needs its own numbers."""
+        return self.show_track_ids and self.plot_type != "feature"
+
+    def set_show_hover_info(self, show: bool) -> None:
+        """Enable/disable the hover tooltip (Visualization tab toggle)."""
+        self.show_hover_info = bool(show)
+        if not self.show_hover_info:
+            QToolTip.hideText()  # a tooltip already on screen would otherwise linger
+
+    def set_show_track_ids(self, show: bool) -> None:
+        """Show/hide track ids along the lane axis (Visualization tab toggle)."""
+        show = bool(show)
+        if show == self.show_track_ids or self._closed:
+            return
+        self.show_track_ids = show
+        self._configure_docks()  # the dock has to grow/shrink to fit the labels
+        with contextlib.suppress(Exception):
+            self._figure.canvas.request_draw()
 
     def _update_rulers(self) -> None:
         """Each frame, sync both rulers' dock cameras to the main camera's matching
@@ -346,6 +428,7 @@ class TreePlot(QWidget):
             self._ruler_time.visible = False
             self._ruler_feature.visible = False
             self._time_label.visible = False
+            self._track_labels.visible = False
             return
 
         state = self._subplot.camera.get_state()
@@ -369,6 +452,9 @@ class TreePlot(QWidget):
                 minimal,
                 negated=self.plot_type != "feature",
             )
+        # runs last: with track ids on, they take the place of the perpendicular
+        # ruler's tick marks, which _sync_* has just switched back on
+        self._update_track_labels(left, right, bottom, top)
 
     def _sync_left(self, ruler, bottom, top, minimal, label=None, negated=True) -> None:
         """Lay a vertical ruler in the left dock. Normal: axis line just inside the
@@ -435,6 +521,111 @@ class TreePlot(QWidget):
             label.local.position = ((left + right) / 2, _DOCK_WORLD * 0.14, 0)
 
     # ------------------------------------------------------------------ #
+    # track-id axis (optional row of labels along the lane axis)
+    # ------------------------------------------------------------------ #
+    def _update_track_labels(self, left, right, bottom, top) -> None:
+        """Lay one track id per visible lane in the perpendicular axis' dock, thinning
+        them out so neighbouring labels stay at least ``_TRACK_LABEL_MIN_PX`` apart.
+
+        Lanes are one unit apart, so the step is a lane count, and lanes that fall
+        between two labels are simply skipped rather than drawn on top of each other.
+        """
+        if not self._track_id_axis_shown() or not self._lane_track_ids:
+            self._track_labels.visible = False
+            return
+
+        # the dock holding the lane axis, and the lane range it currently spans. In
+        # vertical view lanes run along x; flipped, they run along y as -x_axis_pos.
+        if self.view_direction == "vertical":
+            dock, low, high = self._dock_bottom, left, right
+            span_px = dock.viewport.logical_size[0]
+        else:
+            dock, low, high = self._dock_left, -top, -bottom
+            span_px = dock.viewport.logical_size[1]
+        span = high - low
+        if span <= 0 or span_px < 1:
+            self._track_labels.visible = False
+            return
+
+        step = max(1, int(np.ceil(_TRACK_LABEL_MIN_PX / (span_px / span))))
+        lanes = [
+            lane
+            for lane in range(int(np.ceil(low)), int(np.floor(high)) + 1, step)
+            if lane in self._lane_track_ids
+        ]
+        if not lanes or len(lanes) > _TRACK_LABEL_MAX:
+            self._track_labels.visible = False
+            return
+
+        # the ruler in this dock is the tick strip these labels replace
+        self._ruler_feature.visible = False
+        self._track_labels.visible = True
+        self._ensure_text_blocks(self._track_labels, len(lanes))
+        for i in range(self._track_labels.get_text_block_count()):
+            block = self._track_labels.get_text_block(i)
+            if i >= len(lanes):
+                block.set_text("")
+                continue
+            lane = lanes[i]
+            block.set_text(str(self._lane_track_ids[lane]))
+            if self.view_direction == "vertical":
+                block.set_position(lane, _DOCK_WORLD * 0.5)
+            else:
+                block.set_position(_DOCK_WORLD * 0.5, -lane)
+
+    @staticmethod
+    def _ensure_text_blocks(multi_text, count: int) -> None:
+        """Grow a MultiText to at least ``count`` blocks. Blocks are never removed —
+        they are reused across frames, and surplus ones are blanked by the caller."""
+        missing = count - multi_text.get_text_block_count()
+        if missing > 0:
+            multi_text.create_text_blocks(missing)
+
+    # ------------------------------------------------------------------ #
+    # node-id labels (drawn inside the markers once they are big enough)
+    # ------------------------------------------------------------------ #
+    def _update_node_labels(self) -> None:
+        """Write each on-screen node's id inside its marker, once the markers are drawn
+        big enough to hold the text and few enough of them are visible."""
+        if self._closed or self._scatter is None:
+            return
+        if _BASE_SIZE * self._size_scale < _NODE_LABEL_MIN_SIZE:
+            self._node_labels.visible = False
+            return
+
+        state = self._subplot.camera.get_state()
+        px, py = state["position"][0], state["position"][1]
+        w, h = state["width"], state["height"]
+        xs, ys = self._positions[:, 0], self._positions[:, 1]
+        visible = np.nonzero(
+            (xs >= px - w / 2)
+            & (xs <= px + w / 2)
+            & (ys >= py - h / 2)
+            & (ys <= py + h / 2)
+        )[0]
+        if len(visible) == 0 or len(visible) > _NODE_LABEL_MAX:
+            self._node_labels.visible = False
+            return
+
+        labels = [str(int(self._node_ids[row])) for row in visible]
+        diameter = _BASE_SIZE * self._size_scale
+        widest_label = max(len(label) for label in labels)
+        self._node_labels.visible = True
+        self._node_labels.font_size = min(
+            diameter * _NODE_LABEL_FONT_FRACTION,
+            diameter * _MARKER_FILL / (widest_label * _NODE_LABEL_DIGIT_WIDTH),
+        )
+        self._ensure_text_blocks(self._node_labels, len(visible))
+        for i in range(self._node_labels.get_text_block_count()):
+            block = self._node_labels.get_text_block(i)
+            if i >= len(visible):
+                block.set_text("")
+                continue
+            row = int(visible[i])
+            block.set_text(labels[i])
+            block.set_position(float(xs[row]), float(ys[row]))
+
+    # ------------------------------------------------------------------ #
     # rendering
     # ------------------------------------------------------------------ #
     def _axis_value_column(self) -> str:
@@ -477,11 +668,13 @@ class TreePlot(QWidget):
             self._node_ids = np.empty(0, dtype=np.int64)
             self._id_to_row = {}
             self._base_sizes = np.empty(0, dtype=np.float32)
+            self._lane_track_ids = {}
             return
 
         self._node_ids = df["node_id"].to_numpy()
         self._id_to_row = {int(nid): i for i, nid in enumerate(self._node_ids)}
         self._positions = self._compute_positions(df)
+        self._build_track_lookups(df)
 
         # colors: track_df["color"] is per-row RGBA in 0-255 -> float 0-1
         colors = np.stack(df["color"].to_numpy()).astype(np.float32) / 255.0
@@ -535,6 +728,58 @@ class TreePlot(QWidget):
         wo.geometry.edge_colors = gfx.Buffer(edge_colors)
         self._edge_colors = wo.geometry.edge_colors
         self._scatter.add_event_handler(self._on_click, "pointer_down")
+        self._scatter.add_event_handler(self._on_hover, "pointer_move")
+        self._scatter.add_event_handler(self._on_hover_leave, "pointer_leave")
+        # node-id labels are raw pygfx, so _subplot.clear() above dropped them
+        self._subplot.scene.add(self._node_labels)
+
+    def _build_track_lookups(self, df: pd.DataFrame) -> None:
+        """Per-row track ids (and lineage ids, where derivable) for the hover tooltip,
+        plus the lane -> track id map behind the track-id axis.
+
+        A lineage id is the track id at the root of the lineage: follow parent_track_id
+        (0 means "no parent") up from each track. Deriving it here keeps the tree view
+        independent of funtracks' optional lineage feature.
+        """
+        self._row_track_ids = df["track_id"].to_numpy()
+        self._row_times = df["t"].to_numpy()
+        self._lane_track_ids = dict(
+            zip(
+                df["x_axis_pos"].to_numpy().astype(int),
+                self._row_track_ids.astype(int),
+                strict=True,
+            )
+        )
+
+        if "parent_track_id" not in df:
+            self._row_lineage_ids = None
+            return
+        parent_of = dict(
+            zip(
+                self._row_track_ids.astype(int),
+                df["parent_track_id"].to_numpy().astype(int),
+                strict=True,
+            )
+        )
+        roots: dict[int, int] = {}
+        for track_id in parent_of:
+            chain, current = set(), track_id
+            # `current not in chain` only guards against a cycle in malformed data,
+            # which would otherwise spin here forever
+            while (
+                current not in roots
+                and current not in chain
+                and parent_of.get(current, 0) != 0
+            ):
+                chain.add(current)
+                current = parent_of[current]
+            root = roots.get(current, current)
+            roots[current] = root
+            for seen in chain:
+                roots[seen] = root
+        self._row_lineage_ids = np.array(
+            [roots[int(tid)] for tid in self._row_track_ids], dtype=np.int64
+        )
 
     def _build_edges(self, df: pd.DataFrame, colors: np.ndarray):
         """Vectorized edge build for a single NaN-separated ``gfx.Line``.
@@ -572,12 +817,17 @@ class TreePlot(QWidget):
     # zoom-dependent marker size
     # ------------------------------------------------------------------ #
     def _compute_size_scale(self) -> float:
-        """Multiplier on ``_base_sizes`` at the current zoom: the on-screen width of one
-        lane as a fraction of ``_BASE_SIZE``, clamped to ``[_MIN_SIZE, _BASE_SIZE]``.
+        """Multiplier on ``_base_sizes`` at the current zoom, clamped to
+        ``[_MIN_SIZE, _MAX_SIZE]``. Tree mode only; feature mode returns 1.0, and a
+        transiently degenerate viewport/camera keeps the current scale.
 
-        Tree mode only — lanes are one x_axis_pos unit apart there (y when flipped to
-        horizontal). Returns 1.0 in feature mode, and keeps the current scale while the
-        viewport or camera is transiently degenerate.
+        The two axes are not symmetric. Lanes are what must not collide, so the lane
+        spacing alone decides how far the markers shrink — a track densely sampled in
+        time is *meant* to read as a continuous run of overlapping dots, and letting the
+        time spacing shrink things too would leave the markers permanently at the floor.
+        Growing is the other way round: a marker only grows past its base size once both
+        spacings can take it, so zooming x alone stretches the tree without inflating the
+        dots into their vertical neighbours.
         """
         if self.plot_type == "feature":
             return 1.0
@@ -587,18 +837,19 @@ class TreePlot(QWidget):
             width, height = state["width"], state["height"]
             if viewport_size[0] < 1 or viewport_size[1] < 1 or not width or not height:
                 return self._size_scale
-            if self.view_direction == "vertical":
-                lane_px = viewport_size[0] / width  # lanes along x, one unit apart
-            else:
-                lane_px = viewport_size[1] / height  # flipped: lanes along y
+            # one unit on each axis, in pixels; the flip decides which is which
+            x_px, y_px = viewport_size[0] / width, viewport_size[1] / height
+            lane_px = x_px if self.view_direction == "vertical" else y_px
             # measure against the widest glyph in the plot, not the plain dot: the
             # triangle/cross factors make those nearly twice as wide, and they are the
             # ones that touch their neighbours first.
             widest = (
                 float(self._base_sizes.max()) if len(self._base_sizes) else _BASE_SIZE
             )
-            scale = lane_px * _MARKER_FILL / widest
-            return float(np.clip(scale, _MIN_SIZE / _BASE_SIZE, 1.0))
+            shrink = lane_px * _MARKER_FILL / widest  # lane spacing rules the way down
+            grow = min(x_px, y_px) * _MARKER_FILL / widest  # both rule the way up
+            scale = min(shrink, max(grow, 1.0))
+            return float(np.clip(scale, _MIN_SIZE / _BASE_SIZE, _MAX_SIZE / widest))
         return self._size_scale
 
     def _update_marker_scale(self) -> None:
@@ -794,6 +1045,32 @@ class TreePlot(QWidget):
             append = "Shift" in mods
             self.node_clicked.emit(node_id, append)
             self.setFocus()
+
+    def _on_hover(self, ev) -> None:
+        """Tooltip with the identity of the node under the pointer."""
+        if self._closed or not self.show_hover_info or self._drag_start is not None:
+            return  # mid box-select: a tooltip would just follow the rubber band
+        idx = ev.pick_info.get("vertex_index")
+        if idx is None:
+            QToolTip.hideText()
+            return
+        QToolTip.showText(
+            QCursor.pos() + _TOOLTIP_OFFSET, self._describe_node(int(idx)), self
+        )
+
+    def _on_hover_leave(self, ev) -> None:  # noqa: ARG002 (pygfx passes the event)
+        QToolTip.hideText()
+
+    def _describe_node(self, row: int) -> str:
+        """Tooltip text for one row: node, track, lineage (when derivable) and time."""
+        parts = [f"node {int(self._node_ids[row])}"]
+        if len(self._row_track_ids) > row:
+            parts.append(f"track {int(self._row_track_ids[row])}")
+        if self._row_lineage_ids is not None and len(self._row_lineage_ids) > row:
+            parts.append(f"lineage {int(self._row_lineage_ids[row])}")
+        if len(self._row_times) > row:
+            parts.append(f"t {int(self._row_times[row])}")
+        return "\n".join(parts)
 
     def select_points_in_rect(self, x0, x1, y0, y1) -> None:
         """Box-select: emit all node ids whose positions fall in the rect."""
