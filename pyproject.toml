@@ -102,7 +102,7 @@ dev = [
 # ("Shared Cython type cython_function_or_method has the wrong size"), which broke GEFF
 # import in the tree view. rstar-python is Rust, so there is nothing to collide with.
 # Drop this source once a funtracks release includes the commit.
-funtracks = { git = "https://github.com/funkelab/funtracks.git", rev = "390b79842f28db053ab906be1e6fe80ad64fc133" }
+funtracks = { git = "https://github.com/funkelab/funtracks.git", rev = "d9d83ea23c273e880b5b82cdc8343235d8e9e9eb" }
 
 [tool.uv]
 # gurobi12 and gurobi13 conflict with each other (mutually exclusive version pins)
