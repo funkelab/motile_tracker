@@ -229,7 +229,9 @@ def test_ensure_valid_label(viewer, solution_tracks_3d_with_division):
     assert tracks_viewer.selected_track == 4  # new track id (still unused)
 
 
-def test_background_label_does_not_get_a_color(viewer, solution_tracks_3d_with_division):
+def test_background_label_does_not_get_a_color(
+    viewer, solution_tracks_3d_with_division
+):
     """Regression (#493): selecting the background label must not color the background.
 
     napari binds "X" on Labels layers to swap_selected_and_background_labels, which
