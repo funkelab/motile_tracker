@@ -23,7 +23,16 @@ _SELECT_EDGE_WIDTH = (
     2.0  # px outline around a selected node (fill keeps its track color)
 )
 _BASE_SIZE = 10.0  # bigger than the old 10 so nodes are easier to click and glyphs read
-_SELECT_BUMP = 6.0  # size increase for a selected node
+_SELECT_BUMP = 6.0  # size increase for a selected node (scaled along with the markers)
+_SELECT_BUMP_MIN = 2.0  # ...but at least this, so a small node still reads as selected
+# Markers are drawn in screen pixels, so zooming out packs the lanes closer together
+# without shrinking the dots, until parallel lineages merge into one blob. In tree mode
+# the lanes sit on integer x_axis_pos, so scale the markers with the on-screen width of
+# one lane: a dot spans _MARKER_FILL of it, clamped to [_MIN_SIZE, _BASE_SIZE]. Feature
+# mode keeps the fixed size — its axis is continuous, so there is no lane width to use.
+_MIN_SIZE = 3.0  # never shrink past this: nodes must stay visible and clickable
+_MARKER_FILL = 0.9  # dot diameter as a fraction of the lane width (<1 leaves a gap)
+_SIZE_SCALE_EPS = 0.02  # skip <2% changes so a slow zoom won't re-upload sizes a frame
 # triangle (split) and cross (end) glyphs have less visual weight than a filled circle
 # at the same bounding-box size, so enlarge them to match and stay clickable/legible.
 _SYMBOL_SIZE_FACTOR = {"t1": 1.9, "x": 1.4}
@@ -102,6 +111,7 @@ class TreePlot(QWidget):
             None  # pygfx per-vertex edge-color buffer (selection outline)
         )
         self._selected_rows: list[int] = []
+        self._size_scale = 1.0  # zoom-dependent multiplier on _base_sizes
 
         # shift-drag rectangle (box-select) state
         self._drag_start: tuple[float, float] | None = None
@@ -178,8 +188,9 @@ class TreePlot(QWidget):
         self.setLayout(layout)
 
         # keep the rulers pinned to the viewport edges every frame (they follow the
-        # camera as the user pans/zooms)
-        self._subplot.add_animations(self._update_rulers)
+        # camera as the user pans/zooms), and rescale the markers with the zoom level
+        self._animations = (self._update_rulers, self._update_marker_scale)
+        self._subplot.add_animations(*self._animations)
 
         # canvas mouse handling: right-click reset + shift-drag box-select
         self._pointer_handlers = (
@@ -219,8 +230,9 @@ class TreePlot(QWidget):
         if self._closed:
             return
         self._closed = True
-        with contextlib.suppress(Exception):
-            self._subplot.remove_animation(self._update_rulers)
+        for animation in self._animations:
+            with contextlib.suppress(Exception):
+                self._subplot.remove_animation(animation)
         for handler, event_type in self._pointer_handlers:
             with contextlib.suppress(Exception):
                 self._figure.renderer.remove_event_handler(handler, event_type)
@@ -270,6 +282,7 @@ class TreePlot(QWidget):
         self.set_selection(selected_nodes, plot_type)
         if reset_view:
             self._reset_view()
+        self._update_marker_scale()
 
     def set_view(
         self,
@@ -495,10 +508,13 @@ class TreePlot(QWidget):
             [_SYMBOL_SIZE_FACTOR.get(s, 1.0) for s in symbols], dtype=np.float32
         )
         self._base_sizes = (_BASE_SIZE * factors).astype(np.float32)
+        # keep the scale from the previous frame here: the camera has not been framed
+        # for this data yet, so it would be measured against a stale view. It is
+        # corrected right after (_reset_view, or the per-frame _update_marker_scale).
         self._scatter = self._subplot.add_scatter(
             data=self._positions,
             colors=colors,
-            sizes=self._base_sizes,
+            sizes=self._base_sizes * self._size_scale,
             markers="circle",
             name="nodes",
         )
@@ -553,6 +569,58 @@ class TreePlot(QWidget):
         return edge_pos, edge_cols
 
     # ------------------------------------------------------------------ #
+    # zoom-dependent marker size
+    # ------------------------------------------------------------------ #
+    def _compute_size_scale(self) -> float:
+        """Multiplier on ``_base_sizes`` at the current zoom: the on-screen width of one
+        lane as a fraction of ``_BASE_SIZE``, clamped to ``[_MIN_SIZE, _BASE_SIZE]``.
+
+        Tree mode only — lanes are one x_axis_pos unit apart there (y when flipped to
+        horizontal). Returns 1.0 in feature mode, and keeps the current scale while the
+        viewport or camera is transiently degenerate.
+        """
+        if self.plot_type == "feature":
+            return 1.0
+        with contextlib.suppress(Exception):
+            viewport_size = self._subplot.viewport.logical_size
+            state = self._subplot.camera.get_state()
+            width, height = state["width"], state["height"]
+            if viewport_size[0] < 1 or viewport_size[1] < 1 or not width or not height:
+                return self._size_scale
+            if self.view_direction == "vertical":
+                lane_px = viewport_size[0] / width  # lanes along x, one unit apart
+            else:
+                lane_px = viewport_size[1] / height  # flipped: lanes along y
+            # measure against the widest glyph in the plot, not the plain dot: the
+            # triangle/cross factors make those nearly twice as wide, and they are the
+            # ones that touch their neighbours first.
+            widest = (
+                float(self._base_sizes.max()) if len(self._base_sizes) else _BASE_SIZE
+            )
+            scale = lane_px * _MARKER_FILL / widest
+            return float(np.clip(scale, _MIN_SIZE / _BASE_SIZE, 1.0))
+        return self._size_scale
+
+    def _update_marker_scale(self) -> None:
+        """Per frame: resize the markers if the zoom changed the lane width enough."""
+        if self._scatter is None or self._closed:
+            return
+        scale = self._compute_size_scale()
+        largest = max(scale, self._size_scale)
+        if abs(scale - self._size_scale) < _SIZE_SCALE_EPS * largest:
+            return
+        self._size_scale = scale
+        sizes = self._base_sizes * scale
+        if self._selected_rows:
+            sizes[self._selected_rows] += self._select_bump()
+        self._scatter.sizes = sizes
+
+    def _select_bump(self) -> float:
+        """Extra size for a selected node: shrinks with the markers, but never below
+        ``_SELECT_BUMP_MIN``, so the selection stays visible when zoomed out."""
+        return max(_SELECT_BUMP * self._size_scale, _SELECT_BUMP_MIN)
+
+    # ------------------------------------------------------------------ #
     # selection (surgical: only touch changed rows)
     # ------------------------------------------------------------------ #
     def set_selection(self, selected_nodes: list[Any], plot_type: str) -> None:
@@ -564,14 +632,17 @@ class TreePlot(QWidget):
         # restore previously selected rows: clear the outline and the size bump
         for row in self._selected_rows:
             self._set_edge_color(row, _EDGE_NONE)
-            self._scatter.sizes[row] = self._base_sizes[row]
+            self._scatter.sizes[row] = self._base_sizes[row] * self._size_scale
 
+        bump = self._select_bump()
         new_rows = []
         for node_id in selected_nodes:
             row = self._id_to_row.get(int(node_id))
             if row is not None:
                 self._set_edge_color(row, _SELECT_COLOR)
-                self._scatter.sizes[row] = self._base_sizes[row] + _SELECT_BUMP
+                self._scatter.sizes[row] = (
+                    self._base_sizes[row] * self._size_scale + bump
+                )
                 new_rows.append(row)
         self._selected_rows = new_rows
 
