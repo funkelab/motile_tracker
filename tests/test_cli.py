@@ -11,13 +11,13 @@ def test_main_entrypoint(mode):
     viewer = MagicMock(name="viewer")
 
     with (
-        patch("motile_tracker.__main__.napari.Viewer", return_value=viewer),
-        patch("motile_tracker.__main__.napari.run"),
-        patch("motile_tracker.data_views.views.ortho_views.initialize_ortho_views"),
-        patch("motile_tracker.__main__.StartupWidget") as mock_widget,
+        patch("napari_track_edit.__main__.napari.Viewer", return_value=viewer),
+        patch("napari_track_edit.__main__.napari.run"),
+        patch("napari_track_edit.data_views.views.ortho_views.initialize_ortho_views"),
+        patch("napari_track_edit.__main__.StartupWidget") as mock_widget,
         patch.object(sys, "argv", ["prog", "--mode", mode]),
     ):
-        from motile_tracker.__main__ import main
+        from napari_track_edit.__main__ import main
 
         main()
 

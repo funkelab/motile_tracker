@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
-from motile_tracker.data_views.views.layers.track_labels import new_label
-from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
+from napari_track_edit.data_views.views.layers.track_labels import new_label
+from napari_track_edit.data_views.views_coordinator.tracks_viewer import TracksViewer
 
 
 @pytest.fixture(autouse=True)

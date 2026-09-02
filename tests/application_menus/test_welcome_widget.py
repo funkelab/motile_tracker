@@ -2,7 +2,7 @@
 
 from qtpy.QtWidgets import QLabel, QTextBrowser
 
-from motile_tracker.application_menus.welcome_widget import WelcomeWidget
+from napari_track_edit.application_menus.welcome_widget import WelcomeWidget
 
 
 def test_welcome_widget_initializes(qtbot):

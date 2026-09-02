@@ -2,7 +2,7 @@ import numpy as np
 from napari.components import ViewerModel
 from napari.layers import Points
 
-from motile_tracker.data_views.views.layers.out_of_slice_points import ZOnlyPoints
+from napari_track_edit.data_views.views.layers.out_of_slice_points import ZOnlyPoints
 
 
 def get_visible_indices(layer):

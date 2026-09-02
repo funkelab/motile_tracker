@@ -9,11 +9,11 @@ import napari
 import pytest
 from funtracks.data_model import SolutionTracks
 
-from motile_tracker.data_views.views.layers.track_graph import TrackGraph
-from motile_tracker.data_views.views.layers.track_labels import TrackLabels
-from motile_tracker.data_views.views.layers.track_points import TrackPoints
-from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
-from motile_tracker.motile.backend.motile_run import MotileRun
+from napari_track_edit.data_views.views.layers.track_graph import TrackGraph
+from napari_track_edit.data_views.views.layers.track_labels import TrackLabels
+from napari_track_edit.data_views.views.layers.track_points import TrackPoints
+from napari_track_edit.data_views.views_coordinator.tracks_viewer import TracksViewer
+from napari_track_edit.motile.backend.motile_run import MotileRun
 
 
 @pytest.fixture(autouse=True)
@@ -184,7 +184,7 @@ class TestEdgeOperations:
 
         # Approve the force dialog automatically
         monkeypatch.setattr(
-            "motile_tracker.data_views.views_coordinator.tracks_viewer.confirm_force_operation",
+            "napari_track_edit.data_views.views_coordinator.tracks_viewer.confirm_force_operation",
             lambda message: (True, False),
         )
 
@@ -529,7 +529,7 @@ class TestLayerCreation:
     def test_layers_present_after_solve(self, viewer, segmentation_2d):
         """End-to-end test: solve on a segmentation, wrap result in MotileRun,
         load into TracksViewer, and verify all three layer types are present."""
-        from motile_tracker.motile.backend import MotileRun, SolverParams, solve
+        from napari_track_edit.motile.backend import MotileRun, SolverParams, solve
 
         segmentation = segmentation_2d
         params = SolverParams()

@@ -4,7 +4,7 @@ import napari
 import numpy as np
 import pytest
 
-from motile_tracker.import_export.menus.export_dialog import (
+from napari_track_edit.import_export.menus.export_dialog import (
     ExportDialog,
     ExportTypeDialog,
 )
@@ -93,7 +93,7 @@ def mock_file_dialog():
             fd.exec_.return_value = True
             fd.selectedFiles.return_value = [str(paths[0])]
             return patch(
-                "motile_tracker.import_export.menus.export_dialog.QFileDialog",
+                "napari_track_edit.import_export.menus.export_dialog.QFileDialog",
                 return_value=fd,
             )
         else:
@@ -104,7 +104,7 @@ def mock_file_dialog():
                 fd.selectedFiles.return_value = [str(p)]
                 fds.append(fd)
             return patch(
-                "motile_tracker.import_export.menus.export_dialog.QFileDialog",
+                "napari_track_edit.import_export.menus.export_dialog.QFileDialog",
                 side_effect=fds,
             )
 
@@ -426,11 +426,11 @@ def test_export_geff_error(
     with (
         mock_file_dialog(geff_dir),
         patch(
-            "motile_tracker.import_export.menus.export_dialog.export_to_geff",
+            "napari_track_edit.import_export.menus.export_dialog.export_to_geff",
             side_effect=ValueError("Export failed"),
         ),
         patch(
-            "motile_tracker.import_export.menus.export_dialog.QMessageBox.warning"
+            "napari_track_edit.import_export.menus.export_dialog.QMessageBox.warning"
         ) as mock_warning,
     ):
         result = ExportDialog.show_export_dialog(

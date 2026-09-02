@@ -1,7 +1,7 @@
 # Interactive Cell Tracking with Motile Tracker
 *June 2026 - motile-tracker v5.\* - Caroline Malin-Mayor - Teun Huijben - Anniek Stokkermans*
 
-[`Motile Tracker`](https://www.napari-hub.org/plugins/motile-tracker) is napari plugin implementing [`motile`](https://funkelab.github.io/motile/) for interactive cell tracking. You can find the full documentation [`here`](https://funkelab.github.io/motile_tracker/). Please follow the preparation instructions below before the workshop.
+[`Motile Tracker`](https://www.napari-hub.org/plugins/motile-tracker) is napari plugin implementing [`motile`](https://funkelab.github.io/motile/) for interactive cell tracking. You can find the full documentation [`here`](https://live-image-tracking-tools.github.io/napari-track-edit/). Please follow the preparation instructions below before the workshop.
 
 ## Preparations
 
@@ -95,7 +95,7 @@ Tracking parameters should be specified in the `Tracking` tab and are subdivided
     <p>1. Start the plugin via <code>Plugins > Motile Tracker > Open all widgets </code> </p>
     <p>2. Go to <code>File > Open Sample > Motile Tracker > Fluo-N2DL-HeLa crop (2D)</code> to open the 2D HeLa cell test dataset, or load your own segmentation data.</p>
     <p>3. To compute tracks, go to the <code>Tracking</code> tab, and choose parameters for tracking. Use '01_ST' as input layer. Consult the
-    <a href="https://funkelab.github.io/motile_tracker/motile.html" target="_blank" style="color: #0073e6; text-decoration: underline;">documentation</a> to help you decide on the different values. Click <code>Run Tracking (SCIP)</code> to start the computation. After the solver has finished, you should see that the Lineage View is now populated with tracks and that the cells are relabeled.</p>
+    <a href="https://live-image-tracking-tools.github.io/napari-track-edit/motile.html" target="_blank" style="color: #0073e6; text-decoration: underline;">documentation</a> to help you decide on the different values. Click <code>Run Tracking (SCIP)</code> to start the computation. After the solver has finished, you should see that the Lineage View is now populated with tracks and that the cells are relabeled.</p>
     <p>4. Click <code>Back to editing</code> and test multiple combinations of parameters. Note that you can also use the Points layer 'centroids' as input. Compare the different tracking results. Verify that you can find previous results in the <code>Tracks List</code> tab.
   </div>
 
