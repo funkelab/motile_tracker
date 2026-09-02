@@ -24,8 +24,8 @@ authors:
   - given-names: Jan
     family-names: Funke
     affiliation: HHMI Janelia Research Campus; Fondazione Human Technopole
-repository-code: https://github.com/funkelab/motile_tracker
-url: https://funkelab.github.io/motile_tracker/
+repository-code: https://github.com/live-image-tracking-tools/napari-track-edit
+url: https://live-image-tracking-tools.github.io/napari-track-edit/
 abstract: >-
   Application for interactive tracking and track editing with global
   optimization.

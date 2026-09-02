@@ -1,11 +1,11 @@
 # Motile Tracker
 
-[![tests](https://github.com/funkelab/motile_tracker/workflows/tests/badge.svg)](https://github.com/funkelab/motile_tracker/actions)
-[![codecov](https://codecov.io/gh/funkelab/motile_tracker/branch/main/graph/badge.svg)](https://codecov.io/gh/funkelab/motile_tracker)
+[![tests](https://github.com/live-image-tracking-tools/napari-track-edit/workflows/tests/badge.svg)](https://github.com/live-image-tracking-tools/napari-track-edit/actions)
+[![codecov](https://codecov.io/gh/live-image-tracking-tools/napari-track-edit/branch/main/graph/badge.svg)](https://codecov.io/gh/live-image-tracking-tools/napari-track-edit)
 
 
 An application for interactive tracking with [motile](https://github.com/funkelab/motile).
-The full documentation of the plugin can be found [here](https://funkelab.github.io/motile_tracker/).
+The full documentation of the plugin can be found [here](https://live-image-tracking-tools.github.io/napari-track-edit/).
 
 Motile is a library that makes it easy to solve tracking problems using optimization
 by framing the task as an Integer Linear Program (ILP).
@@ -57,7 +57,7 @@ See the developer guide in `DEVELOPER.md` for more information.
 Start napari and call the main widget via Plugins > Motile > Motile Main Widget.
 2D+time and 3D+time sample data can be loaded via File > Open Sample > Motile. You can
 track objects in napari Labels or Points layers. For details, please read the
-[documentation](https://funkelab.github.io/motile_tracker/).
+[documentation](https://live-image-tracking-tools.github.io/napari-track-edit/).
 
 ![motile_tracker_quick_demo](https://github.com/user-attachments/assets/07a4a954-3d2d-4d67-8f75-aec11ee14697)
 
@@ -71,5 +71,5 @@ which pushes the tagged version to PyPi and creates a github release; draft rele
 ## Issues
 
 If you encounter any problems, please
-[file an issue](https://github.com/funkelab/motile_tracker/issues)
+[file an issue](https://github.com/live-image-tracking-tools/napari-track-edit/issues)
 along with a detailed description.

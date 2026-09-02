@@ -3,9 +3,9 @@ requires = ["setuptools>=70", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "motile-tracker"
+name = "napari-track-edit"
 dynamic = ["version"]
-description = "Application for interactive tracking with global optimization"
+description = "Napari plugin for interactive tracks and segmentation annotation"
 readme = "README.md"
 license = { text = "BSD 3-Clause License" }
 requires-python = ">=3.11"
@@ -62,8 +62,8 @@ all = [
 motile-tracker = "motile_tracker:napari.yaml"
 
 [project.urls]
-"Bug Tracker" = "https://github.com/funkelab/motile_tracker/issues"
-"Documentation" ="https://funkelab.github.io/motile_tracker/"
+"Bug Tracker" = "https://github.com/live-image-tracking-tools/napari-track-edit/issues"
+"Documentation" ="https://live-image-tracking-tools.github.io/napari-track-edit/"
 
 [project.scripts]
 motile_tracker = "motile_tracker.__main__:main"

@@ -184,9 +184,9 @@ or ``CSV`` and pick the location, optionally including the (relabeled) segmentat
 zarr or tiff. You can also export a subset of tracks from the Groups tab. Exported tracks are meant to be read by other tools: to continue working
 on them here later, save them instead.
 
-.. _Issue #48: https://github.com/funkelab/motile_tracker/issues/48
+.. _Issue #48: https://github.com/live-image-tracking-tools/napari-track-edit/issues/48
 .. _Cell Tracking Challenge: https://celltrackingchallenge.net/
 .. _Fabrèges et al (2024): https://www.science.org/doi/10.1126/science.adh1145
 .. _zenodo: https://zenodo.org/records/13903500
 .. _geff: https://github.com/live-image-tracking-tools/geff
-.. _tutorial: https://github.com/funkelab/motile_tracker/blob/main/assets/motile-tracker_tutorial.pdf
+.. _tutorial: https://github.com/live-image-tracking-tools/napari-track-edit/blob/main/assets/motile-tracker_tutorial.pdf
