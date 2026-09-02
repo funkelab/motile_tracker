@@ -12,12 +12,12 @@ from funtracks.data_model import SolutionTracks, Tracks
 from funtracks.import_export import write_to_geff
 from qtpy.QtWidgets import QDialog
 
-from motile_tracker.data_views.views_coordinator.tracks_list import (
+from napari_track_edit.data_views.views_coordinator.tracks_list import (
     TracksButton,
     TracksList,
     default_save_dir,
 )
-from motile_tracker.motile.backend.motile_run import MotileRun, SolverParams
+from napari_track_edit.motile.backend.motile_run import MotileRun, SolverParams
 
 
 @pytest.fixture(autouse=True)
@@ -239,7 +239,7 @@ class TestTracksListSavePathFields:
 
     def test_browse_sets_save_dir(self, tracks_list, tmp_path, monkeypatch):
         monkeypatch.setattr(
-            "motile_tracker.data_views.views_coordinator.tracks_list."
+            "napari_track_edit.data_views.views_coordinator.tracks_list."
             "QFileDialog.getExistingDirectory",
             lambda *a, **k: str(tmp_path),
         )
@@ -249,7 +249,7 @@ class TestTracksListSavePathFields:
     def test_browse_cancelled_leaves_save_dir(self, tracks_list, monkeypatch):
         before = tracks_list.save_dir_line.text()
         monkeypatch.setattr(
-            "motile_tracker.data_views.views_coordinator.tracks_list."
+            "napari_track_edit.data_views.views_coordinator.tracks_list."
             "QFileDialog.getExistingDirectory",
             lambda *a, **k: "",
         )
@@ -610,7 +610,7 @@ class TestTracksListLoadExternal:
 
         tracks_list.dropdown_menu.setCurrentText("External tracks from CSV")
         with patch(
-            "motile_tracker.data_views.views_coordinator.tracks_list.ImportDialog",
+            "napari_track_edit.data_views.views_coordinator.tracks_list.ImportDialog",
             return_value=mock_dialog,
         ):
             tracks_list.load_tracks()
@@ -622,7 +622,7 @@ class TestTracksListLoadExternal:
         mock_dialog.exec_.return_value = QDialog.Rejected
 
         with patch(
-            "motile_tracker.data_views.views_coordinator.tracks_list.ImportDialog",
+            "napari_track_edit.data_views.views_coordinator.tracks_list.ImportDialog",
             return_value=mock_dialog,
         ):
             assert tracks_list._load_tracks("csv") is None
@@ -635,7 +635,7 @@ class TestTracksListLoadExternal:
         mock_dialog.tracks = None
 
         with patch(
-            "motile_tracker.data_views.views_coordinator.tracks_list.ImportDialog",
+            "napari_track_edit.data_views.views_coordinator.tracks_list.ImportDialog",
             return_value=mock_dialog,
         ):
             assert tracks_list._load_tracks("csv") is None
@@ -654,7 +654,7 @@ class TestTracksListExport:
         item = tracks_list.tracks_list.item(0)
 
         with patch(
-            "motile_tracker.data_views.views_coordinator.tracks_list.ExportDialog.show_export_dialog"
+            "napari_track_edit.data_views.views_coordinator.tracks_list.ExportDialog.show_export_dialog"
         ) as mock_export:
             tracks_list.show_export_dialog(item)
             mock_export.assert_called_once()
@@ -667,7 +667,7 @@ class TestTracksListExport:
         tracks_list.request_colormap.connect(lambda: emitted.append(True))
 
         with patch(
-            "motile_tracker.data_views.views_coordinator.tracks_list.ExportDialog.show_export_dialog"
+            "napari_track_edit.data_views.views_coordinator.tracks_list.ExportDialog.show_export_dialog"
         ):
             tracks_list.show_export_dialog(item)
 

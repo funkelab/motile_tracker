@@ -11,8 +11,8 @@ import numpy as np
 import pytest
 from qtpy.QtWidgets import QMessageBox
 
-from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
-from motile_tracker.data_views.views_coordinator.user_dialogs import (
+from napari_track_edit.data_views.views_coordinator.tracks_viewer import TracksViewer
+from napari_track_edit.data_views.views_coordinator.user_dialogs import (
     confirm_force_operation,
 )
 
@@ -164,7 +164,7 @@ def test_on_paint_invalid_action_upstream_division1_forceable(
 
     # Mock the confirm_force_operation dialog
     monkeypatch.setattr(
-        "motile_tracker.data_views.views.layers.track_labels.confirm_force_operation",
+        "napari_track_edit.data_views.views.layers.track_labels.confirm_force_operation",
         lambda message: confirm_response,
     )
 
@@ -270,7 +270,7 @@ def test_on_paint_invalid_action_upstream_division2_forceable(
 
     # Mock the confirm_force_operation dialog
     monkeypatch.setattr(
-        "motile_tracker.data_views.views.layers.track_labels.confirm_force_operation",
+        "napari_track_edit.data_views.views.layers.track_labels.confirm_force_operation",
         lambda message: confirm_response,
     )
 
@@ -385,7 +385,7 @@ def test_invalid_edge_force(
     tracks_viewer.force = False
 
     monkeypatch.setattr(
-        "motile_tracker.data_views.views_coordinator.tracks_viewer.confirm_force_operation",
+        "napari_track_edit.data_views.views_coordinator.tracks_viewer.confirm_force_operation",
         lambda message: confirm_response,
     )
 

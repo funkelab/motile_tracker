@@ -4,8 +4,8 @@ from unittest.mock import MagicMock
 
 from qtpy.QtWidgets import QDockWidget, QScrollArea, QTabBar, QWidget
 
-from motile_tracker.application_menus.main_app import MENU_WIDGETS, StartupWidget
-from motile_tracker.application_menus.menu_manager import MenuManager
+from napari_track_edit.application_menus.main_app import MENU_WIDGETS, StartupWidget
+from napari_track_edit.application_menus.menu_manager import MenuManager
 
 
 class DummyWidget(QWidget):

@@ -4,7 +4,7 @@ test:
     uv run pytest .
 
 start:
-    uv run motile_tracker
+    uv run napari-track-edit
 
 [working-directory: 'docs']
 @docs-build:

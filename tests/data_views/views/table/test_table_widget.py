@@ -2,10 +2,10 @@ import pandas as pd
 import pytest
 from qtpy.QtWidgets import QApplication
 
-from motile_tracker.data_views.views.table.custom_table_widget import (
+from napari_track_edit.data_views.views.table.custom_table_widget import (
     ColoredTableWidget,
 )
-from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
+from napari_track_edit.data_views.views_coordinator.tracks_viewer import TracksViewer
 
 
 @pytest.fixture(autouse=True)

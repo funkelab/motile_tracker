@@ -5,8 +5,8 @@ from unittest.mock import MagicMock
 import pytest
 from funtracks.annotators._regionprops_annotator import DEFAULT_POS_KEY
 
-from motile_tracker.application_menus.feature_widget import FeatureWidget
-from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
+from napari_track_edit.application_menus.feature_widget import FeatureWidget
+from napari_track_edit.data_views.views_coordinator.tracks_viewer import TracksViewer
 
 
 @pytest.fixture
