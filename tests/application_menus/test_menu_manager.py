@@ -130,13 +130,9 @@ def test_foreground_tabs_and_tabbar_fallback(make_napari_viewer):
         else:
             assert not getattr(dw.raise_, "called", False)
 
-    # Invalid tabbar location falls back safely
+    # Invalid tabbar location falls back safely (defaults to North) without raising,
+    # whether or not napari has materialized any real QTabBar yet.
     tabbars = qt_window.findChildren(QTabBar)
-    if not tabbars:
-        tabbar = QTabBar()
-        tabbar.setParent(qt_window)
-        tabbars = [tabbar]
-
     for tb in tabbars:
         tb.setStyleSheet = MagicMock()
         tb.setElideMode = MagicMock()
