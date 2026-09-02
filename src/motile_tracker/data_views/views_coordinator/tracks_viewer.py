@@ -256,9 +256,10 @@ class TracksViewer:
         Does nothing if the reference track has no node at one of the two time points.
         """
 
-        nodes = self.tracks.get_track_nodes_at_times(
-            self.reference_track, (previous_time, new_time)
-        )
+        nodes = {
+            int(time): node
+            for time, node in self.tracks.get_track_node_times(self.reference_track)
+        }
         if previous_time not in nodes or new_time not in nodes:
             return
 
