@@ -111,15 +111,26 @@ def register_napari_actions(keymap_provider: type, tracks_viewer: TracksViewer) 
     get_settings().shortcuts.shortcuts = settings
 
 
-def current_general_key_actions() -> dict[int, str]:
-    """Qt.Key_* -> tracks_viewer method name, reflecting live napari settings.
+def qt_event_key(event) -> tuple[int, int]:
+    """Build the (key, modifiers) lookup tuple for a QKeyEvent.
 
-    Rebuilt from napari's settings/action_manager state (rather than the
-    static KEYBINDINGS defaults) so a rebind made via napari's Preferences
-    dialog is picked up by the Qt-side keyPressEvent dispatch too.
+    Use this on the receiving end (e.g. `event.key()`/`event.modifiers()`
+    in a `keyPressEvent` override) to look up `current_general_key_actions()`.
+    """
+    return (int(event.key()), int(event.modifiers().value))
+
+
+def current_general_key_actions() -> dict[tuple[int, int], str]:
+    """(Qt.Key_*, modifiers) -> tracks_viewer method name, reflecting live
+    napari settings.
+
+    Rebuilt from napari's settings/action_manager state (rather than a
+    static dict) so a rebind made via napari's Preferences dialog is picked
+    up by the Qt-side keyPressEvent dispatch too. Keys are (key, modifiers)
+    tuples so e.g. "d" and "ctrl+d" don't collide.
     """
     shortcuts = get_settings().shortcuts.shortcuts
-    result: dict[int, str] = {}
+    result: dict[tuple[int, int], str] = {}
     for action, config in KEYBINDINGS.items():
         if "tracks_viewer" not in config["targets"]:
             continue
@@ -127,90 +138,83 @@ def current_general_key_actions() -> dict[int, str]:
         bound = shortcuts.get(action_id)
         if not bound:
             # not yet registered/seeded (e.g. called before viewer init) -
-            # fall back to the static default so Qt widgets still work.
-            for key in config["qt_keys"]:
-                result[key] = action
-            continue
+            # fall back to the static defaults so Qt widgets still work.
+            bound = [coerce_keybinding(key) for key in config["napari_keys"]]
         for shortcut in bound:
-            qt_key = _napari_shortcut_to_qt_key(str(shortcut))
-            if qt_key is not None:
-                result[qt_key] = action
+            qt_combo = _napari_shortcut_to_qt_key(str(shortcut))
+            if qt_combo is not None:
+                result[qt_combo] = action
     return result
 
 
-def _napari_shortcut_to_qt_key(shortcut: str) -> int | None:
-    """Best-effort conversion of a napari shortcut string to a Qt.Key_* code.
+def _napari_shortcut_to_qt_key(shortcut: str) -> tuple[int, int] | None:
+    """Convert a napari shortcut string to a (Qt.Key_*, modifiers) tuple.
 
-    Prototype-only: handles single, unmodified keys only (matches today's
-    scope, where none of the tracks_viewer actions use modifiers). A real
-    implementation would need to handle modifier combos and map them to
-    Qt.KeyboardModifier flags as well.
+    Handles a single key plus any combination of modifiers (e.g. "d",
+    "ctrl+d", "ctrl+shift+d"). Does NOT handle chords (multi-key sequences
+    like "ctrl+k p") - `QKeySequence` doesn't model those as a single combo,
+    and none of today's actions need them.
     """
     qt_seq = QKeySequence(shortcut)
     if qt_seq.count() != 1:
         return None
     combo = qt_seq[0]
-    if combo.keyboardModifiers() != Qt.KeyboardModifier.NoModifier:
-        # prototype scope: only unmodified single keys are supported today
-        return None
-    return int(combo.key())
+    return (int(combo.key()), int(combo.keyboardModifiers().value))
 
 
 KEYBINDINGS = {
     # General actions: apply to both napari layers and tree_widget (via tracks_viewer)
+    # PROTOTYPE NOTE: "tracks_viewer"-only actions no longer need "qt_keys" -
+    # Qt dispatch for these is derived from "napari_keys" at runtime via
+    # `current_general_key_actions()`/`_napari_shortcut_to_qt_key`, so there
+    # is exactly one place a key is specified (removes a duplication that
+    # was a latent bug source: editing one list and forgetting the other).
     "delete_node": {
         "napari_keys": ["d", "Delete"],
-        "qt_keys": [Qt.Key_D, Qt.Key_Delete],
         "targets": ["tracks_viewer"],
     },
     "create_edge": {
-        "napari_keys": ["a"],
-        "qt_keys": [Qt.Key_A],
+        # plain "a" collides with napari's built-in
+        # "napari:select_all_in_slice" (Points-layer action); use a
+        # modifier combo to avoid the conflict.
+        "napari_keys": ["shift+a"],
         "targets": ["tracks_viewer"],
     },
     "delete_edge": {
         "napari_keys": ["b"],
-        "qt_keys": [Qt.Key_B],
         "targets": ["tracks_viewer"],
     },
     "swap_nodes": {
         "napari_keys": ["s"],
-        "qt_keys": [Qt.Key_S],
         "targets": ["tracks_viewer"],
     },
     "undo": {
         "napari_keys": ["z"],
-        "qt_keys": [Qt.Key_Z],
         "targets": ["tracks_viewer"],
     },
     "redo": {
-        "napari_keys": ["r"],
-        "qt_keys": [Qt.Key_R],
+        # "ctrl+shift+z" demonstrates a modifier-combo default binding.
+        "napari_keys": ["r", "ctrl+shift+z"],
         "targets": ["tracks_viewer"],
     },
     "deselect": {
         "napari_keys": ["Escape"],
-        "qt_keys": [Qt.Key_Escape],
         "targets": ["tracks_viewer"],
     },
     "restore_selection": {
         "napari_keys": ["e"],
-        "qt_keys": [Qt.Key_E],
         "targets": ["tracks_viewer"],
     },
     "hide_panels": {
         "napari_keys": ["/"],
-        "qt_keys": [Qt.Key_Slash],
         "targets": ["tracks_viewer"],
     },
     "select_previous": {
         "napari_keys": ["p"],  # Previous: Navigate backwards in selection history
-        "qt_keys": [Qt.Key_P],
         "targets": ["tracks_viewer"],
     },
     "select_next": {
         "napari_keys": ["n"],  # Next: Navigate forwards in selection history
-        "qt_keys": [Qt.Key_N],
         "targets": ["tracks_viewer"],
     },
     # Actions available in both napari and tree_widget (but connected to different functions)

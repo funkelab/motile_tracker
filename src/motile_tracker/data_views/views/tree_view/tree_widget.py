@@ -23,6 +23,7 @@ from motile_tracker.data_views.keybindings_config import (
     TREE_WIDGET_NAVIGATION_KEYS,
     TREE_WIDGET_SPECIFIC_ACTIONS,
     current_general_key_actions,
+    qt_event_key,
 )
 from motile_tracker.data_views.views.layers.click_utils import (
     detect_side_button,
@@ -597,7 +598,8 @@ class TreeWidget(QWidget):
 
         # Try general keybinds (these also work in table widget), rebuilt
         # from napari's current settings so user rebinds apply here too.
-        action_name = current_general_key_actions().get(event.key())
+        # Keyed on (key, modifiers) so e.g. "z" and "ctrl+shift+z" don't collide.
+        action_name = current_general_key_actions().get(qt_event_key(event))
         if action_name:
             method = getattr(self.tracks_viewer, action_name, None)
             if method:
