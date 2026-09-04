@@ -34,7 +34,7 @@ _SELECT_BUMP_MIN = 2.0  # ...but at least this, so a small node still reads as s
 # clamped to [_MIN_SIZE, _MAX_SIZE]. Feature mode keeps a fixed size — its value axis is
 # continuous, so it has no grid to measure.
 _MIN_SIZE = 3.0  # never shrink past this: nodes must stay visible and clickable
-_MAX_SIZE = 68.0  # ...and never grow past this, however far you zoom in
+_MAX_SIZE = 100.0  # ...and never grow past this, however far you zoom in
 _MARKER_FILL = 0.9  # glyph diameter as a fraction of the grid spacing (<1 leaves a gap)
 _SIZE_SCALE_EPS = 0.02  # skip <2% changes so a slow zoom won't re-upload sizes a frame
 # Once a node is drawn big enough to hold text, write its node_id inside it. Only the
@@ -47,7 +47,9 @@ _NODE_LABEL_COLOR = (0.0, 0.0, 0.0, 1.0)  # black on the track-coloured fill
 # ways: by the dot's height, and by its width once the digits are counted (a five-digit
 # id in a dot sized for two would spill its first and last digit outside the circle).
 _NODE_LABEL_FONT_FRACTION = 0.5  # of the dot diameter, for a short label
-_NODE_LABEL_DIGIT_WIDTH = 0.62  # digit advance as a fraction of the font size
+# digit ink width as a fraction of the font size, measured by rendering a string
+# offscreen and counting pixels (0.550 at both font 20 and font 40)
+_NODE_LABEL_DIGIT_WIDTH = 0.55
 # Track ids along the lane axis (optional, toggled from the Visualization tab). They
 # live in the same dock as the perpendicular ruler, which they replace when shown.
 _DOCK_TRACK_ID_PX = 22.0  # dock margin needed for one row of track-id labels
@@ -91,6 +93,15 @@ _AXIS_LINE = _DOCK_WORLD * 0.88
 # the perpendicular axis in tree mode is drawn "minimal": no axis line, no numbers,
 # just tick marks near the *outer* edge of the canvas (matching the old pyqtgraph look).
 _AXIS_EDGE = _DOCK_WORLD * 0.10
+# Tick labels hang in the margin between the axis line and the dock's outer edge, and a
+# dock clips at its viewport, so a label wider than that margin loses its leading
+# digits. The default left dock leaves ~37 px, which a feature value big enough to be
+# formatted in scientific notation ("1.5e+04", ~44 px) overflows — so grow the dock to
+# fit whatever the ruler is currently labelling.
+_DOCK_LEFT_MAX_PX = 120.0  # never eat more of the canvas than this, however big
+_TICK_LABEL_CHAR_PX = 0.55  # character advance as a fraction of the font size
+_TICK_LABEL_MARGIN_PX = 14.0  # ruler's own tick-to-label gap (10) + room to the edge
+_DOCK_RESIZE_EPS_PX = 2.0  # a resize relayouts the whole figure; ignore smaller changes
 
 
 def _flag_canvas_closed(canvas_ref: weakref.ref) -> None:
@@ -357,10 +368,16 @@ class TreePlot(QWidget):
             self._reset_view()
 
     def _update_viewed_data(self, view_direction: str) -> None:
-        """Re-apply positions for the given view direction (used by flip_axes)."""
+        """Re-apply positions for the given view direction (used by flip_axes).
+
+        The rebuild drops the scatter and its selection buffers, so carry the selected
+        node ids across it — a flip changes the layout, not what is selected.
+        """
         self.view_direction = view_direction
         self._configure_docks()
+        selected = [int(self._node_ids[row]) for row in self._selected_rows]
         self._rebuild()
+        self.set_selection(selected, self.plot_type)
 
     # ------------------------------------------------------------------ #
     # axis rulers (hosted in dock viewports; synced to the main camera)
@@ -382,10 +399,14 @@ class TreePlot(QWidget):
         # the perpendicular axis in tree mode is either a thin strip of tick marks or,
         # with the track-id axis switched on, a row of track ids that replaces them
         minimal = _DOCK_TRACK_ID_PX if self._track_id_axis_shown() else _DOCK_MINIMAL_PX
+        # a numbered left dock may have been grown to fit wide tick labels: keep that
+        # width rather than snapping back to the base and re-growing a frame later
+        # (_fit_left_dock shrinks it again as soon as the labels get shorter)
+        numbered_left = max(_DOCK_LEFT_PX, self._dock_left.size)
         if self.view_direction == "vertical":
             self._dock_left.scene.add(self._ruler_time, self._time_label)
             self._dock_bottom.scene.add(self._ruler_feature, self._track_labels)
-            self._dock_left.size = _DOCK_LEFT_PX
+            self._dock_left.size = numbered_left
             self._dock_bottom.size = (
                 _DOCK_BOTTOM_PX if self.plot_type == "feature" else minimal
             )
@@ -394,7 +415,7 @@ class TreePlot(QWidget):
             self._dock_left.scene.add(self._ruler_feature, self._track_labels)
             self._dock_bottom.size = _DOCK_BOTTOM_PX
             self._dock_left.size = (
-                _DOCK_LEFT_PX if self.plot_type == "feature" else minimal
+                numbered_left if self.plot_type == "feature" else minimal
             )
 
     def _track_id_axis_shown(self) -> bool:
@@ -468,12 +489,12 @@ class TreePlot(QWidget):
         (a numeric feature axis, whose world y = +value) lays it bottom->top so
         feature values increase upward."""
         dock = self._dock_left
-        dv = dock.viewport.logical_size
-        if dv[0] < 1 or dv[1] < 1:
-            return  # transient degenerate size — keep last-good geometry, don't hide
-        dock.camera.show_rect(0, _DOCK_WORLD, bottom, top, depth=1)
-        axis = _AXIS_EDGE if minimal else _AXIS_LINE
-        ruler.visible = True
+        prepared = self._prepare_ruler(
+            dock, ruler, minimal, (0, _DOCK_WORLD, bottom, top)
+        )
+        if prepared is None:
+            return
+        dv, axis = prepared
         # tick_side is relative to the ruler's start->end direction. For the downward
         # ruler "right" puts marks toward the plot and numbers in the left margin; for
         # the upward ruler that same margin side is "left" (else numbers render into the
@@ -488,13 +509,63 @@ class TreePlot(QWidget):
             ruler.start_value = bottom
             ruler.start_pos = (axis, bottom, 0)
             ruler.end_pos = (axis, top, 0)
-        ruler.update(dock.camera, dv)
-        ruler._line.visible = not minimal
-        ruler._text.visible = not minimal
+        stats = self._finish_ruler(dock, ruler, dv, minimal)
+        if not minimal:
+            self._fit_left_dock(ruler, stats["tick_values"])
         if label is not None:
             label.visible = not minimal
             label.local.rotation = (0.0, 0.0, 0.70710677, 0.70710677)  # +90°
             label.local.position = (_DOCK_WORLD * 0.14, (top + bottom) / 2, 0)
+
+    def _prepare_ruler(self, dock, ruler, minimal, rect):
+        """Set up a dock to draw one of the two rulers: frame its camera on ``rect``
+        (the visible range along the ruler, across the dock's own world width) and pick
+        where the axis sits inside it — next to the plot for a numbered axis, at the
+        canvas edge for a minimal one.
+
+        Returns ``(viewport_size, axis_position)``, or None if the dock's viewport is
+        transiently degenerate, in which case the caller must leave the ruler alone
+        (keep the last-good geometry rather than hide it).
+        """
+        dv = dock.viewport.logical_size
+        if dv[0] < 1 or dv[1] < 1:
+            return None
+        dock.camera.show_rect(*rect, depth=1)
+        ruler.visible = True
+        return dv, (_AXIS_EDGE if minimal else _AXIS_LINE)
+
+    def _finish_ruler(self, dock, ruler, dv, minimal):
+        """Lay out the ruler's ticks for the range its dock camera now shows, and drop
+        the parts a minimal axis does without (its line and its numbers). Returns the
+        stats dict from ``Ruler.update`` (``tick_step`` and ``tick_values``)."""
+        stats = ruler.update(dock.camera, dv)
+        ruler._line.visible = not minimal
+        ruler._text.visible = not minimal
+        return stats
+
+    def _fit_left_dock(self, ruler, tick_values) -> None:
+        """Widen the left dock when its tick labels no longer fit in it (and let it
+        shrink back when they do). Only the vertical rulers need this: their labels
+        grow sideways, into the dock's narrow dimension.
+
+        Resizing here cannot feed back on itself — the dock's width does not affect the
+        vertical span the ruler labels, so the labels stay put and the size settles
+        after one frame.
+        """
+        fmt = ruler.tick_format
+        if not isinstance(fmt, str) or fmt == "km":
+            return  # a custom formatter: no cheap way to know what it will produce
+        widest = max((len(format(v, fmt)) for v in tick_values), default=0)
+        if not widest:
+            return
+        label_px = widest * _TICK_LABEL_CHAR_PX * ruler.text.font_size
+        # the labels sit left of the axis line, which is _AXIS_LINE/_DOCK_WORLD of the
+        # way across the dock — so that fraction of the dock has to hold them
+        needed = (label_px + _TICK_LABEL_MARGIN_PX) / (_AXIS_LINE / _DOCK_WORLD)
+        needed = float(np.clip(needed, _DOCK_LEFT_PX, _DOCK_LEFT_MAX_PX))
+        if abs(needed - self._dock_left.size) > _DOCK_RESIZE_EPS_PX:
+            self._dock_left.size = needed
+            self._figure.canvas.request_draw()
 
     def _sync_bottom(self, ruler, left, right, minimal, label=None) -> None:
         """Lay a horizontal ruler in the bottom dock. Normal: axis line just inside
@@ -502,19 +573,17 @@ class TreePlot(QWidget):
         margin below. Minimal (tree-mode perpendicular axis): no line, no numbers,
         just tick marks near the bottom edge of the canvas."""
         dock = self._dock_bottom
-        dv = dock.viewport.logical_size
-        if dv[0] < 1 or dv[1] < 1:
-            return  # transient degenerate size — keep last-good geometry, don't hide
-        dock.camera.show_rect(left, right, 0, _DOCK_WORLD, depth=1)
-        axis = _AXIS_EDGE if minimal else _AXIS_LINE
-        ruler.visible = True
+        prepared = self._prepare_ruler(
+            dock, ruler, minimal, (left, right, 0, _DOCK_WORLD)
+        )
+        if prepared is None:
+            return
+        dv, axis = prepared
         ruler.tick_side = "right"  # marks toward plot, numbers extend down into margin
         ruler.start_value = left
         ruler.start_pos = (left, axis, 0)
         ruler.end_pos = (right, axis, 0)
-        ruler.update(dock.camera, dv)
-        ruler._line.visible = not minimal
-        ruler._text.visible = not minimal
+        self._finish_ruler(dock, ruler, dv, minimal)
         if label is not None:
             label.visible = not minimal
             label.local.rotation = (0.0, 0.0, 0.0, 1.0)  # horizontal
@@ -881,6 +950,7 @@ class TreePlot(QWidget):
         # you can still tell which track a selected node belongs to (like the old tree).
         # Surgical: only touch changed rows' edge-color buffer + size.
         # restore previously selected rows: clear the outline and the size bump
+        previous = set(self._selected_rows)
         for row in self._selected_rows:
             self._set_edge_color(row, _EDGE_NONE)
             self._scatter.sizes[row] = self._base_sizes[row] * self._size_scale
@@ -897,7 +967,15 @@ class TreePlot(QWidget):
                 new_rows.append(row)
         self._selected_rows = new_rows
 
-        if len(new_rows) > 1:
+        # Fit the view to a multi-node selection only when a node that was *just* added
+        # to it is off screen. Shift-clicking a node in the tree can only hit a node
+        # that is already in view, and zooming out to also fit the rest of the selection
+        # would throw away the zoom the user picked it out in — which makes picking a
+        # run of nodes by hand painful. A selection made elsewhere (the two endpoints of
+        # a broken edge, the table, the napari layers) can land outside the view though,
+        # and then it still has to be brought in.
+        added = [row for row in new_rows if row not in previous]
+        if len(new_rows) > 1 and added and not self._rows_fit(added):
             self._center_on_rows(new_rows)
 
     def _set_edge_color(self, row: int, rgba: np.ndarray) -> None:
@@ -1098,6 +1176,24 @@ class TreePlot(QWidget):
             return
         self._center_on_rows([row])
 
+    def _rows_fit(self, rows: list[int]) -> bool:
+        """Whether all the given rows are inside the current viewport. True (nothing to
+        do) for an empty list, and if the camera can't be read."""
+        if not rows:
+            return True
+        pts = self._positions[rows]
+        with contextlib.suppress(Exception):
+            state = self._subplot.camera.get_state()
+            x, y = state["position"][0], state["position"][1]
+            w, h = state["width"], state["height"]
+            return bool(
+                (x - w / 2) <= pts[:, 0].min()
+                and pts[:, 0].max() <= (x + w / 2)
+                and (y - h / 2) <= pts[:, 1].min()
+                and pts[:, 1].max() <= (y + h / 2)
+            )
+        return True
+
     def _center_on_rows(self, rows: list[int]) -> None:
         """Bring the given rows into view.
 
@@ -1108,7 +1204,7 @@ class TreePlot(QWidget):
         midpoint at the current zoom (leaving both off-screen), we widen the view so
         both are visible.
         """
-        if not rows:
+        if not rows or self._rows_fit(rows):
             return
         pts = self._positions[rows]
         xmin, xmax = float(pts[:, 0].min()), float(pts[:, 0].max())
@@ -1116,16 +1212,7 @@ class TreePlot(QWidget):
         with contextlib.suppress(Exception):
             cam = self._subplot.camera
             state = cam.get_state()
-            x, y = state["position"][0], state["position"][1]
             w, h = state["width"], state["height"]
-            # already fully visible at the current zoom -> nothing to do
-            if (
-                (x - w / 2) <= xmin
-                and xmax <= (x + w / 2)
-                and (y - h / 2) <= ymin
-                and ymax <= (y + h / 2)
-            ):
-                return
             # grow the view only if the rows don't fit (never shrink = never zoom in);
             # dividing the span by 0.8 leaves a ~10% margin so nodes aren't flush to
             # the edge. For a single row the span is 0, so the zoom is preserved and we

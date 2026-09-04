@@ -29,6 +29,9 @@ from motile_tracker.data_views.views.tree_view.tree_view_feature_widget import (
 from motile_tracker.data_views.views.tree_view.tree_view_mode_widget import (
     TreeViewModeWidget,
 )
+from motile_tracker.data_views.views.tree_view.tree_view_options_widget import (
+    TreeViewOptionsWidget,
+)
 from motile_tracker.data_views.views.tree_view.tree_widget_utils import (
     extract_lineage_tree,
     get_features_from_tracks,
@@ -67,16 +70,6 @@ class TreeWidget(QWidget):
         self.tree_widget.jump_to_node.connect(self.tracks_viewer.center_on_node)
         self.tree_widget.nodes_selected.connect(self.selected_nodes.add_list)
         self.tracks_viewer.center_node.connect(self.tree_widget.center_on_node)
-        # track-id axis: follow the Visualization tab, and adopt whatever it is set to
-        # now (the tab may well have been used before this tree view was opened)
-        self.tracks_viewer.show_track_ids_updated.connect(
-            self.tree_widget.set_show_track_ids
-        )
-        self.tree_widget.set_show_track_ids(self.tracks_viewer.show_track_ids)
-        self.tracks_viewer.show_hover_info_updated.connect(
-            self.tree_widget.set_show_hover_info
-        )
-        self.tree_widget.set_show_hover_info(self.tracks_viewer.show_hover_info)
 
         # Add radiobuttons for switching between different display modes
         self.mode_widget = TreeViewModeWidget()
@@ -108,18 +101,31 @@ class TreeWidget(QWidget):
         self.flip_widget = FlipTreeWidget()
         self.flip_widget.flip_tree.connect(self.flip_axes)
 
+        # Add checkboxes for the tree view's own annotations
+        self.options_widget = TreeViewOptionsWidget(
+            show_track_ids=self.tree_widget.show_track_ids,
+            show_hover_info=self.tree_widget.show_hover_info,
+        )
+        self.options_widget.show_track_ids_changed.connect(
+            self.tree_widget.set_show_track_ids
+        )
+        self.options_widget.show_hover_info_changed.connect(
+            self.tree_widget.set_show_hover_info
+        )
+
         # Construct a toolbar and set main layout
         panel_layout = QHBoxLayout()
         panel_layout.addWidget(self.mode_widget)
         panel_layout.addWidget(self.plot_type_widget)
         panel_layout.addWidget(self.navigation_widget)
         panel_layout.addWidget(self.flip_widget)
+        panel_layout.addWidget(self.options_widget)
         panel_layout.setSpacing(0)
         panel_layout.setContentsMargins(0, 0, 0, 0)
 
         panel = QWidget()
         panel.setLayout(panel_layout)
-        panel.setMaximumWidth(930)
+        panel.setMaximumWidth(1060)  # 930 + room for the options checkboxes
         panel.setMaximumHeight(82)
 
         # Make a collapsible for TreeView widgets
@@ -158,14 +164,6 @@ class TreeWidget(QWidget):
             (self.tracks_viewer.node_selection_updated, self._update_selected),
             (self.tracks_viewer.tracks_updated, self._update_track_data),
             (self.tracks_viewer.center_node, self.tree_widget.center_on_node),
-            (
-                self.tracks_viewer.show_track_ids_updated,
-                self.tree_widget.set_show_track_ids,
-            ),
-            (
-                self.tracks_viewer.show_hover_info_updated,
-                self.tree_widget.set_show_hover_info,
-            ),
         ):
             with contextlib.suppress(ValueError, KeyError, RuntimeError):
                 signal.disconnect(slot)
@@ -308,6 +306,12 @@ class TreeWidget(QWidget):
                 self.plot_type,
                 self.plot_type_widget.get_current_feature(),
                 self.selected_nodes,
+                # the plot now holds a different lineage, whose lanes (and, in feature
+                # mode, whose value range) have nothing to do with the camera framing
+                # left over from the previous one, so refit. TracksViewer's center_node
+                # signal cannot cover this: it fires before this rebuild, against data
+                # that is about to be replaced.
+                reset_view=True,
             )
         else:
             self.tree_widget.set_selection(self.selected_nodes, self.plot_type)

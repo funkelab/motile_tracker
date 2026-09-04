@@ -181,26 +181,7 @@ class VisualizationWidget(QWidget):
         self.show_ortho_views.stateChanged.connect(self.initialize_ortho_views)
         self.show_ortho_views.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
 
-        self.show_track_ids = QCheckBox("Track IDs in tree view")
-        self.show_track_ids.setChecked(self.tracks_viewer.show_track_ids)
-        self.show_track_ids.setToolTip(
-            "Label the tree view's track axis with the track ID of each lane"
-        )
-        self.show_track_ids.stateChanged.connect(self._update_show_track_ids)
-        self.show_track_ids.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-
-        self.show_hover_info = QCheckBox("Hover info in tree view")
-        self.show_hover_info.setChecked(self.tracks_viewer.show_hover_info)
-        self.show_hover_info.setToolTip(
-            "Show a tooltip with node, track and lineage ID when hovering over a node "
-            "in the tree view"
-        )
-        self.show_hover_info.stateChanged.connect(self._update_show_hover_info)
-        self.show_hover_info.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-
         main_layout.addWidget(self.show_ortho_views)
-        main_layout.addWidget(self.show_track_ids)
-        main_layout.addWidget(self.show_hover_info)
         main_layout.addStretch(1)
 
         self.setMaximumHeight(360)
@@ -256,20 +237,6 @@ class VisualizationWidget(QWidget):
                 )
             self.orth_views_connection = None
         self.orth_view_manager = None
-
-    def _update_show_track_ids(self) -> None:
-        """Toggle the track-id axis in the tree view (if one is open)."""
-
-        show = self.show_track_ids.isChecked()
-        self.tracks_viewer.show_track_ids = show
-        self.tracks_viewer.show_track_ids_updated.emit(show)
-
-    def _update_show_hover_info(self) -> None:
-        """Toggle the tree view's hover tooltip (if a tree view is open)."""
-
-        show = self.show_hover_info.isChecked()
-        self.tracks_viewer.show_hover_info = show
-        self.tracks_viewer.show_hover_info_updated.emit(show)
 
     def _update_mode(self, mode: str) -> None:
         """Update the display mode on the Tracksviewer"""

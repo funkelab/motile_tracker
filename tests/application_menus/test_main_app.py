@@ -24,6 +24,7 @@ from motile_tracker.application_menus.main_app import (
 # MainAppWidget builds the fastplotlib/wgpu tree view. On headless Linux CI wgpu
 # aborts (SIGABRT) constructing the Qt canvas figure, killing the whole pytest
 # process. These are covered on macOS (Metal) and Windows (DX12); skip on Linux.
+# TODO: check in the future if headless Linux CI support can be added
 pytestmark = pytest.mark.skipif(
     sys.platform == "linux",
     reason="fastplotlib/wgpu can't build a Qt canvas on headless Linux CI",

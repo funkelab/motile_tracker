@@ -8,6 +8,7 @@ import gc
 import sys
 from unittest.mock import MagicMock, patch
 
+import numpy as np
 import pandas as pd
 import pytest
 from qtpy.QtCore import Qt
@@ -167,6 +168,50 @@ def test_centering(viewer, solution_tracks_2d):
 
     # Test 4: selecting multiple nodes centers on their range without error
     tree_plot.set_selection([1, 2, 3], "tree")
+
+
+def test_adding_a_visible_node_to_the_selection_keeps_the_zoom(
+    viewer, solution_tracks_2d
+):
+    """Shift-clicking a node that is already on screen must not reframe the view.
+
+    Picking a run of nodes by hand means adding them one by one while zoomed in; if
+    every addition zoomed out far enough to also fit the nodes selected earlier (which
+    may have been panned off screen since), the user would have to zoom back in for
+    each click. A selection that lands off screen must still be brought into view.
+    """
+    tracks_viewer = TracksViewer.get_instance(viewer)
+    tracks_viewer.update_tracks(tracks=solution_tracks_2d, name="test")
+
+    tree_widget = TreeWidget(viewer)
+    tree_plot = tree_widget.tree_widget
+    cam = tree_plot._subplot.camera
+
+    node_ids = [int(n) for n in tree_plot._node_ids]
+    rows = tree_plot._positions
+
+    # zoom in tightly on the first node, with a second node just inside the view
+    first, second = node_ids[0], node_ids[1]
+    tree_plot.set_selection([first], "tree")
+    pts = rows[[tree_plot._id_to_row[first], tree_plot._id_to_row[second]]]
+    st = dict(cam.get_state())
+    st["position"] = (pts[:, 0].mean(), pts[:, 1].mean(), st["position"][2])
+    st["width"] = max(1.0, (np.ptp(pts[:, 0]) + 1) * 1.5)
+    st["height"] = max(1.0, (np.ptp(pts[:, 1]) + 1) * 1.5)
+    cam.set_state(st)
+    before = cam.get_state()
+
+    tree_plot.set_selection([first, second], "tree")
+    after = cam.get_state()
+    assert tuple(after["position"]) == tuple(before["position"])
+    assert (after["width"], after["height"]) == (before["width"], before["height"])
+
+    # ...but a node outside the view (e.g. the far end of a broken edge) still pulls
+    # the camera out far enough to show it
+    far = max(node_ids, key=lambda n: abs(rows[tree_plot._id_to_row[n], 1]))
+    if not tree_plot._rows_fit([tree_plot._id_to_row[far]]):
+        tree_plot.set_selection([first, far], "tree")
+        assert cam.get_state()["height"] > before["height"]
 
 
 def test_tree_widget_initialization(viewer, solution_tracks_2d):

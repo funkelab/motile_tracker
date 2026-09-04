@@ -55,8 +55,6 @@ class TracksViewer:
     mode_updated = Signal()
     center_node = Signal(int)  # emitted when any component wants to center on a node
     node_selection_updated = Signal(bool)
-    show_track_ids_updated = Signal(bool)  # track-id axis toggle (Visualization tab)
-    show_hover_info_updated = Signal(bool)  # tree hover tooltip toggle (same tab)
 
     @classmethod
     def get_instance(cls, viewer=None):
@@ -83,12 +81,6 @@ class TracksViewer:
         self.menu_manager = None  # will be set by MenuManager after initialization
         self.tree_widget_present = False
         self.table_widget_present = False
-        # tree view: show track ids along the lane axis. Lives here rather than on the
-        # tree widget so the Visualization tab can toggle it without holding a
-        # reference to a widget that may not exist yet (or at all).
-        self.show_track_ids = False
-        # tree view: tooltip with node/track/lineage identity on hover
-        self.show_hover_info = True
 
         def _clear_if_current():
             self._disconnect_tracks()
