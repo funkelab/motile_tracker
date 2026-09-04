@@ -9,6 +9,7 @@ from qtpy.QtWidgets import (
     QCheckBox,
     QGroupBox,
     QHBoxLayout,
+    QPushButton,
     QRadioButton,
     QSizePolicy,
     QVBoxLayout,
@@ -132,6 +133,81 @@ class ModeWidget(QWidget):
             self.update_mode.emit(button.property("mode"))
 
 
+class ReferenceTrackWidget(QWidget):
+    """Button that toggles the active tracklet ID as reference track.
+
+    While a reference track is set, stepping to another time point with the napari
+    slider shifts the view by the displacement of that track between the two time
+    points. The button shows the reference track ID and carries a border in its color.
+    """
+
+    def __init__(self, tracks_viewer: TracksViewer):
+        super().__init__()
+
+        self.tracks_viewer = tracks_viewer
+        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+
+        self.reference_btn = QPushButton()
+        self.reference_btn.setToolTip(
+            "Follow the active tracklet when stepping through time with the slider: "
+            "the view moves along with the cell. Click again with the same tracklet "
+            "active to stop following it."
+        )
+        self.reference_btn.clicked.connect(self._toggle_reference)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(8, 6, 8, 6)
+        layout.setSpacing(6)
+        layout.addWidget(self.reference_btn)
+        self.tracks_viewer.update_track_id.connect(
+            lambda: self.reference_btn.setEnabled(
+                self.tracks_viewer.selected_track is not None
+            )
+        )
+        self.tracks_viewer.reference_track_updated.connect(self._update_display)
+        self._update_display()
+
+    def _toggle_reference(self) -> None:
+        """Make the active tracklet the reference track, or clear the reference when it
+        already is the reference track."""
+
+        selected = self.tracks_viewer.selected_track
+        if selected is not None and selected == self.tracks_viewer.reference_track:
+            selected = None
+        self.tracks_viewer.set_reference_track(selected)
+
+    def _update_display(self) -> None:
+        """Show the reference track ID on the button and mark it with its color"""
+
+        reference = self.tracks_viewer.reference_track
+        self.reference_btn.setText(f"Reference Track: {reference}")
+
+        if reference is None:
+            self.reference_btn.setStyleSheet(
+                """
+            QPushButton {
+                border: 2px solid rgba(0,0,0,0);
+                border-radius: 3px;
+                padding: 5px;
+            }
+            """
+            )
+            return
+
+        color = self.tracks_viewer.reference_track_color
+        r, g, b, a = [int(c * 255) if i < 3 else c for i, c in enumerate(color)]
+        css_color = f"rgba({r}, {g}, {b}, {a})"
+        self.reference_btn.setStyleSheet(
+            f"""
+            QPushButton {{
+                border: 2px solid {css_color};
+                border-radius: 3px;
+                padding: 5px;
+            }}
+            """
+        )
+
+
 class VisualizationWidget(QWidget):
     """Widget to adjust opacity and contour display in different TrackLabels layer display modes."""
 
@@ -172,10 +248,13 @@ class VisualizationWidget(QWidget):
 
         self.background_widget.setEnabled(False)  # initially disabled
 
+        self.reference_track_widget = ReferenceTrackWidget(self.tracks_viewer)
+
         main_layout.addWidget(self.mode_widget)
         main_layout.addWidget(self.highlight_widget)
         main_layout.addWidget(self.foreground_widget)
         main_layout.addWidget(self.background_widget)
+        main_layout.addWidget(self.reference_track_widget)
 
         self.show_ortho_views = QCheckBox("Orthogonal views")
         self.show_ortho_views.stateChanged.connect(self.initialize_ortho_views)
@@ -184,7 +263,7 @@ class VisualizationWidget(QWidget):
         main_layout.addWidget(self.show_ortho_views)
         main_layout.addStretch(1)
 
-        self.setMaximumHeight(360)
+        self.setMaximumHeight(480)
 
     def initialize_ortho_views(self, checked: bool):
         """Initializes the ortho views."""
