@@ -19,10 +19,12 @@ from qtpy.QtWidgets import (
 from superqt import QCollapsible
 
 from motile_tracker.data_views.keybindings_config import (
-    GENERAL_KEY_ACTIONS,
     TREE_WIDGET_MODIFIER_ACTIONS,
     TREE_WIDGET_NAVIGATION_KEYS,
-    TREE_WIDGET_SPECIFIC_ACTIONS,
+    current_general_key_actions,
+    current_tree_widget_specific_actions,
+    qt_event_key,
+    register_napari_actions,
 )
 from motile_tracker.data_views.views.layers.click_utils import (
     detect_side_button,
@@ -488,6 +490,12 @@ class TreeWidget(QWidget):
             initialization=True, refresh_view=True
         )  # make sure tracks_viewer initializes/updates the track df
         self.tracks_viewer.tree_widget_present = True
+        # Registers tree_widget-only actions (toggle_feature_mode, flip_axes)
+        # with napari's action_manager so they're visible/conflict-checked in
+        # napari's Preferences dialog. Re-registers tracks_viewer actions too
+        # (harmless/idempotent) since this is the only point with access to
+        # both objects.
+        register_napari_actions(napari.Viewer, self.tracks_viewer, tree_widget=self)
         self.selected_nodes = self.tracks_viewer.selected_nodes
         self.tracks_viewer.node_selection_updated.connect(self._update_selected)
         self.tracks_viewer.tracks_updated.connect(self._update_track_data)
@@ -586,8 +594,10 @@ class TreeWidget(QWidget):
         3. Modifier keybinds (mouse zoom constraints)
         4. Navigation (arrow keys)
         """
-        # Handle tree-widget-specific keybinds first (higher priority)
-        action_name = TREE_WIDGET_SPECIFIC_ACTIONS.get(event.key())
+        # Handle tree-widget-specific keybinds first (higher priority),
+        # rebuilt from napari's current settings so user rebinds apply here
+        # too. Keyed on (key, modifiers) so combos don't collide.
+        action_name = current_tree_widget_specific_actions().get(qt_event_key(event))
         if action_name:
             method = getattr(self, action_name, None)
             if method:
@@ -595,8 +605,10 @@ class TreeWidget(QWidget):
                 event.accept()
                 return
 
-        # Try general keybinds (these also work in table widget)
-        action_name = GENERAL_KEY_ACTIONS.get(event.key())
+        # Try general keybinds (these also work in table widget), rebuilt
+        # from napari's current settings so user rebinds apply here too.
+        # Keyed on (key, modifiers) so e.g. "z" and "ctrl+shift+z" don't collide.
+        action_name = current_general_key_actions().get(qt_event_key(event))
         if action_name:
             method = getattr(self.tracks_viewer, action_name, None)
             if method:
