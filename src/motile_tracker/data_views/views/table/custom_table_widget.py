@@ -24,7 +24,7 @@ from qtpy.QtWidgets import (
     QWidget,
 )
 
-from motile_tracker.data_views.keybindings_config import GENERAL_KEY_ACTIONS
+from motile_tracker.data_views.keybindings_config import current_general_key_actions
 from motile_tracker.data_views.views.layers.click_utils import (
     detect_side_button,
 )
@@ -264,8 +264,9 @@ class CustomTableWidget(QTableView):
 
         tracks_viewer = parent.tracks_viewer
 
-        # Get the action name from the general keybind mapping
-        action_name = GENERAL_KEY_ACTIONS.get(event.key())
+        # Get the action name from the general keybind mapping, rebuilt from
+        # napari's current settings so a user rebind is picked up here too.
+        action_name = current_general_key_actions().get(event.key())
         if action_name:
             method = getattr(tracks_viewer, action_name, None)
             if method:

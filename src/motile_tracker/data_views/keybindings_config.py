@@ -10,13 +10,33 @@ An action can target multiple objects. It will be available in the following way
 - napari layers: if "tracks_viewer" is in targets
 - Qt table_widget: if "tracks_viewer" is in targets
 - Qt tree_widget: if "tree_widget" is in targets
+
+PROTOTYPE: actions targeting "tracks_viewer" are registered with napari's
+``action_manager`` and seeded into ``napari.settings.get_settings().shortcuts``.
+This means:
+- they persist across sessions in napari's own settings YAML
+- they are rebindable/resettable via napari's built-in
+  Preferences -> Shortcuts dialog, with napari's own conflict warnings
+- the Qt-side dispatch tables (``GENERAL_KEY_ACTIONS``) are rebuilt from the
+  *current* napari settings/action_manager state, so a rebind made in the
+  Preferences dialog also updates Qt widget dispatch (table widget), not
+  just the napari layers/viewer.
+
+"tree_widget"-only actions are NOT wired through action_manager here (their
+keymapprovider would have to be a Qt widget class with ``bind_key``, which
+napari's ``action_manager`` does not support) -- they stay on the static
+``KEYBINDINGS`` dict for this prototype.
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from napari.settings import get_settings
+from napari.utils.action_manager import action_manager
+from napari.utils.key_bindings import coerce_keybinding
 from qtpy.QtCore import Qt
+from qtpy.QtGui import QKeySequence
 
 if TYPE_CHECKING:
     from napari.layers import Labels, Points
@@ -24,6 +44,12 @@ if TYPE_CHECKING:
     from motile_tracker.data_views.views.layers.track_labels import TrackLabels
     from motile_tracker.data_views.views.layers.track_points import TrackPoints
     from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
+
+ACTION_PREFIX = "motile-tracker"
+
+
+def _action_id(name: str) -> str:
+    return f"{ACTION_PREFIX}:{name}"
 
 
 def bind_keymap(
@@ -39,6 +65,95 @@ def bind_keymap(
         if handler is not None:
             for key in keys:
                 target.bind_key(key)(handler)
+
+
+def register_napari_actions(keymap_provider: type, tracks_viewer: TracksViewer) -> None:
+    """Register `tracks_viewer`-targeted actions with napari's action_manager.
+
+    Seeds napari's persisted shortcut settings with our defaults the first
+    time an action is seen, then binds from whatever is currently in
+    settings (so a previously user-rebound shortcut is honored on restart).
+    """
+    settings = get_settings().shortcuts.shortcuts
+    seeded_new_defaults = False
+    for action, config in KEYBINDINGS.items():
+        if "tracks_viewer" not in config["targets"] or not config["napari_keys"]:
+            continue
+        action_id = _action_id(action)
+        handler = getattr(tracks_viewer, action, None)
+        if handler is None:
+            continue
+
+        action_manager.register_action(
+            name=action_id,
+            command=handler,
+            description=action.replace("_", " "),
+            keymapprovider=keymap_provider,
+        )
+
+        if action_id not in settings:
+            settings[action_id] = [
+                coerce_keybinding(key) for key in config["napari_keys"]
+            ]
+            seeded_new_defaults = True
+        for shortcut in settings[action_id]:
+            action_manager.bind_shortcut(action_id, str(shortcut))
+
+    if seeded_new_defaults:
+        # Assigning triggers the evented model's changed signal (and
+        # therefore autosave) only when the value differs from what's
+        # already set; re-assigning an unchanged dict is a no-op for
+        # persistence. Force a save so first-run defaults actually land in
+        # napari's settings file, not just in memory for this session.
+        get_settings().shortcuts.shortcuts = settings
+        get_settings().save()
+
+    get_settings().shortcuts.shortcuts = settings
+
+
+def current_general_key_actions() -> dict[int, str]:
+    """Qt.Key_* -> tracks_viewer method name, reflecting live napari settings.
+
+    Rebuilt from napari's settings/action_manager state (rather than the
+    static KEYBINDINGS defaults) so a rebind made via napari's Preferences
+    dialog is picked up by the Qt-side keyPressEvent dispatch too.
+    """
+    shortcuts = get_settings().shortcuts.shortcuts
+    result: dict[int, str] = {}
+    for action, config in KEYBINDINGS.items():
+        if "tracks_viewer" not in config["targets"]:
+            continue
+        action_id = _action_id(action)
+        bound = shortcuts.get(action_id)
+        if not bound:
+            # not yet registered/seeded (e.g. called before viewer init) -
+            # fall back to the static default so Qt widgets still work.
+            for key in config["qt_keys"]:
+                result[key] = action
+            continue
+        for shortcut in bound:
+            qt_key = _napari_shortcut_to_qt_key(str(shortcut))
+            if qt_key is not None:
+                result[qt_key] = action
+    return result
+
+
+def _napari_shortcut_to_qt_key(shortcut: str) -> int | None:
+    """Best-effort conversion of a napari shortcut string to a Qt.Key_* code.
+
+    Prototype-only: handles single, unmodified keys only (matches today's
+    scope, where none of the tracks_viewer actions use modifiers). A real
+    implementation would need to handle modifier combos and map them to
+    Qt.KeyboardModifier flags as well.
+    """
+    qt_seq = QKeySequence(shortcut)
+    if qt_seq.count() != 1:
+        return None
+    combo = qt_seq[0]
+    if combo.keyboardModifiers() != Qt.KeyboardModifier.NoModifier:
+        # prototype scope: only unmodified single keys are supported today
+        return None
+    return int(combo.key())
 
 
 KEYBINDINGS = {
@@ -133,19 +248,23 @@ SPECIAL_KEYBINDS = {
     },
 }
 
-# Napari KEYMAP: action -> list of napari key strings
+# Napari KEYMAP: action -> list of napari key strings.
+# PROTOTYPE NOTE: kept only as the static fallback/seed default; the live
+# napari-side bindings for "tracks_viewer" actions now go through
+# `register_napari_actions` / `action_manager` instead of `bind_keymap`, so
+# they can be persisted and rebound via napari's settings.
 KEYMAP = {
     action: config["napari_keys"]
     for action, config in KEYBINDINGS.items()
     if config["napari_keys"] and "tracks_viewer" in config["targets"]
 }
 
-# Qt General Key Actions: Qt key constants -> tracks_viewer method names
-GENERAL_KEY_ACTIONS = {}
-for action, config in KEYBINDINGS.items():
-    if "tracks_viewer" in config["targets"] and config["qt_keys"]:
-        for key in config["qt_keys"]:
-            GENERAL_KEY_ACTIONS[key] = action
+# Qt General Key Actions: Qt key constants -> tracks_viewer method names.
+# PROTOTYPE NOTE: this used to be a static dict built once at import time.
+# It's now a function, `current_general_key_actions()`, that reads live
+# napari settings so Qt dispatch reflects user rebinds made in napari's
+# Preferences dialog. Callers should call the function instead of importing
+# a module-level dict.
 
 # Qt Tree-Widget Specific Actions: Qt key constants -> tree_widget method names
 TREE_WIDGET_SPECIFIC_ACTIONS = {}

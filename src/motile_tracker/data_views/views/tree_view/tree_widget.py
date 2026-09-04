@@ -19,10 +19,10 @@ from qtpy.QtWidgets import (
 from superqt import QCollapsible
 
 from motile_tracker.data_views.keybindings_config import (
-    GENERAL_KEY_ACTIONS,
     TREE_WIDGET_MODIFIER_ACTIONS,
     TREE_WIDGET_NAVIGATION_KEYS,
     TREE_WIDGET_SPECIFIC_ACTIONS,
+    current_general_key_actions,
 )
 from motile_tracker.data_views.views.layers.click_utils import (
     detect_side_button,
@@ -595,8 +595,9 @@ class TreeWidget(QWidget):
                 event.accept()
                 return
 
-        # Try general keybinds (these also work in table widget)
-        action_name = GENERAL_KEY_ACTIONS.get(event.key())
+        # Try general keybinds (these also work in table widget), rebuilt
+        # from napari's current settings so user rebinds apply here too.
+        action_name = current_general_key_actions().get(event.key())
         if action_name:
             method = getattr(self.tracks_viewer, action_name, None)
             if method:
