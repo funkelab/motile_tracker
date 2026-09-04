@@ -11,21 +11,31 @@ An action can target multiple objects. It will be available in the following way
 - Qt table_widget: if "tracks_viewer" is in targets
 - Qt tree_widget: if "tree_widget" is in targets
 
-PROTOTYPE: actions targeting "tracks_viewer" are registered with napari's
-``action_manager`` and seeded into ``napari.settings.get_settings().shortcuts``.
-This means:
+PROTOTYPE: all actions (both "tracks_viewer" and "tree_widget" targets) are
+registered with napari's ``action_manager`` and seeded into
+``napari.settings.get_settings().shortcuts``. This means:
 - they persist across sessions in napari's own settings YAML
 - they are rebindable/resettable via napari's built-in
-  Preferences -> Shortcuts dialog, with napari's own conflict warnings
-- the Qt-side dispatch tables (``GENERAL_KEY_ACTIONS``) are rebuilt from the
-  *current* napari settings/action_manager state, so a rebind made in the
-  Preferences dialog also updates Qt widget dispatch (table widget), not
-  just the napari layers/viewer.
+  Preferences -> Shortcuts dialog, with napari's own conflict warnings -
+  including cross-checking a "tracks_viewer" rebind against a
+  "tree_widget"-only default and vice versa (e.g. rebinding something to
+  "w" now warns about colliding with toggle_feature_mode)
+- the Qt-side dispatch tables (``current_general_key_actions`` /
+  ``current_tree_widget_specific_actions``) are rebuilt from the *current*
+  napari settings/action_manager state, so a rebind made in the
+  Preferences dialog also updates Qt widget dispatch, not just napari
+  layers/viewer.
 
-"tree_widget"-only actions are NOT wired through action_manager here (their
-keymapprovider would have to be a Qt widget class with ``bind_key``, which
-napari's ``action_manager`` does not support) -- they stay on the static
-``KEYBINDINGS`` dict for this prototype.
+"tree_widget"-only actions have no real napari keymap to bind to (their
+"keymapprovider" would have to be a Qt widget class with `bind_key`, which
+napari's `action_manager` doesn't support). They're registered against
+`_TreeWidgetKeymapProvider`, a bare `KeymapProvider` subclass that exists
+only so `action_manager` has somewhere to park the binding - this makes the
+action visible and conflict-checked in napari's Preferences dialog (which
+otherwise skips any action with `keymapprovider=None`), without ever
+actually being triggered through napari's own keymap dispatch. The real
+dispatch stays in `TreeWidget.keyPressEvent`, reading the same
+settings-backed source.
 """
 
 from __future__ import annotations
@@ -34,7 +44,7 @@ from typing import TYPE_CHECKING
 
 from napari.settings import get_settings
 from napari.utils.action_manager import action_manager
-from napari.utils.key_bindings import coerce_keybinding
+from napari.utils.key_bindings import KeymapProvider, coerce_keybinding
 from qtpy.QtCore import Qt
 from qtpy.QtGui import QKeySequence
 
@@ -46,6 +56,19 @@ if TYPE_CHECKING:
     from motile_tracker.data_views.views_coordinator.tracks_viewer import TracksViewer
 
 ACTION_PREFIX = "motile-tracker"
+# Shown as a prefix on the "Action" column in napari's Preferences ->
+# Shortcuts dialog, so our actions are visually grouped/identifiable among
+# napari's own and other plugins'. Update when the package is renamed
+# (napari-track-edit / NTE).
+DESCRIPTION_PREFIX = "Motile Tracker"
+
+
+class _TreeWidgetKeymapProvider(KeymapProvider):
+    """Dummy keymapprovider so tree-widget-only actions show up in napari's
+    Preferences -> Shortcuts dialog and get conflict-checked there, even
+    though no real napari keymap dispatch ever reads `class_keymap` here -
+    `TreeWidget.keyPressEvent` is the actual executor.
+    """
 
 
 def _action_id(name: str) -> str:
@@ -67,8 +90,21 @@ def bind_keymap(
                 target.bind_key(key)(handler)
 
 
-def register_napari_actions(keymap_provider: type, tracks_viewer: TracksViewer) -> None:
-    """Register `tracks_viewer`-targeted actions with napari's action_manager.
+def register_napari_actions(
+    keymap_provider: type,
+    tracks_viewer: TracksViewer,
+    tree_widget: object | None = None,
+) -> None:
+    """Register all actions with napari's action_manager, scoped by target.
+
+    "tracks_viewer"-targeted actions are registered against `keymap_provider`
+    (a real napari `Viewer`/layer class), so a shortcut actually triggers
+    the napari-level keymap dispatch. "tree_widget"-targeted actions are
+    registered against `_TreeWidgetKeymapProvider` (a dummy `KeymapProvider`
+    with no real dispatch reading it) purely so they're visible and
+    conflict-checked in napari's Preferences -> Shortcuts dialog; the real
+    trigger stays `TreeWidget.keyPressEvent`, which is why `tree_widget` is
+    only needed to resolve the handler method, not for real key binding.
 
     Seeds napari's persisted shortcut settings with our defaults the first
     time an action is seen, then binds from whatever is currently in
@@ -77,18 +113,34 @@ def register_napari_actions(keymap_provider: type, tracks_viewer: TracksViewer) 
     settings = get_settings().shortcuts.shortcuts
     seeded_new_defaults = False
     for action, config in KEYBINDINGS.items():
-        if "tracks_viewer" not in config["targets"] or not config["napari_keys"]:
+        targets = config["targets"]
+        if "tracks_viewer" in targets:
+            provider, handler_obj, description_prefix = (
+                keymap_provider,
+                tracks_viewer,
+                DESCRIPTION_PREFIX,
+            )
+        elif "tree_widget" in targets:
+            provider, handler_obj, description_prefix = (
+                _TreeWidgetKeymapProvider,
+                tree_widget,
+                f"{DESCRIPTION_PREFIX} (Tree Widget)",
+            )
+        else:
             continue
+        if not config["napari_keys"] or handler_obj is None:
+            continue
+
         action_id = _action_id(action)
-        handler = getattr(tracks_viewer, action, None)
+        handler = getattr(handler_obj, action, None)
         if handler is None:
             continue
 
         action_manager.register_action(
             name=action_id,
             command=handler,
-            description=action.replace("_", " "),
-            keymapprovider=keymap_provider,
+            description=f"{description_prefix}: {action.replace('_', ' ')}",
+            keymapprovider=provider,
         )
 
         if action_id not in settings:
@@ -120,9 +172,9 @@ def qt_event_key(event) -> tuple[int, int]:
     return (int(event.key()), int(event.modifiers().value))
 
 
-def current_general_key_actions() -> dict[tuple[int, int], str]:
-    """(Qt.Key_*, modifiers) -> tracks_viewer method name, reflecting live
-    napari settings.
+def _current_key_actions_for_target(target: str) -> dict[tuple[int, int], str]:
+    """(Qt.Key_*, modifiers) -> method name, for all actions with `target`
+    in their "targets", reflecting live napari settings.
 
     Rebuilt from napari's settings/action_manager state (rather than a
     static dict) so a rebind made via napari's Preferences dialog is picked
@@ -132,7 +184,7 @@ def current_general_key_actions() -> dict[tuple[int, int], str]:
     shortcuts = get_settings().shortcuts.shortcuts
     result: dict[tuple[int, int], str] = {}
     for action, config in KEYBINDINGS.items():
-        if "tracks_viewer" not in config["targets"]:
+        if target not in config["targets"]:
             continue
         action_id = _action_id(action)
         bound = shortcuts.get(action_id)
@@ -145,6 +197,20 @@ def current_general_key_actions() -> dict[tuple[int, int], str]:
             if qt_combo is not None:
                 result[qt_combo] = action
     return result
+
+
+def current_general_key_actions() -> dict[tuple[int, int], str]:
+    """(Qt.Key_*, modifiers) -> tracks_viewer method name, reflecting live
+    napari settings. See `_current_key_actions_for_target`.
+    """
+    return _current_key_actions_for_target("tracks_viewer")
+
+
+def current_tree_widget_specific_actions() -> dict[tuple[int, int], str]:
+    """(Qt.Key_*, modifiers) -> tree_widget method name, reflecting live
+    napari settings. See `_current_key_actions_for_target`.
+    """
+    return _current_key_actions_for_target("tree_widget")
 
 
 def _napari_shortcut_to_qt_key(shortcut: str) -> tuple[int, int] | None:
@@ -220,18 +286,15 @@ KEYBINDINGS = {
     # Actions available in both napari and tree_widget (but connected to different functions)
     "toggle_display_mode": {
         "napari_keys": ["q"],
-        "qt_keys": [Qt.Key_Q],
         "targets": ["tracks_viewer", "tree_widget"],
     },
     # Tree-widget-specific actions
     "toggle_feature_mode": {
         "napari_keys": ["w"],
-        "qt_keys": [Qt.Key_W],
         "targets": ["tree_widget"],
     },
     "flip_axes": {
         "napari_keys": ["f"],
-        "qt_keys": [Qt.Key_F],
         "targets": ["tree_widget"],
     },
 }
@@ -263,19 +326,12 @@ KEYMAP = {
     if config["napari_keys"] and "tracks_viewer" in config["targets"]
 }
 
-# Qt General Key Actions: Qt key constants -> tracks_viewer method names.
-# PROTOTYPE NOTE: this used to be a static dict built once at import time.
-# It's now a function, `current_general_key_actions()`, that reads live
-# napari settings so Qt dispatch reflects user rebinds made in napari's
-# Preferences dialog. Callers should call the function instead of importing
-# a module-level dict.
-
-# Qt Tree-Widget Specific Actions: Qt key constants -> tree_widget method names
-TREE_WIDGET_SPECIFIC_ACTIONS = {}
-for action, config in KEYBINDINGS.items():
-    if "tree_widget" in config["targets"] and config["qt_keys"]:
-        for key in config["qt_keys"]:
-            TREE_WIDGET_SPECIFIC_ACTIONS[key] = action
+# PROTOTYPE NOTE: the old static "Qt General Key Actions" and "Qt
+# Tree-Widget Specific Actions" dicts (built once at import time) are gone.
+# Both are now functions - `current_general_key_actions()` and
+# `current_tree_widget_specific_actions()` - that read live napari settings
+# so Qt dispatch reflects user rebinds made in napari's Preferences dialog.
+# Callers should call the function instead of importing a module-level dict.
 
 # Qt Modifier Actions: for mouse zoom constraints
 TREE_WIDGET_MODIFIER_ACTIONS = SPECIAL_KEYBINDS["qt_modifier_zoom"]
