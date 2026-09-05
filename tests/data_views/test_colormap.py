@@ -14,6 +14,24 @@ class ConstantColorSource:
         return np.tile(self.color, (len(np.atleast_1d(values)), 1))
 
 
+def _tracks_subset(tracks, nodes):
+    """A `Tracks`-like object exposing only a subset of `tracks`'s nodes, for
+    exercising set_tracks() with a shrunk node set."""
+
+    class NodeSubsetGraph:
+        def node_ids(self):
+            return list(nodes)
+
+    class TracksSubset:
+        graph = NodeSubsetGraph()
+        features = tracks.features
+
+        def get_nodes_attr(self, nodes, attr):
+            return tracks.get_nodes_attr(nodes, attr)
+
+    return TracksSubset()
+
+
 class TestCategoricalColorSource:
     def test_maps_same_id_to_same_color(self):
         source = CategoricalColorSource()
@@ -85,17 +103,7 @@ class TestTrackColormapLaziness:
         cmap.set_tracks(solution_tracks_2d)
         cmap.to_direct_colormap()
 
-        class NodeSubsetGraph:
-            def node_ids(self):
-                return [2, 3]
-
-        class TracksSubset:
-            graph = NodeSubsetGraph()
-
-            def get_track_ids(self, nodes):
-                return solution_tracks_2d.get_track_ids(nodes)
-
-        cmap.set_tracks(TracksSubset())  # node 1 no longer exists, dirty
+        cmap.set_tracks(_tracks_subset(solution_tracks_2d, [2, 3]))  # node 1 gone, dirty
         cmap.set_alpha([1], 0.3)  # must not silently "work" against stale state
 
         assert cmap.get_alpha(1, default=None) is None
@@ -163,20 +171,39 @@ class TestTrackColormapSetTracks:
         cmap.set_tracks(solution_tracks_2d)
         cmap.set_alpha([1], 0.3)
 
-        class NodeSubsetGraph:
-            def node_ids(self):
-                return [2, 3]
-
-        class TracksSubset:
-            graph = NodeSubsetGraph()
-
-            def get_track_ids(self, nodes):
-                return solution_tracks_2d.get_track_ids(nodes)
-
-        cmap.set_tracks(TracksSubset())
+        cmap.set_tracks(_tracks_subset(solution_tracks_2d, [2, 3]))
 
         assert set(cmap.nodes) == {2, 3}
         assert cmap.get_alpha(1, default=None) is None
+
+
+class TestTrackColormapGetColors:
+    def test_matches_get_color_per_node(self, solution_tracks_2d):
+        cmap = TrackColormap()
+        cmap.set_tracks(solution_tracks_2d)
+
+        nodes = [1, 2, 3]
+        colors = cmap.get_colors(np.asarray(nodes))
+
+        for i, node in enumerate(nodes):
+            assert np.array_equal(colors[i], cmap.get_color(node))
+
+    def test_unknown_node_is_transparent(self, solution_tracks_2d):
+        cmap = TrackColormap()
+        cmap.set_tracks(solution_tracks_2d)
+
+        colors = cmap.get_colors(np.asarray([999]))
+
+        assert np.array_equal(colors[0], [0, 0, 0, 0])
+
+    def test_reflects_alpha_overrides(self, solution_tracks_2d):
+        cmap = TrackColormap()
+        cmap.set_tracks(solution_tracks_2d)
+        cmap.set_alpha([1], 0.4)
+
+        colors = cmap.get_colors(np.asarray([1]))
+
+        assert colors[0][3] == 0.4
 
 
 class TestTrackColormapColorAlphaSeparation:
@@ -256,6 +283,24 @@ class TestTrackColormapMap:
         cmap = TrackColormap()
         colors = cmap.map(np.asarray([1, 3]))
         assert not np.array_equal(colors[0], colors[1])
+
+
+class TestTrackColormapFeatureKey:
+    def test_defaults_to_track_id(self, solution_tracks_2d):
+        cmap = TrackColormap()
+        cmap.set_tracks(solution_tracks_2d)
+
+        # nodes 3, 4, 5 share track_id 3 -> should share a color by default
+        assert np.array_equal(cmap.get_color(3), cmap.get_color(4))
+
+    def test_can_color_by_a_different_feature(self, solution_tracks_2d):
+        # nodes 4 and 5 both have area 16.0, despite different track ids (3, 5)
+        cmap = TrackColormap(feature_key="area")
+        cmap.set_tracks(solution_tracks_2d)
+
+        assert np.array_equal(cmap.get_color(4), cmap.get_color(5))
+        # and now nodes 3 and 4 (same track id, different area) should differ
+        assert not np.array_equal(cmap.get_color(3), cmap.get_color(4))
 
 
 class TestTrackColormapDirectColormap:
@@ -357,17 +402,7 @@ class TestTrackColormapDirectColormap:
         cmap.set_tracks(solution_tracks_2d)
         cmap.to_direct_colormap()
 
-        class NodeSubsetGraph:
-            def node_ids(self):
-                return [2, 3]
-
-        class TracksSubset:
-            graph = NodeSubsetGraph()
-
-            def get_track_ids(self, nodes):
-                return solution_tracks_2d.get_track_ids(nodes)
-
-        cmap.set_tracks(TracksSubset())
+        cmap.set_tracks(_tracks_subset(solution_tracks_2d, [2, 3]))
         direct_after = cmap.to_direct_colormap()
 
         assert 1 not in direct_after.color_dict

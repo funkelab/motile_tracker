@@ -56,11 +56,19 @@ class TrackColormap:
     trick that used to live in `TrackLabels`, `custom_table_widget`, and
     `ortho_views.py`.
 
-    Color is node -> track id -> RGB via `color_source`; there's no per-node
-    color setter, since a node's color should always be a pure function of
-    its category value. Recoloring happens by changing `color_source` (e.g.
-    `shuffle`) and letting the next sync pick it up. `add_node` is the
-    exception, for nodes that need a color before `Tracks` knows about them.
+    Color is a two-step composition, `node -> feature value -> RGB`:
+    `feature_key` names the `Tracks` node attribute to read (default: the
+    track id attribute, `tracks.features.tracklet_key`) via
+    `tracks.get_nodes_attr`, and `color_source` maps that value to a color.
+    Swapping `feature_key` (e.g. to an area/volume attribute) or
+    `color_source` (e.g. to a continuous colormap) are independent, composable
+    changes - neither needs to know about the other.
+
+    There's no per-node color setter, since a node's color should always be a
+    pure function of its feature value: recoloring happens by changing
+    `color_source` (e.g. `shuffle`) and letting the next sync pick it up.
+    `add_node` is the exception, for nodes that need a color before `Tracks`
+    knows about them.
 
     The node/color join is lazy: `set_tracks()` only marks it stale - it does
     not do the O(node count) recompute itself. That cost still has to be paid
@@ -70,13 +78,20 @@ class TrackColormap:
     paying it on every call regardless.
     """
 
-    def __init__(self, color_source: ColorSource | None = None):
+    def __init__(
+        self, color_source: ColorSource | None = None, feature_key: str | None = None
+    ):
         self.color_source: ColorSource = color_source or CategoricalColorSource()
+        self.feature_key = feature_key
         self._tracks: Tracks | None = None
         self._nodes_dirty = True
         self._node_colors: dict[int, np.ndarray] = {}
         self._alpha: dict[int, float] = {}
         self._direct_colormap: DirectLabelColormap | None = None
+
+    def _feature_values(self, tracks: Tracks, nodes) -> list:
+        key = self.feature_key or tracks.features.tracklet_key
+        return tracks.get_nodes_attr(nodes, key)
 
     def map(self, values: np.ndarray) -> np.ndarray:
         """Map track ids to base RGBA (no per-node alpha). Delegates to
@@ -111,11 +126,11 @@ class TrackColormap:
 
         tracks = self._tracks
         nodes = tracks.graph.node_ids() if tracks is not None else []
-        track_ids = tracks.get_track_ids(nodes) if tracks is not None else []
-        if len(track_ids) > 0:
+        values = self._feature_values(tracks, nodes) if tracks is not None else []
+        if len(values) > 0:
             # One vectorized call - color_source.map has a large fixed
             # per-call overhead, so mapping per-node is much slower.
-            mapped = self.color_source.map(np.asarray(track_ids))
+            mapped = self.color_source.map(np.asarray(values))
             colors = {node: color.copy() for node, color in zip(nodes, mapped, strict=True)}
         else:
             colors = {}
@@ -132,18 +147,17 @@ class TrackColormap:
                 color_dict[node] = self._colored(node)
             self._direct_colormap._clear_cache()
 
-    def add_node(self, node: int, category_value) -> None:
+    def add_node(self, node: int, feature_value) -> None:
         """Add a node not yet known to `self._tracks`, colored via
-        `color_source.map(category_value)`. Alpha defaults to opaque.
+        `color_source.map(feature_value)`. Alpha defaults to opaque.
 
-        `category_value` must be passed in (rather than looked up, like
-        `_sync_nodes` does) because callers need this before the node exists
-        in the `Tracks` graph - e.g. `TrackLabels._new_label`, previewing a
-        color while painting. Named generically rather than `track_id` so a
-        differently-keyed `color_source` doesn't change this method's shape.
+        `feature_value` must be passed in (rather than looked up via
+        `feature_key`, like `_sync_nodes` does) because callers need this
+        before the node exists in the `Tracks` graph - e.g.
+        `TrackLabels._new_label`, previewing a color while painting.
         """
         self._sync_nodes()
-        color = self.color_source.map(np.asarray([category_value]))[0]
+        color = self.color_source.map(np.asarray([feature_value]))[0]
         self._node_colors[node] = np.asarray(color, dtype=float).copy()
         self._alpha[node] = 1.0
         if self._direct_colormap is not None:
@@ -191,6 +205,21 @@ class TrackColormap:
         rgba = color.copy()
         rgba[3] = self._alpha.get(node, 1.0)
         return rgba
+
+    def get_colors(self, nodes: np.ndarray) -> np.ndarray:
+        """Vectorized `get_color`: RGBA per node id in `nodes`, in order.
+        Unknown nodes get transparent black. For napari-independent
+        consumers (e.g. the table widget) that need many colors at once
+        without going through `to_direct_colormap()`.
+        """
+        self._sync_nodes()
+        transparent = np.zeros(4)
+        return np.array(
+            [
+                self._colored(node) if node in self._node_colors else transparent
+                for node in nodes
+            ]
+        )
 
     @property
     def nodes(self):
