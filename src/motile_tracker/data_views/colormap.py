@@ -12,34 +12,21 @@ if TYPE_CHECKING:
 
 @runtime_checkable
 class ColorSource(Protocol):
-    """Anything that can map an array of ids/values to an (N, 4) RGBA array.
+    """Maps an array of ids/values to an (N, 4) RGBA array.
 
-    Duck-type compatible with `napari.utils.colormaps.CyclicLabelColormap.map`
-    (and `Colormap.map` in general), so a `ColorSource` can be handed directly
-    to code that only ever calls `.map(...)` on a napari colormap (napari's
-    `Tracks` layer `colormaps_dict`, `TrackGraph`/`TrackPoints`/`export_dialog`
-    track-id coloring, etc.) without those call sites needing to change.
-
-    Implementations plug in *how* a base color is chosen - by a categorical id
-    (`CategoricalColorSource`, e.g. track id, cell type, lineage id - the only
-    one implemented so far), by a continuous feature (e.g. area/volume), or a
-    constant color to avoid biasing reviewers - without `TrackColormap` or any
-    of its consumers needing to know which. Which values get passed to `map`
-    (e.g. track ids vs. some other categorical feature) is entirely up to the
-    caller; the source itself has no notion of "track."
+    Duck-type compatible with `CyclicLabelColormap.map`, so it's a drop-in
+    replacement anywhere a napari colormap's `.map()` is used for track-id
+    coloring. Swap in a continuous-feature or constant-color source later
+    without touching `TrackColormap` or its consumers.
     """
 
     def map(self, values: np.ndarray) -> np.ndarray: ...
 
 
 class CategoricalColorSource:
-    """Maps arbitrary integer ids to colors using napari's cyclic label
-    colormap - a distinct color per unique id from a random cycle, with 0
-    (conventionally "no category"/background) mapping to transparent.
+    """Default `ColorSource`: cyclic color per unique id, 0 -> transparent.
 
-    This is the default `ColorSource`, used for track-id coloring today, but
-    equally applicable to any other categorical value (cell type, lineage id,
-    group membership, ...) - it has no track-specific behavior itself.
+    Not track-specific - works for any categorical id (cell type, lineage id).
     """
 
     def __init__(self, num_colors: int = 49, seed: float = 0.5):
@@ -51,74 +38,83 @@ class CategoricalColorSource:
         return self._cyclic_colormap.map(values)
 
     def shuffle(self, num_colors: int, seed: float) -> None:
-        """Replace the underlying color cycle (e.g. to get a new, more separated
-        set of colors, see `TrackLabels.new_colormap`)."""
+        """Replace the color cycle (see `TrackLabels.new_colormap`)."""
         self._cyclic_colormap = label_colormap(
             num_colors, seed=seed, background_value=0
         )
 
 
 class TrackColormap:
-    """Owns the node -> display color mapping for a `Tracks` object, keeping
-    color (which base RGB a node/track gets) and alpha (highlighted /
-    foreground / background / hidden) as independent, independently
-    updatable pieces of state.
+    """Node -> display color for a `Tracks` object, with color and alpha as
+    independently updatable state (unlike `DirectLabelColormap`, which
+    conflates them in one `color_dict`).
 
-    Rationale: `napari.utils.DirectLabelColormap` conflates color and alpha in
-    a single `color_dict`, and constructing one (`DirectLabelColormap(
-    color_dict=...)`) re-validates every color via pydantic - expensive for
-    graphs with many thousands of labels. This class separates color and
-    alpha as independently mutable state, and every mutator (`set_color`,
-    `set_alpha`, `remove_node`, `set_nodes`) writes straight into an
-    already-built `DirectLabelColormap`'s `color_dict` (already-normalized
-    (4,) float arrays, so no `transform_color` validation needed) and clears
-    its internal cache, rather than reconstructing it. So pydantic validation
-    is only ever paid once per `TrackColormap` instance, the first time
-    `to_direct_colormap()` is called - see that method for details.
-    `to_direct_colormap()` is the only place that knows how to produce a
-    napari `DirectLabelColormap` from this state, replacing three independent
-    reimplementations of the "mutate color_dict in place, clear the cache,
-    reassign the same object" trick that used to live in `TrackLabels`,
-    `custom_table_widget`, and `ortho_views.py`.
+    `to_direct_colormap()` produces the napari colormap, patching an
+    already-built one in place rather than reconstructing it, so pydantic's
+    per-color validation is paid at most once per instance - see that method.
+    This replaces three copies of the same mutate-in-place-then-clear-cache
+    trick that used to live in `TrackLabels`, `custom_table_widget`, and
+    `ortho_views.py`.
 
-    The base color for each track id comes from a `ColorSource`, so swapping
-    "color by track id" for "color by a continuous feature" or "one color for
-    everything" (to avoid biasing reviewers) is a matter of handing this class
-    a different `ColorSource`, not rewriting it or its consumers.
+    Color is node -> track id -> RGB via `color_source`; there's no per-node
+    color setter, since a node's color should always be a pure function of
+    its category value. Recoloring happens by changing `color_source` (e.g.
+    `shuffle`) and letting the next sync pick it up. `add_node` is the
+    exception, for nodes that need a color before `Tracks` knows about them.
+
+    The node/color join is lazy: `set_tracks()` only marks it stale - it does
+    not do the O(node count) recompute itself. That cost still has to be paid
+    by whichever accessor next needs current colors (see `_sync_nodes`); the
+    laziness just means `set_alpha`, the hot path (every selection/hover
+    change), skips it entirely when nothing is actually stale, instead of
+    paying it on every call regardless.
     """
 
     def __init__(self, color_source: ColorSource | None = None):
         self.color_source: ColorSource = color_source or CategoricalColorSource()
+        self._tracks: Tracks | None = None
+        self._nodes_dirty = True
         self._node_colors: dict[int, np.ndarray] = {}
         self._alpha: dict[int, float] = {}
         self._direct_colormap: DirectLabelColormap | None = None
 
     def map(self, values: np.ndarray) -> np.ndarray:
-        """Map track ids to their base RGBA color, ignoring any per-node alpha
-        overrides set on this instance.
-
-        Delegates to `color_source`, so this instance is a drop-in replacement
-        anywhere a napari colormap's `.map()` is used for track-id coloring
-        (e.g. `TrackGraph`/`TrackPoints`/`export_dialog`/`tree_widget_utils`).
+        """Map track ids to base RGBA (no per-node alpha). Delegates to
+        `color_source`, so this is a drop-in replacement anywhere a napari
+        colormap's `.map()` is used for track-id coloring.
         """
         return self.color_source.map(values)
 
-    def set_nodes(self, tracks: Tracks) -> None:
-        """(Re)compute the node -> base color mapping for every node currently
-        in `tracks`, using `color_source` to look up track-id colors.
+    def set_tracks(self, tracks: Tracks | None) -> None:
+        """Point this colormap at a `Tracks` object.
 
-        This is the "rare" path: call it when the set of nodes changes (new
-        Tracks object, nodes added/removed in bulk) or the color source itself
-        changes (recolor). Existing per-node alpha overrides for nodes that
-        are still present are preserved; overrides for removed nodes are
-        dropped and new nodes default to fully opaque.
+        This call itself is O(1) - it just stores the reference and marks
+        colors stale, it doesn't touch any nodes. The actual O(node count)
+        re-derivation happens later, in `_sync_nodes`, the first time an
+        accessor needs current colors. So it's fine to call this even when
+        nothing changed, but don't mistake that for the whole operation being
+        cheap - something downstream still pays for the resync.
         """
-        nodes = tracks.graph.node_ids()
-        track_ids = tracks.get_track_ids(nodes)
+        self._tracks = tracks
+        self._nodes_dirty = True
+
+    def _sync_nodes(self) -> None:
+        """Recompute the node -> base color mapping from `self._tracks` if
+        `set_tracks` marked it stale since the last sync. O(node count) - not
+        cheap, just skipped when nothing is dirty. Existing per-node alpha
+        overrides for nodes that are still present are preserved; overrides
+        for removed nodes are dropped and new nodes default to fully opaque.
+        """
+        if not self._nodes_dirty:
+            return
+        self._nodes_dirty = False
+
+        tracks = self._tracks
+        nodes = tracks.graph.node_ids() if tracks is not None else []
+        track_ids = tracks.get_track_ids(nodes) if tracks is not None else []
         if len(track_ids) > 0:
-            # One vectorized call: color_source.map has a large fixed per-call
-            # overhead, so mapping the whole array at once is far faster than
-            # calling it per node or per unique track id.
+            # One vectorized call - color_source.map has a large fixed
+            # per-call overhead, so mapping per-node is much slower.
             mapped = self.color_source.map(np.asarray(track_ids))
             colors = {node: color.copy() for node, color in zip(nodes, mapped, strict=True)}
         else:
@@ -128,11 +124,7 @@ class TrackColormap:
         self._node_colors = colors
 
         if self._direct_colormap is not None:
-            # Patch the existing DirectLabelColormap's color_dict in place -
-            # dropping removed nodes, writing already-normalized (4,) float
-            # arrays for every current node - instead of reconstructing it,
-            # which would re-validate (transform_color) every entry via
-            # pydantic even though nothing here needs normalizing.
+            # Patch color_dict in place instead of reconstructing it.
             color_dict = self._direct_colormap.color_dict
             for stale_node in color_dict.keys() - colors.keys() - {None, 0}:
                 del color_dict[stale_node]
@@ -140,21 +132,26 @@ class TrackColormap:
                 color_dict[node] = self._colored(node)
             self._direct_colormap._clear_cache()
 
-    def set_color(self, node: int, color: np.ndarray) -> None:
-        """Set a single node's base color directly (e.g. a newly painted label
-        that should get the current track's color before `set_nodes` has run
-        for it). Preserves the node's current alpha, if any."""
+    def add_node(self, node: int, category_value) -> None:
+        """Add a node not yet known to `self._tracks`, colored via
+        `color_source.map(category_value)`. Alpha defaults to opaque.
+
+        `category_value` must be passed in (rather than looked up, like
+        `_sync_nodes` does) because callers need this before the node exists
+        in the `Tracks` graph - e.g. `TrackLabels._new_label`, previewing a
+        color while painting. Named generically rather than `track_id` so a
+        differently-keyed `color_source` doesn't change this method's shape.
+        """
+        self._sync_nodes()
+        color = self.color_source.map(np.asarray([category_value]))[0]
         self._node_colors[node] = np.asarray(color, dtype=float).copy()
-        self._alpha.setdefault(node, 1.0)
+        self._alpha[node] = 1.0
         if self._direct_colormap is not None:
-            # Write the already-normalized (4,) float array straight into the
-            # existing DirectLabelColormap's color_dict, instead of going
-            # through DirectLabelColormap(color_dict=...), which would
-            # re-validate (transform_color) every entry, not just this one.
             self._direct_colormap.color_dict[node] = self._colored(node)
             self._direct_colormap._clear_cache()
 
     def remove_node(self, node: int) -> None:
+        self._sync_nodes()
         self._node_colors.pop(node, None)
         self._alpha.pop(node, None)
         if self._direct_colormap is not None:
@@ -162,11 +159,12 @@ class TrackColormap:
             self._direct_colormap._clear_cache()
 
     def set_alpha(self, nodes, value: float) -> None:
-        """Set the alpha for many nodes at once. This is the hot path (fires on
-        every selection/hover/highlight change), so it never re-validates
-        color state - it only ever mutates alpha in place, both on this
-        instance's own state and (if one has already been built) on the
-        cached `DirectLabelColormap`'s `color_dict`."""
+        """Set alpha for many nodes at once - the hot path, fired on every
+        selection/hover change. Syncs first so it never operates on a stale
+        node set; that sync is a no-op (cheap) unless a `set_tracks()` call
+        is actually pending, which is the overwhelmingly common case here.
+        """
+        self._sync_nodes()
         color_dict = (
             self._direct_colormap.color_dict if self._direct_colormap else None
         )
@@ -181,11 +179,12 @@ class TrackColormap:
             self._direct_colormap._clear_cache()
 
     def get_alpha(self, node: int, default: float = 0.0) -> float:
+        self._sync_nodes()
         return self._alpha.get(node, default)
 
     def get_color(self, node: int) -> np.ndarray | None:
-        """Return the current RGBA (base color with alpha applied) for a node,
-        or None if the node is not known to this colormap."""
+        """RGBA (color + alpha) for a node, or None if unknown."""
+        self._sync_nodes()
         color = self._node_colors.get(node)
         if color is None:
             return None
@@ -195,21 +194,17 @@ class TrackColormap:
 
     @property
     def nodes(self):
+        self._sync_nodes()
         return self._node_colors.keys()
 
     def to_direct_colormap(self) -> DirectLabelColormap:
-        """Return a napari `DirectLabelColormap` reflecting the current color
-        and alpha state, for use as a napari `Labels` layer colormap.
-
-        Only ever pays pydantic's per-color validation cost (`transform_color`
-        on every entry, ~0.2s for a 37k-label graph) once, the first time this
-        is called: `set_nodes`/`set_color`/`set_alpha`/`remove_node` all keep
-        this cached `DirectLabelColormap`'s `color_dict` patched in place
-        afterwards (writing already-normalized (4,) float arrays directly,
-        skipping validation) and clear its internal cache so napari only
-        rebuilds the GPU texture on the next render - see `refresh_colormap`
-        in `ContourLabels` for why that distinction matters.
+        """Return a napari `DirectLabelColormap` for the current color/alpha
+        state, syncing first if stale (see `_sync_nodes` - not free). Only
+        pays pydantic's per-color validation cost once per instance, though:
+        every mutator patches the cached object's `color_dict` in place
+        afterward instead of rebuilding it.
         """
+        self._sync_nodes()
         if self._direct_colormap is None:
             self._direct_colormap = DirectLabelColormap(
                 color_dict={
