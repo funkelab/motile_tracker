@@ -61,28 +61,12 @@ class TestCategoricalColorSource:
         assert not np.array_equal(colors[0], colors[1])
 
 
-class TestTrackColormapLaziness:
-    def test_set_tracks_does_not_eagerly_map_colors(self, solution_tracks_2d, monkeypatch):
-        # set_tracks() must be cheap: it just records which Tracks to derive
-        # colors from later, it does not call color_source.map() itself. The
-        # colormap.map() a categorical color source uses is a pure function of
-        # track id - it never needed to know which nodes exist - so there's no
-        # reason for set_tracks() to do that work before anyone asks for colors.
-        cmap = TrackColormap()
-        calls = []
-        monkeypatch.setattr(cmap.color_source, "map", lambda values: calls.append(values))
-
-        cmap.set_tracks(solution_tracks_2d)
-
-        assert calls == []
-
-    def test_set_alpha_skips_sync_when_not_dirty(self, solution_tracks_2d, monkeypatch):
+class TestTrackColormapSetAlpha:
+    def test_set_alpha_never_touches_node_colors(self, solution_tracks_2d, monkeypatch):
         # set_alpha is the hot path (fires on every selection/hover change);
-        # on the common case - nothing pending from set_tracks() - it must not
-        # pay for a node/color re-derivation it doesn't need.
+        # it must never call color_source.map() or otherwise recompute colors.
         cmap = TrackColormap()
         cmap.set_tracks(solution_tracks_2d)
-        cmap.to_direct_colormap()  # sync once, so nothing is dirty afterwards
 
         calls = []
         monkeypatch.setattr(cmap.color_source, "map", lambda values: calls.append(values))
@@ -91,20 +75,14 @@ class TestTrackColormapLaziness:
 
         assert calls == []
 
-    def test_set_alpha_syncs_first_if_a_set_tracks_call_is_pending(
+    def test_set_alpha_ignores_nodes_removed_by_a_later_set_tracks(
         self, solution_tracks_2d
     ):
-        # If set_tracks() was called (marking node/color state dirty) and
-        # set_alpha() runs before anything else triggers a sync, set_alpha
-        # must still operate against up-to-date node state - e.g. a node that
-        # was removed by the pending set_tracks() must not still accept an
-        # alpha update as if it still existed.
         cmap = TrackColormap()
         cmap.set_tracks(solution_tracks_2d)
-        cmap.to_direct_colormap()
 
-        cmap.set_tracks(_tracks_subset(solution_tracks_2d, [2, 3]))  # node 1 gone, dirty
-        cmap.set_alpha([1], 0.3)  # must not silently "work" against stale state
+        cmap.set_tracks(_tracks_subset(solution_tracks_2d, [2, 3]))  # node 1 removed
+        cmap.set_alpha([1], 0.3)  # must not silently "work" for a removed node
 
         assert cmap.get_alpha(1, default=None) is None
 
@@ -304,20 +282,18 @@ class TestTrackColormapFeatureKey:
 
 
 class TestTrackColormapDirectColormap:
-    def test_set_tracks_after_first_build_populates_same_object(self, solution_tracks_2d):
+    def test_set_tracks_before_any_build_still_populates_it(self, solution_tracks_2d):
         # to_direct_colormap() may be called before any tracks are set (e.g.
-        # right after construction); a later set_tracks() must still populate
-        # that already-built (initially empty) DirectLabelColormap in place,
-        # lazily, the next time to_direct_colormap() is called.
+        # right after construction, producing an empty colormap); a later
+        # set_tracks() must be reflected the next time it's called.
         cmap = TrackColormap()
-        direct_before = cmap.to_direct_colormap()
+        cmap.to_direct_colormap()
 
         cmap.set_tracks(solution_tracks_2d)
-        direct_after = cmap.to_direct_colormap()
+        direct = cmap.to_direct_colormap()
 
-        assert direct_before is direct_after
         for node in solution_tracks_2d.graph.node_ids():
-            assert node in direct_after.color_dict
+            assert node in direct.color_dict
 
     def test_produces_direct_colormap_with_all_nodes(self, solution_tracks_2d):
         cmap = TrackColormap()
@@ -336,85 +312,60 @@ class TestTrackColormapDirectColormap:
 
         assert np.array_equal(direct.color_dict[None], [0, 0, 0, 0])
 
-    def test_alpha_only_change_reuses_same_object(self, solution_tracks_2d):
+    def test_alpha_change_is_reflected(self, solution_tracks_2d):
         cmap = TrackColormap()
         cmap.set_tracks(solution_tracks_2d)
 
-        direct_before = cmap.to_direct_colormap()
         cmap.set_alpha([1], 0.2)
-        direct_after = cmap.to_direct_colormap()
+        direct = cmap.to_direct_colormap()
 
-        assert direct_before is direct_after
-        assert direct_after.color_dict[1][3] == 0.2
+        assert direct.color_dict[1][3] == 0.2
 
-    def test_recolor_patches_cached_colormap_in_place(self, solution_tracks_2d):
-        # Recoloring (via a new color_source + resync) must never force a full
-        # DirectLabelColormap rebuild - that would re-validate every entry via
-        # pydantic, not just the changed ones - so object identity is
-        # preserved and only the color values update.
+    def test_recolor_is_reflected(self, solution_tracks_2d):
         cmap = TrackColormap()
         cmap.set_tracks(solution_tracks_2d)
+        before_color = cmap.to_direct_colormap().color_dict[1][:3].copy()
 
-        direct_before = cmap.to_direct_colormap()
-        before_color = direct_before.color_dict[1][:3].copy()
         cmap.color_source.shuffle(num_colors=60, seed=0.9)
         cmap.set_tracks(solution_tracks_2d)
         direct_after = cmap.to_direct_colormap()
 
-        assert direct_before is direct_after
         assert not np.allclose(direct_after.color_dict[1][:3], before_color)
 
-    def test_new_node_patches_cached_colormap_in_place(self, solution_tracks_2d):
+    def test_new_node_is_reflected(self, solution_tracks_2d):
         cmap = TrackColormap()
         cmap.set_tracks(solution_tracks_2d)
 
-        direct_before = cmap.to_direct_colormap()
         cmap.add_node(999, 1)
-        direct_after = cmap.to_direct_colormap()
+        direct = cmap.to_direct_colormap()
 
-        assert direct_before is direct_after
-        assert 999 in direct_after.color_dict
+        assert 999 in direct.color_dict
 
-    def test_remove_node_patches_cached_colormap_in_place(self, solution_tracks_2d):
+    def test_removed_node_is_reflected(self, solution_tracks_2d):
         cmap = TrackColormap()
         cmap.set_tracks(solution_tracks_2d)
 
-        direct_before = cmap.to_direct_colormap()
         cmap.remove_node(1)
-        direct_after = cmap.to_direct_colormap()
+        direct = cmap.to_direct_colormap()
 
-        assert direct_before is direct_after
-        assert 1 not in direct_after.color_dict
+        assert 1 not in direct.color_dict
 
-    def test_set_tracks_patches_cached_colormap_in_place(self, solution_tracks_2d):
+    def test_set_tracks_drops_stale_entries(self, solution_tracks_2d):
         cmap = TrackColormap()
         cmap.set_tracks(solution_tracks_2d)
-        direct_before = cmap.to_direct_colormap()
-
-        # re-setting the same tracks (e.g. a refresh) should still reuse the object
-        cmap.set_tracks(solution_tracks_2d)
-        direct_after = cmap.to_direct_colormap()
-
-        assert direct_before is direct_after
-
-    def test_set_tracks_drops_stale_entries_from_cached_colormap(self, solution_tracks_2d):
-        cmap = TrackColormap()
-        cmap.set_tracks(solution_tracks_2d)
-        cmap.to_direct_colormap()
 
         cmap.set_tracks(_tracks_subset(solution_tracks_2d, [2, 3]))
-        direct_after = cmap.to_direct_colormap()
+        direct = cmap.to_direct_colormap()
 
-        assert 1 not in direct_after.color_dict
-        assert 2 in direct_after.color_dict
-        assert 3 in direct_after.color_dict
+        assert 1 not in direct.color_dict
+        assert 2 in direct.color_dict
+        assert 3 in direct.color_dict
 
-    def test_never_pays_pydantic_validation_after_first_build(self, solution_tracks_2d, monkeypatch):
+    def test_never_pays_pydantic_validation(self, solution_tracks_2d, monkeypatch):
+        # to_direct_colormap() must always use DirectLabelColormap.model_construct
+        # (which skips pydantic's per-color validation), never the normal
+        # constructor - not even on the first call.
         import motile_tracker.data_views.colormap as colormap_module
-
-        cmap = TrackColormap()
-        cmap.set_tracks(solution_tracks_2d)
-        cmap.to_direct_colormap()  # first build: validation is unavoidable here
 
         calls = []
         original_init = colormap_module.DirectLabelColormap.__init__
@@ -424,6 +375,9 @@ class TestTrackColormapDirectColormap:
             lambda self, *a, **k: (calls.append(1), original_init(self, *a, **k))[1],
         )
 
+        cmap = TrackColormap()
+        cmap.set_tracks(solution_tracks_2d)
+        cmap.to_direct_colormap()
         cmap.set_alpha([1], 0.2)
         cmap.add_node(999, 1)
         cmap.remove_node(2)
@@ -444,12 +398,10 @@ class TestTrackColormapDirectColormap:
 
         assert direct.color_dict[1][3] == 0.0
 
-    def test_empty_colormap_only_has_default_keys(self):
-        # napari's DirectLabelColormap always adds a `0` (background) entry
-        # alongside whatever default we provide via the `None` key.
+    def test_empty_colormap_has_default_key(self):
         cmap = TrackColormap()
         direct = cmap.to_direct_colormap()
-        assert set(direct.color_dict.keys()) == {None, 0}
+        assert set(direct.color_dict.keys()) == {None}
         assert np.array_equal(direct.color_dict[None], [0, 0, 0, 0])
 
 
@@ -474,4 +426,4 @@ class TestTrackColormapEmptyTracks:
 
         assert list(cmap.nodes) == []
         direct = cmap.to_direct_colormap()
-        assert set(direct.color_dict.keys()) == {None, 0}
+        assert set(direct.color_dict.keys()) == {None}

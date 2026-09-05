@@ -49,12 +49,13 @@ class TrackColormap:
     independently updatable state (unlike `DirectLabelColormap`, which
     conflates them in one `color_dict`).
 
-    `to_direct_colormap()` produces the napari colormap, patching an
-    already-built one in place rather than reconstructing it, so pydantic's
-    per-color validation is paid at most once per instance - see that method.
-    This replaces three copies of the same mutate-in-place-then-clear-cache
-    trick that used to live in `TrackLabels`, `custom_table_widget`, and
-    `ortho_views.py`.
+    `to_direct_colormap()` builds a fresh napari colormap on every call via
+    `DirectLabelColormap.model_construct`, which skips pydantic's per-color
+    validation entirely (the expensive part of a normal `DirectLabelColormap(
+    ...)` call) - see that method. This replaces three copies of a
+    mutate-in-place-then-clear-cache trick that used to live in `TrackLabels`,
+    `custom_table_widget`, and `ortho_views.py`, working around that
+    validation cost; with it gone, there's nothing left to work around.
 
     Color is a two-step composition, `node -> feature value -> RGB`:
     `feature_key` names the `Tracks` node attribute to read (default: the
@@ -66,16 +67,13 @@ class TrackColormap:
 
     There's no per-node color setter, since a node's color should always be a
     pure function of its feature value: recoloring happens by changing
-    `color_source` (e.g. `shuffle`) and letting the next sync pick it up.
-    `add_node` is the exception, for nodes that need a color before `Tracks`
-    knows about them.
+    `color_source` (e.g. `shuffle`) and calling `set_tracks()` again to
+    re-derive colors. `add_node` is the exception, for nodes that need a
+    color before `Tracks` knows about them.
 
-    The node/color join is lazy: `set_tracks()` only marks it stale - it does
-    not do the O(node count) recompute itself. That cost still has to be paid
-    by whichever accessor next needs current colors (see `_sync_nodes`); the
-    laziness just means `set_alpha`, the hot path (every selection/hover
-    change), skips it entirely when nothing is actually stale, instead of
-    paying it on every call regardless.
+    `set_tracks()` does the full O(node count) node/color recompute
+    immediately - not lazily. `set_alpha` never triggers it: it only ever
+    touches alpha, so the hot path (every selection/hover change) stays cheap.
     """
 
     def __init__(
@@ -84,10 +82,8 @@ class TrackColormap:
         self.color_source: ColorSource = color_source or CategoricalColorSource()
         self.feature_key = feature_key
         self._tracks: Tracks | None = None
-        self._nodes_dirty = True
         self._node_colors: dict[int, np.ndarray] = {}
         self._alpha: dict[int, float] = {}
-        self._direct_colormap: DirectLabelColormap | None = None
 
     def _feature_values(self, tracks: Tracks, nodes) -> list:
         key = self.feature_key or tracks.features.tracklet_key
@@ -101,30 +97,13 @@ class TrackColormap:
         return self.color_source.map(values)
 
     def set_tracks(self, tracks: Tracks | None) -> None:
-        """Point this colormap at a `Tracks` object.
-
-        This call itself is O(1) - it just stores the reference and marks
-        colors stale, it doesn't touch any nodes. The actual O(node count)
-        re-derivation happens later, in `_sync_nodes`, the first time an
-        accessor needs current colors. So it's fine to call this even when
-        nothing changed, but don't mistake that for the whole operation being
-        cheap - something downstream still pays for the resync.
+        """Point this colormap at a `Tracks` object and recompute node colors
+        from it immediately (O(node count) - color_source.map + one vectorized
+        feature lookup). Existing per-node alpha overrides for nodes that are
+        still present are preserved; overrides for removed nodes are dropped
+        and new nodes default to fully opaque.
         """
         self._tracks = tracks
-        self._nodes_dirty = True
-
-    def _sync_nodes(self) -> None:
-        """Recompute the node -> base color mapping from `self._tracks` if
-        `set_tracks` marked it stale since the last sync. O(node count) - not
-        cheap, just skipped when nothing is dirty. Existing per-node alpha
-        overrides for nodes that are still present are preserved; overrides
-        for removed nodes are dropped and new nodes default to fully opaque.
-        """
-        if not self._nodes_dirty:
-            return
-        self._nodes_dirty = False
-
-        tracks = self._tracks
         nodes = tracks.graph.node_ids() if tracks is not None else []
         values = self._feature_values(tracks, nodes) if tracks is not None else []
         if len(values) > 0:
@@ -138,67 +117,36 @@ class TrackColormap:
         self._alpha = {node: self._alpha.get(node, 1.0) for node in nodes}
         self._node_colors = colors
 
-        if self._direct_colormap is not None:
-            # Patch color_dict in place instead of reconstructing it.
-            color_dict = self._direct_colormap.color_dict
-            for stale_node in color_dict.keys() - colors.keys() - {None, 0}:
-                del color_dict[stale_node]
-            for node in colors:
-                color_dict[node] = self._colored(node)
-            self._direct_colormap._clear_cache()
-
     def add_node(self, node: int, feature_value) -> None:
         """Add a node not yet known to `self._tracks`, colored via
         `color_source.map(feature_value)`. Alpha defaults to opaque.
 
         `feature_value` must be passed in (rather than looked up via
-        `feature_key`, like `_sync_nodes` does) because callers need this
+        `feature_key`, like `set_tracks` does) because callers need this
         before the node exists in the `Tracks` graph - e.g.
         `TrackLabels._new_label`, previewing a color while painting.
         """
-        self._sync_nodes()
         color = self.color_source.map(np.asarray([feature_value]))[0]
         self._node_colors[node] = np.asarray(color, dtype=float).copy()
         self._alpha[node] = 1.0
-        if self._direct_colormap is not None:
-            self._direct_colormap.color_dict[node] = self._colored(node)
-            self._direct_colormap._clear_cache()
 
     def remove_node(self, node: int) -> None:
-        self._sync_nodes()
         self._node_colors.pop(node, None)
         self._alpha.pop(node, None)
-        if self._direct_colormap is not None:
-            self._direct_colormap.color_dict.pop(node, None)
-            self._direct_colormap._clear_cache()
 
     def set_alpha(self, nodes, value: float) -> None:
         """Set alpha for many nodes at once - the hot path, fired on every
-        selection/hover change. Syncs first so it never operates on a stale
-        node set; that sync is a no-op (cheap) unless a `set_tracks()` call
-        is actually pending, which is the overwhelmingly common case here.
+        selection/hover change. Only ever touches alpha, never node colors.
         """
-        self._sync_nodes()
-        color_dict = (
-            self._direct_colormap.color_dict if self._direct_colormap else None
-        )
-        changed = False
         for node in nodes:
             if node is not None and node in self._alpha:
                 self._alpha[node] = value
-                if color_dict is not None and node in color_dict:
-                    color_dict[node][3] = value
-                changed = True
-        if changed and self._direct_colormap is not None:
-            self._direct_colormap._clear_cache()
 
     def get_alpha(self, node: int, default: float = 0.0) -> float:
-        self._sync_nodes()
         return self._alpha.get(node, default)
 
     def get_color(self, node: int) -> np.ndarray | None:
         """RGBA (color + alpha) for a node, or None if unknown."""
-        self._sync_nodes()
         color = self._node_colors.get(node)
         if color is None:
             return None
@@ -212,7 +160,6 @@ class TrackColormap:
         consumers (e.g. the table widget) that need many colors at once
         without going through `to_direct_colormap()`.
         """
-        self._sync_nodes()
         transparent = np.zeros(4)
         return np.array(
             [
@@ -223,25 +170,26 @@ class TrackColormap:
 
     @property
     def nodes(self):
-        self._sync_nodes()
         return self._node_colors.keys()
 
     def to_direct_colormap(self) -> DirectLabelColormap:
-        """Return a napari `DirectLabelColormap` for the current color/alpha
-        state, syncing first if stale (see `_sync_nodes` - not free). Only
-        pays pydantic's per-color validation cost once per instance, though:
-        every mutator patches the cached object's `color_dict` in place
-        afterward instead of rebuilding it.
+        """Build a fresh napari `DirectLabelColormap` for the current
+        color/alpha state.
+
+        Uses `model_construct` instead of the normal constructor to skip
+        pydantic's per-color validation (`transform_color` on every entry) -
+        the ~400x-slower path for large graphs. Safe here because every value
+        we hand it is already a properly-shaped (4,) float array; napari's
+        validation exists for arbitrary user input (color names, 3-channel
+        colors, etc.), not for values built this way.
         """
-        self._sync_nodes()
-        if self._direct_colormap is None:
-            self._direct_colormap = DirectLabelColormap(
-                color_dict={
-                    **{node: self._colored(node) for node in self._node_colors},
-                    None: np.array([0, 0, 0, 0], dtype=float),
-                }
-            )
-        return self._direct_colormap
+        return DirectLabelColormap.model_construct(
+            color_dict={
+                **{node: self._colored(node) for node in self._node_colors},
+                None: np.array([0, 0, 0, 0], dtype=float),
+            },
+            colors=np.zeros(3),
+        )
 
     def _colored(self, node: int) -> np.ndarray:
         color = self._node_colors[node].copy()
