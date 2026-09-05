@@ -280,6 +280,24 @@ class TestTrackColormapFeatureKey:
         # and now nodes 3 and 4 (same track id, different area) should differ
         assert not np.array_equal(cmap.get_color(3), cmap.get_color(4))
 
+    def test_reassigning_feature_key_resyncs_colors(self, solution_tracks_2d):
+        cmap = TrackColormap()
+        cmap.set_tracks(solution_tracks_2d)
+        assert np.array_equal(cmap.get_color(3), cmap.get_color(4))  # by track id
+
+        cmap.feature_key = "area"
+
+        assert np.array_equal(cmap.get_color(4), cmap.get_color(5))  # now by area
+        assert not np.array_equal(cmap.get_color(3), cmap.get_color(4))
+
+    def test_reassigning_color_source_resyncs_colors(self, solution_tracks_2d):
+        cmap = TrackColormap()
+        cmap.set_tracks(solution_tracks_2d)
+
+        cmap.color_source = ConstantColorSource(color=(0.2, 0.4, 0.6, 1.0))
+
+        assert np.allclose(cmap.get_color(1)[:3], [0.2, 0.4, 0.6])
+
 
 class TestTrackColormapDirectColormap:
     def test_set_tracks_before_any_build_still_populates_it(self, solution_tracks_2d):

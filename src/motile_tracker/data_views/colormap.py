@@ -79,11 +79,44 @@ class TrackColormap:
     def __init__(
         self, color_source: ColorSource | None = None, feature_key: str | None = None
     ):
-        self.color_source: ColorSource = color_source or CategoricalColorSource()
-        self.feature_key = feature_key
+        self._color_source: ColorSource = color_source or CategoricalColorSource()
+        self._feature_key = feature_key
         self._tracks: Tracks | None = None
+        # Cache of node -> RGB, so get_color/get_colors/to_direct_colormap don't
+        # re-derive colors (color_source.map, feature lookup) on every call -
+        # only set_tracks/add_node touch color_source, everything else just reads
+        # this. Keys always match self._alpha's; kept as a separate dict from
+        # alpha (not one dict[node, RGBA]) so alpha-only updates (set_alpha, the
+        # hot path) never need to touch color values at all.
         self._node_colors: dict[int, np.ndarray] = {}
         self._alpha: dict[int, float] = {}
+
+    @property
+    def color_source(self) -> ColorSource:
+        return self._color_source
+
+    @color_source.setter
+    def color_source(self, color_source: ColorSource) -> None:
+        """Assigning a new `color_source` immediately re-derives node colors
+        from it (same cost as `set_tracks` - one vectorized `color_source.map`
+        call), so `_node_colors` never goes stale relative to it. Mutating the
+        current source in place (e.g. `.shuffle()`) doesn't go through this
+        setter - call `set_tracks` again afterward to pick up its new colors,
+        same as any other recolor.
+        """
+        self._color_source = color_source
+        self.set_tracks(self._tracks)
+
+    @property
+    def feature_key(self) -> str | None:
+        return self._feature_key
+
+    @feature_key.setter
+    def feature_key(self, feature_key: str | None) -> None:
+        """Assigning a new `feature_key` immediately re-derives node colors
+        from it (see `color_source` setter)."""
+        self._feature_key = feature_key
+        self.set_tracks(self._tracks)
 
     def _feature_values(self, tracks: Tracks, nodes) -> list:
         key = self.feature_key or tracks.features.tracklet_key
