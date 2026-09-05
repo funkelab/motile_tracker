@@ -307,9 +307,11 @@ class TrackLabels(ContourLabels):
     def _refresh(self):
         """Refresh the data in the labels layer"""
         self.data = self.tracks_viewer.tracks.segmentation
-        # Cheap (no recompute until the colormap is next asked for) - safe to call
-        # even when tracks_viewer already called this for the same Tracks object.
-        self.track_colormap.set_tracks(self.tracks_viewer.tracks)
+        # No set_tracks() here: TracksViewer._refresh already synced track_colormap
+        # before calling this, and the other caller (_on_paint's revert path) never
+        # changes the node/track-id set - it just undoes a rejected paint - so the
+        # cached colors are already correct. Just rebuild the napari-facing colormap
+        # from that cached state.
         self.colormap = self.track_colormap.to_direct_colormap()
         self.refresh()
 
